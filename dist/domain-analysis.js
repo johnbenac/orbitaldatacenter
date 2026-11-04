@@ -1,4 +1,5 @@
 // All quantities originate in the installed design, sizing envelope or time-resolved model.
+import {propulsionReview} from './spacecraft-architecture.js';
 import {aiPurposes} from './ai-purpose.js';
 import {purposeId,purposeInfo} from './purpose-display.js';
 import {sizingEnvelope,ageProperties} from './design.js';
@@ -306,6 +307,7 @@ export function environmentFlows({hardware:h,state:s}){
   F('Articulated surfaces','Relative flow','Projected ram area',open?s.ramAreaM2:null,'m²'),
   F('Relative flow','Spacecraft bus','Drag force',s.dragN,'N'),
   F('Pressure center','CMG cluster','Drag torque',s.dragTorqueNm,'N·m'),
+  F('Engine thrust line','CMG cluster','Torque from thrust offset',s.burn?propulsionReview(h,s.propellantKg).torqueNm:0,'N·m'),
   F('Sunlit surfaces','CMG cluster','Solar-pressure torque',s.solarTorqueNm,'N·m'),
   F('Mass distribution','CMG cluster','Gravity-gradient torque',s.gravityTorqueNm,'N·m'),
   F('Sun-facing cells','Regulated bus','Delivered generation',s.solarKW,'kW'),

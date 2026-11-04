@@ -1,4 +1,6 @@
 import {defaults,controls,presets,applyPreset,applyAIPurpose,missionStarter,missionStarterContextKeys,sizeDesign,inverseSolve,solveModes,enumeratePresets,estimateLife,checks,sources,assumptions,validateDesign,ageProperties,YEAR} from './design.js';
+import {renderArchitecture} from './architecture-view.js';
+import {renderEquipmentList,bindEquipmentList} from './equipment-list.js';
 import {createSimulation,modelNotes} from './model.js';
 import {impactOfChange,displaySetting} from './design-impact.js';
 import {helpButton,helpForElement,shortHint,helpBody,sourceGuideIndex} from './input-help-ui.js';
@@ -46,6 +48,7 @@ const solverKeys={workload:['trayCount','solarM2','radiatorM2','batteryKWh','sto
 function toast(msg){$('toast').textContent=msg;$('toast').classList.add('on');clearTimeout(toastId);toastId=setTimeout(()=>$('toast').classList.remove('on'),3400)}
 function liveDate(t){return new Date(Date.parse(input.epoch)+t*1000).toISOString().slice(0,19).replace('T',' ')+' UTC'}
 function starterContext(d){return Object.fromEntries(missionStarterContextKeys.map(k=>[k,d[k]]))}
+const referenceIds=['architecture','equipment','sources','checks'];
 function loadScenario(obj){
  if(obj?.schema!=='odc-scenario/1'||!obj.design||typeof obj.design!=='object')throw Error('Choose an Orbital Data Center scenario JSON or PDR package.');
  const h=sizeDesign(obj.design);if(h.errors.length)throw Error(h.errors[0]);
@@ -57,9 +60,9 @@ function loadScenario(obj){
   overlays:Array.isArray(v.overlays)?v.overlays.filter(x=>Object.hasOwn(overlayNames,x)):[],speed:[1,10,30,120,600].includes(v.speed)?v.speed:30,event:v.event&&typeof v.event.label==='string'&&Number.isFinite(v.event.start)&&Number.isFinite(v.event.end)?v.event:null,inspect:typeof v.inspect==='string'?v.inspect:null,
   chronological:!!v.chronological,tradeKey:Object.hasOwn(controlByKey,v.tradeKey)?v.tradeKey:null};
  if(v.tradeBase&&typeof v.tradeBase==='object'){const b=sizeDesign(v.tradeBase);if(!b.errors.length)view.tradeBase=b.input}
- referencePage=null;playing=false;initialChronology=!!v.chronological;
+ referencePage=referenceIds.includes(v.reference)?v.reference:null;playing=false;initialChronology=!!v.chronological;
 }
-function scenario(){return {schema:'odc-scenario/1',modelVersion:'7.0',design:input,view:{...view,cameraStates:scene?.getCameraState?.()||view.cameraStates,t:Math.round(view.t*1000)/1000}}}
+function scenario(){return {schema:'odc-scenario/1',modelVersion:'8.0',design:input,view:{...view,reference:referencePage,cameraStates:scene?.getCameraState?.()||view.cameraStates,t:Math.round(view.t*1000)/1000}}}
 try{if(location.hash.startsWith('#design=')){loadScenario(decodeScenario(location.hash.slice(8)));initialShared=true}}catch(e){toast(e.message)}
 if(!initialShared){
  const q=new URLSearchParams(location.search),domain=q.get('domain')||q.get('subsystem'),phase=(q.get('phase')||'').toUpperCase(),chapter=chapters.find(c=>c.id===q.get('chapter'));
@@ -94,7 +97,7 @@ function value(key,s=snap){return key[0]==='$'?hardware[key.slice(1)]:key[0]==='
 function hydrateIcons(root=document){root.querySelectorAll('[data-icon]').forEach(e=>{e.innerHTML=icon(e.dataset.icon,16)})}
 function setNav(){$('nav').innerHTML=domainNav(view,referencePage);$('home').onclick=e=>{e.preventDefault();goPage('conops');switchPhase('A')}}
 function goPage(k){clearTimeout(rebuildId);
- if(k==='sources'||k==='checks'){referencePage=k;playing=false}
+ if(referenceIds.includes(k)){referencePage=k;playing=false}
  else{const id=k==='overview'?'conops':k;if(!Object.hasOwn(domains,id))return;referencePage=null;view.domain=id;view.detail=false;view.inspect=null;view.tradeKey=null;
   if(['C','D','E'].includes(view.phase))view.camera=recommendedCamera(view.phase,id);}
  document.body.classList.remove('navshow');draw();window.scrollTo({top:0,behavior:'instant'});
@@ -171,7 +174,10 @@ function deploymentEvidence(){
  const rows=deploymentAudit.rows.map(x=>tr([esc(presetList.find(p=>p.id===x.id)?.name||x.id),fmt(x.minLeafGapM*1000,2),fmt(x.minSolarRadiatorGapM*1000,2),fmt(x.minHardwareGapM*1000,2),fmt(x.minCarriageGapM*1000,2)]));
  return '<section class="panel lowerpan">'+head('Deployment clearance','ruler','<span class="tag">BUILT-IN CONFIGURATIONS</span>')+'<div class="panelpad"><p>The four solar wings deploy first. The aft radiator clears the vehicle before the forward radiator moves. These rigid-body sweeps checked '+fmt(deploymentAudit.posesPerPreset,0)+' positions per preset, spaced '+fmt(deploymentAudit.stepSeconds,3)+' s apart. The numbers are minimum sampled gaps in millimetres. Flexure, manufacturing tolerances and custom designs require their own checks.</p></div>'+rowTable(['Preset','Any two leaves · mm','Solar to radiator · mm','Leaf to fixed hardware · mm','Carriage to other leaf · mm'],rows.join(''))+'<div class="panelpad"><h3>Suggested AI builds</h3><p>Reference geometry with each purpose’s suggested hardware, sampled at '+fmt(aiDeploymentAudit.posesPerPreset,0)+' positions. Signs indicate clearance (+) or overlap (−).</p></div>'+rowTable(['Purpose','Solar to radiator · mm','Fairing radial · m','Fairing axial · m'],aiDeploymentAudit.rows.map(x=>tr([esc(aiPurposes[x.id].label),fmt(x.minSolarRadiatorGapM*1000,2),plus(x.radialClearanceM),plus(x.axialClearanceM)])).join(''))+'</section>';
 }
-function references(){if(referencePage==='checks'){const list=[...checks(),...scenarioTests()],passed=list.filter(x=>x.pass).length;return '<section class="panel">'+head('Surface geometry audit','scan-line','<span class="tag">REFERENCE BUILD</span>')+'<div class="panelpad"><p>Triangle winding and vertex normals were compared in '+fmt(surfaceAudit.geometries)+' unique geometries across the spacecraft and launch assemblies. Each exterior wall and the reflector passed closed-volume and paired-edge checks.</p></div>'+rowTable(['Geometry check','Measured'],[['Triangles with checked orientation',fmt(surfaceAudit.checkedTriangles)],['Zero-area triangles',fmt(surfaceAudit.zeroAreaPoleTriangles)],['Closed wall panels',fmt(surfaceAudit.shellSides)],['Occupied wall penetrations',fmt(surfaceAudit.occupiedPorts)]].map(x=>tr(x)).join(''))+'</section>'+deploymentEvidence()+'<section class="panel lowerpan">'+head('Numerical verification','list-checks','<span class="tag '+(passed===list.length?'':'warn')+'">'+passed+' / '+list.length+' PASS</span>')+rowTable(['Group','Reference calculation','Expected','Computed','Unit','Result'],list.map(c=>tr([c.group,esc(c.name),fmt(c.expected,5),fmt(c.actual,5),esc(c.unit),'<span class="'+(c.pass?'checkpass':'checkfail')+'">'+(c.pass?'Pass':'Review')+'</span>'])).join(''))+'</section>'}
+function references(){
+ if(referencePage==='architecture')return renderArchitecture(hardware,snap);
+ if(referencePage==='equipment')return renderEquipmentList(hardware);
+ if(referencePage==='checks'){const list=[...checks(),...scenarioTests()],passed=list.filter(x=>x.pass).length;return '<section class="panel">'+head('Surface geometry audit','scan-line','<span class="tag">REFERENCE BUILD</span>')+'<div class="panelpad"><p>Triangle winding and vertex normals were compared in '+fmt(surfaceAudit.geometries)+' unique geometries across the spacecraft and launch assemblies. Each exterior wall and the reflector passed closed-volume and paired-edge checks.</p></div>'+rowTable(['Geometry check','Measured'],[['Triangles with checked orientation',fmt(surfaceAudit.checkedTriangles)],['Zero-area triangles',fmt(surfaceAudit.zeroAreaPoleTriangles)],['Closed wall panels',fmt(surfaceAudit.shellSides)],['Occupied wall penetrations',fmt(surfaceAudit.occupiedPorts)]].map(x=>tr(x)).join(''))+'</section>'+deploymentEvidence()+'<section class="panel lowerpan">'+head('Numerical verification','list-checks','<span class="tag '+(passed===list.length?'':'warn')+'">'+passed+' / '+list.length+' PASS</span>')+rowTable(['Group','Reference calculation','Expected','Computed','Unit','Result'],list.map(c=>tr([c.group,esc(c.name),fmt(c.expected,5),fmt(c.actual,5),esc(c.unit),'<span class="'+(c.pass?'checkpass':'checkfail')+'">'+(c.pass?'Pass':'Review')+'</span>'])).join(''))+'</section>'}
  const d=hardware.input;const ledgerExamples=[['Solar generation','1.361 × '+fmt(d.solarM2)+' m² × '+fmt(d.pvEfficiency,3)+' × '+fmt(d.solarDelivery,3)+' × incidence × sunlight × retention × deployment',fmt(snap.solarKW)+' kW'],['Data generation',fmt(snap.tokensPerSec)+' tok/s × '+fmt(d.bytesPerToken)+' B/tok × 8',fmt(snap.tokensPerSec*d.bytesPerToken*8/1e6,5)+' Mbit/s text'],['Dry + consumables + adapter',fmt(hardware.dryKg)+' + '+fmt(hardware.propellantKg)+' + '+fmt(hardware.pressurantKg)+' + '+fmt(d.adapterKg)+' kg',fmt(hardware.launchKg)+' kg'],['Drag force','½ × '+fmt(snap.densityKgM3,4)+' kg/m³ × '+fmt(snap.relativeSpeedMs)+'² × '+fmt(d.cd)+' × '+fmt(snap.ramAreaM2)+' m²',fmt(snap.dragN,6)+' N']];
  return sourceNote()+sourceGuideIndex()+'<section class="panel">'+head('Live calculation sheet','activity','<span class="metacode">'+time(view.t)+'</span>')+rowTable(['Balance','Substitution','Result'],ledgerExamples.map(r=>tr(r.map(esc))).join(''))+'</section><section class="panel lowerpan">'+head('Model boundaries and equations','book-open')+'<div class="panelpad">'+assumptions.map(a=>'<details><summary>'+esc(a.name)+'</summary><p class="eq">'+esc(a.equation)+'</p><p>'+esc(a.note)+'</p></details>').join('')+'<h3 class="gap">Numerical method</h3>'+modelNotes.map(n=>'<p>'+esc(n)+'</p>').join('')+'</div></section><section class="panel lowerpan">'+head('Reference library','book-open','<span class="metacode">04 NOV 2026</span>')+'<div class="panelpad sourcegrid">'+sources.map(s=>'<a class="sourcecard" data-tip="Open the cited engineering reference in a new tab." href="'+esc(s.url)+'" target="_blank" rel="noopener">'+icon('square-arrow-out-up-right',14)+'<span><strong>'+esc(s.name)+'</strong><small>'+esc(s.note)+'</small></span></a>').join('')+'</div></section>';
 }
@@ -189,7 +195,7 @@ function draw(){
  $('study').hidden=true;$('kpis').hidden=true;$('timeline').hidden=!detailed;$('lower').hidden=!detailed;
  $('phase-extras').hidden=!!ref;$('phase-extras').innerHTML='';$('subsystem').innerHTML='';$('trade-input').hidden=!c;$('trade-output').hidden=!c;
  $('disposal-plot').hidden=!!ref||p!=='F';$('domain-readout').hidden=!!ref||p==='B';
- if(ref){$('subsystem').innerHTML=references();return}
+ if(ref){$('pagecode').textContent=['architecture','equipment'].includes(ref)?'SPACECRAFT BASELINE  /  ODC–01':'ENGINEERING REFERENCE';const panel=$('subsystem');panel.innerHTML=references();if(ref==='equipment')bindEquipmentList(panel,hardware);return}
  if(a){$('presetshelf').innerHTML=presetShelf(view,loadedPresets,hardware);$('phase-content').innerHTML=phaseA(hardware,view,result,k=>inputRow(k,false,'concept'));$('phase-extras').innerHTML=phaseHandoff('B',id)+sourceNote()}
  if(b){$('system-choice').innerHTML=designSection();renderDiagram();$('engineering-toggle').innerHTML=diagramTools();$('phase-extras').innerHTML=phaseHandoff('C',id)}
  if(visual){
@@ -198,6 +204,11 @@ function draw(){
   if(flight){$('missionpath').innerHTML=flightChapters(view);$('storyextras').innerHTML=flightPlayer();if(p==='F'){renderDisposal();$('phase-extras').innerHTML='<button class="btn export gap" data-action="pdr">Prepare quantitative PDR</button>'}else $('phase-extras').innerHTML=phaseHandoff(p==='D'?'E':'F',id)}
  }
  if(!b)$('domain-readout').innerHTML=renderDomainReadout(id,p,currentContext());
+ if(id==='prop'||id==='mass'){
+  const related=id==='prop'?'architecture':'equipment',label=pages[related][0];
+  const hold=id==='prop'&&snap.burnHold?'<p class="arch-hold"><strong>Chemical burn held.</strong> '+esc(snap.burnHold)+'</p>':'';
+  $('phase-extras').insertAdjacentHTML('afterbegin','<div class="baseline-link">'+hold+'<button class="btn" data-page="'+related+'">'+icon(id==='prop'?'box':'list-checks',14)+esc(label)+'</button></div>');
+ }
  if(detailed){kpis();drawStudy();timeline();lower()}
 }
 function serviceFor(model,start){
@@ -468,6 +479,7 @@ document.addEventListener('click',async e=>{const el=e.target.closest('button,[d
  if(el.dataset.provisionPurpose){usePurpose(el.dataset.provisionPurpose,true);return}
  if(el.dataset.studyPurpose){comparePurposes(el.dataset.studyPurpose);return}
  if(el.dataset.artifactCase){if(isEditable(view.phase))open('Model return budget',transferDesk(hardware,el.dataset.artifactCase==='trillion'),'ai-transfer');return}
+ if(el.dataset.inspectBay){view.domain='prop';switchPhase('C');return}
  if(el.dataset.domain){goPage(el.dataset.domain);return}
  if(el.dataset.disposalMethod){if(view.phase==='A')changeParam('disposalMethod',el.dataset.disposalMethod,true);return}
  if(el.dataset.presetDownload){const p=loadedPresets.find(x=>x.id===el.dataset.presetDownload);if(p)presetDownload(p);return}
@@ -717,8 +729,8 @@ recalc();if(!initialShared){
  const q=new URLSearchParams(location.search),t=q.has('met')?Number(q.get('met')):NaN,stage=sim.story(view.chapter);
  view.t=Number.isFinite(t)?clamp(t,-3600,sim.duration):view.phase==='D'?stage.start:view.phase==='F'?stage.start:stage.instant??3438;
  view.start=dayStart(view.t);refreshSamples();snap=sim.at(view.t);
- if(['sources','checks'].includes(q.get('reference')))referencePage=q.get('reference');
+ if(referenceIds.includes(q.get('reference')))referencePage=q.get('reference');
 }
-playing=view.phase==='E'&&!matchMedia('(prefers-reduced-motion: reduce)').matches;lastTick=performance.now();draw();import('./scene.js').then(({createScene})=>{scene=createScene($('scene'),{onPick:inspect,onThermalScale:id=>{view.thermalScale=id},onHover:(id,x,y,row)=>help.component(id,x,y,row)});scene.setDomain?.(view.domain,view.phase);scene.setChapter?.(view.chapter);if(view.phase==='F')scene.setDisposalPlan?.(sim.disposal());scene.setView(view.camera);scene.setThermalScale?.(view.thermalScale);if(view.cameraStates)scene.setCameraState?.(view.cameraStates);scene.update(hardware,snap);scene.setOverlays(effectiveLayers());scene.highlight(view.inspect||'')}).catch(err=>{console.error(err);$('scene').textContent='The 3D renderer could not start. The engineering workspaces remain available.'});requestAnimationFrame(tick);if(view.phase==='E')prepareFlight();else if(view.phase==='F')prepareCloseout();else if(initialShared&&initialChronology)fullAudit();
+playing=!referencePage&&view.phase==='E'&&!matchMedia('(prefers-reduced-motion: reduce)').matches;lastTick=performance.now();draw();import('./scene.js').then(({createScene})=>{scene=createScene($('scene'),{onPick:inspect,onThermalScale:id=>{view.thermalScale=id},onHover:(id,x,y,row)=>help.component(id,x,y,row)});scene.setDomain?.(view.domain,view.phase);scene.setChapter?.(view.chapter);if(view.phase==='F')scene.setDisposalPlan?.(sim.disposal());scene.setView(view.camera);scene.setThermalScale?.(view.thermalScale);if(view.cameraStates)scene.setCameraState?.(view.cameraStates);scene.update(hardware,snap);scene.setOverlays(effectiveLayers());scene.highlight(view.inspect||'')}).catch(err=>{console.error(err);$('scene').textContent='The 3D renderer could not start. The engineering workspaces remain available.'});requestAnimationFrame(tick);if(!referencePage&&view.phase==='E')prepareFlight();else if(!referencePage&&view.phase==='F')prepareCloseout();else if(initialShared&&initialChronology)fullAudit();
 
 if(!initialShared&&view.phase==='A'){const field=new URLSearchParams(location.search).get('field');if(Object.hasOwn(controlByKey,field))openFieldGuide(field)}

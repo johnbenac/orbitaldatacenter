@@ -173,19 +173,31 @@ function attitude({h,d,s},id){
 }
 
 function prop({h,d,s},id){
- const parts=[
- P('fuel','Fuel vessel','The fuel inventory falls with burn impulse. The cutaway encodes liquid volume fraction in a pressure-fed microgravity tank.','propellantKg','propellant',[row('Fuel mass',val(s.fuelKg,'kg')),row('Liquid volume',val(s.fuelKg/d.fuelDensity,'L')),row('Initial fuel',val(h.fuelKg,'kg')),row('Density',val(d.fuelDensity,'kg/L',3))]),
- P('oxidizer','Oxidizer vessel','The second vessel supplies oxidizer at the selected engine mixture ratio. The tanks retain separate liquid masses.','mixtureRatio','propellant',[row('Oxidizer mass',val(s.oxidizerKg,'kg')),row('Liquid volume',val(s.oxidizerKg/d.oxidizerDensity,'L')),row('Initial oxidizer',val(h.oxidizerKg,'kg')),row('Oxidizer / fuel',num(d.mixtureRatio,3))]),
- P('engine','Paired engines','The feed manifold supplies two pressure-fed engines. Only a scheduled chemical burn draws propellant.','engine','propulsion',[row('Engine package',tech(d,'engine')),row('Total thrust',val(d.thrustN,'N')),row('Delivered Isp',val(d.isp,'s')),row('Integrated impulse',val(s.burnImpulseNs,'N·s',0))]),
- P('disposal','End-of-mission supply','Maintenance reserves propellant for disposal. Final retrograde thrust targets the selected perigee and a descending atmospheric interface.','disposalTargetPerigeeKm','propellant',[row('Disposal state',s.disposalStatus||'Scheduled'),row('Protected inventory',val(s.disposalProtectedKg,'kg')),row('Disposal target',val(s.disposalTargetPerigeeKm,'km')),row('Disposal used',val(s.disposalUsedKg,'kg'))])];
- function tank(x,label,kg,p,halfWidth,col){const r=halfWidth,y=71,hgt=74,level=frac(s.tankFillPct/100),cid=id+'-'+p.id;
-  return pick(p,x-r-12,48,r*2+24,140,`<defs><clipPath id="${cid}"><rect x="${x-r}" y="${y}" width="${r*2}" height="${hgt}" rx="${r*.75}"/></clipPath></defs>`+rect(x-r,y,2*r,hgt,'sd-tank',r*.75)+`<rect x="${x-r}" y="${y+hgt*(1-level)}" width="${2*r}" height="${level*hgt}" class="sd-fill-${col}" clip-path="url(#${cid})"/>`+
- path(`M${x-r} ${y+hgt*.48}H${x+r}m${-r-4} ${hgt*.52}v6h8v-6`,'sd-tankline')+named(x,175,label,val(kg,'kg')));}
- const art=tank(105,'Fuel',s.fuelKg,parts[0],26,'amber')+tank(230,'Oxidizer',s.oxidizerKg,parts[1],31,'cyan')+T(164,39,'PRESSURIZED INVENTORY','sd-over')+
- flow(id,'M108 151v5h184v-49h97','amber',s.burn)+flow(id,'M232 151v-7h48V92h109','cyan',s.burn)+
- pick(parts[2],373,49,146,111,glyph('engine',419,90,.70)+glyph('engine',463,90,.70)+named(443,139,'Engine pair',s.burn?val(d.thrustN,'N'):'Valves closed'))+
- pick(parts[3],316,184,232,48,rect(318,188,228,41,'sd-reserve',5)+T(330,205,'DISPOSAL ALLOCATION','sd-over','start')+T(330,222,val(s.disposalProtectedKg,'kg protected'),'sd-value','start'));
- return info('Propellant feed system','Inventory, mixture ratio and protected disposal allocation',parts,art,[legend('amber','Fuel'),legend('cyan','Oxidizer'),legend('violet','Protected reserve')],s.burn?(s.burnKind||'chemical')+' burn':'Valves closed');
+ const model=h.propulsion;
+ const parts=model.tanks.filter(t=>t.id!=='helium').map(t=>{
+  const fuel=t.id==='fuel',density=d[t.id+'Density'],kg=s[t.id+'Kg'];
+  return P(t.id,fuel?'Fuel vessel':'Oxidizer vessel','An internal spherical vessel supplies its own isolated liquid circuit. The inventory glyph represents occupied volume in microgravity.',fuel?'propellantKg':'mixtureRatio','propellant',[
+   row('Remaining',val(kg,'kg')),row('Tank internal volume',val(t.volumeL,'L')),row('Liquid volume',val(kg/density,'L')),row('Occupied volume',val(100*kg/density/t.volumeL,'%'))]);
+ });
+ const he=model.tanks.find(t=>t.id==='helium');
+ parts.push(P('pressure','Pressurant and regulator','A separate helium bottle feeds a regulator. A check valve on each gas branch isolates the two tank ullages.',null,'propellant',[row('Helium load',val(h.pressurantKg,'kg',3)),row('Bottle volume',val(he.volumeL,'L',2)),row('Charge / feed pressure',val(model.bottlePa/1e5,'bar')+' / '+val(model.feedPa/1e5,'bar'))]),
+  P('engine','Twin thrust chambers','Separate filtered liquid feeds meet at each engine injector. Two parallel engines mounted on the thrust deck fire together along the body +Y axis.','engine','propulsion',[row('Engine package',tech(d,'engine')),row('Operating thrust',val(d.thrustN,'N')),row('Delivered Isp',val(d.isp,'s')),row('Integrated impulse',val(s.burnImpulseNs,'N·s',0))]),
+  P('disposal','Disposal allocation','The disposal ledger reserves liquid for the selected terminal maneuver.','disposalDv','propellant',[row('Disposal state',s.disposalStatus||'Scheduled'),row('Protected inventory',val(s.disposalProtectedKg,'kg')),row('Disposal used',val(s.disposalUsedKg,'kg'))]));
+ const tank=(x,i,col)=>{
+  const t=model.tanks.find(t=>t.id===parts[i].id),kg=s[t.id+'Kg'],r=25,fill=Math.cbrt(frac(kg/d[t.id+'Density']/t.volumeL));
+  return pick(parts[i],x-35,92,70,99,circle(x,120,r,'sd-tank')+circle(x,120,r*fill,'sd-fill-'+col)+path('M'+(x-r*.75)+' 132h'+r*1.5,'sd-tankline')+named(x,167,i?'Oxidizer':'Fuel',val(kg,'kg')));
+ };
+ const valve=(x,y)=>path(`M${x-6} ${y-4}l12 8v-8l-12 8z`,'sd-metal');
+ const art=path('M22 27H444V198H22Z','sd-boundary')+T(34,44,'INTERNAL PROPULSION BAY','sd-over','start')+
+ pick(parts[2],41,53,121,107,circle(83,92,20,'sd-tank')+T(83,97,'He','sd-name')+named(90,138,'Helium bottle',val(h.pressurantKg,'kg',2)))+
+ flow(id,'M104 92h26V66h72','steel',s.burn)+valve(160,66)+T(159,53,'REGULATOR','sd-over')+
+ path('M202 66h115v28m-115-28v28','sd-wire sd-steel')+valve(202,83)+valve(317,83)+tank(202,0,'amber')+tank(317,1,'cyan')+
+ flow(id,'M227 120v-20h155v-27h147v23','amber',s.burn)+flow(id,'M478 73v23','amber',s.burn)+
+ flow(id,'M342 120h55V84h144v12','cyan',s.burn)+flow(id,'M490 84v12','cyan',s.burn)+
+ T(393,146,'ISOLATION','sd-over')+T(393,162,'+ FILTERS','sd-over')+valve(367,100)+valve(367,120)+
+ pick(parts[3],461,97,105,91,glyph('engine',484,111,.70)+glyph('engine',535,111,.70)+named(509,160,'Thrust deck',s.burn?val(d.thrustN,'N'):'Valves closed'))+
+ pick(parts[4],296,204,274,39,rect(298,207,269,32,'sd-reserve',5)+T(311,226,'Disposal allocation','sd-name','start')+T(554,226,val(s.disposalProtectedKg,'kg'),'sd-value','end'));
+ return info('Pressure-fed bipropellant system','Separate liquid paths from internal vessels to the twin engines',parts,art,[legend('steel','Regulated helium'),legend('amber','Fuel'),legend('cyan','Oxidizer')],s.burn?(s.burnKind||'Chemical')+' burn':'Valves closed');
 }
 
 function mass({h,s},id){

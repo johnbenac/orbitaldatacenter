@@ -45,10 +45,10 @@ globalThis.setTimeout=(handler,ms,...args)=>{const t=originalTimer(handler,ms,..
 const t=sim.story('contact').instant,view={page:'overview',chapter:'contact',camera:'spacecraft',preset:'reference',t,start:0,event:sim.story('contact')};
 exported=await makePacket({scenario:{schema:'odc-scenario/1',modelVersion:'2',design:study,view},hardware:hw,sim,result:inverseSolve(study),snap:sim.at(t),day:sim.daySummary(0),events:sim.events(0,86400),audit});
 const zip=await JSZip.loadAsync(await exported.arrayBuffer());
-for(const file of ['design/launch-vehicle.json','design/fairing-fit.csv','design/fairing-stations.csv','design/stowed-stack.csv','design/enclosure-walls.csv','operations/chapter-samples.csv','operations/selected-story.json','operations/disposal.json','PDR.html'])assert.ok(zip.file(file),file);
+for(const file of ['design/master-equipment-list.csv','design/mass-rollup.json','propulsion/geometric-screens.csv','propulsion/depletion-mass-properties.csv','propulsion/tank-installation.csv','propulsion/engine-stations.csv','design/launch-vehicle.json','design/fairing-fit.csv','design/fairing-stations.csv','design/stowed-stack.csv','design/enclosure-walls.csv','operations/chapter-samples.csv','operations/selected-story.json','operations/disposal.json','PDR.html'])assert.ok(zip.file(file),file);
 const carrier=JSON.parse(await zip.file('design/launch-vehicle.json').async('text'));
 assert.equal(carrier.selection,hw.input.launcher);assert.equal(carrier.reference.referenceKg,hw.input.referenceKg);
 near(carrier.limitingMassScreenKg,hw.launchScreenMarginKg);assert.ok(carrier.reference.sourceUrl.startsWith('https://'));
 const metadata=JSON.parse(await zip.file('operations/selected-story.json').async('text'));assert.equal(metadata.chapter,'contact');assert.equal(metadata.elapsedSeconds,t);
-const report=await zip.file('PDR.html').async('text');assert.ok(report.includes('Global')||report.includes('Stowed payload clearance'));assert.ok(report.includes('Enclosure and heat transfer'));
+const report=await zip.file('PDR.html').async('text');assert.ok(report.includes('Global')||report.includes('Stowed payload clearance'));assert.ok(report.includes('Enclosure and heat transfer'));assert.ok(report.includes('Master equipment list'));near(JSON.parse(await zip.file('design/mass-rollup.json').async('text')).launchKg,hw.launchKg);
 console.log('Ten fairing presets, taper and motion allowances, six wall masses, signed shell heat balance, flight thermal channel, disposal allocation and generated quantitative PDR ZIP passed.');

@@ -14,7 +14,7 @@ const off=createSimulation({...d,duty:0,idleComputePolicy:'off',pumpStandbyPolic
 const powerless=createSimulation({...d,solarM2:5,batteryKWh:1,socInitial:d.socMin});
 let unserved=powerless.window(1200,DAY,450).find(s=>s.eclipse&&s.unmetKW>.1&&s.itKW<.001);assert.ok(unserved);assert.equal(unserved.thermalQualification.find(x=>x.id==='junction').state,'survival');assert.equal(unserved.thermalQualification.find(x=>x.id==='coolant').state,'survival');assert.equal(unserved.thermalQualification.find(x=>x.id==='enclosure').state,'operating');
 const end=m.at(m.duration);assert.ok(end.thermalQualification.every(r=>r.status==='unassessed'));
-const cut=m.at(m.disposal().cutoff);assert.equal(cut.thermalQualification.find(r=>r.id==='radiator').state,'survival');assert.equal(cut.thermalQualification.find(r=>r.id==='enclosure').state,'operating');
+const cut=m.at(m.disposal().cutoff);assert.equal(cut.deployment,1);assert.equal(cut.thermalQualification.find(r=>r.id==='radiator').state,'operating');assert.equal(cut.thermalQualification.find(r=>r.id==='enclosure').state,'operating');
 const w=m.thermalWindow(0,m.duration),result=chronologicalAudit(d).result,audit=result.thermal;
 assert.equal(result.firstCrossing.id,'battery');near(result.firstCrossing.time,w.firstViolation.time,.1);near(result.thermalQualifiedUntilS,w.firstViolation.time,.1);near(w.coveredSeconds,result.finalState.spacecraftModelEndedAt,1e-5);
 for(const n of thermalNodes){

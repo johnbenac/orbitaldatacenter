@@ -1,0 +1,62 @@
+import {icon} from './icons.js';
+import {propulsionSectionDrawing} from './propulsion-drawing.js';
+import {propulsionReview} from './spacecraft-architecture.js';
+
+export const vehicleBaseline='ODC-01 / Rev B';
+const number=(v,d=2)=>Number.isFinite(v)?v.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:d}):'—';
+const esc=v=>String(v).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;');
+const rule=(id,scope,fixed,variable)=>({id,scope,fixed,variable});
+export const groundRules=Object.freeze([
+ rule('SC-01','Structure','One continuous six-sided insulated bus. The compute accommodation and the internal propulsion bay share a primary structure.','Bus dimensions, wall mass, shielding and equipment accommodation.'),
+ rule('SC-02','Power','Four hinged solar wings extend to port and starboard (±X). Three leaves unfold per wing. Batteries sit inside the enclosure.','Cell technology, wing area, battery chemistry and installed energy.'),
+ rule('SC-03','Thermal','Two independent, double-sided, three-leaf radiator banks extend fore and aft (±Z). Cold plates and pumped supply and return lines connect the payload to the banks.','Radiator area, coating, heat load, transport resistance and pump draw.'),
+ rule('SC-04','Compute and data','Two internal equipment rack locations share the enclosure, recorder, avionics and data connections.','Accelerator and host population, storage capacity, network throughput and power.'),
+ rule('SC-05','Propulsion','Two internal liquid tanks, one helium bottle and two pressure-fed engines. Both engines fire through the −Y deck. Net nominal thrust points toward +Y.','Tank volumes, load, mixture ratio, selected engine performance and burn duration.'),
+ rule('SC-06','Pointing and communications','Four CMGs, three magnetic torquer axes, two S-band patches, one steerable Ka-band reflector and one optical terminal.','Momentum capacity, magnetic dipole, dish and aperture size, link choice and pointing demand.'),
+ rule('SC-07','Deployment and burns','The four wings deploy first, followed by the two radiator banks in sequence. Chemical burns require deployed and locked appendages.','Deployment clearances, thrust alignment and burn feasibility for the sized vehicle.')
+].map(Object.freeze));
+const precedents=[
+ ['Boeing 702','Internal tank cavity and separate thrust face','The DIRECTV spacecraft filing describes four propellant tanks and two helium tanks in the bus cavity. Its main thruster and several smaller thrusters occupy the aft face. ODC adopts that separation with a two-liquid-tank bay.','FCC filing · spacecraft bus §13','https://fcc.report/IBFS/SAT-LOA-20040909-00168/421284.pdf'],
+ ['Lockheed Martin A2100 / GOES-R','A complete pressure-fed circuit','NOAA’s schematic traces helium storage, regulation and isolation, separate liquid inventories, filters and engine valves. ODC uses this feed arrangement for two main engines. GOES-R itself used multiple thruster families.','NOAA · GOES-R Series Data Book, fig. 13-1','https://www.ospo.noaa.gov/resources/documents/GOES-RSeriesDataBook.pdf'],
+ ['ESA Artemis','Propulsion and thermal faces','Artemis placed tanks, the apogee engine and most of its plumbing in a central propulsion module. Its north and south panels provided the principal thermal radiation surfaces. ODC assigns its deployable radiators a different axis from the exhaust.','ESA Bulletin 91 · Satellite Platform','https://www.esa.int/esapub/bulletin/bullet91/b91dick.htm']
+];
+const action=(attr,label,ic)=>`<button class="btn" ${attr}>${icon(ic,14)}${label}</button>`;
+const vector=p=>p.map(x=>number(x,3)).join(' / ');
+
+export function architectureReadings(h,remaining=h.propellantKg){
+ const p=propulsionReview(h,remaining);
+ return [
+  ['Tank installation margin',p.tankMarginM,'m'],
+  ['Radiator to plume margin',p.radiatorMarginM,'m'],
+  ['Solar wing to plume margin',p.wingMarginM,'m'],
+  ['Assumed plume half-angle',p.plumeHalfAngleDeg,'deg'],
+  ['Thrust-line miss distance',p.missM,'m'],
+  ['Residual burn torque',p.torqueNm,'N·m'],
+  ['Angle from thrust axis to CM',p.alignmentDeg,'deg'],
+  ['Alignment screen limit',p.alignmentLimitDeg,'deg']
+ ].map(([quantity,value,unit])=>({quantity,value,unit}));
+}
+
+export function renderArchitecture(h,s){
+ const remaining=s?.propellantKg??h.propellantKg;
+ const p=propulsionReview(h,remaining);
+ const conditions=[['Loaded on orbit',h.propellantKg],['Selected instant',remaining],['Trapped residual',h.propellantKg*h.input.residualFraction]];
+ const measurements=architectureReadings(h,remaining);
+ const pressure=h.propulsion;
+ const fluidNames=h.input.engine==='aero'?['Aerozine-50','NTO','Helium']:['MMH','MON-3','Helium'];
+ const tanks=pressure.tanks.map((t,i)=>[fluidNames[i],number(t.volumeL,2)+' L',number(2*t.radiusM,3)+' m',i<2?number(100*h.input.tankFill,1)+'% liquid':'Compressed gas',i<2?number(pressure.feedPa/1e6)+' MPa':number(pressure.bottlePa/1e6)+' MPa']);
+ const fixed=groundRules.map(r=>`<tr><td><small>${r.id}</small><strong>${r.scope}</strong></td><td>${r.fixed}</td><td>${r.variable}</td></tr>`).join('');
+ const row=(cells)=>'<tr>'+cells.map(v=>'<td>'+v+'</td>').join('')+'</tr>';
+ return `<div class="arch-sheet">
+ <section class="arch-lead panel"><div><span class="arch-index">VEHICLE DEFINITION &nbsp; / &nbsp; REV B</span><h2>One bus, three distinct axes</h2><p>Solar wings extend along ±X. Radiators unfold along ±Z. Two engines exhaust through the −Y deck, below the internal tank bay. Every customer mission uses this layout.</p></div><div class="arch-actions">${action('data-inspect-bay="true"','Inspect propulsion in 3D','box')}${action('data-page="equipment"','Master equipment list','list-checks')}</div></section>
+ <section class="panel arch-figure"><div class="panelhead"><h2>${icon('fuel',16)} Propulsion bay section</h2><span class="arch-stamp">CURRENT BUILD</span></div>${propulsionSectionDrawing(h,s)}<div class="arch-strip"><span>Bus, X × Y × Z <b>${number(h.bodyWidthM)} × ${number(h.bodyHeightM)} × ${number(h.bodyLengthM)} m</b></span><span>Launch propellant <b>${number(h.propellantKg)} kg</b></span><span>Combined thrust <b>${number(h.input.thrustN)} N</b></span></div></section>
+ <section class="panel"><div class="panelhead"><h2>${icon('list-checks',16)} Ground rules and assumptions</h2><span class="arch-stamp">FIXED BASELINE</span></div><div class="arch-scroll" tabindex="0" aria-label="Ground rules table"><table class="arch-table"><thead><tr><th>Subsystem</th><th>Fixed spacecraft architecture</th><th>What a study can size or select</th></tr></thead><tbody>${fixed}</tbody></table></div></section>
+ <section class="panel"><div class="panelhead"><h2>${icon('fuel',16)} Pressure and propellant feed</h2><span class="arch-stamp">PRESSURE-FED BIPROPELLANT</span></div><div class="arch-pad"><p>Helium passes through the regulator and independent check valves into the gas space in each liquid tank. Separate fuel and oxidizer circuits feed the two injectors through isolation valves, filters and manifolds. Propellant management devices keep the liquid outlets supplied in microgravity.</p></div>
+ <div class="arch-scroll" tabindex="0" aria-label="Internal vessel sizing"><table class="arch-table"><thead><tr><th>Vessel</th><th>Internal volume</th><th>Installed diameter</th><th>At launch</th><th>Initial pressure, absolute</th></tr></thead><tbody>${tanks.map(row).join('')}</tbody></table></div><div class="arch-pad"><p class="arch-method">Vessels use a spherical envelope. The regulator holds the ullages at ${number(pressure.feedPa/1e6)} MPa. At the selected instant, modeled bottle pressure is ${number(p.bottlePressureMPa)} MPa. The sizing calculation assumes ideal helium at ${number(pressure.temperatureK)} K.</p><a href="https://www.space-propulsion.com/spacecraft-propulsion/apogee-motors/" target="_blank" rel="noopener">ArianeGroup S400 apogee motor family ↗</a></div></section>
+ <section class="panel"><div class="panelhead"><h2>${icon('crosshair',16)} Thrust alignment and clearance</h2><span class="arch-stamp">PRELIMINARY SCREEN</span></div><div class="arch-pad"><p>Each engine delivers half the selected thrust. The two thrust vectors add through the midpoint of the nozzle pair. The check uses the sized vehicle and its mass distribution to calculate the offset from the fixed thrust line and its resulting torque.</p>
+ <div class="arch-verdict ${p.clear?'':'inspect'}"><strong>${p.clear?'Geometry and alignment screens pass':'Geometry or alignment requires review'}</strong><span>${p.engineRangeOK?'MMH engine pair within the reference thrust and mixture range.':'Engine sizing is outside the MMH reference thrust or mixture range, or uses a different chemistry.'}</span></div>
+ <div class="arch-metrics">${measurements.map(m=>`<div><small>${m.quantity}</small><strong>${number(m.value,4)} <em>${m.unit}</em></strong></div>`).join('')}</div>
+ <div class="arch-scroll" tabindex="0" aria-label="Mass properties at three propellant loads"><table class="arch-table"><thead><tr><th>Deployed mass case</th><th>Propellant</th><th>Center of mass X / Y / Z</th><th>Off-axis angle</th><th>Residual torque</th></tr></thead><tbody>${conditions.map(([l,m])=>{const a=propulsionReview(h,m);return row([l,number(m)+' kg',vector(a.cm)+' m',number(a.alignmentDeg,3)+'°',number(a.torqueNm,3)+' N·m'])}).join('')}</tbody></table></div>
+ <p class="arch-method">Body coordinates are measured from the bus center. The packed launch center of mass is ${vector(p.stowedCM)} m. The clearance screen uses a ${p.plumeHalfAngleDeg}° cone plus a ${p.alignmentLimitDeg}° angular allowance. Positive clearance indicates separation. The burn sequencer holds the configured wing angle while the spacecraft turns its +Y axis toward the maneuver direction. The torque screen compares the offset load with ${number(h.input.cmgTorqueNm)} N·m of installed CMG torque. Plume spread, backflow, surface heating and contamination require engine-specific analysis. Mass properties use preliminary equipment allocations.</p><a href="https://standards.nasa.gov/system/files/tmp/JSC-67723_Propulsion_Standard_Basic_Final%20%281%29_0.pdf" target="_blank" rel="noopener">NASA JSC-67723 · plume effects, §3.1.8 ↗</a></div></section>
+ <section class="panel"><div class="panelhead"><h2>${icon('book-open',16)} Flight design references</h2></div><div class="arch-sources">${precedents.map(([bus,topic,desc,label,url])=>`<article><small>${bus}</small><h3>${topic}</h3><p>${desc}</p><a href="${esc(url)}" target="_blank" rel="noopener">${label} ↗</a></article>`).join('')}</div></section></div>`;
+}

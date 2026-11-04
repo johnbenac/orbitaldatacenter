@@ -70,9 +70,18 @@ export function makeLaunch(h){
   const z0=section.z0M,z1=section.z1M,H=Math.max(.025,z1-z0),w=section.widthM||hw,dep=section.heightM||hh,y=(z0+z1)/2,name=String(section.part).toLowerCase();
   if(/adapter|interface/.test(name)){cylinder(payload,0,y,0,section.radiusM*.81,section.radiusM,H,steel,'adapter');continue;}
   if(/bus|body|core|chassis/.test(name)){
-   box(payload,0,y,0,w,H,dep,rib,'payload');
-   for(let i=0;i<5;i++){const cy=z0+H*(i+.5)/5;for(const side of [-1,1]){thermalMesh(box(payload,side*w*.506,cy,0,w*.014,H*.18,dep*.88,i%3===0?finish.foil:finish.panels,'structure'),'enclosure');thermalMesh(box(payload,0,cy,side*dep*.506,w*.89,H*.18,dep*.014,i%2?finish.panels:finish.foil,'structure'),'enclosure');}}
-   for(let x of [-1,1])for(let z of [-1,1])box(payload,x*w*.49,y,z*dep*.49,w*.034,H,dep*.034,steel,'structure');
+   // The stack allowance includes parked hardware. Draw the insulated mold
+   // line at its physical dimensions and the two nozzle exits at their stations.
+   box(payload,0,y,0,hw,H,hh,rib,'payload');
+   for(let i=0;i<5;i++){const cy=z0+H*(i+.5)/5;for(const side of [-1,1]){thermalMesh(box(payload,side*hw*.506,cy,0,hw*.014,H*.18,hh*.88,i%3===0?finish.foil:finish.panels,'structure'),'enclosure');thermalMesh(box(payload,0,cy,side*hh*.506,hw*.89,H*.18,hh*.014,i%2?finish.panels:finish.foil,'structure'),'enclosure');}}
+   for(let x of [-1,1])for(let z of [-1,1])box(payload,x*hw*.49,y,z*hh*.49,hw*.034,H,hh*.034,steel,'structure');
+   for(const exit of h.propulsion.engines){
+    const height=exit.throatY-exit.y;
+    const mount=cylinder(payload,exit.x,y+exit.z,(-exit.throatY+hh*.5)/2,exit.exitRadiusM*.4,exit.exitRadiusM*.4,-exit.throatY-hh*.5,steel,'propulsion');
+    const shell=shellBands([[exit.exitRadiusM,-height/2],[exit.exitRadiusM*.61,0],[exit.exitRadiusM*.25,height/2]],0,2*Math.PI);
+    const nozzle=mesh(payload,shell,dark,exit.x,y+exit.z,-(exit.throatY+exit.y)/2,'propulsion');
+    nozzle.rotation.x=-Math.PI/2;mount.rotation.x=-Math.PI/2;
+   }
   }else if(/cassette|fold|wing|radiator|array|panel/.test(name)){
    box(payload,0,y,0,w*.92,H*.98,dep*.96,black,'payload');
    for(let i=0;i<18;i++){const iz=(i+.5)/18-.5;const leaf=box(payload,0,y,iz*dep,w*.997,H*.996,dep*.049,i<12?(i%2?blue:steel):fin,i<12?'solar':'radiator');if(i>=12)thermalMesh(leaf,'radiator');}

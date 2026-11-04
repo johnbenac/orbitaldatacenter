@@ -75,12 +75,12 @@ export function packedSections(g){
  }
  const adapterWidth=g.launcher==='glenn'?3.30:1.52;
  add('Separation adapter',adapterWidth,adapterWidth,.36,adapterWidth/2);
- add('Engine recess',w*.8,h*.8,Math.max(.48,.03*l+.27*w+.035));
- const tr=Math.min(.24*w,.9*Math.cbrt(Math.max(.02,(g.tankVolumeL||0)/1000)*3/(8*Math.PI)));
- const tankEdge=Math.hypot(.50*w+.68*tr,.21*h)+tr;
+ add('Launch service stand-off',w*.8,h*.8,Math.max(.48,.03*l+.27*w+.035));
+ const nozzles=g.propulsion?.engines||[];
+ const bellEdge=Math.max(0,...nozzles.map(e=>Math.hypot(Math.abs(e.x)+e.exitRadiusM,e.y)));
  const dishEdge=Math.hypot(w*.16+kaDishM*.5,h*.5+Math.min(w,h)*.052*3+kaDishM*.42);
- const radius=Math.max(Math.hypot(w+.12,h+.12)/2,tankEdge,dishEdge);
- add('Insulated bus',Math.max(w+.12,w+3.36*tr),h+.12,l,radius);
+ const radius=Math.max(Math.hypot(w+.12,h+.12)/2,bellEdge,dishEdge);
+ add('Insulated bus',Math.max(w+.12,...nozzles.map(e=>2*(Math.abs(e.x)+e.exitRadiusM))),Math.max(h+.12,...nozzles.map(e=>h*.5+.06-e.y)),l,radius);
  const solarShort=Math.min(wingLengthM/3,wingWidthM),solarLong=Math.max(wingLengthM/3,wingWidthM);
  const radiatorShort=Math.min(radiatorLengthM/3,radiatorWidthM),radiatorLong=Math.max(radiatorLengthM/3,radiatorWidthM);
  // Rails on both sides, plus allowances for hinges, latches and fluid loops.

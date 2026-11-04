@@ -13,7 +13,7 @@ export const deploymentAudit={
       "fit": true,
       "radialClearanceM": 0.44550662,
       "axialClearanceM": 4.36833556,
-      "meshFitMarginM": 0.445904
+      "meshFitMarginM": 0.63318572
     },
     {
       "id": "reference",
@@ -43,21 +43,21 @@ export const deploymentAudit={
       "minSolarRadiatorGapM": 0.016,
       "minHardwareGapM": 0.009,
       "minCarriageGapM": 0.002,
-      "fit": true,
-      "radialClearanceM": 0.04207379,
-      "axialClearanceM": 5.42061694,
-      "meshFitMarginM": 0.15830455
+      "fit": false,
+      "radialClearanceM": -0.37215762,
+      "axialClearanceM": 3.48751796,
+      "meshFitMarginM": -0.22036078
     },
     {
       "id": "scale",
       "minLeafGapM": 0.002,
-      "minSolarRadiatorGapM": 0.01368167,
+      "minSolarRadiatorGapM": 0.00561726,
       "minHardwareGapM": 0.009,
       "minCarriageGapM": 0.002,
       "fit": false,
       "radialClearanceM": -38.0752946,
-      "axialClearanceM": -119.44999033,
-      "meshFitMarginM": -119.08099033
+      "axialClearanceM": -212.251744,
+      "meshFitMarginM": -211.882744
     }
   ]
 };

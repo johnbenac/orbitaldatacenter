@@ -35,7 +35,7 @@ cellMat.map=tex(c);[c,g]=canvas(512,256);g.fillStyle='#d9d8cf';g.fillRect(0,0,51
 function face(p,x,y,z,w,d,m,id){const a=obj(p,new T.PlaneGeometry(w,d),m,x,y,z,id);a.rotation.x=-Math.PI/2;a.userData.texturePlane=true;return a;}
 function join(p,x,y,z,id){let g=new T.Group();g.position.set(x,y,z);g.userData.part=id;p.add(g);return g;}
 function labelPlate(p,x,y,z,w,d,caption){const [c,g]=canvas(512,112);g.fillStyle='#e3e1d7';g.fillRect(0,0,512,112);g.fillStyle='#26343b';g.font='bold 60px monospace';g.fillText(caption,18,74);g.fillStyle='#bd6b21';g.fillRect(0,0,7,112);let m=solid('#fff');m.map=tex(c);return face(p,x,y,z,w,d,m,'structure');}
-export function makeCraft(h){textures();const root=new T.Group(),internal=new T.Group(),skin=new T.Group();root.add(skin,internal);let bw=h.bodyWidthM,bh=h.bodyHeightM,bl=h.bodyLengthM;const panelL=h.wingLengthM,panelW=h.wingWidthM,radL=h.radiatorLengthM,radW=h.radiatorWidthM;let wings=[],rads=[],panels=[],trayRows=[],cmgs=[],cells=[],leds=[],plumes=[];const gleam=[];const w=bw,hgt=bh,l=bl,beam=Math.min(w,hgt)*.052;const y0=hgt*.5,kin=deploymentLayout(h),appendages=new T.Group();root.add(appendages);
+export function makeCraft(h){textures();const root=new T.Group(),internal=new T.Group(),skin=new T.Group();root.add(skin,internal);let bw=h.bodyWidthM,bh=h.bodyHeightM,bl=h.bodyLengthM;const panelL=h.wingLengthM,panelW=h.wingWidthM,radL=h.radiatorLengthM,radW=h.radiatorWidthM;let wings=[],rads=[],panels=[],trayRows=[],cmgs=[],cells=[],leds=[],plumes=[],engines=[];const propulsion=h.propulsion;const gleam=[];const w=bw,hgt=bh,l=bl,beam=Math.min(w,hgt)*.052;const y0=hgt*.5,kin=deploymentLayout(h),appendages=new T.Group();root.add(appendages);
 // Six dedicated, finite-thickness walls. Positive-axis covers lift away for the core section.
 const enclosure=new T.Group(),walls=[];root.add(enclosure);
 const wallT=Math.min(w,hgt,l)*.024,flexLoops=[];
@@ -45,6 +45,7 @@ function wall(parent,axis,sign,width,height,depth,x,y,z){
  const u=axis==='x'?depth:width,vv=axis==='y'?depth:height;
  const holes=apertures.map((diameter,i)=>{
   if(axis==='x')return {u:(i?1:-1)*u*.28,v:vv*.07,d:diameter};
+  if(axis==='y'&&sign<0&&i>0){const exit=propulsion.engines[i-1];return {u:exit.x,v:exit.z,d:diameter,engine:true};}
   if(axis==='y')return {u:-.18*w,v:.27*vv,d:diameter};
   return {u:(i%2?1:-1)*(i<2?.225:.28)*w*sign,v:hgt*(i<2?-.115:-.21),d:diameter};
  });
@@ -54,7 +55,7 @@ function wall(parent,axis,sign,width,height,depth,x,y,z){
  const shell=obj(parent,g,steel,x,y,z,'structure');if(axis==='x')shell.rotation.y=sign*Math.PI/2;else if(axis==='y')shell.rotation.x=-sign*Math.PI/2;else if(sign<0)shell.rotation.y=Math.PI;
  shell.name=spec?.id||axis+(sign>0?'+':'−')+' thermal wall';shell.userData.wall={axis,sign,holes};walls.push(shell);
  // Metal gland sleeves fill the bores. Dielectric gaskets seat against the dry shell and carry the blankets around the cable or pipe.
- for(const q of holes){const a=join(shell,q.u,q.v,0,axis==='z'?'radiator':'structure'),r=q.d*.5;
+ for(const q of holes){const a=join(shell,q.u,q.v,0,q.engine?'propulsion':axis==='z'?'radiator':'structure'),r=q.d*.5;
   const sleeve=cyl(a,0,0,0,r*.986,r*.986,wallT+beam*1.12,axis==='z'?copper:dark,undefined,30);sleeve.rotation.x=Math.PI/2;
   const gasket=new T.Mesh(new T.TorusGeometry(r*1.15,r*.25,10,36),black);gasket.position.z=wallT*.50+beam*.08;a.add(gasket);
   const flange=cyl(a,0,0,wallT*.5+beam*.36,r*1.50,r*1.50,beam*.14,steel,undefined,30);flange.rotation.x=Math.PI/2;
@@ -73,7 +74,13 @@ for(let side of [-1,1]){
  const cover=side>0?skin:enclosure,x=side*(w*.5+beam*.12),y=side*(y0+beam*.11),z=side*(l*.5+beam*.11);
  for(let k=0;k<4;k++){const cz=l*((k+.5)/4-.5);
   thermalMesh(box(cover,x,0,cz,beam*.18,hgt*.86,l*.232,k===1||k===3?foilMat:ivory,'structure'),'enclosure');
-  thermalMesh(box(cover,0,y,cz,w*.90,beam*.17,l*.232,(k+side)%2?foilMat:white,'structure'),'enclosure');
+  const panelMat=(k+side)%2?foilMat:white,halfTile=l*.116;
+  const nozzle=propulsion.engines[0],pad=Math.max(...propulsion.engines.map(e=>e.exitRadiusM))+.025;
+  if(side>0||Math.abs(cz-nozzle.z)>halfTile+pad)thermalMesh(box(cover,0,y,cz,w*.90,beam*.17,2*halfTile,panelMat,'structure'),'enclosure');
+  else{
+   const cutLow=Math.max(cz-halfTile,nozzle.z-pad),cutHigh=Math.min(cz+halfTile,nozzle.z+pad);
+   for(const [lo,hi] of [[cz-halfTile,cutLow],[cutHigh,cz+halfTile]])if(hi-lo>.004)thermalMesh(box(cover,0,y,(hi+lo)/2,w*.90,beam*.17,hi-lo,panelMat,'structure'),'enclosure');
+  }
   for(let edge of [-1,1]){box(cover,x+side*beam*.12,edge*hgt*.392,cz,beam*.052,beam*.15,l*.208,dark,'structure');box(cover,edge*w*.416,y+side*beam*.116,cz,beam*.14,beam*.052,l*.210,bronze,'structure');}
   for(let i=0;i<3;i++)box(cover,x+side*beam*.125,hgt*(.10-.11*i),cz+l*.04,beam*.058,beam*.12,l*.082,silver,'structure');
  }
@@ -101,8 +108,50 @@ for(let q of [-1,1])box(leaf,x,-depth*.4,q*panelW*.49,seg,depth*.86,Math.max(dep
 pipe(pivot,v(side*w*.1,-beam,0),v(side*w*.44,-beam*.15,panelW*.26),beam*.33,gold,'solar');}
 // Two double-sided radiator banks run fore and aft from independent roots.
 for(let sign of [-1,1]){const pivot=join(root,0,-y0*.45,sign*l*.50,'radiator');const bank=join(pivot,0,0,0,'radiator');bank.rotation.z=-Math.PI/2;const leaves=[];rads.push({bank,sign,leaves});const stem=kin.radRoot-l*.5;box(bank,0,0,sign*stem*.5,beam*1.65,beam,stem,steel,'radiator');for(let k=0;k<3;k++){let z=sign*radL/6,wid=radW;const previous=k?leaves[k-1]:bank,leaf=join(previous,0,0,sign*(k?radL/3:stem),'radiator'),surface=new T.Group();leaf.add(surface);leaves.push(leaf);panels.push({surface,anchor:leaf,cx:0,cz:z,alongX:radW>radL/3});thermalMesh(box(surface,0,0,z,wid,beam*.49,radL/3*.98,steel,'radiator'),'radiator');thermalMesh(face(surface,0,beam*.257,z,wid*.981,radL/3*.961,finMat,'radiator'),'radiator');let f=thermalMesh(face(surface,0,-beam*.257,z,wid*.981,radL/3*.961,finMat,'radiator'),'radiator');f.rotation.x=Math.PI/2;let grid=[];for(let j=1;j<10;j++)grid.push([[-wid*.49+j*wid*.098,beam*.262,z-radL*.158],[-wid*.49+j*wid*.098,beam*.262,z+radL*.158]]);strokes(surface,grid,'#8a9799','radiator',.53);for(let x of [-1,1])box(surface,wid*.49*x,0,z,beam*.20,beam*.55,radL/3,white,'radiator');}for(let s of [-1,1])pipe(bank,v(s*w*.20,0,0),v(s*radW*.42,0,sign*(stem-.10)),beam*.25,copper,'radiator');}
-// Tank pair with external bands, pressure domes and dedicated feed lines.
-const tankR=Math.min(w*.24,Math.cbrt(Math.max(.02,h.tankVolumeL/1000)/2/(4*Math.PI/3))*.9);for(let sign of [-1,1]){let x=sign*(w*.50+tankR*.68),uc=join(root,x,-hgt*.21,0,'propellant');ell(uc,0,0,0,tankR,tankR,tankR*1.32,gold,'propellant');for(let z of [-.49,.49]){let ring=new T.Mesh(new T.TorusGeometry(tankR*.93,beam*.13,10,48),dark);ring.position.z=z*tankR;uc.add(ring);}let fluid=ell(uc,0,0,0,tankR*.92,tankR*.92,tankR*1.22,sign<0?blue:copper,'propellant');fluid.visible=false;cells.push({fluid,tank:uc.children[0],sign});pipe(uc,v(0,0,-tankR*1.29),v(-sign*tankR*1.2,-beam,-l*.45),beam*.21,copper,'propellant');}
+// The two liquid vessels and high-pressure helium bottle sit within the dry bus.
+const service=join(root,0,0,0,'propellant'),tankMap={},regulatorParts=[];service.visible=false;
+service.name='Internal pressure-fed propulsion bay';
+for(const t of propulsion.tanks){
+ const liquid=t.id!=='helium',r=t.radiusM,g=join(service,t.x,t.y,t.z,'propellant');
+ const shell=ell(g,0,0,0,r,r,r,liquid?gold:silver,'propellant');
+ shell.name=t.id+' pressure vessel';tankMap[t.id]=g;
+ // Separate replaceable half-shell and an equivalent-volume inventory glyph for inspection.
+ if(liquid){
+  const section=obj(g,new T.SphereGeometry(r,40,24,Math.PI*1.5,Math.PI),gold,0,0,0,'propellant');section.visible=false;
+  const fluid=ell(g,0,0,0,r,r,r,t.id==='fuel'?copper:blue,'propellant');fluid.visible=false;
+  cells.push({id:t.id,fluid,tank:shell,section,volumeL:t.volumeL,fluidRadiusM:Math.cbrt(.001*t.volumeL*3/(4*Math.PI))});
+ }
+ for(const z of [-.34,.34]){const rad=r*Math.sqrt(1-z*z),ring=new T.Mesh(new T.TorusGeometry(rad,Math.min(r*.021,.014),10,44),steel);ring.position.z=z*r;g.add(ring);}
+ const saddleHeight=(t.y-r*.80)-(-hgt/2+wallT);
+ for(const sign of [-1,1])box(g,sign*r*.48,-r*.80-saddleHeight/2,0,Math.min(.038,r*.15),saddleHeight,r*.42,steel,'propellant');
+ const cradle=box(g,0,-r*.83,0,r*1.35,Math.min(r*.10,.036),r*.77,steel,'propellant');
+ cradle.name='Vessel restraint';
+}
+// Separate regulated gas and liquid rails on opposite bay walls. Each liquid
+// circuit stays isolated all the way to the twin injector valve packages.
+const gas=propulsion.tanks.find(q=>q.id==='helium'),liquids=propulsion.tanks.filter(q=>q.id!=='helium');
+const feedR=Math.min(.018,w*.008),gasX=-w*.409,railX=w*.414,deck=-hgt/2;
+function tubeRun(points,r,mat){for(let i=1;i<points.length;i++)if(points[i-1].distanceToSquared(points[i])>1e-9)pipe(service,points[i-1],points[i],r,mat,'propulsion');}
+function fitting(p,kind,mat){
+ const body=box(service,p.x,p.y,p.z,feedR*4.4,feedR*4.0,feedR*5.8,mat,'propulsion');body.name=kind;
+ cyl(service,p.x,p.y+feedR*2.5,p.z,feedR*1.65,feedR*1.65,feedR*2.5,dark,'propulsion',16);return body;
+}
+const reg=v(gasX,gas.y,gas.z);
+tubeRun([v(gas.x-gas.radiusM,gas.y,gas.z),reg],feedR,silver);
+regulatorParts.push(fitting(reg,'Helium isolation and pressure regulator',aqua));
+for(const [idx,t] of liquids.entries()){
+ const end=v(t.x-t.radiusM,t.y,t.z),tap=v(gasX,t.y,t.z);
+ tubeRun([reg,v(gasX,t.y,gas.z),tap,end],feedR*.8,silver);fitting(tap,'Pressurant check valve',steel);
+ const color=idx?blue:copper,py=Math.min(t.y,deck+(.13+idx*.11)*(propulsion.bayTopY-deck)),x=railX-idx*w*.038;
+ const a=v(x,t.y,t.z),b=v(x,py,t.z);
+ tubeRun([v(t.x+t.radiusM,t.y,t.z),a,b,v(x,py,0)],feedR,color);
+ fitting(a,'Liquid latch / isolation valve',color);
+ fitting(b.clone().lerp(v(x,py,0),.44),'In-line propellant filter',steel);
+ for(const e of propulsion.engines){
+  const portX=e.x+(idx?1:-1)*.014,inlet=v(portX,py,e.z);
+  tubeRun([v(x,py,0),v(x,py,e.z),inlet,v(portX,e.throatY+.013,e.z)],feedR*.72,color);
+ }
+}
 // Reflector is a shallow paraboloid with crossed support rods and a feed horn.
 const dishD=Math.max(.3,h.input.kaDishM),base=join(root,w*.16,y0+beam,-l*.35,'communications');cyl(base,0,beam*.6,0,dishD*.18,dishD*.24,beam*1.3,steel,'communications');const dish=join(base,0,beam*2,0,'communications');// The continuous finite-thickness shell runs from inner rim to axis and back along the outer skin.
 const parab=[],dishT=Math.max(.007,dishD*.014),profile=(i,dy)=>{const r=dishD*.5*i/16;return new T.Vector2(r,(r/dishD)**2*dishD*.65+dy);};
@@ -142,12 +191,23 @@ for(let axis=0;axis<3;axis++){const p=join(internal,-w*.34+(axis===0?w*.11:0),hg
  const len=Math.min(w*.31,l*.18),r=beam*.33,bar=cyl(p,0,0,0,r,r,len,bronze,'torquer',24);for(let n=0;n<4;n++)cyl(p,0,len*(n-1.5)*.19,0,r*1.10,r*1.10,len*.13,copper,'torquer',24);
  if(axis===0)p.rotation.z=Math.PI/2;if(axis===2)p.rotation.x=Math.PI/2;torquers.push(p);
 }
-for(let i=0;i<4;i++){let a=i*Math.PI/2+Math.PI/4,r=w*.22,g=join(internal,r*Math.cos(a),hgt*.45,r*Math.sin(a),'cmg');g.rotation.z=Math.sin(a)*.55;let rotor=cyl(g,0,0,0,w*.103,w*.103,beam*.7,bronze,'cmg');let ring=new T.Mesh(new T.TorusGeometry(w*.114,beam*.19,10,48),ivory);ring.rotation.x=.4;g.add(ring);cmgs.push({g,rotor,a});}for(let s of [-1,1]){const engine=join(root,s*w*.28,-hgt*.21,-l*.53,'propulsion');let bell=cyl(engine,0,0,-w*.10,w*.080,w*.15,w*.25,dark,'propulsion',24,true);bell.rotation.x=Math.PI/2;const inner=cyl(engine,0,0,-w*.10,w*.072,w*.141,w*.245,solid('#232327',.22,.68),'propulsion',32,true);inner.rotation.x=Math.PI/2;inner.geometry=inner.geometry.clone();inner.geometry.userData.shared=false;
-const innerIdx=inner.geometry.index,innerNormals=inner.geometry.attributes.normal;
-for(let k=0;k<innerIdx.count;k+=3){const j=innerIdx.getX(k+1);innerIdx.setX(k+1,innerIdx.getX(k+2));innerIdx.setX(k+2,j);}
-for(let k=0;k<innerNormals.count;k++)innerNormals.setXYZ(k,-innerNormals.getX(k),-innerNormals.getY(k),-innerNormals.getZ(k));
-const throat=cyl(engine,0,0,w*.018,w*.071,w*.071,beam*.06,black,'propulsion',32);throat.rotation.x=Math.PI/2;
-let rim=cyl(engine,0,0,-w*.236,w*.151,w*.151,beam*.22,bronze,'propulsion',24,true);rim.rotation.x=Math.PI/2;const plume=new T.Mesh(trimPoleTriangles(new T.ConeGeometry(w*.125,w*1.7,32,1,true)),new T.MeshBasicMaterial({color:0x6ccaff,transparent:true,opacity:.43,side:T.FrontSide,depthWrite:false}));plume.position.z=-w*1.06;plume.rotation.x=-Math.PI/2;engine.add(plume);plumes.push(plume);}
+for(let i=0;i<4;i++){let a=i*Math.PI/2+Math.PI/4,r=w*.22,g=join(internal,r*Math.cos(a),hgt*.45,r*Math.sin(a),'cmg');g.rotation.z=Math.sin(a)*.55;let rotor=cyl(g,0,0,0,w*.103,w*.103,beam*.7,bronze,'cmg');let ring=new T.Mesh(new T.TorusGeometry(w*.114,beam*.19,10,48),ivory);ring.rotation.x=.4;g.add(ring);cmgs.push({g,rotor,a});}// Twin parallel nozzle exit planes face −Y. Mounts, valves and chamber sit
+// above the exit edge. Both animated exhaust fans begin exactly on that edge.
+for(const e of propulsion.engines){
+ const engine=join(root,e.x,e.y,e.z,'propulsion'),r=e.exitRadiusM,ht=e.throatY-e.y;
+ engine.name='Thrust-deck engine';engines.push(engine);
+ const flange=cyl(engine,0,deck-e.y,0,r*.93,r*.93,Math.min(.025,ht*.12),steel,'propulsion',36);
+ const chamber=cyl(engine,0,(deck-e.y+ht)/2,0,r*.48,r*.42,Math.max(.008,deck-e.y-ht),silver,'propulsion',36);chamber.name='Injector and combustion chamber';
+ cyl(engine,0,ht*.99,0,r*.25,r*.25,ht*.14,black,'propulsion',32);
+ // Continuous two-sided bell section with inner wall winding facing the bore.
+ const profile=[[r,0],[r*.978,0],[r*.61,ht*.46],[r*.305,ht*.83],[r*.24,ht],[r*.28,ht],[r*.34,ht*.83],[r*.65,ht*.46],[r,0]].map(([x,y])=>new T.Vector2(x,y));
+ // Lathe normals point outward when following the outer face upward.
+ const bell=obj(engine,new T.LatheGeometry(profile.reverse(),48),dark,0,0,0,'propulsion');bell.name='Engine nozzle';
+ const lip=new T.Mesh(new T.TorusGeometry(r*.989,r*.018,8,48),bronze);lip.rotation.x=Math.PI/2;engine.add(lip);
+ const len=Math.min(w*1.05,r*9),end=r+len*Math.tan(propulsion.plumeHalfAngleDeg*Math.PI/180);
+ const plume=cyl(engine,0,-len/2,0,r,end,len,new T.MeshBasicMaterial({color:0x82cfff,transparent:true,opacity:.26,side:T.FrontSide,depthWrite:false}),'propulsion',40,true);
+ plume.visible=false;plumes.push(plume);
+}
 // A longitudinal frame spaces the cassette away from both wing saddles. Its
 // rails run along the cassette sides; the frame retracts after the last packet clears.
 const cassette=h.fairing?.stack.find(q=>/cassette/i.test(q.part)),cassStart=kin.center-(cassette?.lengthM||0)/2;
@@ -155,6 +215,16 @@ guide.position.z=l/2;
 for(const x of [-1,1])pipe(guide,v(x*w*.20,0,0),v(x*w*.20,0,Math.max(.06,cassStart-l/2-.08)),.024,steel,'structure');
 for(const o of wings){const x1=w*.93,x2=kin.rootX-.022;
  pipe(o.fold,v(0,0,0),v(o.side*(x2-x1),0,0),.024,steel,'solar');}
+// Place the electronics rack envelope between the equipment shelf and zenith wall.
+const upper=hgt*.486,lower=propulsion.bayTopY+.018;
+internal.scale.y=(upper-lower)/hgt;internal.position.y=(upper+lower)/2;
+// Flexible end drops join the raised equipment deck to the two bulkhead
+// coolant penetrations. The descending segments run beside the end walls.
+for(const side of [-1,1])for(const end of [-1,1]){
+ const x=side*w*.225,upperPortY=-hgt*.115*internal.scale.y+internal.position.y,z=end*(l/2-wallT*.56),portY=-hgt*.115;
+ if(Math.abs(upperPortY-portY)>.001)pipe(internal.parent,v(x,upperPortY,z),v(x,portY,z),beam*.26,end>0?blue:copper,'radiator');
+}
+const shelf=box(root,0,propulsion.bayTopY,0,w*.94,.017,l*.96,steel,'structure');shelf.name='Propulsion bay separation deck';
 const rz=v(0,0,1),ry=v(0,1,0),qY=new T.Quaternion(),offset=v(0,0,0);
 for(const [i,p] of panels.entries()){
  p.descriptor=kin.descriptors[i];appendages.add(p.surface);p.surface.userData.leafIndex=i;
@@ -203,4 +273,4 @@ function positionPanels(progress){
  }positionGuides(progress);
 }
 positionPanels(1);
-return{root,internal,skin,enclosure,walls,wings,panels,carriages,appendages,recorder,avionics,torquers,driveCount,shownDrives,trayRows,positionPanels,rads,cmgs,cells,leds,dish,optic,patches,plumes,bw,bh,bl,wingspan:2*(panelL+kin.rootX),spanZ:2*(radL+kin.radRoot)};}
+return{root,internal,skin,enclosure,service,shelf,tankMap,engines,regulator:regulatorParts[0],walls,wings,panels,carriages,appendages,recorder,avionics,torquers,driveCount,shownDrives,trayRows,positionPanels,rads,cmgs,cells,leds,dish,optic,patches,plumes,bw,bh,bl,wingspan:2*(panelL+kin.rootX),spanZ:2*(radL+kin.radRoot)};}

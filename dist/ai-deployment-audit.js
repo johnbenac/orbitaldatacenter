@@ -36,9 +36,9 @@ export const aiDeploymentAudit={
       "minHardwareGapM": 0.009,
       "minCarriageGapM": 0.002,
       "fit": true,
-      "radialClearanceM": 0.70644897,
-      "axialClearanceM": 7.85724753,
-      "meshFitMarginM": 0.445904
+      "radialClearanceM": 0.69545515,
+      "axialClearanceM": 7.11046092,
+      "meshFitMarginM": 0.78243131
     },
     {
       "id": "agents",
@@ -48,9 +48,9 @@ export const aiDeploymentAudit={
       "minHardwareGapM": 0.009,
       "minCarriageGapM": 0.002,
       "fit": true,
-      "radialClearanceM": 0.65547975,
-      "axialClearanceM": 6.76752311,
-      "meshFitMarginM": 0.445904
+      "radialClearanceM": 0.39939126,
+      "axialClearanceM": 5.24582851,
+      "meshFitMarginM": 0.53526648
     },
     {
       "id": "finetune",
@@ -62,7 +62,7 @@ export const aiDeploymentAudit={
       "fit": true,
       "radialClearanceM": 0.44550662,
       "axialClearanceM": 3.86963321,
-      "meshFitMarginM": 0.445904
+      "meshFitMarginM": 0.63318572
     },
     {
       "id": "pretrain",
@@ -73,8 +73,8 @@ export const aiDeploymentAudit={
       "minCarriageGapM": 0.002,
       "fit": false,
       "radialClearanceM": -7.66909155,
-      "axialClearanceM": -8.91648928,
-      "meshFitMarginM": -8.54748928
+      "axialClearanceM": -14.23301059,
+      "meshFitMarginM": -13.86401059
     }
   ]
 };

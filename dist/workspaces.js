@@ -14,6 +14,8 @@ export const pages={
  mass:['Mass Budget','chart-no-axes-column-increasing','Trace every kilogram from installed hardware to the launched stack.'],
  launch:['Launch & Insertion','rocket','Compare stowed hardware, launch allowance, and the insertion sequence.'],
  launcher:['Launch vehicle','rocket','Compare provider references, recovery modes, upper stages and mission-specific launch allowances.'],
+ architecture:['Spacecraft architecture','box','One spacecraft layout for all six customer missions. Inspect its fixed interfaces and the dimensions of your current build.'],
+ equipment:['Master equipment list','list-checks','Trace each mass allocation to the installed hardware, its sizing basis and its published reference.'],
  sources:['Model & sources','book-open','Inspect the equations, assumptions, and reference hardware behind this design.'],
  checks:['Numerical checks','list-checks','Reproduce reference calculations and verify coupled mission behavior.']
 };

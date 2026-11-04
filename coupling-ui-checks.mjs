@@ -20,6 +20,14 @@ const {decodeScenario}=await imp('exports.js');
 const snapshot=async()=>{await fire({action:'share'});const encoded=el('dialogbody').innerHTML.match(/#design=([A-Za-z0-9_-]+)/)[1];await fire({action:'close'});return decodeScenario(encoded)};
 const accept=async()=>{assert.equal(el('dialogtitle').textContent,'Review design change');assert.match(el('dialogbody').innerHTML,/data-action="applyimpact"/);await fire({action:'applyimpact'})};
 const {domainIds}=await imp('matrix-ui.js');
+const initial=await snapshot();
+await fire({page:'architecture'});assert.equal(el('title').textContent,'Spacecraft architecture');assert.match(el('subsystem').innerHTML,/Ground rules and assumptions/);
+const linked=await snapshot();assert.equal(linked.view.reference,'architecture');assert.deepEqual(linked.design,initial.design);
+await fire({page:'equipment'});assert.equal(el('title').textContent,'Master equipment list');assert.match(el('subsystem').innerHTML,/Helium/);
+assert.deepEqual((await snapshot()).design,initial.design);
+await fire({page:'architecture'});await fire({inspectBay:'true'});const cutaway=await snapshot();assert.equal(cutaway.view.phase,'C');assert.equal(cutaway.view.domain,'prop');assert.equal(cutaway.view.camera,'core');
+await fire({phase:'A'});
+
 await fire({domain:'power'});await change('',182,{param:'packWhKg'});const old=(await snapshot()).design;
 await change('','lfp',{param:'battery'});assert.match(el('dialogbody').innerHTML,/Edited preset values will be replaced/);assert.match(el('dialogbody').innerHTML,/Battery pack volume/);assert.match(el('dialogbody').innerHTML,/Retained assumptions to verify/);assert.match(el('dialogbody').innerHTML,/Same 24-hour window/);
 await fire({action:'cancelimpact'});assert.deepEqual((await snapshot()).design,old);

@@ -1,0 +1,25 @@
+.mel{--mel-edge:#35464c;background:#172027;border:1px solid var(--mel-edge);border-radius:9px;min-width:0;overflow:hidden}
+.mel-header{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;padding:24px 22px 17px}
+.mel-eyebrow{font:10px var(--mono);text-transform:uppercase;letter-spacing:.09em;color:#8acac6}
+.mel-header h2{font-size:clamp(24px,2.5vw,34px);line-height:1.12;margin:8px 0}
+.mel-header p,.mel footer{font-size:12px;line-height:1.55;color:#b9c8d1;max-width:78ch}
+.mel-files,.mel-views{display:flex;align-items:center;gap:6px;flex-wrap:wrap}.mel-files{flex:none}.mel-files a{cursor:pointer;white-space:nowrap}
+.mel-cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-block:1px solid var(--mel-edge);background:#1b272d}
+.mel-cards>div{padding:12px 18px;border-right:1px solid var(--mel-edge)}.mel-cards>div:last-child{border-right:0}
+.mel-cards small,.mel-cards span,.mel-fields small{display:block}.mel-cards small{font-size:11px;color:#c5d4d7}
+.mel-cards strong{display:block;font:600 clamp(17px,1.55vw,25px) var(--mono);margin:5px 0;color:#dbede8}
+.mel-cards em{font:11px var(--mono);color:#93b8b4}.mel-cards span{font-size:10px;color:#a5b5c1}
+.mel-controls{display:flex;gap:12px;align-items:end;flex-wrap:wrap;padding:16px 18px 10px}.mel-controls label{display:grid;gap:3px;color:#adc3ca;font:10px var(--mono)}
+.mel-controls label select,.mel-controls label input{border:1px solid #43545d;border-radius:4px;padding:6px 9px;min-width:0;max-width:100%;color:#d9e6e8;background:#131c23;font-size:12px;height:32px}
+.mel-views{gap:1px;border:1px solid #456069;border-radius:5px;padding:2px}.mel-views button{font-size:12px;border-radius:3px;padding:5px 10px;color:#a9bec5}.mel-views button[aria-pressed=true]{background:#345151;color:#dff3ee}
+.mel-caption{display:flex;justify-content:space-between;align-items:center;min-height:31px;padding:2px 18px 9px;color:#a3b5be;font:10px var(--mono)}.mel-caption button{color:#a1d5d0;text-decoration:underline}
+.mel-scroll{max-width:100%;overflow:auto}.mel-table{width:100%;min-width:615px;border-collapse:collapse;table-layout:auto;font-size:12px}
+.mel .mel-table th,.mel .mel-table td{vertical-align:top;text-align:left;border:0;border-bottom:1px solid #304047;padding:9px 11px;white-space:normal}.mel-table thead{color:#b5c8cb;font:10px var(--mono);background:#101a21}.mel-table thead th:first-child{width:24%}.mel-table small{display:block;font-weight:400;color:#a2b4bd;font-size:10px;line-height:1.45}
+.mel-table th b{font-weight:560;font-size:12px;line-height:1.4;display:block}.mel-number{font:9px var(--mono);color:#85a1a8}
+.mel-table .mel-group th{background:#203037;border-top:1px solid #3f535b;color:#cae7df;padding:6px 11px;font-size:12px}.mel-group th span{color:#8cb0ad;margin-right:7px;font:10px var(--mono)}.mel-group th small{float:right;font:10px var(--mono);padding:1px 0;color:#b3c8d0}
+.mel-table .mel-value,.mel-qty,.mel-comparison{font:12px var(--mono);white-space:nowrap!important}.mel-extended{color:#d4e8dc}.mel-qty small{font:10px var(--mono)}.mel-table td strong{display:block;font-size:11px;color:#c6d4d7}.mel-table td p{font-size:11px;color:#b8c6cf;line-height:1.5;margin:0 0 4px}.mel-table td a{font-size:11px;text-decoration:underline;text-underline-offset:2px;color:#93cec8}
+.mel-comparison small{max-width:17ch;white-space:normal!important}.mel-badge{display:inline-block;border:1px solid #52616e;padding:1px 5px;border-radius:3px;color:#c1ccd6;font:9px/1.5 var(--mono);margin-bottom:4px}.mel-badge[data-tone=flight]{color:#9dd6b5;border-color:#416757}.mel-badge[data-tone=ground]{color:#ebc793;border-color:#746044}
+.mel footer{padding:13px 18px;max-width:100%;font-size:11px}.mel-none{padding:22px 18px;color:var(--soft)}.mel-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+@media(max-width:800px){.mel-header{flex-wrap:wrap;gap:10px;padding:17px 14px}.mel-controls{padding:12px;gap:9px}.mel-cards>div{padding:9px 12px}.mel-views{flex-basis:auto}.mel .mel-table td,.mel .mel-table th{padding-inline:8px}}
+@media(max-width:580px){.mel-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.mel-cards>div:nth-child(2){border-right:0}.mel-cards>div:nth-child(-n+2){border-bottom:1px solid var(--mel-edge)}.mel-controls label{flex:1 1 126px}.mel-views{flex:1 1 100%}.mel-views button{flex:1}.mel-caption{padding-inline:12px}}
+.mel-additional{border-top:1px solid var(--mel-edge);margin-top:6px;padding-top:5px}

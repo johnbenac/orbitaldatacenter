@@ -15,7 +15,7 @@ function focusColor(part,domain,o){
  if(domain==='launch'||domain==='launcher')return 'native';
  if(domain==='mass'&&part==='structure')return 'native';
  if(o.isLine||part==='solar'&&o.material.map||part==='radiator'&&o.material.map||domain==='environment')return 'native';
- if(domain==='prop'&&part==='propellant')return 'native';
+ if(domain==='prop'&&['propellant','propulsion'].includes(part))return 'native';
  return sceneColors[part]||'native';
 }
 export function focusHardware(root){
@@ -46,8 +46,9 @@ export function focusHardware(root){
 const materials={text:0x91d7cb,bulk:0xd7ad75,write:0x83d3c3,down:0x99bff2};
 export function dataRoutes(craft,h){
  const root=new T.Group();root.name='Modeled data routes';const routes=[],w=h.bodyWidthM,b=h.bodyHeightM,l=h.bodyLengthM;
- const P=(x,y,z)=>V(x*w,y*b,z*l);
- const cpu=P(.24,.13,-.24),bulk=P(-.44,-.13,-.27),sw=craft.avionics.position.clone(),ssd=craft.recorder.position.clone(),top=P(-.27,.54,-.35);
+ const P=(x,y,z)=>V(x*w,y*b*craft.internal.scale.y+craft.internal.position.y,z*l);
+ const inBus=o=>craft.root.worldToLocal(o.getWorldPosition(V()));
+ const cpu=P(.24,.13,-.24),bulk=P(-.44,-.13,-.27),sw=inBus(craft.avionics),ssd=inBus(craft.recorder),top=P(-.27,.54,-.35);
  const targets={Ka:craft.dish,Optical:craft.optic,'S-band':craft.patches[0]};
  const smoothPath=points=>new T.CatmullRomCurve3(points,false,'centripetal');
  function add(key,points,channel=key,terminal=null){
@@ -86,9 +87,9 @@ export function hardwareAnchor(id,c,h,s){
  case 'dish':return centre(c.dish);case 'optic':return centre(c.optic);case 'patch':return centre(c.patches[0]);
  case 'activeTerminal':return centre(s.groundLink==='Optical'?c.optic:s.groundLink==='S-band'?c.patches[0]:c.dish);
  case 'cmg':return centre(c.cmgs[0].g);case 'torquer':return centre(c.torquers[0]);
- case 'fuel':return centre(c.cells[0].tank);case 'oxidizer':return centre(c.cells[1].tank);
+ case 'fuel':case 'oxidizer':case 'helium':return centre(c.tankMap[id]);case 'engine':return centre(c.engines[0]);
  case 'solar':case 'radiator':{const p=c.panels[id==='solar'?4:13];return p.surface.localToWorld(V(p.cx,0,p.cz));}
- default:{const pts={body:P(0,0,0),compute:P(.22,.20,-.17),battery:P(.2,.15,.435),coolant:P(.41,.18,.28),engine:P(.28,-.21,-.57)};
-  return pts[id]?c.root.localToWorld(pts[id]):null;}
+ default:{const pts={body:P(0,0,0),compute:P(.22,.20,-.17),battery:P(.2,.15,.435),coolant:P(.41,.18,.28)};
+  return pts[id]?(id==='body'?c.root:c.internal).localToWorld(pts[id]):null;}
  }
 }

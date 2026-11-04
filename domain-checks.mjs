@@ -5,7 +5,7 @@ import {domains,domainReadout,domainTrade,renderDomainReadout,renderDomainTrade,
 import {cfg} from './dist/workspaces.js';
 import {schematicPages} from './dist/subsystem-diagrams.js';
 
-const expected=['conops','environment','orbit','compute','data','comm','power','thermal','attitude','prop','mass','launch','launcher'];
+const expected=['conops','purpose','environment','orbit','compute','data','comm','power','thermal','attitude','prop','mass','launch','launcher'];
 assert.deepEqual(Object.keys(domains),expected);assert.deepEqual(schematicPages,expected);
 const available=new Set(controls.map(c=>c.key));
 function sample(design){
@@ -26,7 +26,7 @@ for(const id of expected){
  for(const r of t.rows.filter(r=>r.delta!==null))assert.equal(r.delta,r.edited-r.baseline);
  assert.ok(!/NaN|undefined|Infinity/.test(renderDomainTrade(id,baseline,edit)));
 }
-assert.equal(titles.size,78);
+assert.equal(titles.size,84);
 const traffic=domainTrade('data',baseline,edit).rows.find(r=>r.key==='meanTraffic');assert.ok(traffic.delta>0);
 const env=environmentFlows(baseline),g=baseline.state;
 const radiation=env.filter(r=>['Absorbed direct shortwave','Absorbed albedo','Absorbed longwave'].includes(r.quantity));
@@ -35,7 +35,7 @@ const dataRows=domainReadout('data','E',baseline).rows;assert.ok(Math.abs(dataRo
 const post={...baseline,state:{...baseline.state,referenceBody:true,spacecraftModelEndedAt:500,t:501,entryDynamicPressurePa:402,entryReferenceDragMS2:2.68},disposal:{method:'reentry',outcome:'target-miss',targetErrorKm:201,target:{latDeg:-48.9,lonDeg:-123.4},impact:{t:510,speedMs:150},burns:[]}};
 assert.equal(domainReadout('power','F',post).rows.find(r=>r.key==='batteryKWh').value,null);assert.equal(domainReadout('environment','F',post).rows.find(r=>r.key==='entryDynamicPressurePa').value,402);
 const grave=domainReadout('prop','F',{...baseline,disposal:{method:'graveyard',outcome:'graveyard',burns:[{start:2000,end:2001,role:'Raise apogee'},{start:5000,end:5001,role:'Circularize'}],end:5001,finalPerigeeKm:903,finalApogeeKm:909}});assert.ok(grave.rows.some(r=>r.label==='Graveyard final perigee'&&r.value===903));
-console.log('78 distinct phase/domain interpretations, 13 trade studies with aligned curves, same-instant radiative heat closure, payload byte conservation and both disposal routes verified.');
+console.log('84 distinct phase/domain interpretations, 14 trade studies with aligned curves, same-instant radiative heat closure, payload byte conservation and both disposal routes verified.');
 const {chronologicalAudit}=await import('./dist/mission-worker.js');
 const audit=chronologicalAudit(baseline.hardware).result,withAudit={...baseline,audit};
 for(const key of expected){

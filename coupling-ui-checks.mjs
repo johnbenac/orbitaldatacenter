@@ -37,3 +37,17 @@ await fire({phase:'B'});for(const domain of domainIds){await fire({domain});asse
 await fire({phase:'C'});await fire({domain:'thermal'});await fire({domain:'data'});assert(!(await snapshot()).view.overlays.includes('thermal'));
 await fire({phase:'D'});await fire({domain:'launcher'});const before=(await snapshot()).design;await fire({useLauncher:'terran'});assert.deepEqual((await snapshot()).design,before);
 console.log('All Phase B Design and Analysis sections, cited field help, coupled impact preview/cancel/apply, custom overrides, solver and allowance retention, flight locks and thermal layer isolation passed.');
+
+await fire({phase:'A'});await fire({domain:'conops'});assert.equal((el('purpose-brief').innerHTML.match(/class="purpose-shortcut /g)||[]).length,6);
+const original=await snapshot();await fire({openPurpose:'agents'});assert.equal((await snapshot()).view.domain,'purpose');assert.equal((await snapshot()).design.aiPurpose,'text');
+await fire({usePurpose:'agents'});assert.match(el('dialogbody').innerHTML,/Earth customer|Agentic research/i);await fire({action:'cancelimpact'});assert.deepEqual((await snapshot()).design,original.design);
+await fire({usePurpose:'agents'});await accept();const agentMission=(await snapshot()).design;
+for(const key of ['workload','compute','trayCount','paramsB','storageTB','batteryKWh','solarM2','radiatorM2'])assert.equal(agentMission[key],original.design[key],'retained '+key);
+const {sizeDesign}=await imp('design.js');const oldH=sizeDesign(original.design),agentH=sizeDesign(agentMission);for(const key of ['launchKg','dryKg','bodyLengthM','stowedDiameterM','stowedLengthM'])assert.equal(agentH[key],oldH[key],key);
+assert.equal(agentMission.aiPurpose,'agents');await fire({studyPurpose:'text'});assert.match(el('dialogbody').innerHTML,/accelerator memory/);await fire({action:'close'});
+await fire({previewPurpose:'batch'});assert.equal((await snapshot()).design.aiPurpose,'agents');await fire({provisionPurpose:'batch'});await accept();const batchMission=(await snapshot()).design;assert.equal(batchMission.aiPurpose,'batch');assert.notEqual(batchMission.storageTB,original.design.storageTB);
+await fire({domain:'conops'});assert.doesNotMatch(el('phase-content').innerHTML,/data-param="(?:ttftTargetS|latencyTargetS|requiredTps)"/);
+await fire({openPurpose:'pretrain'});await fire({provisionPurpose:'pretrain'});await accept();const trainingMission=(await snapshot()).design;assert.equal(trainingMission.aiPurpose,'pretrain');
+await fire({action:'ai-transfer'});await fire({artifactCase:'trillion'});assert.match(el('dialogbody').innerHTML,/2 TB/);assert.match(el('dialogbody').innerHTML,/26 min 40 s/);await fire({action:'close'});
+await fire({phase:'D'});await fire({usePurpose:'text'});assert.deepEqual((await snapshot()).design,trainingMission);assert.doesNotMatch(el('purpose-host').innerHTML,/data-provision-purpose/);
+console.log('Earth-purpose navigation, preview, cancel, fixed-install comparison, physical provisioning, CONOPS fields, trillion-parameter transfer and flight-phase locks passed.');

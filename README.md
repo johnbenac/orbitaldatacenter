@@ -12,7 +12,7 @@ To deploy, upload the contents of `dist/` to an HTTP(S) static host, preserving 
 
 ## Navigate the mission
 
-The phase tabs select the kind of work. The domain navigation selects the subsystem or question. The same thirteen domains are available in all six phases.
+The phase tabs select the kind of work. The domain navigation selects the subsystem or question. The same fourteen domains are available in all six phases.
 
 | Phase | Work in this phase |
 | --- | --- |
@@ -23,7 +23,7 @@ The phase tabs select the kind of work. The domain navigation selects the subsys
 | E · Operations | Use the shared clock to inspect commissioning, compute bursts, ground contacts, reboost and momentum unloading. |
 | F · Decommissioning | Review the selected retirement maneuver, actual consumption, achieved trajectory and endpoint. Targeted reentry follows a modeled surviving reference body. Graveyard transfer reports the raised orbit. |
 
-The domains are Mission CONOPS, Environment, Orbit & Eclipse, Compute & Storage, Data & Delivery, Communications, Battery & Power, Thermal, Attitude Control, Propellant, Mass Budget, and Launch & Insertion.
+The domains are Mission CONOPS, AI Data Center Purpose, Environment, Orbit & Eclipse, Compute & Storage, Data & Delivery, Communications, Battery & Power, Thermal, Attitude Control, Propellant, Mass Budget, Launch & Insertion, and Launch Vehicle.
 
 In Phase E, open Communications and its engineering instruments. Select a ground pass on the timeline. Read the terminal acquisition, dish direction, CMG draw, pack charge and recorder queue at the same instant. Move the 24-hour window later in the mission to inspect the effects of aging hardware.
 
@@ -34,6 +34,10 @@ The thermal view maps six modeled nodes to fixed Kelvin color scales. Select a n
 Phase A includes five built-in design points, a new-mission action and a shelf for custom presets. **Save as preset** preserves design inputs, solver and thermal requirement settings. **Load preset** restores a preset JSON to the browser shelf. Downloaded presets are portable between browsers.
 
 In Phase A, hover or focus an input for selection advice. Its **?** button opens the basis, worked example where available, and links to the relevant source sections. **Model & sources** includes a searchable field guide. GEVS and the Goddard GOLD Rules anchor environmental verification and margin guidance. Worked study values, equipment references and mission requirements are identified separately.
+
+**AI Data Center Purpose** assigns one Earth customer mission to a design: live text, live voice, batch inference, agentic research or engineering, fine-tuning, or training. Select a card in Phase A CONOPS or open the domain from the drawer. Preview a profile, compare the same installed machine under two orders, or review a suggested build. The design-change dialogue shows which inputs and physical quantities change. Flight phases inspect the committed goal. Prior saved designs open under live text.
+
+The service analysis records customer outcomes against the modeled direct contacts or an explicitly assumed relay allocation. The selected-day study and the optional multi-day order study have independent horizons. Training requires calibration evidence to claim target quality. The model transfer budget gives ideal active transfer times after the selected artifact is released. PDR exports include the installed compute estimate and selected-window customer metrics.
 
 **Launch Vehicle** compares carrier configurations and their reference payload, fairing and recovery assumptions. **Launch & Insertion** follows the selected spacecraft on that carrier through integration and release. In design phases a change review shows replaced inputs, retained interfaces to check, updated coupled quantities and any exceeded sizing limits. Cancel or apply the proposal before switching hardware. A carrier change keeps the active sizing mode and the mission-specific allowance.
 
@@ -52,6 +56,7 @@ node audit-test.mjs
 node disposal-engine-test.mjs
 node geometry-checks.mjs
 node deployment-checks.mjs
+node deployment-checks.mjs 2400 --ai
 node mesh-checks.mjs
 node schematic-checks.mjs
 node thermal-test.mjs
@@ -63,6 +68,9 @@ node lifecycle-checks.mjs
 node coupling-ui-checks.mjs
 node launch-fleet-checks.mjs
 node input-guidance-test.mjs
+node ai-purpose-ui-checks.mjs
+node ai-core-checks.mjs
+node ai-service-test.mjs
 ```
 
 **Model & sources** documents equations, reference conditions, technology assumptions and model boundaries. **Numerical checks** provides reproducible comparisons in the workbench. Data volumes use decimal GB and TB, mission elapsed time is measured from the selected UTC epoch, and component temperatures use kelvin.

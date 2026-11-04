@@ -1,19 +1,24 @@
-import {defaults,controls,presets,applyPreset,sizeDesign,inverseSolve,solveModes,enumeratePresets,estimateLife,checks,sources,assumptions,validateDesign,ageProperties,YEAR} from './design.js';
+import {defaults,controls,presets,applyPreset,applyAIPurpose,sizeDesign,inverseSolve,solveModes,enumeratePresets,estimateLife,checks,sources,assumptions,validateDesign,ageProperties,YEAR} from './design.js';
 import {createSimulation,modelNotes} from './model.js';
 import {impactOfChange,displaySetting} from './design-impact.js';
 import {helpButton,helpForElement,shortHint,helpBody,sourceGuideIndex} from './input-help-ui.js';
 import {fieldGuidance} from './input-guidance.js';
+import {aiPurposes} from './ai-purpose.js';
+import {renderAIPurpose} from './ai-purpose-ui.js';
+import {evaluateService,evaluateServiceAsync} from './ai-service.js';
+import {conopsPurpose,studyHorizon,studyMenu,serviceSummary,sameMachineReport,transferDesk} from './purpose-studies.js';
 import {renderLaunchFleet} from './launch-fleet-ui.js';
 import {recommendedDomainCamera} from './domain-scene.js';
 import {icon} from './icons.js';
 import {vehicleDrawings} from './drawings.js';
-import {pages,cfg,colors,overlayNames,componentMap} from './workspaces.js';
+import {pages,workspaceFor,colors,overlayNames,componentMap} from './workspaces.js';
 import {encodeScenario,decodeScenario,scenarioBlob,telemetryBlob,makePacket,restoreFile} from './exports.js';
+import {aiDeploymentAudit} from './ai-deployment-audit.js';
 import {deploymentAudit} from './deployment-audit.js';
 import {surfaceAudit} from './surface-audit.js';
 import {chapters} from './flight-chapters.js';
 import {presetList,designName,presetShelf,missionPreset,parsePreset,addToShelf,readShelf,writeShelf,presetFileName} from './mission-presets.js';
-import {domains,domainReadout,renderDomainReadout,renderDomainTrade} from './domain-analysis.js';
+import {domains,purposeDomainFields,purposeTradeKeys,purposeStageDescription,domainReadout,renderDomainReadout,renderDomainTrade} from './domain-analysis.js';
 import {renderDisposalView} from './disposal-views.js';
 import {domainIds,isEditable,domainNav,phaseA,observationCard,analysisControls,missionTotals,phaseHandoff} from './matrix-ui.js';
 import {installHelp,explainMetric} from './tooltips.js';
@@ -30,8 +35,9 @@ const plus=(n)=>n>=0?'+'+fmt(n):fmt(n);
 const clocks=t=>{const sec=Math.floor(Math.max(0,t)%DAY);return [Math.floor(sec/3600),Math.floor(sec/60)%60,sec%60].map(x=>String(x).padStart(2,'0')).join(':')};
 const time=t=>t<0?'T−'+clocks(-t):'D'+String(Math.floor(t/DAY)+1).padStart(3,'0')+' '+clocks(t);
 const cv={launch:['Launch configuration','rocket','04'],spacecraft:['Spacecraft','satellite','02'],orbit:['Earth Orbit','globe','01'],core:['Compute Core','cpu','03']};
-const defaultView={phase:'A',domain:'conops',tradeKey:null,tradeBase:null,presetName:null,detail:false,thermalNode:'junction',thermalScope:'window',thermalPadding:0,thermalScale:'working',thermalAuto:true,thermalTargets:{},cameraStates:null,camera:'spacecraft',t:7800,preset:'reference',modified:false,chapter:'integration',instruments:false,start:0,scope:'day',mode:'size',solve:'installed',speed:30,event:null,overlays:[],inspect:null};
+const defaultView={phase:'A',domain:'conops',purposePreview:null,studyDays:0,tradeKey:null,tradeBase:null,presetName:null,detail:false,thermalNode:'junction',thermalScope:'window',thermalPadding:0,thermalScale:'working',thermalAuto:true,thermalTargets:{},cameraStates:null,camera:'spacecraft',t:7800,preset:'reference',modified:false,chapter:'integration',instruments:false,start:0,scope:'day',mode:'size',solve:'installed',speed:30,event:null,overlays:[],inspect:null};
 let view={...defaultView},input={...defaults},hardware,sim,result,snap,samples=[],daySamples=[],events=[],day={},life,plotStart=0,plotEnd=DAY,scene=null,playing=false,lastTick=0,toastId,rebuildId,daysig='',eventFilter='all',modal=null,pickedRow='',initialShared=false;
+let orderJob=null,packetOrderAbort=null,lastOrder=null;const serviceCache=new WeakMap();
 let initialChronology=false,help,referencePage=null,loadedPresets=[],tradeCache=null,tradeBusy=false,flightSyncError='',deferredFlightTime=null;
 const drafts=new Map();try{loadedPresets=readShelf(window.localStorage)}catch(err){toast('The saved mission shelf is unavailable: '+err.message)}
 
@@ -44,23 +50,25 @@ function loadScenario(obj){
  const h=sizeDesign(obj.design);if(h.errors.length)throw Error(h.errors[0]);
  const v=obj.view||{},domain=[v.domain,v.page,v.subsystem].find(k=>Object.hasOwn(domains,k))||'conops';
  input={...h.input};view={...defaultView,domain,phase:phaseFromView(v),preset:typeof v.preset==='string'?v.preset:'custom',presetName:typeof v.presetName==='string'?v.presetName.slice(0,64):null,modified:!!v.modified,
-  detail:!!v.detail,instruments:!!v.instruments,thermalNode:thermalNodes.some(n=>n.id===v.thermalNode)?v.thermalNode:'junction',thermalScope:v.thermalScope==='mission'?'mission':'window',thermalScale:v.thermalScale==='full'?'full':'working',thermalAuto:v.thermalAuto!==false,thermalPadding:clamp(Number(v.thermalPadding)||0,0,100),thermalTargets:sanitizeTargets(v.thermalTargets),
+  purposePreview:Object.hasOwn(aiPurposes,v.purposePreview)?v.purposePreview:null,studyDays:[1,7,30,60,90].includes(v.studyDays)?v.studyDays:0,detail:!!v.detail,instruments:!!v.instruments,thermalNode:thermalNodes.some(n=>n.id===v.thermalNode)?v.thermalNode:'junction',thermalScope:v.thermalScope==='mission'?'mission':'window',thermalScale:v.thermalScale==='full'?'full':'working',thermalAuto:v.thermalAuto!==false,thermalPadding:clamp(Number(v.thermalPadding)||0,0,100),thermalTargets:sanitizeTargets(v.thermalTargets),
   t:Number.isFinite(v.t)?Math.max(-3600,v.t):defaultView.t,start:Number.isFinite(v.start)?Math.max(0,v.start):0,scope:['day','now','mission'].includes(v.scope)?v.scope:'day',solve:Object.hasOwn(solveModes,v.solve)?v.solve:'installed',chapter:chapters.some(c=>c.id===v.chapter)?v.chapter:'operations',camera:Object.hasOwn(cv,v.camera)?v.camera:'spacecraft',cameraStates:v.cameraStates||null,
   overlays:Array.isArray(v.overlays)?v.overlays.filter(x=>Object.hasOwn(overlayNames,x)):[],speed:[1,10,30,120,600].includes(v.speed)?v.speed:30,event:v.event&&typeof v.event.label==='string'&&Number.isFinite(v.event.start)&&Number.isFinite(v.event.end)?v.event:null,inspect:typeof v.inspect==='string'?v.inspect:null,
   chronological:!!v.chronological,tradeKey:Object.hasOwn(controlByKey,v.tradeKey)?v.tradeKey:null};
  if(v.tradeBase&&typeof v.tradeBase==='object'){const b=sizeDesign(v.tradeBase);if(!b.errors.length)view.tradeBase=b.input}
  referencePage=null;playing=false;initialChronology=!!v.chronological;
 }
-function scenario(){return {schema:'odc-scenario/1',modelVersion:'5.0',design:input,view:{...view,cameraStates:scene?.getCameraState?.()||view.cameraStates,t:Math.round(view.t*1000)/1000}}}
+function scenario(){return {schema:'odc-scenario/1',modelVersion:'6.0',design:input,view:{...view,cameraStates:scene?.getCameraState?.()||view.cameraStates,t:Math.round(view.t*1000)/1000}}}
 try{if(location.hash.startsWith('#design=')){loadScenario(decodeScenario(location.hash.slice(8)));initialShared=true}}catch(e){toast(e.message)}
 if(!initialShared){
  const q=new URLSearchParams(location.search),domain=q.get('domain')||q.get('subsystem'),phase=(q.get('phase')||'').toUpperCase(),chapter=chapters.find(c=>c.id===q.get('chapter'));
  view.domain=Object.hasOwn(domains,domain)?domain:'conops';view.phase=Object.hasOwn(phases,phase)?phase:chapter?chapterPhase(chapter.id):'A';view.chapter=chapter?.id||({D:'integration',F:'deorbit'})[view.phase]||'operations';
  const p=presetList.find(x=>x.id===q.get('preset'));if(p){input={...p.design};view.preset=p.id}
- const method=q.get('disposal');if(['graveyard','reentry'].includes(method)){input.disposalMethod=method;view.modified=method!==defaults.disposalMethod}
+ const goal=q.get('purpose');if(Object.hasOwn(aiPurposes,goal)){input=applyAIPurpose(input,goal,q.get('build')==='suggested');view.modified=true}const preview=q.get('preview');if(Object.hasOwn(aiPurposes,preview))view.purposePreview=preview;
+ const method=q.get('disposal');if(['graveyard','reentry'].includes(method)){input.disposalMethod=method;view.modified=view.modified||method!==defaults.disposalMethod}
  view.camera=Object.hasOwn(cv,q.get('camera'))?q.get('camera'):recommendedCamera(view.phase,view.domain);
 }
 function recalc(resolved=null){
+ packetOrderAbort?.abort();orderJob?.abort();lastOrder=null;
  auditAbort?.abort();flightSyncError='';deferredFlightTime=null;tradeCache=null;view.chronological=false;
  result=resolved||inverseSolve(input,view.solve);hardware=result.hardware;sim=createSimulation(hardware);life=estimateLife(hardware);
  view.t=clamp(view.t,-3600,sim.duration);view.start=clamp(view.start,0,Math.max(0,sim.duration-DAY));
@@ -86,7 +94,7 @@ function goPage(k){clearTimeout(rebuildId);
 }
 
 function getPath(arr,w=100,h=30){if(!arr.length)return '';const lo=Math.min(...arr),hi=Math.max(...arr),span=hi-lo||1;return arr.map((v,i)=>(i?'L':'M')+(i*w/Math.max(1,arr.length-1)).toFixed(2)+' '+(h-2-(hi===lo?.5:(v-lo)/span)*(h-4)).toFixed(2)).join(' ')}
-function kpis(){const overview=false,rows=cfg[view.domain]?.metrics;if(!rows){$('kpis').hidden=true;return}$('kpis').hidden=false;
+function kpis(){const overview=false,rows=workspaceFor(view.domain,hardware)?.metrics;if(!rows){$('kpis').hidden=true;return}$('kpis').hidden=false;
  const ico=overview?['cpu','sun','battery-charging','weight']:[pages[view.domain][1],'activity','gauge','clock-3'];const notes=overview?['Aggregate decode','Photovoltaic output','Of aged capacity','Current wet mass']:['Mission telemetry','Design readout','Mission telemetry','Design readout'];
  $('kpis').innerHTML=rows.map((row,i)=>{const [key,label,u]=row.split('|'),v=value(key),a=daySamples.map(s=>value(key,s)).filter(Number.isFinite);const path=getPath(a);const u2=key==='wetKg'&&overview?'t':u,r=key==='wetKg'&&overview?v/1000:v;return '<article tabindex="0" data-metric="'+esc(key)+'" data-label="'+esc(label)+'" data-unit="'+esc(u)+'" class="kpi" style="--accent:'+colors[i]+'"><div class="kpilabel"><span class="kpiicon">'+icon(ico[i],16)+'</span>'+label+'</div><div class="kpiread">'+esc(overview&&key==='wetKg'?fmt(r,2):compact(r))+' <small>'+esc(u2)+'</small></div><div class="kpinote">'+notes[i]+'</div>'+(path?'<svg class="spark" viewBox="0 0 100 30" preserveAspectRatio="none"><path d="'+path+'" fill="none" stroke="currentColor" stroke-width="1.45" vector-effect="non-scaling-stroke"/></svg>':'')+'</article>'}).join('');
 }
@@ -94,6 +102,7 @@ function chooseCamera(k){if(!cv[k])return;view.camera=k;scene?.setView(k);syncTh
 function lock(key){return (solverKeys[view.solve]||[]).includes(key)||(!isEditable(view.phase)||key==='disposalMethod'&&view.phase!=='A')}
 function inputRow(key,quick=false,scope=null){const c=controlByKey[key];if(!c)return '';const val=hardware.input[key],id=(scope?scope+'-':quick?'quick-':'param-')+key,disabled=lock(key)?' disabled':'',label=quick?({altitudeKm:'Orbital altitude',batteryKWh:'Battery capacity',solarM2:'Solar array area',trayCount:'Compute trays'}[key]||c.label):c.label;
  const hint=view.phase==='A'?helpButton(key,label):'';
+ if(key==='aiPurpose')return '<div class="fieldbox"><div class="field-caption"><strong>Earth customer mission</strong>'+hint+'</div><button class="chip" data-open-purpose="'+esc(val)+'">'+esc(aiPurposes[val].label)+' ↗</button></div>';
  if(c.options)return '<div class="'+(quick?'qrow':'fieldbox')+'"><div class="field-caption"><label for="'+id+'">'+esc(label)+'</label>'+hint+'</div><select id="'+id+'" class="forminput fullwide" data-param="'+key+'"'+disabled+'>'+Object.entries(c.options).map(([v,l])=>'<option value="'+esc(v)+'" '+(val===v?'selected':'')+'>'+esc(l)+'</option>').join('')+'</select></div>';
  if(c.type==='date'||key==='epoch')return '';
  const fine=quick?({trayCount:64,altitudeKm:1200,solarM2:900,batteryKWh:250}[key]||c.max):c.max,max=Math.max(fine,val),pct=clamp((val-c.min)/(max-c.min)*100,0,100);
@@ -108,7 +117,7 @@ function powerHistory(){const keys=[['itKW','IT'],['storageKW','Storage'],['term
  for(let j=0;j<keys.length;j++){const [k]=keys[j],next=base.map((v,i)=>v+(samples[i][k]||0));body+='<polygon points="'+next.map((v,i)=>x(i).toFixed(1)+','+y(v).toFixed(1)).concat(base.map((v,i)=>x(i).toFixed(1)+','+y(v).toFixed(1)).reverse()).join(' ')+'" fill="'+pal[j]+'"/>';next.forEach((v,i)=>base[i]=v)}
  const solar=samples.map((s,i)=>(i?'L':'M')+x(i).toFixed(1)+','+y(s.solarKW).toFixed(1)).join(' ');return '<div class="panelpad"><h3>Generation and bus loads</h3><div class="smalltitle">Stacked load · 0–'+fmt(scale,1)+' kW</div><svg data-chart="true" aria-label="Solar generation and itemized bus loads" viewBox="0 0 500 120" style="width:100%;height:120px" preserveAspectRatio="none">'+body+'<path d="'+solar+'" fill="none" stroke="#ffc76f" stroke-width="1.7" vector-effect="non-scaling-stroke"/></svg><div class="legend"><span><i style="--c:#ffc76f"></i>Solar generation</span>'+keys.map((r,i)=>'<span><i style="--c:'+pal[i]+'"></i>'+r[1]+'</span>').join('')+'</div></div>';
 }
-function drawStudy(){const p=view.domain,entry=cfg[p],study=$('study');if(!entry){study.hidden=true;return}study.hidden=false;const scope={day:'24 HOURS',now:'LOCAL HOUR',mission:sim.audit?'CHRONOLOGICAL':'MISSION PREVIEW'}[view.scope];
+function drawStudy(){const p=view.domain,entry=workspaceFor(p,hardware),study=$('study');if(!entry){study.hidden=true;return}study.hidden=false;const scope={day:'24 HOURS',now:'LOCAL HOUR',mission:sim.audit?'CHRONOLOGICAL':'MISSION PREVIEW'}[view.scope];
  let charts='<div class="chartgrid">'+entry.charts.map(drawChart).join('')+'</div>';
  if(p==='power')charts=powerHistory()+charts;
  if(p==='mass')charts='<div class="panelpad"><div class="smalltitle">Installed stack by allocation</div><div class="bars gap">'+hardware.massLedger.map((r,i)=>'<button data-inspect="'+esc(r.id)+'" title="'+esc(r.label)+' · '+fmt(r.kg)+' kg" style="width:'+100*r.kg/hardware.launchKg+'%;background:'+colors[i%colors.length]+'"></button>').join('')+'</div></div>'+charts;
@@ -125,7 +134,7 @@ function timeline(){const ev=activeEvents(),span=plotEnd-plotStart,mission=view.
  const tabs='<div class="tabbar">'+[['now','Now'],['day','24 hours'],['mission','Entire mission']].map(([k,l])=>'<button class="'+(view.scope===k?'selected':'')+'" data-scope="'+k+'">'+l+'</button>').join('')+'</div>';
  $('timeline').innerHTML='<section class="panel timeline">'+head('Mission timeline','activity',tabs)+'<div class="tlbody"><div class="legendrow"><div class="legend">'+(mission?'<span><i style="--c:var(--cyan)"></i>'+(sim.audit?'Daily minimum SOC · chronological':'Daily minimum SOC · representative-day preview')+'</span>':[['Sunlight','#c69865'],['Eclipse',eventColors.eclipse],['Ground contact',eventColors.contact],['Maneuver',eventColors.burn]].map(([l,c])=>'<span><i style="--c:'+c+'"></i>'+l+'</span>').join(''))+'</div><span class="elap" id="timecode">'+time(view.t)+'</span></div><div class="timelineplot"><div class="tracks" tabindex="0" role="slider" aria-label="Mission cursor" aria-valuemin="'+plotStart+'" aria-valuemax="'+plotEnd+'" aria-valuenow="'+Math.floor(view.t)+'"><svg viewBox="0 0 1000 45" preserveAspectRatio="none">'+segs+grid+'</svg><i class="cursor" style="left:'+clamp((view.t-plotStart)/span*100,0,100)+'%"></i></div><div class="tickrow">'+ticks.map(t=>'<span>'+t+'</span>').join('')+'</div></div></div><div class="tlfoot"><div class="playctrl"><button class="iconbtn playbtn" data-action="play" aria-label="'+(playing?'Pause':'Play')+'">'+icon(playing?'pause':'play',15)+'</button><select id="speed" class="smselect" aria-label="Playback speed">'+[1,10,30,120,600].map(v=>'<option value="'+v+'" '+(view.speed===v?'selected':'')+'>'+v+'×</option>').join('')+'</select></div><button class="textbutton" data-action="window" title="Set mission time or window">'+icon('clock-3',12)+' Window</button><div class="agebox"><button class="iconbtn" data-action="prev" aria-label="Previous day">'+icon('chevron-left',14)+'</button><span>Day '+(Math.floor(view.start/DAY)+1)+'</span><button class="iconbtn" data-action="next" aria-label="Next day">'+icon('chevron-right',14)+'</button></div></div></section>';
 }
-function ledger(){const entry=cfg[view.domain];if(!entry)return '';
+function ledger(){const entry=workspaceFor(view.domain,hardware);if(!entry)return '';
  if(view.domain==='mass')return '<section class="panel lowerpan">'+head('Launched mass ledger','chart-no-axes-column-increasing','<span class="metacode">CLICK TO INSPECT</span>')+rowTable(['Allocation','Classification','Mass · kg','Share'],hardware.massLedger.map((r,i)=>tr(['<i class="swatch" style="background:'+colors[i%colors.length]+'"></i>'+esc(r.label),esc(r.group),fmt(r.kg),fmt(100*r.kg/hardware.launchKg)+'%'],'data-inspect="'+r.id+'"')).join(''))+'</section>';
  const read=v=>{const [k,l,u]=v.split('|');return tr([esc(l),esc(fmt(value(k),4))+' '+esc(u)],'tabindex="0" data-metric="'+esc(k)+'" data-label="'+esc(l)+'" data-unit="'+esc(u)+'"')};let add='';
  if(view.domain==='power')add='<div class="panelpad"><h3>Bus load breakdown</h3>'+[['itKW','Compute'],['storageKW','Storage'],['terminalKW','Terminals'],['pumpKW','Pumps'],['cmgKW','CMGs'],['jointKW','Joints'],['coilKW','Magnetic coils'],['auxKW','Auxiliary loads']].map(([k,l],i)=>'<div class="loadrow"><span>'+l+'</span><div><b style="width:'+clamp(100*snap[k]/Math.max(.01,snap.loadKW),0,100)+'%;background:'+colors[i%6]+'"></b></div><strong>'+fmt(snap[k],3)+' kW</strong></div>').join('')+'</div>';
@@ -137,7 +146,7 @@ function ledger(){const entry=cfg[view.domain];if(!entry)return '';
 function eventTable(list,limit){const pick=typeof limit==='number'?list.slice(0,limit):list;return pick.length?rowTable(['Episode','Start · MET','Duration',''],pick.map(e=>tr(['<span class="dotlabel"><i class="legenddot" style="--c:'+eventColor(e.type)+'"></i>'+esc(e.label)+'</span>',time(e.start),fmt(e.end-e.start,1)+' s','<button class="iconbtn" aria-label="Inspect '+esc(e.label)+'">'+icon('chevron-right',14)+'</button>'],'data-event="'+esc(e.id)+'"')).join('')):'<div class="panelpad muted">No matching events in this window. <button class="textbutton" data-action="findnext">Find the next event</button></div>'}
 function lower(){const selected=view.event;let evlist=events.filter(e=>e.end>view.t),ev=evlist.length?evlist:events;const btn='<button class="textbutton" data-action="events">All events '+icon('chevron-right',12)+'</button>';let s='';if(view.scope==='mission')s+='<section class="panel lowerpan">'+head(sim.audit?'Chronological mission integration':'Representative-day preview','activity','<button class="textbutton" data-action="audit">'+(sim.audit?'Mission totals':'Resolve every mission day')+' '+icon('chevron-right',12)+'</button>')+'<div class="panelpad muted">'+(sim.audit?'Mission plots retain interval minima for SOC, maxima for junction temperature and peak recorder backlog.': 'The fast preview samples seasonal operating days. The chronological sweep evaluates each day and preserves its extrema and event totals.')+'</div></section>';
  if(selected)s+='<section class="panel lowerpan">'+head(esc(selected.label),'circle-dot','<button class="textbutton" data-action="eventdetail">Event inspector '+icon('chevron-right',12)+'</button>')+'<div class="panelpad"><span class="mono">'+time(selected.start)+' → '+time(selected.end)+'</span><span class="muted"> &nbsp;·&nbsp; '+fmt(selected.end-selected.start,1)+' seconds</span> <button class="chip" data-action="jumpstart">Jump to start</button> <button class="chip" data-action="viewevent">View in 3D</button></div></section>';
- if(cfg[view.domain])s+=ledger();
+ if(workspaceFor(view.domain,hardware))s+=ledger();
  if(view.domain==='overview')s+='<div class="columns lowerpan"><section class="panel">'+head('Mission events','list-filter',btn)+eventTable(ev,4)+'</section><section class="panel">'+head('Service summary','activity','<span class="metacode">24 H</span>')+rowTable(['Measure','Value'],[['Onboard text generation',fmt(day.textGeneratedGB*1e9/hardware.input.bytesPerToken/86400,1)+' tok/s'],['Delivered text · daily mean',fmt(day.tokensDelivered/86400,1)+' tok/s'],['Delivered payload',fmt(day.deliveredGB)+' GB'],['Free persistent storage',fmt(snap.freeTB)+' TB'],['Minimum battery charge',fmt(day.minSocPct,1)+'%'],['Hottest junction',fmt(day.maxJunctionK,1)+' K'],['Launch mass headroom',fmt(hardware.massMarginKg)+' kg'],[(sim.audit?'Qualified service span':'Sizing-envelope life estimate'),(life.lowerBound?'≥ ':'')+fmt(life.years,2)+' yr'],['Limiting design balance',esc(life.binding)]].map(r=>tr(r)).join(''))+'</section></div>';
  else s+='<section class="panel lowerpan">'+head('Mission events','list-filter',btn)+eventTable(ev.filter(e=>view.domain!=='comm'||e.type==='contact'),5)+'</section>';
  $('lower').innerHTML=s;
@@ -153,7 +162,7 @@ function scenarioTests(){if(cachedTests)return cachedTests;const h=sizeDesign(de
  cachedTests=records;return records}
 function deploymentEvidence(){
  const rows=deploymentAudit.rows.map(x=>tr([esc(presetList.find(p=>p.id===x.id)?.name||x.id),fmt(x.minLeafGapM*1000,2),fmt(x.minSolarRadiatorGapM*1000,2),fmt(x.minHardwareGapM*1000,2),fmt(x.minCarriageGapM*1000,2)]));
- return '<section class="panel lowerpan">'+head('Deployment clearance','ruler','<span class="tag">BUILT-IN CONFIGURATIONS</span>')+'<div class="panelpad"><p>The four solar wings deploy first. The aft radiator clears the vehicle before the forward radiator moves. These rigid-body sweeps checked '+fmt(deploymentAudit.posesPerPreset,0)+' positions per preset, spaced '+fmt(deploymentAudit.stepSeconds,3)+' s apart. The numbers are minimum sampled gaps in millimetres. Flexure, manufacturing tolerances and custom designs require their own checks.</p></div>'+rowTable(['Preset','Any two leaves · mm','Solar to radiator · mm','Leaf to fixed hardware · mm','Carriage to other leaf · mm'],rows.join(''))+'</section>';
+ return '<section class="panel lowerpan">'+head('Deployment clearance','ruler','<span class="tag">BUILT-IN CONFIGURATIONS</span>')+'<div class="panelpad"><p>The four solar wings deploy first. The aft radiator clears the vehicle before the forward radiator moves. These rigid-body sweeps checked '+fmt(deploymentAudit.posesPerPreset,0)+' positions per preset, spaced '+fmt(deploymentAudit.stepSeconds,3)+' s apart. The numbers are minimum sampled gaps in millimetres. Flexure, manufacturing tolerances and custom designs require their own checks.</p></div>'+rowTable(['Preset','Any two leaves · mm','Solar to radiator · mm','Leaf to fixed hardware · mm','Carriage to other leaf · mm'],rows.join(''))+'<div class="panelpad"><h3>Suggested AI builds</h3><p>Reference geometry with each purpose’s suggested hardware, sampled at '+fmt(aiDeploymentAudit.posesPerPreset,0)+' positions. Signs indicate clearance (+) or overlap (−).</p></div>'+rowTable(['Purpose','Solar to radiator · mm','Fairing radial · m','Fairing axial · m'],aiDeploymentAudit.rows.map(x=>tr([esc(aiPurposes[x.id].label),fmt(x.minSolarRadiatorGapM*1000,2),plus(x.radialClearanceM),plus(x.axialClearanceM)])).join(''))+'</section>';
 }
 function references(){if(referencePage==='checks'){const list=[...checks(),...scenarioTests()],passed=list.filter(x=>x.pass).length;return '<section class="panel">'+head('Surface geometry audit','scan-line','<span class="tag">REFERENCE BUILD</span>')+'<div class="panelpad"><p>Triangle winding and vertex normals were compared in '+fmt(surfaceAudit.geometries)+' unique geometries across the spacecraft and launch assemblies. Each exterior wall and the reflector passed closed-volume and paired-edge checks.</p></div>'+rowTable(['Geometry check','Measured'],[['Triangles with checked orientation',fmt(surfaceAudit.checkedTriangles)],['Zero-area triangles',fmt(surfaceAudit.zeroAreaPoleTriangles)],['Closed wall panels',fmt(surfaceAudit.shellSides)],['Occupied wall penetrations',fmt(surfaceAudit.occupiedPorts)]].map(x=>tr(x)).join(''))+'</section>'+deploymentEvidence()+'<section class="panel lowerpan">'+head('Numerical verification','list-checks','<span class="tag '+(passed===list.length?'':'warn')+'">'+passed+' / '+list.length+' PASS</span>')+rowTable(['Group','Reference calculation','Expected','Computed','Unit','Result'],list.map(c=>tr([c.group,esc(c.name),fmt(c.expected,5),fmt(c.actual,5),esc(c.unit),'<span class="'+(c.pass?'checkpass':'checkfail')+'">'+(c.pass?'Pass':'Review')+'</span>'])).join(''))+'</section>'}
  const d=hardware.input;const ledgerExamples=[['Solar generation','1.361 × '+fmt(d.solarM2)+' m² × '+fmt(d.pvEfficiency,3)+' × '+fmt(d.solarDelivery,3)+' × incidence × sunlight × retention × deployment',fmt(snap.solarKW)+' kW'],['Data generation',fmt(snap.tokensPerSec)+' tok/s × '+fmt(d.bytesPerToken)+' B/tok × 8',fmt(snap.tokensPerSec*d.bytesPerToken*8/1e6,5)+' Mbit/s text'],['Dry + consumables + adapter',fmt(hardware.dryKg)+' + '+fmt(hardware.propellantKg)+' + '+fmt(hardware.pressurantKg)+' + '+fmt(d.adapterKg)+' kg',fmt(hardware.launchKg)+' kg'],['Drag force','½ × '+fmt(snap.densityKgM3,4)+' kg/m³ × '+fmt(snap.relativeSpeedMs)+'² × '+fmt(d.cd)+' × '+fmt(snap.ramAreaM2)+' m²',fmt(snap.dragN,6)+' N']];
@@ -162,11 +171,12 @@ function references(){if(referencePage==='checks'){const list=[...checks(),...sc
 function draw(){
  snap=sim.at(view.t);const p=view.phase,id=view.domain,ref=referencePage,def=phases[p],d=domains[id],a=!ref&&p==='A',b=!ref&&p==='B',c=!ref&&p==='C',flight=!ref&&['D','E','F'].includes(p),visual=c||flight;
  setNav();$('lifecycle').innerHTML=lifecycleNav(p);document.body.classList.toggle('storypage',visual);document.body.classList.toggle('subsystems-page',b);document.body.dataset.phase=p;
- $('crumb').textContent=ref?pages[ref][0]:'Phase '+p+' / '+d.label;$('title').textContent=ref?pages[ref][0]:d.label;$('subtitle').textContent=ref?pages[ref][2]:d.stages[p].description;$('pagecode').textContent=ref?'ENGINEERING REFERENCE':'PHASE '+p+'  /  '+def.label.toUpperCase();
+ $('crumb').textContent=ref?pages[ref][0]:'Phase '+p+' / '+d.label;$('title').textContent=ref?pages[ref][0]:d.label;$('subtitle').textContent=ref?pages[ref][2]:purposeStageDescription(id,p,hardware);$('pagecode').textContent=ref?'ENGINEERING REFERENCE':'PHASE '+p+'  /  '+def.label.toUpperCase();
  $('clockstatus').textContent=flight?(playing?'Flight clock running':'Flight clock paused'):designName(view);
  $('presetshelf').hidden=!a;$('phase-content').hidden=!a;$('system-choice').hidden=!b;$('diagram-host').hidden=!b;$('engineering-toggle').hidden=!b;
  $('primary').hidden=!visual;$('viewer').hidden=!visual;$('guidepanel').hidden=!visual;$('missionpath').hidden=!flight;$('storyextras').hidden=!flight;
  const detailed=b||(!ref&&view.detail&&p!=='A');
+ renderPurposePanels();
  const fleet=$('fleet-host');fleet.hidden=!!ref||id!=='launcher';
  if(!fleet.hidden){const anchor=$(a?'phase-content':b?'diagram-host':'trade-input');if(anchor.previousElementSibling!==fleet)anchor.parentNode?.insertBefore(fleet,anchor);fleet.innerHTML=renderLaunchFleet(hardware,p)}
  $('study').hidden=true;$('kpis').hidden=true;$('timeline').hidden=!detailed;$('lower').hidden=!detailed;
@@ -182,6 +192,57 @@ function draw(){
  }
  if(!b)$('domain-readout').innerHTML=renderDomainReadout(id,p,currentContext());
  if(detailed){kpis();drawStudy();timeline();lower()}
+}
+function serviceFor(model,start){
+ const begin=clamp(start,0,model.duration),end=Math.min(begin+DAY,model.duration);
+ if(end<=begin)return null;
+ const cached=serviceCache.get(model);
+ if(cached&&cached.start===begin&&cached.audit===model.audit)return cached.value;
+ const value=evaluateService(model,begin,end-begin);
+ serviceCache.set(model,{start:begin,audit:model.audit,value});return value;
+}
+function renderPurposePanels(){
+ const id=view.domain,p=view.phase,ref=referencePage,host=$('purpose-host'),brief=$('purpose-brief'),studies=$('purpose-studies');
+ host.hidden=!!ref||id!=='purpose';brief.hidden=!!ref||id!=='conops';studies.hidden=!!ref||id!=='purpose'||!isEditable(p);
+ if(!brief.hidden){const anchor=$(p==='A'?'presetshelf':p==='B'?'diagram-host':'trade-input');if(anchor.previousElementSibling!==brief)anchor.parentNode?.insertBefore(brief,anchor);brief.innerHTML=conopsPurpose(hardware,p)}
+ if(!host.hidden){
+  const anchor=$(p==='A'?'phase-content':p==='B'?'diagram-host':'trade-input');if(anchor.previousElementSibling!==host)anchor.parentNode?.insertBefore(host,anchor);
+  const selectedId=isEditable(p)?view.purposePreview:null;
+  host.innerHTML=renderAIPurpose(hardware,p,{selectedId:selectedId||input.aiPurpose,snapshot:snap,state:snap,day,windowStart:view.start,sim,service:serviceFor(sim,view.start)});
+  if(!studies.hidden){
+   const toolsAnchor=$(p==='B'?'kpis':p==='A'?'phase-content':'trade-input');
+   if(toolsAnchor.previousElementSibling!==studies)toolsAnchor.parentNode?.insertBefore(studies,toolsAnchor);
+   studies.innerHTML=studyMenu(hardware.input,selectedId,view.studyDays);
+  }
+ }
+}
+function usePurpose(id,withBuild){
+ if(!isEditable(view.phase)||!Object.hasOwn(aiPurposes,id))return;
+ const next=applyAIPurpose(hardware.input,id,withBuild);
+ reviewProposal(next,{mode:'installed',label:aiPurposes[id].label+' · '+(withBuild?'suggested build':'installed hardware'),force:true,family:'aiPurpose',commit:resolved=>{
+  input=next;view.solve='installed';view.modified=true;view.event=null;view.purposePreview=id;playing=false;recalc(resolved);draw()
+ }});
+}
+function orderSeed(model,start){return {initialSeed:model.serviceSeed?.(start),seedProvenance:model.audit||start<60*DAY?'Chronological spacecraft state at order admission':'Representative-day initial inventory at order admission'}}
+function comparePurposes(id){
+ if(!isEditable(view.phase)||!Object.hasOwn(aiPurposes,id))return;
+ const h2=sizeDesign(applyAIPurpose(hardware.input,id,false)),s2=createSimulation(h2);
+ open('Compare purposes on the installed machine',sameMachineReport(hardware,serviceFor(sim,view.start),h2,serviceFor(s2,view.start)),'ai-compare');
+}
+async function runOrder(){
+ if(!isEditable(view.phase)||view.domain!=='purpose')return;
+ const model=sim,start=view.start,span=Math.min(studyHorizon(hardware.input,view.studyDays)*DAY,model.duration-start);
+ if(span<=0){toast('Select a window before mission closeout.');return}
+ const show=r=>open('Earth order evaluation','<p>'+esc(aiPurposes[input.aiPurpose].label)+' · '+time(start)+' to '+time(start+span)+'</p>'+serviceSummary(r)+'<div class="dialogrow gap"><button class="btn" data-action="ai-order-json">Download study JSON</button></div>','ai-order');
+ if(lastOrder?.model===model&&lastOrder.start===start&&lastOrder.span===span){show(lastOrder.value);return}
+ orderJob?.abort();const controller=new AbortController();orderJob=controller;
+ open('Evaluate the Earth order','<p>Evaluating the selected workload and transfer opportunities over '+fmt(span/DAY,2)+' days.</p><div id="order-progress" role="status" class="callout">Starting client-side study…</div><button class="btn gap" data-action="ai-cancel-order">Cancel</button>','ai-working');
+ try{
+  const value=await evaluateServiceAsync(hardware.input,start,span,{...orderSeed(model,start),signal:controller.signal,onProgress:p=>{if(modal==='ai-working'&&$('order-progress'))$('order-progress').textContent=typeof p==='string'?p:Number.isFinite(p.days)&&Number.isFinite(p.totalDays)?'Mission day '+fmt(p.days,0)+' of '+fmt(p.totalDays,0)+' · resolving compute and Earth access.':'Evaluating Earth service…'}});
+  if(controller.signal.aborted||sim!==model)return;
+  lastOrder={model,start,span,value};if(modal==='ai-working')show(value);else toast('Earth order evaluation ready.');
+ }catch(err){if(err.name!=='AbortError'&&sim===model)open('Order evaluation stopped','<p>'+esc(err.message)+'</p>','ai-error')}
+ finally{if(orderJob===controller)orderJob=null}
 }
 function viewerInfo(){const ribbon=$('eventribbon');if(ribbon)ribbon.hidden=true;const early=view.t<1200;$('imagestate').textContent=early?time(view.t)+'  /  '+(view.t<0?'PREFLIGHT':Math.round(snap.altitudeKm)+' KM'):'ORB '+String(snap.orbitNumber).padStart(3,'0')+'  /  '+fmt(snap.altitudeKm,0)+' KM';$('craftid').textContent=designName(view);$('craftphase').textContent=view.camera==='core'?'CUTAWAY · ENCLOSURE OPEN FOR INSPECTION':early?({integration:'PAYLOAD INTEGRATION',pad:'LAUNCH PAD',ascent:'ASCENT',insertion:'ORBITAL INSERTION',commissioning:'DEPLOYMENT'})[snap.flightPhase]||'COMMISSIONING':snap.flightPhase==='entry'?'ENTRY INTERFACE':snap.burn?'CHEMICAL BURN':snap.station?'CONTACT · '+snap.station.toUpperCase():snap.eclipse?'EARTH SHADOW':'SUNLIT ORBIT'}
 function openFieldGuide(key,option){
@@ -246,7 +307,8 @@ function reviewProposal(next,{mode=view.solve,label,commit,force=false,drag=fals
  const launcher=changes.some(x=>x.key==='launcher')&&assessment.proposed?.hardware,benchmark=launcher?launcher.input.referenceKg:null;
  const launchNote=launcher?'<div class="impact-banner '+(launcher.input.launchAllowanceKg>benchmark?'warn':'')+'"><b>Payload capacity at the reference orbit</b><p>Mission allowance '+fmt(launcher.input.launchAllowanceKg)+' kg · vehicle reference '+fmt(benchmark)+' kg. '+(launcher.input.launchAllowanceKg>benchmark?'The proposed allowance exceeds this vehicle’s published or concept benchmark. Review the mission-specific performance allocation.':'The provider or concept benchmark and the editable mission allowance refer to distinct assumptions. Confirm performance for the selected orbit and recovery mode.')+'</p></div>':'';
  const retained=assessment.retained||[],carry=retained.length?'<h3 class="gap">Retained assumptions to verify</h3>'+rowTable(['Field','Proposed design','Why it needs review'],retained.map(x=>tr([esc(x.label),val(x.key,x.value)+' '+esc(x.unit),esc(x.note)])).join('')):'';
- const body=heading+info+launchNote+(conflict.length?'<p><b>Edited preset values will be replaced.</b> '+esc(conflict.map(x=>x.label).join(', '))+'.</p>':'')+
+ const purposeNote=family==='aiPurpose'&&assessment.proposed?'<div class="impact-banner"><b>'+esc(assessment.proposed.hardware.ai.label)+'</b><p>'+esc(aiPurposes[next.aiPurpose].description)+'</p><p>Operating estimate '+fmt(assessment.proposed.hardware.ai.activeUnitsPerSec,4)+' '+esc(assessment.proposed.hardware.ai.unit)+'/s · accelerator-memory margin '+plus(assessment.proposed.hardware.ai.memoryMarginGB)+' GB.</p></div>':'';
+ const body=heading+info+launchNote+purposeNote+(conflict.length?'<p><b>Edited preset values will be replaced.</b> '+esc(conflict.map(x=>x.label).join(', '))+'.</p>':'')+
  (mode!==view.solve?'<p>Sizing method changes from <b>'+esc(solveModes[view.solve])+'</b> to <b>'+esc(solveModes[mode])+'</b>.</p>':'')+
  (changes.length?'<h3>Input changes</h3>'+rowTable(['Field','Current','Proposed','Unit'],ins):'')+carry+
  (deltas.length?'<h3 class="gap">Coupled design results</h3>'+rowTable(['Quantity','Current','Proposed','Unit'],deltas.map(x=>tr([esc(x.label),fmt(x.before,4),fmt(x.after,4),esc(x.unit)])).join('')):'')+
@@ -259,7 +321,7 @@ function settleImpact(apply){
  pendingImpact=null;close();if(apply&&change.valid&&change.base===input&&view.phase===change.phase)change.commit();else draw();reopenEditor(change.origin);
 }
 function changeParam(key,val,deep=false,opts={}){
- if(lock(key))return;
+ if(lock(key))return;if(key==='aiPurpose'){usePurpose(val,false);return}
  const next=presets[key]?applyPreset(input,key,val):{...input,[key]:val};
  if(val===input[key]&&!presets[key]&&!opts.after){if(deep){draw();reopenEditor(modal)}return}
  const label=(controlByKey[key]?.label||key)+' → '+displaySetting(key,val);
@@ -270,6 +332,7 @@ function changeParam(key,val,deep=false,opts={}){
   if(view.phase==='C'){scene?.update(hardware,snap);viewerInfo();renderObservation();renderTrade(false);$('phase-extras').innerHTML=missionTotals(currentContext(),view,time)+phaseHandoff('D',view.domain)}
   if(view.phase==='B'){$('system-choice').innerHTML=designSection();renderDiagram();kpis();drawStudy();lower();timeline()}
   if(view.phase!=='B')$('domain-readout').innerHTML=renderDomainReadout(view.domain,view.phase,currentContext());
+  if(view.domain==='purpose'||view.domain==='conops')renderPurposePanels();
   document.querySelectorAll('[data-param]').forEach(e=>{const v=hardware.input[e.dataset.param];if(document.activeElement!==e&&typeof v==='number')e.value=+v.toFixed(5);if(e.type==='range')e.style.setProperty('--pct',(100*(v-e.min)/(e.max-e.min))+'%')});if($('solvenote'))$('solvenote').innerHTML=solveNote();
  }});
 }
@@ -306,22 +369,36 @@ async function fullAudit(exporting=false){
    const a=await audit();
    if(!exporting){if(modal==='audit')auditResult(a);else toast('Chronological mission sweep complete.');return}
    const start=chosen.view.start,span=Math.min(DAY,target.duration-start);chosen.view.chronological=true;
+   const horizon=Math.min(studyHorizon(h.input,chosen.view.studyDays)*DAY,target.duration-start);
+   let orderStudy=null;
+   if(h.ai.training||h.input.aiPurpose==='agents'){
+    if(horizon<=DAY)orderStudy=evaluateService(target,start,horizon);
+    else{
+     packetOrderAbort=new AbortController();
+     packetMessage='Evaluating Earth order through the selected study horizon…';if($('auditprogress'))$('auditprogress').textContent=packetMessage;
+     orderStudy=await evaluateServiceAsync(h.input,start,horizon,{...orderSeed(target,start),signal:packetOrderAbort.signal,onProgress:p=>{packetMessage='Earth order · day '+fmt(p.days,0)+' of '+fmt(p.totalDays,0);if($('auditprogress'))$('auditprogress').textContent=packetMessage}});
+    }
+   }else if(lastOrder?.model===target&&lastOrder.start===start)orderStudy=lastOrder.value;
    packetMessage='Assembling engineering ledgers…';if($('auditprogress'))$('auditprogress').textContent=packetMessage;
    await new Promise(r=>setTimeout(r,0));
-   const blob=await makePacket({scenario:chosen,hardware:h,sim:target,result:sol,snap:target.at(chosen.view.t),day:target.daySummary(start),events:target.events(start,span),extraChecks:scenarioTests(),audit:a,onProgress:percent=>{const msg='Packaging ZIP · '+Math.floor(percent)+'%';if(msg!==packetMessage){packetMessage=msg;if($('auditprogress'))$('auditprogress').textContent=msg}}});
+   const blob=await makePacket({scenario:chosen,hardware:h,sim:target,result:sol,orderStudy,snap:target.at(chosen.view.t),day:target.daySummary(start),events:target.events(start,span),extraChecks:scenarioTests(),audit:a,onProgress:percent=>{const msg='Packaging ZIP · '+Math.floor(percent)+'%';if(msg!==packetMessage){packetMessage=msg;if($('auditprogress'))$('auditprogress').textContent=msg}}});
    retainFile('pdr',blob,'ODC-01-quantitative-PDR.zip',designLabel+' · '+time(chosen.view.t)+' · '+a.days+' integrated day bins');
    $('export-state').textContent='Ready';$('export-state').hidden=false;
    if(modal==='audit'||modal==='export')readyDialog('pdr','Download PDR ZIP');else toast('PDR ready. Open Export to download it.');
   }catch(err){if(exporting){if(modal==='audit'||modal==='export')showExportError(err);else toast('PDR preparation stopped: '+err.message)}else if(modal==='audit'){if(err.name==='AbortError')close();else open('Sweep stopped','<p>'+esc(err.message)+'</p>','auditerror')}}
  }
  if(!exporting)return prepare();
- packetJob=prepare().finally(()=>{packetJob=null;packetMessage=''});return packetJob;
+ packetJob=prepare().finally(()=>{packetJob=null;packetMessage='';packetOrderAbort=null});return packetJob;
 }
 
 
 function auditResult(a){open('Chronological mission results','<p>Computed from consecutive integration steps over '+fmt(a.days,0)+' mission days.</p>'+rowTable(['Result','Value'],[['Minimum battery charge',fmt(a.minSocPct)+'% at '+time(a.minSocTime)],['Maximum junction temperature',fmt(a.maxJunctionK)+' K at '+time(a.maxJunctionTime)],['Peak recorder queue',fmt(a.peakQueueGB)+' GB'],['Earth eclipses',fmt(a.eclipseCount||0)],['Ground passes',fmt(a.contactCount||0)],['Chemical burns',fmt(a.burnCount||0)],['Magnetic unloads',fmt(a.desatCount||0)],['Thermal coverage until first excursion',time(a.thermalQualifiedUntilS)],['First in-flight limit',a.firstCrossing?esc(a.firstCrossing.limit)+' at '+time(a.firstCrossing.time):'No crossing within the analyzed period']].map(r=>tr(r)).join(''))+'<button class="btn export gap" data-action="pdr">'+icon('download',14)+' Download PDR package</button>','auditresults')}
 function windowDialog(){open('Mission clock','<p>Select the start of any consecutive 86,400-second window or jump to an exact mission instant. Times use UTC.</p><div class="fieldgrid"><label class="fieldbox">Window start · UTC<input id="windowdate" class="forminput" type="datetime-local" step="1" value="'+liveDate(view.start).slice(0,19).replace(' ','T')+'"></label><label class="fieldbox">Cursor · seconds from launch<input id="cursortime" class="forminput" type="number" min="0" max="'+sim.duration+'" step="0.01" value="'+Number(view.t.toFixed(2))+'"></label></div><div class="chips gap"><button class="chip" data-action="bol">Beginning of life</button><button class="chip" data-action="midlife">Mid-mission day</button><button class="chip" data-action="eol">Final full day</button></div><div class="dialogrow gap"><button class="btn" data-action="gotime">Go to cursor</button><button class="btn export" data-action="setwindow">Apply window</button></div><div class="gap callout">'+(sim.audit?'Chronological mission integration complete.':'Fast mission preview uses representative days after day three. Run the chronological sweep to evaluate every day and retain extrema and event totals.')+'</div><button class="btn gap" data-action="audit">'+icon('activity',14)+(sim.audit?'See sweep results':'Run chronological sweep')+'</button>','window')}
 async function actions(a,el){switch(a){
+ case 'ai-run-order':await runOrder();break;
+ case 'ai-cancel-order':orderJob?.abort();close();break;
+ case 'ai-order-json':if(lastOrder?.model===sim){retainFile('ai-order',new Blob([JSON.stringify(lastOrder.value,null,2)],{type:'application/json'}),'ODC-Earth-order.json',aiPurposes[input.aiPurpose].label);readyDialog('ai-order','Download order study')}break;
+ case 'ai-transfer':if(isEditable(view.phase))open('Model return budget',transferDesk(hardware),'ai-transfer');break;
  case 'cancelimpact':settleImpact(false);break;case 'applyimpact':settleImpact(true);break;
  case 'thermallayer':toggleThermal();break;
  case 'resetpreset':selectPoint(view.preset,true);break;
@@ -346,8 +423,8 @@ async function actions(a,el){switch(a){
  case 'copy':try{await navigator.clipboard.writeText($('shareurl').value);toast('Design link copied.')}catch{$('shareurl').select();if(document.execCommand('copy'))toast('Design link copied.');else toast('Link selected. Use your browser’s copy command.')}break;
  case 'export':playing=false;exportMenu();break;case 'json':retainFile('json',scenarioBlob(scenario()),'ODC-01-scenario.json',designName(view));readyDialog('json','Download design JSON');break;case 'csv':retainFile('csv',telemetryBlob(samples),'ODC-01-telemetry.csv',designName(view));readyDialog('csv','Download CSV');break;case 'import':if(isEditable(view.phase))$('filein').click();break;
  case 'bundle':{const zip=new JSZip(),index=await fetch('./assets.json').then(r=>r.json());for(const name of [...index,'assets.json']){const r=await fetch('./'+name);if(!r.ok)throw Error('Static asset unavailable: '+name);zip.file(name,await r.arrayBuffer())}zip.file('README.txt','Serve this directory over HTTP or HTTPS with index.html at the root. All dependencies are included. No build, API keys or server-side processing are required. ES module scripts need an HTTP origin.');const blob=await zip.generateAsync({type:'blob',mimeType:'application/zip',compression:'DEFLATE'});retainFile('bundle',blob,'orbital-data-center-static.zip','Static HTTP / HTTPS deployment');readyDialog('bundle','Download static site ZIP');break}
- case 'pdr':await fullAudit(true);break;case 'audit':if(sim.audit)auditResult(sim.audit);else await fullAudit();break;case 'cancelaudit':auditAbort?.abort();close();break;
- case 'close':if(modal==='impact')settleImpact(false);else close();break;case 'params':playing=false;params();break;case 'compare':compare();break;case 'events':playing=false;eventFilter=view.domain==='comm'?'contact':'all';eventList();break;case 'eventdetail':eventDetail();break;
+ case 'pdr':await fullAudit(true);break;case 'audit':if(sim.audit)auditResult(sim.audit);else await fullAudit();break;case 'cancelaudit':packetOrderAbort?.abort();auditAbort?.abort();close();break;
+ case 'close':if(modal==='ai-working')orderJob?.abort();if(modal==='impact')settleImpact(false);else close();break;case 'params':playing=false;params();break;case 'compare':compare();break;case 'events':playing=false;eventFilter=view.domain==='comm'?'contact':'all';eventList();break;case 'eventdetail':eventDetail();break;
  case 'findnext':{const type=eventFilter==='all'?(view.domain==='comm'?'contact':'all'):eventFilter;let found=null;for(let i=1;i<=30&&!found;i++){const t=view.start+i*DAY;if(t>=sim.duration)break;found=sim.events(t,Math.min(DAY,sim.duration-t)).find(e=>type==='all'||e.type===type)}if(found){selectEvent(found);break}toast('No matching event in the next 30 days within this mission.');break}
  case 'layers':open('Visualization layers','<p>Toggle vectors and dimensions in the vehicle view. Arrows encode direction; displayed beam widths are enlarged for visibility.</p><div class="chips">'+Object.entries(overlayNames).map(([k,l])=>'<button class="chip '+(effectiveLayers().includes(k)?'selected':'')+'" aria-pressed="'+effectiveLayers().includes(k)+'" data-layer="'+k+'">'+l+'</button>').join('')+'</div><div class="gap"><button class="btn" data-action="resetcam">'+icon('rotate-ccw',14)+' Reset camera</button></div>','layers');break;
  case 'resetcam':scene?.resetCamera();close();break;
@@ -366,6 +443,12 @@ async function actions(a,el){switch(a){
 document.addEventListener('click',async e=>{const el=e.target.closest('button,[data-chart],[data-event],[data-inspect],.tracks');if(!el)return;try{
  if(el.dataset.guideKey){openFieldGuide(el.dataset.guideKey,el.dataset.guideOption);return}
  if(el.dataset.editInput){fieldEditor(el.dataset.editInput);return}
+ if(el.dataset.openPurpose){if(modal)close();view.purposePreview=isEditable(view.phase)&&Object.hasOwn(aiPurposes,el.dataset.openPurpose)?el.dataset.openPurpose:null;goPage('purpose');return}
+ if(el.dataset.previewPurpose){if(isEditable(view.phase)&&Object.hasOwn(aiPurposes,el.dataset.previewPurpose)){view.purposePreview=el.dataset.previewPurpose;renderPurposePanels();$('purpose-host').querySelector('[data-preview-purpose="'+view.purposePreview+'"]')?.focus({preventScroll:true})}return}
+ if(el.dataset.usePurpose){usePurpose(el.dataset.usePurpose,false);return}
+ if(el.dataset.provisionPurpose){usePurpose(el.dataset.provisionPurpose,true);return}
+ if(el.dataset.studyPurpose){comparePurposes(el.dataset.studyPurpose);return}
+ if(el.dataset.artifactCase){if(isEditable(view.phase))open('Model return budget',transferDesk(hardware,el.dataset.artifactCase==='trillion'),'ai-transfer');return}
  if(el.dataset.domain){goPage(el.dataset.domain);return}
  if(el.dataset.disposalMethod){if(view.phase==='A')changeParam('disposalMethod',el.dataset.disposalMethod,true);return}
  if(el.dataset.presetDownload){const p=loadedPresets.find(x=>x.id===el.dataset.presetDownload);if(p)presetDownload(p);return}
@@ -398,6 +481,7 @@ document.addEventListener('change',e=>{const el=e.target;try{if(el.dataset.param
  if(el.id==='thermal-node'){view.thermalNode=el.value;limitDialog();return}
  if(el.id==='thermal-scope'){if(!isEditable(view.phase))return;view.modified=true;view.thermalScope=el.value;limitDialog();return}
  if(el.id==='thermal-pad'){if(!isEditable(view.phase))return;view.modified=true;view.thermalPadding=clamp(el.valueAsNumber||0,0,100);limitDialog();return}
+ if(el.id==='ai-study-days'){if(isEditable(view.phase)&&[0,1,7,30,60,90].includes(+el.value))view.studyDays=+el.value;return}
  if(el.id==='trade-key'){view.tradeKey=el.value;renderTrade(true);return}
  if(el.id==='flight-rate'){view.speed=Number(el.value);return}
  if(el.id==='guidelauncher'){useLauncher(el.value);return}
@@ -410,7 +494,7 @@ $('filein').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f
  const next=sizeDesign(o.design).input,mode=Object.hasOwn(solveModes,o.view?.solve)?o.view.solve:'installed';
  reviewProposal(next,{mode,label:'Import scenario · '+f.name,force:true,commit:()=>{loadScenario(o);recalc();scene?.setThermalScale?.(view.thermalScale);if(view.cameraStates)scene?.setCameraState?.(view.cameraStates);if(modal)close();draw();if(view.phase==='E')prepareFlight();else if(view.phase==='F')prepareCloseout();else if(initialChronology)fullAudit();toast('Design imported.')}});
  }catch(err){toast(err.message)}};
-$('dialog').addEventListener('cancel',e=>{if(modal==='impact'){e.preventDefault();settleImpact(false)}});
+$('dialog').addEventListener('cancel',e=>{if(modal==='impact'){e.preventDefault();settleImpact(false)}else if(modal==='ai-working')orderJob?.abort()});
 document.addEventListener('keydown',e=>{if(e.target.classList.contains('tracks')&&['ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();playing=false;setTime(view.t+(e.key==='ArrowRight'?1:-1)*(e.shiftKey?60:1))}});
 $('scrim').onclick=()=>document.body.classList.remove('navshow');$('dialog').addEventListener('close',()=>{if(!$('dialog').open)modal=null});$('dialog').onclick=e=>{if(e.target===$('dialog')&&e.clientX<$('dialog').getBoundingClientRect().left){if(modal==='impact')settleImpact(false);else close()}};
 const dayStart=t=>clamp(Math.floor(t/DAY)*DAY,0,Math.max(0,sim.duration-DAY));
@@ -465,14 +549,14 @@ function fieldEditor(key){if(!isEditable(view.phase))return;
 }
 function phaseControls(){
  if(!isEditable(view.phase))return;
- const keys=domains[view.domain].inputs.filter(k=>controlByKey[k]&&(k!=='disposalMethod'||view.phase==='A'));
+ const keys=purposeDomainFields(view.domain,hardware.input).filter(k=>controlByKey[k]&&(k!=='disposalMethod'||view.phase==='A'));
  const extra=view.domain==='orbit'?'<label class="fieldbox">Epoch · UTC <input type="datetime-local" id="epoch" class="forminput" step="1" value="'+esc(input.epoch.slice(0,19))+'"></label>':'';
  open(domains[view.domain].label+' design inputs','<p>Changes propagate through the integrated design and subsequent flight phases.</p><div class="fieldgrid">'+extra+keys.map(k=>inputRow(k)).join('')+'</div><div class="dialogrow gap"><button class="btn" data-action="params">All parameters & solver</button><button class="btn export" data-action="close">Done</button></div>','phasecontrols');
 }
-function renderDiagram(){const ctx={hardware,state:snap,day,events,selected:diagramParts[view.domain],thermalScale:view.thermalScale,qualificationWindow:view.domain==='thermal'?activeThermalWindow():undefined};updateSubsystemDiagram($('diagram-host'),view.domain,ctx)}
+function renderDiagram(){const ctx={hardware,state:snap,day,events,service:['purpose','conops'].includes(view.domain)?serviceFor(sim,view.start):null,selected:diagramParts[view.domain],thermalScale:view.thermalScale,qualificationWindow:view.domain==='thermal'?activeThermalWindow():undefined};updateSubsystemDiagram($('diagram-host'),view.domain,ctx)}
 function sectionHeader(index,title,description,actions=''){return '<header class="phase-b-heading '+(index==='02'?'analysis-heading':'')+'"><span class="section-number">'+index+'</span><div><h2>'+title+'</h2><p>'+esc(description)+'</p></div>'+actions+'</header>'}
-function designSection(){const d=domains[view.domain],params=d.inputs.filter(k=>controlByKey[k]&&k!=='disposalMethod').slice(0,4);
- return sectionHeader('01','Design',d.stages.B.description,'<div class="chips"><button class="btn" data-action="domainfields">Edit design inputs</button>'+(view.domain==='thermal'?'<button class="btn" data-action="tempbands">Thermal limits</button>':'')+'</div>')+'<div class="base-assumptions">'+params.map(k=>{const c=controlByKey[k],v=displaySetting(k,hardware.input[k]);return '<button class="chip" data-edit-input="'+esc(k)+'"><small>'+esc(c.label)+'</small><b>'+esc(fmt(v))+' '+esc(c.unit||'')+'</b></button>'}).join('')+'</div>';
+function designSection(){const d=domains[view.domain],params=purposeDomainFields(view.domain,hardware.input).filter(k=>controlByKey[k]&&k!=='disposalMethod').slice(0,4);
+ return sectionHeader('01','Design',purposeStageDescription(view.domain,'B',hardware),'<div class="chips"><button class="btn" data-action="domainfields">Edit design inputs</button>'+(view.domain==='thermal'?'<button class="btn" data-action="tempbands">Thermal limits</button>':'')+'</div>')+'<div class="base-assumptions">'+params.map(k=>{const c=controlByKey[k],v=displaySetting(k,hardware.input[k]);return '<button class="chip" data-edit-input="'+esc(k)+'"><small>'+esc(c.label)+'</small><b>'+esc(fmt(v))+' '+esc(c.unit||'')+'</b></button>'}).join('')+'</div>';
 }
 function diagramTools(){return sectionHeader('02','Analysis','Read the response of this design at the mission clock. Select a time or event to follow its effects.')+`<div class="diagram-toolbar"><div><button class="btn" data-action="diagramplay">${icon(playing?'pause':'play',13)} ${playing?'Pause':'Run clock'}</button><button class="textbutton" data-action="window" id="diagram-clock">${esc(time(view.t))} ${icon('clock-3',13)}</button><button class="textbutton" data-action="events">Select event</button></div></div>`}
 function updateDiagramClock(){if($('diagram-clock'))$('diagram-clock').textContent=time(view.t)}
@@ -481,14 +565,14 @@ function updateDiagramClock(){if($('diagram-clock'))$('diagram-clock').textConte
 function recommendedCamera(phase,domain){return recommendedDomainCamera(phase,domain)}
 function effectiveLayers(){const automatic=view.domain==='thermal'&&['C','D','E'].includes(view.phase)&&view.thermalAuto!==false;return automatic?[...new Set([...view.overlays,'thermal'])]:view.overlays}
 function toggleThermal(){const was=effectiveLayers().includes('thermal');view.overlays=view.overlays.filter(k=>k!=='thermal');view.thermalAuto=!was;if(!was&&view.domain!=='thermal')view.overlays.push('thermal');scene?.setOverlays(effectiveLayers());syncThermalToggle()}
-function currentContext(){return {hardware,state:snap,sim,audit:sim.audit,day,events,samples:daySamples,windowStart:view.start,windowEnd:Math.min(sim.duration,view.start+DAY)}}
+function currentContext(){return {hardware,state:snap,sim,service:['purpose','conops'].includes(view.domain)?serviceFor(sim,view.start):null,audit:sim.audit,day,events,samples:daySamples,windowStart:view.start,windowEnd:Math.min(sim.duration,view.start+DAY)}}
 function renderObservation(){$('guidepanel').innerHTML=observationCard({...view,isPlaying:playing},currentContext(),time(view.t))}
 function renderDisposal(){
  const p=sim.disposal(),host=$('disposal-plot'),expanded=host.querySelector('details[open]')!=null;
  scene?.setDisposalPlan?.(p);host.innerHTML=renderDisposalView(hardware,snap,p);if(expanded){const d=host.querySelector('details');if(d)d.open=true}
 }
 function comparison(){
- const domain=domains[view.domain],keys=domain.tradeKeys.filter(k=>controlByKey[k]&&!lock(k)&&k!=='disposalMethod');if(!keys.length)keys.push('altitudeKm');
+ const keys=purposeTradeKeys(view.domain,hardware.input).filter(k=>controlByKey[k]&&!lock(k)&&k!=='disposalMethod');if(!keys.length)keys.push('altitudeKm');
  if(!keys.includes(view.tradeKey))view.tradeKey=keys[0];if(!view.tradeBase)view.tradeBase={...input};
  const k=view.tradeKey,pin=view.tradeBase;
  if(!tradeCache||tradeCache.current!==sim||tradeCache.pin!==pin||tradeCache.key!==k){
@@ -507,7 +591,7 @@ function renderTrade(editors=true){
  const live=currentContext(),both=b.model===sim;if(!both&&(tradeCache.start!==start||tradeCache.end!==end||tradeCache.audited!==!!b.model.audit)){
   tradeCache.baseDay=b.model.daySummary(start);tradeCache.baseSamples=b.model.window(start,end-start,145);tradeCache.start=start;tradeCache.end=end;tradeCache.audited=!!b.model.audit;
  }
- const base=both?live:{hardware:b.base,state:b.model.at(view.t),day:tradeCache.baseDay,events:[],sim:b.model,audit:b.model.audit,samples:tradeCache.baseSamples,windowStart:start,windowEnd:end};
+ const base=both?live:{hardware:b.base,service:['purpose','conops'].includes(view.domain)?serviceFor(b.model,start):null,state:b.model.at(view.t),day:tradeCache.baseDay,events:[],sim:b.model,audit:b.model.audit,samples:tradeCache.baseSamples,windowStart:start,windowEnd:end};
  const off=live.samples.at(-1)?.t>end+.01;if(off)live.samples=sim.window(start,end-start,145);
  $('trade-output').innerHTML=`<div class="trade-caption"><b>${esc(controlByKey[b.key].label)}</b><span>Pinned ${esc(fmt(view.tradeBase[b.key]))} → current ${esc(fmt(input[b.key]))} ${esc(controlByKey[b.key].unit||'')}</span></div>`+renderDomainTrade(view.domain,base,live)+'<div class="trade-footer"><button class="btn" data-action="comparemissions">'+icon('activity',13)+' Compare both full missions</button><span id="trade-status">'+(both?'Both cases currently share one design.':b.model.audit&&sim.audit?'Both missions integrated chronologically.':'Day curves use matched mission times.')+'</span></div>';
 }

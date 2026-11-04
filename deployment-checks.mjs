@@ -4,6 +4,8 @@ import assert from 'node:assert/strict';
 import {writeFileSync} from 'node:fs';
 import {radiusAt} from './dist/fairings.js';
 import * as T from './dist/vendor/three.module.js';
+import {aiPurposes} from './dist/ai-purpose.js';
+import {defaults,sizeDesign,applyAIPurpose} from './dist/design.js';
 import {presetList} from './dist/mission-presets.js';
 import {deploymentLayout,leafPose,leafAxes,deploymentSchedule} from './dist/deployment.js';
 import {makeCraft} from './dist/craft.js';
@@ -47,9 +49,11 @@ function verifyRenderedLeaves(h){
  }});assert.equal(margin>=0,h.fairing.fit,'Rendered stack and planning fit disagree');return margin;
 }
 if(process.argv[1]?.endsWith('deployment-checks.mjs')){
- const steps=Number(process.argv[2]||2400),rows=[];
- for(const {id,h}of presetList){const {mins,details}=auditDeployment(h,steps),meshFitMarginM=verifyRenderedLeaves(h);assert(Math.min(...Object.values(mins))>0,'Collision in '+id);
-  const round=x=>+x.toFixed(8);const row={id,minLeafGapM:round(mins.panel),minSolarRadiatorGapM:round(mins.cross),minHardwareGapM:round(mins.hardware),minCarriageGapM:round(mins.foreignGuide),fit:h.fairing.fit,radialClearanceM:round(h.fairing.radialClearanceM),axialClearanceM:round(h.fairing.axialClearanceM),meshFitMarginM:round(meshFitMarginM)};rows.push(row);console.log(JSON.stringify(row));
+ const steps=Number(process.argv.slice(2).find(k=>/^\d+$/.test(k))||2400),rows=[],ai=process.argv.includes('--ai');
+ assert(steps>0);
+ const designs=ai?Object.keys(aiPurposes).map(id=>({id,h:sizeDesign(applyAIPurpose(defaults,id,true))})):presetList;
+ for(const {id,h}of designs){const {mins,details}=auditDeployment(h,steps),meshFitMarginM=verifyRenderedLeaves(h);assert(Math.min(...Object.values(mins))>0,'Collision in '+id);
+  const round=x=>+x.toFixed(8);const row={id,...(ai?{launcher:h.input.launcher}:{}),minLeafGapM:round(mins.panel),minSolarRadiatorGapM:round(mins.cross),minHardwareGapM:round(mins.hardware),minCarriageGapM:round(mins.foreignGuide),fit:h.fairing.fit,radialClearanceM:round(h.fairing.radialClearanceM),axialClearanceM:round(h.fairing.axialClearanceM),meshFitMarginM:round(meshFitMarginM)};rows.push(row);console.log(JSON.stringify(row));
  }
- if(process.argv.includes('--write')){assert(steps>=2400);const data={posesPerPreset:steps+1,stepSeconds:300/steps,motionModel:'Sampled nominal rigid envelopes; full-size leaves, box-bounded installed hardware, and non-attached leaf to carriage clearances. Flexure, backlash and tolerances are excluded.',rows};writeFileSync(new URL('./dist/deployment-audit.js',import.meta.url),'// Reproduce with node deployment-checks.mjs '+steps+' --write\nexport const deploymentAudit='+JSON.stringify(data,null,2)+';\n');}
+ if(process.argv.includes('--write')){assert(steps>=2400);const data={posesPerPreset:steps+1,stepSeconds:300/steps,motionModel:'Sampled nominal rigid envelopes; full-size leaves, box-bounded installed hardware, and non-attached leaf to carriage clearances. Flexure, backlash and tolerances are excluded.',rows};const path=ai?'./dist/ai-deployment-audit.js':'./dist/deployment-audit.js',name=ai?'aiDeploymentAudit':'deploymentAudit';writeFileSync(new URL(path,import.meta.url),'// Reproduce with node deployment-checks.mjs '+steps+(ai?' --ai':'')+' --write\nexport const '+name+'='+JSON.stringify(data,null,2)+';\n');}
 }

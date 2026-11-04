@@ -1,4 +1,6 @@
 // Interactive engineering plates. Geometry is schematic except where dimensions are marked.
+import {aiPurposes} from './ai-purpose.js';
+import {purposeInfo,purposeId} from './purpose-display.js';
 import {launchFleet} from './launch-fleet.js';
 import {launcherSilhouette} from './launch-fleet-ui.js';
 import {presets} from './design.js';
@@ -62,8 +64,14 @@ function compute({h,d,s},id){
  P('memory','Model memory','Weights, context and KV cache occupy accelerator memory for every active model replica.','context','compute',[row('Weight precision',val(d.bits,'bit')),row('Weights per replica',val(h.modelGB,'GB')),row('KV per replica',val(h.kvGB,'GB')),row('Batch',d.batch+' streams / replica')]),
  P('storage','Solid-state recorder','Output text and bulk products share the recorder. Delivered bytes leave the queue when the terminal has a ground pass.','storageTB','storage',[row('Media',tech(d,'storage')),row('Installed / free',val(h.storageTB,'TB')+' / '+val(s.freeTB,'TB')),row('Queued text',val(s.textQueueGB,'GB')),row('Queued bulk data',val(s.bulkQueueGB,'GB'))]),
  P('cooling','Cold plate','Power dissipated in the trays enters a pumped loop through the cold plates.','thermalResistanceKPerKw','radiator',[row('Cold plate',val(s.coldPlateK,'K')),row('Tray resistance',val(d.thermalResistanceKPerKw,'K/kW')),row('Compute draw',val(s.itKW,'kW'))])];
+ if(h.ai&&purposeId(h)!=='text'){
+  const q=h.ai,profile=purposeInfo(h);
+  parts[0]=P('compute','Accelerator trays',profile.phases[2],'trayCount','compute',[row('Installed',h.trays+' trays / '+h.chips+' accelerators'),row('Workload',q.label),row('Onboard work rate',val(s.aiUnitRate,q.unit+'/s',2)),row('Fabric efficiency',val(q.fabricEfficiency*100,'%'))]);
+  parts[1]=P('memory','Model state','Installed accelerator memory must hold the selected workload’s resident model and execution state.',q.training?'trainingStateBytes':'context','compute',[row('Model state',val(q.modelMemoryGB,'GB')),row('Installed memory',val(q.installedMemoryGB,'GB')),row('Headroom',val(q.memoryMarginGB,'GB'))]);
+  parts[2]=P('storage','Staging and output','Customer inputs and returned products share the recorder with persistent model files.','storageTB','storage',[row('Staged customer input',val(s.aiInputBufferGB,'GB')),row('Queued customer product',val(s.aiProductQueueGB,'GB')),row('Earth receipt',val(s.aiProductDeliveredGB,'GB'))]);
+ }
  const art=path('M57 40H369V219H57Z','sd-boundary')+T(69,58,'COMPUTE ENCLOSURE','sd-over','start')+
- flow(id,'M154 115H239','cyan',s.tokensPerSec>0)+flow(id,'M318 115H444','cyan',s.offeredMbps>0)+flow(id,'M279 146V183h77','amber',s.itKW>0)+
+ flow(id,'M154 115H239','cyan',(s.aiUnitRate??s.tokensPerSec)>0)+flow(id,'M318 115H444','cyan',s.offeredMbps>0)+flow(id,'M279 146V183h77','amber',s.itKW>0)+
  pick(parts[1],75,74,90,87,glyph('chip',119,108,.82)+named(120,152,'HBM',val(h.memoryGB,'GB',0)))+
  pick(parts[0],218,66,115,100,glyph('rack',274,106,.94)+named(274,152,'Accelerators',h.trays+' trays'))+
  pick(parts[2],424,76,105,96,glyph('ssd',477,111,1)+named(477,154,'Recorder',val(s.queueGB,'GB queued'))) +
@@ -232,20 +240,49 @@ function launcher({h,d,s}){
  return info('Carrier architecture and payload capacity',vehicle.name+' · '+vehicle.status,parts,art,[legend('steel','Provider LEO reference'),legend('violet','Entered allowance'),legend('green','Integrated payload')],h.launchScreenFeasible?'Passes nominal launch screens':'Launch screen exceeded');
 }
 
+function purpose({h,d,s,events},id){
+ const profile=purposeInfo(h),q=h.ai||{},u=q.unit||'work unit',p=aiPurposes[purposeId(h)],contact=events.find(e=>e.type==='contact'&&e.end>=s.t);
+ const parts=[
+  P('customer','Earth customer',profile.goal,q.training?'trainingBudgetDays':'serviceDeadlineS',null,[row('Recipient',profile.customer),row('Requested deliverable',profile.product),row('Required mean pace',val(q.requiredRate,u+'/s',3)),row('Route',d.serviceRoute==='relay'?'Assumed relay':'Direct contacts')]),
+  P('input','Input staging','The spacecraft must receive or preload the input before it can process it.','initialInputGB','storage',[row('Input',profile.input),row('Staged inventory',val(s.aiInputBufferGB,'GB',3)),row('Consumed',val(s.aiInputConsumedGB,'GB',3)),row('Allocated buffer',val(d.inputSpoolGB,'GB'))]),
+  P('work','Payload work',profile.phases[1],p.fields[0],'compute',[row('Installed peak estimate',val(q.activeUnitsPerSec,u+'/s',2)),row('Current work rate',val(s.aiUnitRate,u+'/s',2)),row('Memory headroom',val(q.memoryMarginGB,'GB')),row('Completed onboard',val(s.aiUnitsComputed,u,1))]),
+  P('product','Earth product',profile.product+'. The transfer ledger credits bytes received at the Earth endpoint.','serviceRoute','communications',[row('Output',profile.output),row('Generated onboard',val(s.aiProductGeneratedGB,'GB',3)),row('Queued',val(s.aiProductQueueGB,'GB',3)),row('Received on Earth',val(s.aiProductDeliveredGB,'GB',3))],contact)];
+ const review={
+  text:['Text service gate','First-token time and stream cadence are measured at the Earth endpoint. A complete turn must meet its return deadline.','ttftTargetS','TTFT ≤ '+val(d.ttftTargetS,'s')+'  ·  stream ≥ '+val(d.targetStreamTps,'tok/s'),[row('First token target',val(d.ttftTargetS,'s')),row('Minimum stream rate',val(d.targetStreamTps,'tok/s')),row('Maximum gap',val(d.streamGapTargetS,'s')),row('Return deadline',val(d.serviceDeadlineS,'s'))],path('M0 15h7v-9h3v9h9v-6h3v6h9v-6h3v6h9v-6h3v6h7','sd-trace')],
+  voice:['Conversation gate','First audible reply, playout continuity and interruption handling are assessed against the caller’s timing requirements.','voiceFirstAudioTargetS','First audio ≤ '+val(d.voiceFirstAudioTargetS,'s')+'  ·  barge-in ≤ '+val(d.voiceInterruptionTargetS,'s'),[row('Encoded packet',val(d.audioChunkMs,'ms')),row('Playout buffer',val(d.voicePlaybackBufferMs,'ms')),row('Interruption to silence',val(d.voiceInterruptionTargetS,'s'))],path('M0 12h6l3-8 4 16 4-20 5 24 4-14 3 6 4-5h7l3-3 3 5h7','sd-trace')],
+  batch:['Delivery cutoff','Queued items qualify after their result files return within deadline, weighted by the stated acceptance assumption.','batchQualityFraction','Deadline '+val(d.serviceDeadlineS,'s',0)+'  ·  acceptance '+val(d.batchQualityFraction*100,'%'),[row('Input object',val(d.batchInputMB,'MB')),row('Result object',val(d.batchResultMB,'MB')),row('Acceptance assumption',val(d.batchQualityFraction*100,'%'))],each(4,j=>rect(j*11,7,8,12,'sd-metal',1))+path('M47 2v20','sd-trace')],
+  agents:['Parallel research and verification','Within each assignment, workers exchange messages on the spacecraft. Successive stages, Earth tools and human review contribute to the time before a verified task reaches Earth.','agentFanout',val(d.agentFanout,'agents/stage')+'  ·  '+val(q.agentWaves,'waves/stage')+'  ·  '+val(d.serviceConcurrency,'Earth slots'),[row('Serial stages per assignment',val(d.agentSerialSteps,'stages')),row('Peer message per agent per stage',val(d.agentMessageKB,'kB')),row('Internal traffic per assignment',val(q.internalBytesPerTask/1e6,'MB',3)),row('Resident worker slots',val(q.agentWorkerSlots,'slots')),row('Live peer traffic',val(s.aiPeerMbps,'Mbit/s')),row('Earth tool share',val(100*d.earthToolFraction,'%')),row('Remote tool time',val(d.toolRttS,'s')),row('Verifier credit',val(100*d.agentVerifyFraction,'%'))],path('M7 12h5l9-8h11l8 8h7M12 12l9 8h11l8-8M12 12h28','sd-trace')+each(3,j=>rect(22,1+8*j,8,6,'sd-metal',1))],
+  finetune:['Adapter acceptance','Earth needs the selected artifact, matching validation evidence and a compatible base to use an adapter delta.','trainingCalibration','Artifact '+String(d.artifactKind)+'  ·  '+(d.baseCompatible==='yes'?'base compatible':'base unavailable'),[row('Export size',val(q.artifactGB,'GB',3)),row('Allowed delay after release',val(d.artifactReturnHours,'h')),row('Trainable fraction',val(100*d.trainableFraction,'%',3)),row('Validation target',val(d.validationTarget,'score',3)),row('Calibration',d.trainingCalibration)],rect(0,6,21,15,'sd-metal',2)+path('M25 13h8m-4-4v8','sd-line')+rect(38,9,13,9,'sd-device',2)],
+  pretrain:['Distributed training and return','The campaign needs resident optimizer state, sustained fabric capacity, a returned artifact and a calibrated quality target.','trainingTokensB',val(d.trainingTokensB,'billion tok')+'  ·  export '+val(q.artifactGB/1000,'TB'),[row('Model size',val(q.modelParamsB,'B parameters')),row('Fabric efficiency',val(q.fabricEfficiency*100,'%')),row('Restart package',val(q.restartGB,'GB')),row('Allowed delay after release',val(d.artifactReturnHours,'h')),row('Calibration',d.trainingCalibration)],path('M3 5h40M3 18h40M7 4v16m15-16v16m15-16v16','sd-trace')+each(6,j=>rect(3+j%3*15,2+Math.floor(j/3)*12,8,7,'sd-metal',1))]
+ }[p.id];
+ parts.push(P('qualification',review[0],review[1],review[2],null,review[4]));
+ const gate=pick(parts[4],30,186,530,48,rect(36,190,518,40,'sd-boundary',5)+'<g transform="translate(54,198)">'+review[5]+'</g>'+T(125,206,review[0].toUpperCase(),'sd-over','start')+T(125,223,review[3],'sd-value','start'));
+ const art=T(27,30,'EARTH CUSTOMER','sd-over','start')+T(183,30,'ORBITAL WORKLOAD','sd-over','start')+T(481,30,'EARTH RECEIPT','sd-over','start')+
+  path('M150 47H429V197H150Z','sd-boundary')+
+  flow(id,'M104 111H180','cyan',s.aiInputUploadedGB>0)+flow(id,'M245 111H303','cyan',s.aiUnitRate>0)+flow(id,'M364 111H475','violet',s.goodputMbps>0&&s.aiProductQueueGB>0)+
+  pick(parts[0],24,69,110,106,glyph('earth',76,109,.8)+named(76,157,'Demand',q.training?'Campaign':'Offers'))+
+  pick(parts[1],156,69,115,110,glyph('ssd',212,108,.83)+named(212,157,'Staged input',val(s.aiInputBufferGB,'GB',2)))+
+  pick(parts[2],284,69,125,110,glyph('rack',347,108,.82)+named(347,157,'Processing',val(s.aiUnitRate,u+'/s',1)))+
+  pick(parts[3],450,69,120,110,glyph('dish',508,106,.78)+named(508,157,'Delivered',val(s.aiProductDeliveredGB,'GB',2)))+
+  gate;
+ return info('AI customer service chain',profile.goal,parts,art,[legend('cyan','Inputs and execution'),legend('violet','Earth product')],profile.name);
+}
+
 function conops({h,d,s,day,events},id){
+ const profile=purposeInfo(h),q=h.ai||{},u=q.unit||'work unit';
  const current=events.filter(e=>e.start<=s.t&&e.end>s.t).sort((a,b)=>(a.end-a.start)-(b.end-b.start))[0],next=events.find(e=>e.start>s.t);
  const parts=[
  P('schedule','Operating schedule','The orbit clock schedules compute bursts. Eclipse, access, periodic burns and CMG unloading change the available resources.','duty','compute',[row('Mission horizon',val(d.missionYears,'yr')),row('Scheduled duty',val(d.duty*100,'%')),row('Operating interval',val(s.periodSec*d.duty/60,'min/orbit')),row('Active episode',current?.label||'Between scheduled episodes')],current),
- P('service','Compute service','The installed trays share prompt and decode work. The useful payload enters storage at the configured bytes per output token.','requiredTps','compute',[row('Required active output',val(d.requiredTps,'tok/s')),row('Installed active output',val(h.tokensPerSec,'tok/s')),row('Planned average',val(h.sustainedTps,'tok/s')),row('Delivered in this window',val(day.tokensDelivered,'tok',0))]),
+ P('service',profile.name,profile.goal,q.training?'trainingBudgetDays':'serviceDeadlineS','compute',[row('Customer',profile.customer),...(q.purposeId==='agents'?[row('Parallel agents per assignment stage',val(d.agentFanout,'agents')),row('Internal peer traffic',val(s.aiPeerMbps,'Mbit/s')),row('Earth service concurrency',val(d.serviceConcurrency,'slots'))]:[]),row('Peak work estimate',val(q.activeUnitsPerSec,u+'/s',2)),row('Computed onboard',val(s.aiUnitsComputed,u)),row('Product returned',val(s.aiProductDeliveredGB,'GB',3))]),
  P('access','Transfer opportunity','Ground visibility and acquisition start a transfer from the queued recorder. The shareable clock preserves the event and design state.','network','communications',[row('Access mask',val(d.elevationDeg,'°')),row('Windows today',String(day.contactCount??'—')),row('Transfer backlog',val(s.queueGB,'GB')),row('Next scheduled event',next?.label||'Outside this window')],events.find(e=>e.type==='contact'&&e.end>=s.t)),
  P('retirement','Retirement plan','Chemical control protects disposal inventory. The selected retirement method sets the terminal maneuver and final state.','disposalDv','propulsion',[row('Disposal method',(d.disposalMethod||'reentry')),row('Protected stock',val(s.disposalProtectedKg,'kg')),row('Orbit-maintenance allocation',val(d.yearsSupply,'yr')),row('Mission state',s.disposalStatus||'Scheduled')])];
- const art=T(42,37,'NOMINAL SPACECRAFT SERVICE','sd-over','start')+flow(id,'M102 95H200','cyan',s.t>=1200)+flow(id,'M266 95H362','cyan',s.tokensPerSec>0)+flow(id,'M421 95H487','violet',s.t>=s.disposalStart)+
+ const art=T(42,37,'NOMINAL SPACECRAFT SERVICE','sd-over','start')+flow(id,'M102 95H200','cyan',s.t>=1200)+flow(id,'M266 95H362','cyan',s.aiUnitRate>0)+flow(id,'M421 95H487','violet',s.t>=s.disposalStart)+
  pick(parts[0],34,57,105,115,circle(80,94,23,'sd-device')+path('M80 76v18l12 9','sd-hardware')+named(80,145,'Schedule',val(d.duty*100,'% duty')))+
  pick(parts[1],179,53,107,115,glyph('rack',233,94,.8)+named(233,145,'Compute',val(s.itKW,'kW')))+
  pick(parts[2],330,53,112,115,glyph('dish',386,91,.84)+named(386,145,'Transfer',val(s.goodputMbps,'Mbit/s')))+
  pick(parts[3],463,53,100,115,glyph('engine',513,92,.76)+named(513,145,'Retire',s.disposalStatus||'Planned'))+
  path('M80 185v10h432v-10','sd-dim')+T(296,220,'MISSION DURATION   '+num(d.missionYears,2)+' YEARS','sd-over');
- return info('Concept of operations','Schedule computation, downlink and mission retirement',parts,art,[legend('cyan','Routine service'),legend('violet','Retirement')],current?.type||s.flightPhase||'Mission sequence');
+ return info('Concept of operations',profile.goal,parts,art,[legend('cyan','Routine service'),legend('violet','Retirement')],current?.type||s.flightPhase||'Mission sequence');
 }
 
 function environment({h,d,s,day},id){
@@ -281,6 +318,7 @@ function environment({h,d,s,day},id){
 }
 
 function data({h,d,s,day,events},id){
+ if(h.ai&&purposeId(h)!=='text')return purpose({h,d,s,events},id);
  const parts=[
  P('text','Output text','The tokenizer traffic model converts generated tokens to transmitted bytes before communication overhead.','bytesPerToken','compute',[row('Serialization',val(d.bytesPerToken,'B/tok')),row('Instantaneous generated text',val(s.tokensPerSec*d.bytesPerToken*8/1e6,'Mbit/s',4)),row('Text waiting',val(s.textQueueGB,'GB',4)),row('Text received',val(s.textDeliveredGB,'GB',4))]),
  P('bulk','Bulk products','Imagery, checkpoints and model packages occupy the bulk recorder queue independently of text token rates.','bulkMbps','storage',[row('Bulk offered when active',val(d.bulkMbps,'Mbit/s')),row('Initial payload',val(d.initialQueueGB,'GB')),row('Bulk waiting',val(s.bulkQueueGB,'GB')),row('Bulk received',val(s.bulkDeliveredGB,'GB'))]),
@@ -297,7 +335,7 @@ function data({h,d,s,day,events},id){
  return info('Payload custody','Separate text and bulk queues from completed ground deliveries',parts,art,[legend('cyan','Output text'),legend('violet','Bulk payload')],s.goodputMbps>0?'Delivering':'Buffering');
 }
 
-const builders={conops,environment,orbit,compute,data,comm,power,thermal,attitude,prop,mass,launch,launcher};
+const builders={conops,purpose,environment,orbit,compute,data,comm,power,thermal,attitude,prop,mass,launch,launcher};
 export const schematicPages=Object.keys(builders);
 const indexes=Object.fromEntries(schematicPages.map((k,i)=>[k,String(i+1).padStart(2,'0')]));
 const norm=({hardware:h,state:s,day={},events=[],selected,instance,qualificationWindow,thermalScale})=>({h,d:h.input,s,day,events,selected,instance,qualificationWindow,thermalScale});

@@ -3,6 +3,7 @@ import {controls,defaults,inverseSolve,presets,validateDesign} from './design.js
 const fields=Object.fromEntries(controls.map(c=>[c.key,c]));
 const rateNames={solar:'Solar generation',battery:'Eclipse energy',thermal:'Heat rejection',storage:'Storage capacity',downlink:'Link capacity',compute:'Compute service',propellant:'Propellant supply',diskLife:'Storage endurance',launcherReference:'Vehicle reference capacity',mass:'Launch allowance',fairing:'Stowed fit'};
 const dependencies={
+ aiPurpose:['AI Data Center Purpose','Mission CONOPS','Compute & Storage','Data & Delivery','Communications','Battery & Power','Thermal','Mass Budget'],
  launcher:['Launch Vehicle','Launch & Insertion','Mass Budget','Orbit & Eclipse'],battery:['Battery & Power','Thermal','Mass Budget','Launch & Insertion'],
  compute:['Compute & Storage','Data & Delivery','Battery & Power','Thermal','Mass Budget'],workload:['Compute & Storage','Data & Delivery','Communications','Battery & Power'],
  storage:['Compute & Storage','Data & Delivery','Battery & Power','Mass Budget'],pv:['Battery & Power','Environment','Attitude Control','Mass Budget'],coating:['Thermal','Environment','Battery & Power'],
@@ -13,6 +14,7 @@ const dependencies={
 // Each item is an independently entered requirement whose validity can change
 // even when the preset does not supply a replacement value.
 const validationLinks={
+ aiPurpose:[['compute','Check accelerator memory and sustainable performance for this workload.'],['storageTB','Reserve capacity for the new input, scratch data and customer artifacts.'],['serviceRoute','Recheck Earth availability, return bandwidth and delivery deadlines.'],['fabricGbps','Verify the cluster interconnect against model sharding, tool traffic or training synchronization.']],
  launcher:[['launchAllowanceKg','Confirm delivered performance for the target orbit and the selected recovery mode.'],['inclinationDeg','Verify injection inclination with the provider.'],['adapterKg','Reconcile adapter and separation hardware with the interface drawing.'],['trimDv','Recheck the separation dispersion and spacecraft trim allocation.']],
  battery:[['batteryKWh','Check the number of series and parallel cells that realize this pack energy.'],['batteryOpMinK','Check the pack-level operating limits, including low-temperature charging.'],['batterySurvMinK','Verify the selected pack’s storage and survival limits.'],['socMin','Confirm the usable SOC window and cycle-life assumptions for this chemistry.']],
  pv:[['solarM2','Recheck peak and end-of-life bus supply using the installed planform.'],['solarDelivery','Check harness, regulator and array operating-point losses.']],
@@ -27,12 +29,13 @@ const validationLinks={
  attitude:[['solarTiltDeg','Check illumination, effective radiator area and exposed silhouette.']],thermalMode:[['radiatorM2','Recheck the thermal balance for the selected applied or compute heat.']]
 };
 const metrics=[
+ ['Accelerator trays','trays',r=>r.hardware.trays],['Accelerator memory headroom','GB',r=>r.hardware.ai?.memoryMarginGB],['Required local storage','GB',r=>r.hardware.ai?.requiredStorageGB],['Active host CPU load','kW',r=>r.hardware.ai?.hostKw],['Active cluster fabric load','kW',r=>r.hardware.ai?.fabricKw],['Enclosed bus length','m',r=>r.hardware.bodyLengthM],
  ['Launch stack','kg',r=>r.hardware.launchKg],['Payload mass margin','kg',r=>r.hardware.massMarginKg],['Reference vehicle headroom','kg',r=>r.hardware.input.referenceKg-r.hardware.launchKg],
  ['Minimum radial clearance','m',r=>r.hardware.radialClearanceM],['Axial clearance','m',r=>r.hardware.axialClearanceM],
  ['Battery pack mass','kg',r=>r.hardware.massLedger.find(x=>x.id==='battery').kg],['Battery pack volume','L',r=>r.hardware.batteryVolumeL],
  ['Required nameplate energy','kWh',r=>r.envelope.batteryNeeded],['Required solar area','m²',r=>r.envelope.solarNeeded],
  ['Required radiator area','m²',r=>r.envelope.radiatorNeeded],['Design junction temperature','K',r=>r.envelope.thermalK],
- ['Active compute power','kW',r=>r.hardware.itKw],['Decode capacity','tok/s',r=>r.hardware.tokensPerSec],
+ ['Active compute power','kW',r=>r.hardware.itKw],['Decode capacity','tok/s',r=>r.hardware.ai?.training?null:r.hardware.tokensPerSec],
  ['Usable storage','TB',r=>r.hardware.usableTB],['Required goodput','Mbit/s',r=>r.envelope.goodputNeeded],
  ['Sizing link goodput','Mbit/s',r=>r.envelope.linkGoodput],['Station-keeping coverage','yr',r=>r.envelope.supplyYears],
  ['Required propellant','kg',r=>r.envelope.propForCoverage],['Disposal velocity allocation','m/s',r=>r.envelope.disposalBudgetDv],

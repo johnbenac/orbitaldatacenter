@@ -4,6 +4,7 @@ import {controls,defaults,presets,solveModes} from './design.js';
 import {thermalNodes} from './thermal-limits.js';
 import {fairings} from './fairings.js';
 import {launchFleet} from './launch-fleet.js';
+import {serviceSources} from './ai-service.js';
 
 const GOLD='https://standards.nasa.gov/system/files/tmp/GSFC-STD-1000RevI_Approved_0.pdf';
 const GEVS='https://standards.nasa.gov/sites/default/files/standards/GSFC/B/0/gsfc-std-7000b_signature_cycle_04_28_2021_fixed_links.pdf';
@@ -441,6 +442,100 @@ for(const key of ['blanketKgM2','blanketEffectiveEpsilon','blanketOuterEpsilon',
 for(const key of ['emissivityRetention','alphaGrowth'])catalog[key].ids.unshift('painttest');
 const aliases={'phase-solve':'solve',solver:'solve',sizingMethod:'solve',designFrom:'solve',preset:'missionPreset',presetSelection:'missionPreset',presets:'missionPreset',newpreset:'newPreset',savepreset:'savePreset',loadpreset:'loadPreset',managepresets:'managePresets',presetname:'presetName',presetdescription:'presetDescription',thermalTargets:'thermalRole','bound-role':'thermalRole','thermal-node':'thermalNode','thermal-scope':'thermalScope','thermal-padding':'thermalPadding',thermalTarget:'thermalRole','thermal-scale':'thermalScale',solverTarget:'independentTarget',compare:'technologyCompare',disposal:'disposalMethod',launcherProfile:'launcherEnvelope'};
 const numericExtras={kvKB:['kB/tok'],diskModuleKg:['kg'],referenceKg:['kg']};
+// Service goals, hardware sizing and customer acceptance have separate evidence.
+for(const r of serviceSources)source(r.id,r.title,r.url,r.locator,r.kind);
+group('mlperf-inference seh',missionBasis,[
+ ['serviceOffersPerHour','Enter external offers per wall-clock hour. Every arrival, including one made during an outage, belongs in the service denominator.'],
+ ['serviceConcurrency','Set the number of runnable user slots whose data and model state can coexist on the installed hardware. Excess arrivals remain queued.'],
+ ['serviceDeadlineS','Measure the receipt deadline from the Earth-side request or job offer. For a training order the dedicated training budget in days sets the deadline.'],
+ ['targetStreamTps','Choose a sustained generation target per simultaneous Earth stream. Inspect achieved rate alongside first-response delay and interruptions; ingress and protocol overhead have separate budgets.','10,000 streams × 50 tok/s × 4 B/token × 8 bits/B = 16 Mbit/s of text payload.'],
+ ['liveQualityFraction','Estimate the share of SLA-qualified replies that pass a named answer-quality or voice intelligibility/effectiveness test. Multiply by the count received by deadline, keeping every Earth offer in the denominator.'],
+ ['ttftTargetS','Choose the maximum delay from the Earth prompt offer until the first returned output token, including acquisition, input transfer, waiting, prefill and return propagation.'],
+ ['streamGapTargetS','Set the longest acceptable gap between returned text tokens. Evaluate outage gaps and cadence independently of mean decode throughput.'],
+ ['batchResultSwing','Set the deterministic fractional variation above and below mean object size. Alternating small and large results make storage spikes and contact return times visible without changing average production.','At 10 MB per result and a 0.4 swing, alternating objects are 6 MB and 14 MB.'],
+ ['batchQualityFraction','Supply the acceptance fraction from validation on the intended dataset and test. This parameter converts on-time returned items to expected accepted items.'],
+ ['batchInputMB','Measure the actual staged input file in decimal MB. Large inputs compete for uplink and recorder capacity.'],
+ ['batchResultMB','Measure the encoded output object. Change this input to test text-sized output, images, embeddings or larger generated products.'],
+ ['customerUplinkMbps','Set an explicit customer-traffic cap. Direct spacecraft ingress also depends on station contact, acquisition and the S-band channel left after commands.'],
+ ['initialInputGB','Specify customer data already aboard at the epoch. Preloaded examples or a resident training corpus can be processed without crediting new Earth utterances as uploaded.'],
+ ['inputSpoolGB','Reserve persistent storage for uploaded inference requests and file inputs waiting for compute. Check space for outputs and other retained files separately.']
+]);
+group('opus mlperf-inference',missionBasis,[
+ ['voiceAudioKbps','Enter the encoded speech bitrate per direction. Include the actual codec and packet overhead in the service budget.'],
+ ['voiceTurnSeconds','Set the duration of the input speech and modeled audible reply. The bidirectional byte budget is independent of serialized text bytes.'],
+ ['audioChunkMs','Set the modeled audio packet duration. Compare packetization delay and buffering with the first-audio and interruption objectives.'],
+ ['vadEndpointMs','Estimate the delay to recognize that speech has ended, from a measured turn-taking trace. Network and inference time are added afterward.'],
+ ['voicePlaybackBufferMs','Provide the receiving client’s jitter buffer and playout delay. A larger buffer can mask short gaps and increases interruption-to-silence delay.'],
+ ['voiceFirstAudioTargetS','Set the maximum time from speech end on Earth to the first audible reply, after voice processing, return transit and buffering.'],
+ ['voiceInterruptionTargetS','Set the acceptable interruption-to-silence time. The counterfactual probe includes sending a cancellation, receiving the response and clearing the modeled playout buffer.']
+]);
+group('agent-study claude-study mlperf-inference',estimate,[
+ ['agentFanout','Set the number of search agents commissioned inside one assignment at each serial stage. Limited model slots force parallel branches into successive waves. Only one verifier-qualified result can be returned per assignment.'],
+ ['agentMessageKB','Specify the total decimal kB exchanged by each participating agent per stage. These peer messages consume onboard fabric bandwidth separately from the customer-facing result.'],
+ ['agentVerifyFraction','Enter an evidence-backed verification acceptance fraction for the assigned task class. Compare completed, tested results with all Earth task offers.'],
+ ['agentSerialSteps','Count model stages that depend sequentially on previous outputs. Tool round trips can block each stage.'],
+ ['toolsPerTask','Estimate the typical number of tool executions per task, including verification steps when they consume resources.'],
+ ['toolCpuSeconds','Measure local tool CPU core-seconds per call under the selected task and verification workload. Parallel cores affect aggregate throughput.'],
+ ['toolIOMB','Budget per-call input/output bytes. The service model splits the modeled remote transfer into request and response.'],
+ ['hostCores','Enter installed usable CPU cores available for tool execution, staging and service. Check host power and fabric load with the active purpose.'],
+ ['earthToolFraction','Allocate tool calls between Earth-hosted tools and onboard tools. Earth calls wait for usable downlink and uplink in the model.'],
+ ['toolRttS','Enter remote tool processing and gateway delay in addition to the actual Earth-path round trip.'],
+ ['humanSteeringS','Add the Earth-side human review time for each task requiring steering. The request and response still need contact opportunities.']
+]);
+group('optimizer parallel mlperf-training',estimate,[
+ ['fabricGbps','Use sustained useful collective bandwidth per worker at the selected topology. Gradients, optimizer steps and communication overhead affect attainable training throughput.'],
+ ['trainingStateBytes','Enter device memory bytes per updated parameter, including the relevant weights, gradients and optimizer state at actual precision.'],
+ ['trainableFraction','For parameter-efficient tuning, enter updated parameters divided by total base parameters. The resident base and activation workspace still need memory.'],
+ ['activationFraction','Reserve activation and temporary workspace memory as a fraction of modeled training state. Use measurements at the selected batch, context and recomputation settings.'],
+ ['pretrainParamsB','Enter the complete model parameter count in billions. All stored parameters contribute to model size.'],
+ ['activeParamFraction','Set the portion of total parameters active per training token. Sparse activation reduces arithmetic under a specified model architecture while stored state still occupies memory.'],
+ ['trainingTokensB','Set the pretraining token budget in billions. A token count determines compute work; quality requires a matched validation calibration.'],
+ ['fineTuneTokensM','Set the customer tuning budget in millions of optimizer input tokens, including repeated epochs.'],
+ ['trainingStepTokens','Set global tokens processed for an optimizer update. Communication per step interacts with compute and fabric bandwidth.'],
+ ['trainingBudgetDays','Set the customer’s wall-clock order deadline, allowing time for staging, training, validation and complete transfer to Earth.'],
+ ['datasetGB','Enter unique corpus bytes that must be resident for this run. Multiple epochs can reuse these data without adding new unique tokens.'],
+ ['checkpointIntervalH','Set scheduled restart-save spacing in active hours. Compare exposed work between saves against I/O overhead.'],
+ ['checkpointBytesPerParam','Use measured serialized restart state per relevant trained parameter; architecture, precision and optimizer change this number.','At 14 bytes per parameter, a full one-trillion-parameter restart package occupies 14 decimal TB.'],
+ ['artifactReturnHours','Set the Earth delivery budget starting only after the final artifact has been trained and serialized. An order must meet this handoff and the separate end-to-end training deadline.','Returning 2 TB in 6 h takes an average 741 Mbit/s of net goodput, compared with about 3.09 Mbit/s over 60 days. Intermittent access requires higher in-contact rates.'],
+ ['artifactBits','Choose the packed precision of the exported full weights. Record configuration, tokenizer and any quantization metadata separately.','One trillion full weights occupy 2 decimal TB at 16 bits, or 500 GB at packed four-bit precision, before metadata.'],
+ ['corpusTokenBytes','Set the serialized pretokenized bytes per unique stored token. Account for metadata or independently staged source data if appropriate.','One trillion distinct uint32 token IDs occupy 4 decimal TB before metadata.'],
+ ['validationTarget','Set the required higher-is-better score on a named held-out task. Use the same validation protocol for both hardware options.'],
+ ['validationObserved','Enter the calibration result obtained at this order’s token budget, model revision and training recipe. The estimator does not generate validation evidence.'],
+ ['validationBaseline','Enter the base model’s evaluation score on the same task and protocol. The achieved gain is the calibrated tuned score less the baseline.']
+]);
+group('laser filing suncatcher',assume,[
+ ['relayUpMbps','Use contract-level customer uplink goodput after routing and overhead. Hardware intersatellite line rates do not establish customer access.'],
+ ['relayDownMbps','Specify the customer downlink separately from uplink, ground access and the laser hardware line rate.'],
+ ['relayAvailability','Specify the available share of a repeatable service cycle. The experiment applies an additional handover blackout each cycle.'],
+ ['relayCycleS','Choose the period of the assumed relay availability pattern. This scheduling sensitivity stands in for a signed service trace.'],
+ ['relayHandoverS','Reserve a blackout at the start of each relay cycle. Direct-plus-relay falls back to the ground link only if the station is acquired.'],
+ ['relayRttMs','Enter the complete relay-path round trip including switching and gateway legs. The model uses half of this value per direction.'],
+ ['groundEdgeMs','Add Earth-side gateway processing one way. This is separate from slant-range propagation or contracted relay RTT.']
+]);
+group('mlperf-inference mlperf-training',assume,[
+ ['earthITKw','Measure Earth IT power for a hardware configuration running the same task, quality test and service objective.'],
+ ['earthUsefulPerHour','Enter Earth hardware throughput for comparable completed orders before the separate quality and deadline acceptance factors.'],
+ ['earthPUE','Use facility electricity divided by IT electricity for the workload location and measurement interval.'],
+ ['earthQualityFraction','Supply independently measured acceptance among completed Earth jobs using the same quality criterion as the spacecraft.'],
+ ['earthDeadlineFraction','Enter the fraction of quality-accepted Earth completions meeting the same wall-clock service deadline.'],
+ ['earthEnergyPrice','Enter the electricity tariff per facility kWh for an energy-only operating-cost comparison.'],
+ ['spaceEnergyPrice','Optionally assign a cost per spacecraft bus kWh. Launch, manufacturing, ground and relay contract charges are outside this accounting boundary.']
+]);
+for(const [key,advice,ids] of [
+ ['aiPurpose','Select the customer deliverable before choosing spacecraft hardware. Compare Earth-returned useful work under its own acceptance criteria.','mlperf-inference mlperf-training'],
+ ['serviceRoute','Choose direct contacts, an assumed relay path, or relay with direct fallback. One path supplies the payload in an interval.','laser filing'],
+ ['trainingCalibration','Declare whether a measured validation result maps this model, data, recipe and token budget to the specified quality target.','mlperf-training'],
+ ['baseCompatible','Record whether the Earth recipient has the exact base model, revision, tokenizer and adapter configuration required to load the update.','peft'],
+ ['artifactKind','Choose the deliverable the customer needs to open on Earth. Adapter updates, complete weights and restartable training states have different byte counts and dependencies.','peft optimizer']
+])catalog[key]={advice,ids:ids.split(' '),basis:codeInput};
+options('aiPurpose',[
+ ['text','Count on-time turns that meet Earth first-token delay and streaming cadence.','mlperf-inference'],['voice','Count audible turns with acceptable response, gap and cancellation delay.','opus'],['batch','Count quality-accepted objects received by deadline.','mlperf-inference'],['agents','Count verified tasks with their entire tool and steering chain.','agent-study claude-study'],['finetune','Require a matched validation and usable adapter or full-model receipt.','peft mlperf-training'],['pretrain','Require an attainable training state, matched target quality, and final artifact return.','mlperf-training parallel optimizer']
+]);
+options('serviceRoute',[['direct','Serve Earth work through actual ground visibility, acquisition and directional net rate.','rf ground'],['relay','Use an explicitly assumed periodic relay customer service contract.','laser filing'],['hybrid','Prefer the available relay and switch to acquired ground during outages; never add the two rates.','laser rf']]);
+options('trainingCalibration',[['none','Report physical training and transfer forecasts with quality still unassessed.','mlperf-training'],['measured','Use the specified matched evaluation score at the full training-token budget.','mlperf-training']]);
+options('baseCompatible',[['yes','The receiving site already holds the declared compatible base.','peft'],['no','An adapter alone cannot reconstruct the requested model at the recipient.','peft']]);
+options('artifactKind',[['adapter','Return trainable adapter weights and their configuration against a compatible base.','peft'],['full','Return the complete updated model at export precision.','peft optimizer'],['restart','Return training state required for restart under this implementation, including optimizer state as configured.','optimizer parallel']]);
+
 export const guidanceSources=Array.from(refs.values());
 function records(ids){return [...new Set(ids)].map(id=>{const r=refs.get(id);if(!r)throw Error('Unregistered guidance source '+id);return r})}
 function resolvedKey(key){return aliases[key]||key}

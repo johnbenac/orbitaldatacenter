@@ -33,7 +33,7 @@ for(const p of presetList)assert.ok(shelf.includes('data-design="'+p.id+'"'));
 assert.deepEqual(domainIds,Object.keys(domains));
 for(const phase of 'ABCDEF')for(const domain of domainIds){
  const nav=domainNav({phase,domain});
- assert.equal((nav.match(/data-domain=/g)||[]).length,13);
+ assert.equal((nav.match(/data-domain=/g)||[]).length,14);
  assert.equal((nav.match(/aria-current="page"/g)||[]).length,1);
  const selected=nav.match(/<button[^>]*aria-current="page"[^>]*>/)[0];
  assert.ok(selected.includes('data-domain="'+domain+'"'),phase+' '+domain);
@@ -59,4 +59,4 @@ const assets=JSON.parse(readFileSync(new URL('./dist/assets.json',import.meta.ur
 assert.equal(new Set(assets).size,assets.length);
 for(const file of assets)assert.ok(statSync(new URL('./dist/'+file,import.meta.url)).isFile(),file);
 for(const file of ['app.js','matrix-ui.js','matrix.css','mission-presets.js','flight-chapters.js','domain-analysis.js','domain-analysis.css','deployment.js','entry.js','disposal-views.js'])assert.ok(assets.includes(file),file);
-console.log('Five launch studies, portable preset persistence and conflict handling, thirteen-domain navigation across six phases, ordered flight chapters, URL replay and packaged assets passed.');
+console.log('Five launch studies, portable preset persistence and conflict handling, fourteen-domain navigation across six phases, ordered flight chapters, URL replay and packaged assets passed.');

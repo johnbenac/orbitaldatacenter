@@ -62,9 +62,17 @@ export function dataRoutes(craft,h){
  // in the bus frame at the gimbal hardpoints; the terminal head points separately.
  craft.root.updateMatrixWorld(true);
  for(const [name,obj]of Object.entries(targets)){const at=craft.root.worldToLocal(obj.getWorldPosition(V()));add('down',[ssd,P(.18,.24,-.43),P(-.16,.31,-.38),sw,P(-.28,.38,-.35),top,V(at.x,top.y+.06*b,at.z),at],'down',name);}
- return {root,routes,update(s,visible){
+ // The purpose cutaway traces customer input through local staging. A relay
+ // contract has no located spacecraft endpoint, so its cue ends at the switch.
+ add('consume',[ssd,P(-.14,-.11,-.4),sw,P(-.16,.1,-.30),cpu],'bulk');
+ add('produce',[cpu,P(.23,.22,-.28),P(.09,.20,-.34),ssd],'write');
+ add('relay',[ssd,P(.01,.25,-.38),sw],'down');
+ return {root,routes,update(s,visible,kind='data'){
   root.visible=visible;if(!visible)return;const rates=routeRates(h,s);
-  for(const r of routes){const on=r.terminal?r.terminal===s.groundLink&&rates.down>0:rates[r.key]>0;
+  for(const r of routes){let on;if(kind==='purpose'){
+    const q=h.ai||{},relay=s.aiRoute==='relay',service=s.aiUnitRate>0;
+    on=r.terminal?!relay&&r.terminal===s.groundLink&&s.aiOutputMbps>0:r.key==='consume'?service&&q.inputBytesPerUnit>0:r.key==='produce'?service&&q.outputBytesPerUnit>0:r.key==='relay'?relay&&s.aiRelayOn&&s.aiOutputMbps>0:false;
+   }else on=r.terminal?r.terminal===s.groundLink&&rates.down>0:rates[r.key]>0;
    r.tube.visible=on;r.pulse.visible=on;
    if(on){const progress=((s.t*.19+(r.key==='write'?.31:r.key==='down'?.61:.12))%1+1)%1;r.pulse.position.copy(r.path.getPointAt(progress));}
   }

@@ -1,4 +1,6 @@
 // All quantities originate in the installed design, sizing envelope or time-resolved model.
+import {aiPurposes} from './ai-purpose.js';
+import {purposeId,purposeInfo} from './purpose-display.js';
 import {sizingEnvelope,ageProperties} from './design.js';
 import {launchFleet} from './launch-fleet.js';
 import {groundSites} from './orbit.js';
@@ -12,14 +14,23 @@ function spec(label,icon,summary,inputs,tradeKeys,curves,entries,eventTypes){
 }
 export const domains={
  conops:spec('Mission CONOPS','orbit','Mission objectives, operating schedule and delivered service.',
-  'missionYears requiredTps duty latencyTargetS idleComputePolicy pumpStandbyPolicy disposalMethod','duty missionYears requiredTps','tokensPerSec loadKW',[
-  ['Service definition','Specify the required output rate, response time, activity schedule and mission duration.','reqTps lifetime duty latencyTarget'],
-  ['Operating sequence','Compute is scheduled each orbit. Contacts drain the recorder, and maintenance burns protect the operating orbit.','orbitMinutes duty nSites periodOn'],
-  ['Mission return and resource limits','Compare service capacity with demand, then inspect the power and propellant needed to sustain it.','dutyTps serviceMargin meanBus annualProp launchMargin planLimit'],
-  ['Activation sequence','Follow payload integration, launch, separation and deployment before scheduled service begins.','phase deploymentPct trimPaidDv itKW solarKW'],
-  ['Work, store, transmit','Follow the selected operating interval from on-board compute to ground delivery.','burst tokensPerSec queueGB station dailyTokens dutyDelivery'],
-  ['End of service','Track final data disposition and the commanded retirement outcome.','disposalMode disposalStatus tokensDelivered queueGB lastContact closureReason']
+  'missionYears duty serviceRoute disposalMethod','duty missionYears trayCount','aiUnitRate loadKW',[
+  ['Customer mission requirements','Define the Earth customer, useful product, service target, activity schedule and closing condition.','aiPurpose aiGoal requiredWorkRate duty lifetime'],
+  ['Mission operating sequence','Connect the customer’s input, scheduled compute and flight-to-ground product handover.','aiPurpose aiDeliverable orbitMinutes periodOn nSites servicePath'],
+  ['Mission value and resource limits','Compare useful work for the selected mission against memory, energy, contact capacity and launch allowance.','aiPurpose activeWorkRate requiredWorkRate aiMemoryMargin meanBus launchMargin'],
+  ['Service commissioning','Follow input availability, processor power and commissioning before admitting customer work.','aiPurpose phase deploymentPct aiInputBufferGB itKW'],
+  ['Customer work and receipt','Trace the selected customer workload through onboard processing to the Earth endpoint.','aiPurpose aiUnitRate aiProductQueueGB aiProductDeliveredGB station'],
+  ['Customer service closeout','Reconcile the intended customer deliverable and received product with shutdown and disposal.','aiPurpose aiDeliverable aiUnitsComputed aiProductDeliveredGB disposalStatus closureReason']
  ],'launch insertion deployment burst contact reboost desat maneuver disposal coast impact entry graveyard'),
+ purpose:spec('AI Data Center Purpose','activity','Choose the Earth customer and measure the service or model artifact they actually receive.',
+  'serviceRoute duty trayCount storageTB','duty trayCount storageTB','aiUnitRate aiOutputMbps',[
+  ['Customer and primary goal','Choose the recipient, product and outcome that define a successful mission.','aiPurpose aiCustomer aiGoal aiDeliverable requiredWorkRate'],
+  ['Workload and delivery chain','Trace the input, computation and result transfer required for this customer.','aiPurpose aiDeliverable aiInputBytes aiOutputBytes aiRequiredStorage servicePath'],
+  ['Purpose-specific feasibility','Check the installed work rate, model-state memory, staging storage and delivery capacity.','aiPurpose aiUnit activeWorkRate requiredWorkRate aiMemoryMargin aiStorageMargin aiFabricEfficiency'],
+  ['Readiness for customer work','Inspect staged input, commissioning state and powered compute at the flight instant.','aiPurpose phase aiInputBufferGB aiUnitsComputed itKW deploymentPct'],
+  ['Service received on Earth','Assess the selected workload from offered input to qualified service or a received model artifact.','aiPurpose aiUnitsComputed aiInputConsumedGB aiProductGeneratedGB aiProductDeliveredGB aiProductQueueGB'],
+  ['Delivered outcome at closure','Reconcile completed work and transferred product with the selected mission’s success measure.','aiPurpose aiDeliverable aiUnitsComputed aiProductDeliveredGB aiProductQueueGB closureReason']
+ ],'launch insertion deployment burst contact eclipse disposal coast entry impact graveyard'),
  environment:spec('Environment','sun','External forcing, spacecraft-induced loads and receiving subsystems.',
   'solarDriver solarCyclePhase f107Floor f107Ceiling ap altitudeKm attitude solarTiltDeg entryBallisticKgM2','solarTiltDeg ap solarCyclePhase altitudeKm','densityKgM3 absorbedKW',[
   ['Environmental assumptions','Choose the thermospheric driver and the attitude that sets intercepted flux and atmospheric cross-section.','solarDriver ap betaDeg solarTilt'],
@@ -130,6 +141,25 @@ export const domains={
  ],'integration pad launch insertion deployment disposal coast entry impact graveyard')
 };
 
+const serviceFields={
+ text:['serviceOffersPerHour','serviceConcurrency','ttftTargetS','targetStreamTps','streamGapTargetS','liveQualityFraction','serviceDeadlineS'],
+ voice:['serviceOffersPerHour','voiceFirstAudioTargetS','voiceInterruptionTargetS','voicePlaybackBufferMs','vadEndpointMs','liveQualityFraction','serviceDeadlineS'],
+ batch:['serviceOffersPerHour','serviceDeadlineS','batchQualityFraction','serviceConcurrency'],
+ agents:['agentFanout','agentMessageKB','agentSerialSteps','serviceConcurrency','serviceOffersPerHour','serviceDeadlineS','agentVerifyFraction','humanSteeringS','toolRttS'],
+ finetune:['trainingBudgetDays','artifactReturnHours','validationTarget','trainingCalibration','validationObserved','validationBaseline','baseCompatible'],
+ pretrain:['trainingBudgetDays','artifactReturnHours','validationTarget','trainingCalibration','validationObserved','artifactKind','trainingStateBytes']
+};
+const tradeByPurpose={text:['ttftTargetS','serviceOffersPerHour','trayCount','duty'],voice:['serviceRoute','voiceAudioKbps','serviceConcurrency','trayCount'],batch:['serviceOffersPerHour','serviceDeadlineS','batchInputMB','storageTB'],agents:['agentFanout','agentMessageKB','agentSerialSteps','earthToolFraction','hostCores','serviceDeadlineS'],finetune:['fineTuneTokensM','trainableFraction','fabricGbps','trayCount'],pretrain:['pretrainParamsB','trainingTokensB','fabricGbps','trayCount']};
+export function purposeDomainFields(id,input){
+ const p=purposeId(input),prof=aiPurposes[p]||aiPurposes.text,meta=domains[id];if(!meta)return [];
+ if(id==='conops'||id==='purpose')return [...new Set([...serviceFields[prof.id],...prof.fields,'serviceRoute',...(input.serviceRoute==='relay'?['relayAvailability','relayRttMs','relayUpMbps','relayDownMbps']:['network','elevationDeg','customerUplinkMbps']),'missionYears','duty','idleComputePolicy','pumpStandbyPolicy',...(id==='conops'?['disposalMethod']:[])])];
+ if(id==='compute'&&p!=='text')return [...new Set(['compute','workload','trayCount','bits','hostCores','fabricGbps',...prof.fields,'duty','storageTB'])];
+ if(id==='data'&&p!=='text')return [...new Set(['inputSpoolGB','initialInputGB','storageTB','customerUplinkMbps','serviceRoute','link',...prof.fields,'retainedGB','diskReserve'])];
+ return meta.inputs;
+}
+export function purposeTradeKeys(id,input){const p=purposeId(input);
+ return (id==='purpose'||id==='conops'||(p!=='text'&&(id==='data'||id==='compute')))?tradeByPurpose[p]||tradeByPurpose.text:domains[id]?.tradeKeys||[];}
+export function purposeStageDescription(id,phase,h){const index='ABCDEF'.indexOf(phase);return ['purpose','conops'].includes(id)&&index>=0?purposeInfo(h).phases[index]:domains[id]?.stages[phase]?.description||'';}
 const registry={};
 function fields(source,defs,note=''){
  for(const [id,label,unit='',key=id] of defs)registry[id]={label,unit,note,read:c=>c[source]?.[key],source};
@@ -152,6 +182,30 @@ fields('e',[
  ['meanBus','Planning mean bus demand','kW'],['annualProp','Station-keeping propellant','kg/yr','propAnnual'],['annualImpulse','Annual drag impulse','N·s/yr','yearlyImpulse'],['supplyYears','Station-keeping coverage','yr'],['meanTraffic','Planning payload production','Mbit/s','traffic'],['requiredGoodput','Required goodput during access','Mbit/s','goodputNeeded'],['accessGoodput','Planned in-contact capacity','Mbit/s','linkGoodput'],['solarRequired','End-of-service array requirement','m²','solarNeeded'],['batteryNeeded','End-of-service pack requirement','kWh'],['radRequired','End-of-service radiator requirement','m²','radiatorNeeded'],['transportRise','Design junction transport rise','K','transportRiseK'],['designJunction','Design-state junction estimate','K','thermalK'],['propRequired','Propellant for allocated years','kg','propForCoverage'],['trimBudget','Ideal insertion trim consumption','kg','trimKg'],['disposalBudget','Protected disposal Δv','m/s','disposalBudgetDv'],['planLimit','Binding design constraint','','binding']
 ],'Planning envelope at requested mission age');
 function calc(id,label,unit,read,note='Calculated from model channels'){registry[id]={label,unit,note,read}}
+const primaryKeys={text:'slaTurns',voice:'audibleTurns',batch:'qualifiedItems',agents:'verifiedTasks',finetune:'deliveredRun',pretrain:'deliveredRun'};
+calc('aiPurpose','Mission purpose','',c=>purposeInfo(c.h).name,'Selected Earth-customer mission');
+calc('aiCustomer','Beneficiary','',c=>purposeInfo(c.h).customer,'Mission definition');
+calc('aiGoal','Primary goal','',c=>purposeInfo(c.h).goal,'Mission definition');
+calc('aiDeliverable','Earth deliverable','',c=>purposeInfo(c.h).product,'Mission definition');
+calc('aiUnit','Unit of onboard work','',c=>c.h.ai?.unit||'request','Workload estimator');
+calc('servicePath','Earth service route','',c=>c.d.serviceRoute==='relay'?'Assumed relay':'Direct contact','Selected route');
+for(const [key,label,unit,field] of [
+ ['activeWorkRate','Installed active work rate','ai/s','activeUnitsPerSec'],['requiredWorkRate','Required mean work rate','ai/s','requiredRate'],['aiMemoryMargin','Accelerator memory headroom','GB','memoryMarginGB'],['aiStorageMargin','Persistent storage headroom','GB','storageMarginGB'],['aiRequiredStorage','Required persistent storage','GB','requiredStorageGB'],['aiInputBytes','Input per work unit','B','inputBytesPerUnit'],['aiOutputBytes','Stream product per work unit','B','outputBytesPerUnit'],['aiArtifactGB','Requested model artifact','GB','artifactGB'],['aiTrainingGoal','Training target','training tok','trainingGoalTokens']])calc(key,label,unit,c=>c.h.ai?.[field],'Installed workload estimate');
+calc('agentWidth','Parallel agents per assignment stage','agents',c=>c.d.agentFanout,'Customer workflow design');
+calc('agentResidentSlots','Resident worker slots on the vehicle','slots',c=>c.h.ai?.agentWorkerSlots,'Installed workload estimate');
+calc('aiPeerMbps','Onboard peer traffic rate','Mbit/s',c=>c.s.aiPeerMbps,'Internal fabric · mission instant');
+calc('aiPeerTrafficGB','Cumulative onboard peer traffic','GB',c=>c.s.aiPeerTrafficGB,'Internal fabric ledger');
+calc('aiFabricEfficiency','Fabric efficiency','%',c=>100*(c.h.ai?.fabricEfficiency??0),'Installed workload estimate');
+fields('s',[
+ ['aiUnitRate','Instantaneous work rate','ai/s'],['aiUnitsComputed','Cumulative onboard computation','ai'],['aiInputBufferGB','Staged customer input','GB'],['aiInputConsumedGB','Customer input consumed','GB'],['aiProductGeneratedGB','Customer product generated','GB'],['aiProductDeliveredGB','Customer product received on Earth','GB'],['aiProductQueueGB','Customer product in recorder','GB'],['aiOutputMbps','Customer product return rate','Mbit/s'],['aiTrainingTokens','Training tokens processed','tok'],['storageKW','Recorder draw','kW']
+],'Mission instant · conserved service channels');
+function effectiveUnit(unit,c){return unit==='ai/s'?(c.h.ai?.unit||'work unit')+'/s':unit==='ai'?(c.h.ai?.unit||'work unit'):unit;}
+function serviceRows(c){
+ const r=c.service;if(!r?.metrics||r.purpose&&r.purpose!==purposeId(c.h))return [];
+ const id=purposeId(c.h),extra=id==='agents'?['agentWorkers','agentWaves','peerTrafficPerTask','agentCriticalS']:c.h.ai?.training?['artifactReturnDelay','artifactGoodputRequired']:[];
+ const primary=primaryKeys[id],rows=r.metrics.filter(x=>x.key===primary||extra.includes(x.key)),status=r.status;
+ return [...rows.map(q=>({key:'service-'+q.key,label:q.label,unit:q.unit||'',value:q.value??null,note:q.note||'Earth service replay · selected window'})),{key:'service-status',label:'Earth service assessment',unit:'',value:status,note:'Selected offer window · Earth receipt and qualification'}];
+}
 const lv=c=>launchFleet[c.d.launcher];
 calc('lvStatus','Programme status','',c=>lv(c).status,'Provider and agency references in the vehicle catalogue');
 calc('lvReferenceOrbit','Capacity reference conditions','',c=>lv(c).referenceOrbit,'Cited LEO reference');
@@ -223,14 +277,14 @@ function context(ctx,needEnvelope=false){
  return {...ctx,h,d,s,day,e:e??{},audit:ctx.audit??ctx.sim?.audit??null};
 }
 const numberValue=x=>typeof x==='number'&&!Number.isFinite(x)?null:x??null;
-const nonSpacecraftFields=new Set(['lvStatus','lvReferenceOrbit','lvStages','lvBoosters','lvRecovery','lvArchitecture','lvBenchmarkMargin','lvScreenMargin','lvHandoff','lvCarrierService','phase','disposalStatus','altitudeKm','perigeeKm','apogeeKm','densityKgM3','dragN','t','disposalMode','closureReason','modelBoundary','endpointMET','finalPerigee','finalApogee','relSpeed','entryDynamicPressurePa','entryReferenceDragMS2','reqTrim','requiredOrbit','targetAlt','disposalPaidDv','disposalUsedKg','disposalRequiredDv','disposalProtectedKg','propellantUsedKg','tokensGenerated','tokensDelivered','generatedGB','deliveredGB','droppedGB','textDeliveredGB','bulkDeliveredGB','uploadedGB','burnImpulseNs']);
+const nonSpacecraftFields=new Set(['aiUnitsComputed','aiProductGeneratedGB','aiProductDeliveredGB','aiInputConsumedGB','aiTrainingTokens','lvStatus','lvReferenceOrbit','lvStages','lvBoosters','lvRecovery','lvArchitecture','lvBenchmarkMargin','lvScreenMargin','lvHandoff','lvCarrierService','phase','disposalStatus','altitudeKm','perigeeKm','apogeeKm','densityKgM3','dragN','t','disposalMode','closureReason','modelBoundary','endpointMET','finalPerigee','finalApogee','relSpeed','entryDynamicPressurePa','entryReferenceDragMS2','reqTrim','requiredOrbit','targetAlt','disposalPaidDv','disposalUsedKg','disposalRequiredDv','disposalProtectedKg','propellantUsedKg','tokensGenerated','tokensDelivered','generatedGB','deliveredGB','droppedGB','textDeliveredGB','bulkDeliveredGB','uploadedGB','burnImpulseNs']);
 function readMetric(code,c){
  const metric=registry[code];if(!metric)throw new Error('Missing domain quantity '+code);
  const beyond=c.s.spacecraftModelEndedAt!=null&&c.s.t>c.s.spacecraftModelEndedAt+1e-6;
  const inOrbitalEnvironment=c.s.t>=540;
  const unavailablePrelaunch=!inOrbitalEnvironment&&['f107Daily','densityKgM3','magFieldUT','sunFlux','earthIR','albedoFlux','betaDeg','ramAreaM2','dragN'].includes(code);
  const closed=(c.s.referenceBody||beyond)&&!nonSpacecraftFields.has(code)&&(metric.source==='s'||['burst','groundLink','station','burnKind','deploymentPct','earthIR','albedoFlux','sunFlux','wetResidual','byteResidual','lastContact'].includes(code));
- return {key:code,label:metric.label,unit:metric.unit,value:closed||unavailablePrelaunch?null:numberValue(metric.read(c)),note:closed?'Spacecraft channel outside propagation interval':unavailablePrelaunch?'Orbital environment begins at insertion':metric.note};
+ return {key:code,label:metric.label,unit:effectiveUnit(metric.unit,c),value:closed||unavailablePrelaunch?null:numberValue(metric.read(c)),note:closed?'Spacecraft channel outside propagation interval':unavailablePrelaunch?'Orbital environment begins at insertion':metric.note};
 }
 const F=(source,receiver,quantity,value,unit,kind='Induced')=>({source,receiver,quantity,value:numberValue(value),unit,kind});
 export function environmentFlows({hardware:h,state:s}){
@@ -274,7 +328,8 @@ function linkedFlows(id,c){
  const h=c.h,s=c.s,d=c.d;
  if(id==='environment')return environmentFlows(c);
  const all={
- conops:[F('Scheduled workload','Onboard service','Active decode',s.tokensPerSec,'tok/s'),F('Recorder','Ground users','Delivered output tokens',s.tokensDelivered,'tok')],
+ conops:[F('Customer input','Onboard processing','Customer input consumed',s.aiInputConsumedGB,'GB'),F('Payload recorder',purposeInfo(h).customer,'Products received on Earth',s.aiProductDeliveredGB,'GB')],
+ purpose:[F(purposeInfo(h).customer,'Staged input','Input held onboard',s.aiInputBufferGB,'GB'),F('Installed workload',purposeInfo(h).output,'Cumulative work',s.aiUnitsComputed,h.ai?.unit||'work units'),F('Recorder',purposeInfo(h).customer,'Returned product',s.aiProductDeliveredGB,'GB')],
  orbit:[F('Relative atmosphere','Exposed silhouette','Drag impulse since launch',s.dragImpulseNs,'N·s'),F('Chemical engines','Trajectory','Cumulative applied impulse',s.burnImpulseNs,'N·s')],
  compute:[F('Regulated bus','Compute trays','IT draw',s.itKW,'kW'),F('Compute trays','Recorder','Serialized text offered',s.tokensPerSec*d.bytesPerToken*8/1e6,'Mbit/s')],
  data:[F('Decode output','Recorder','Serialized text generated',s.textGeneratedGB,'GB'),F('Recorder','Ground','Text delivered',s.textDeliveredGB,'GB'),F('Recorder','Ground','Bulk delivered',s.bulkDeliveredGB,'GB')],
@@ -287,6 +342,10 @@ function linkedFlows(id,c){
  launcher:[F('Provider reference','Stack comparison','LEO reference headroom',h.launchReferenceMarginKg,'kg'),F('Mission allowance','Integrated stack','Mass headroom',h.massMarginKg,'kg'),F('Launch manifest','Released vehicle','Initial spacecraft wet mass',h.wetKg,'kg')],
  launch:[F('Flight vehicle','Payload interface','Initial wet mass',h.wetKg,'kg'),F('Launcher allowance','Manifest','Mass allowance less stack',h.massMarginKg,'kg'),F('Spacecraft engines','Injection orbit','Delivered trim',s.trimPaidDv,'m/s')]
  };
+ if(purposeId(h)!=='text'){
+  if(id==='compute')all.compute=[F('Regulated bus','Installed workload','Served IT demand',s.itKW,'kW'),F('Accelerators','Execution ledger','Onboard work completed',s.aiUnitsComputed,h.ai?.unit||'work units')];
+  if(id==='data')all.data=[F('Customer','Input staging','Received onboard',s.aiInputUploadedGB,'GB'),F('Compute','Recorder','Customer product generated',s.aiProductGeneratedGB,'GB'),F('Recorder',purposeInfo(h).customer,'Customer product received',s.aiProductDeliveredGB,'GB')];
+ }
  return (s.referenceBody||s.spacecraftModelEndedAt!=null&&s.t>s.spacecraftModelEndedAt)?[]:(all[id]??[]);
 }
 const isRelevant=(domain,e)=>domain.eventTypes.includes(e.type)||(/disposal|graveyard|entry|impact|coast|passiv|retire/.test(e.type)&&domain.eventTypes.some(k=>['disposal','graveyard'].includes(k)));
@@ -303,7 +362,8 @@ function auditRows(id,a){
  if(!a)return [];
  const end=a.finalState??{},E=a.energyKWh??{};
  const map={
- conops:[['Thermally evaluated interval',a.thermal?.coveredSeconds,'s'],['Delivered output tokens',end.tokensDelivered,'tok'],['First in-flight limit',a.firstCrossing?.time,'s']],
+ purpose:[['Returned customer product',end.aiProductDeliveredGB,'GB'],['Campaign input consumed',end.aiInputConsumedGB,'GB'],['Customer product remaining',end.aiProductQueueGB,'GB']],
+ conops:[['Thermally evaluated interval',a.thermal?.coveredSeconds,'s'],['Returned customer product',end.aiProductDeliveredGB,'GB'],['First in-flight limit',a.firstCrossing?.time,'s']],
  environment:[['Accumulated drag impulse',end.dragImpulseNs,'N·s'],['Environmental heat absorbed',E.absorbed,'kWh'],['Cumulative joint energy',E.joints,'kWh']],
  orbit:[['Eclipse events',a.eclipseCount,'events'],['Terminal perigee',end.perigeeKm,'km'],['Accumulated atmospheric impulse',end.dragImpulseNs,'N·s']],
  compute:[['Generated output',end.tokensGenerated,'tok'],['Integrated IT energy',E.it,'kWh'],['Integrated writes',end.writeGB,'GB']],
@@ -335,12 +395,19 @@ export function domainReadout(id,phase,ctx){
  // Terminal trajectory propagation is requested solely inside the retirement phase.
  if(phase==='F'&&c.disposal===undefined)c.disposal=c.sim?.disposal?.();
  let keys=stage.keys;
+ if(purposeId(c.h)!=='text'&&id==='compute')keys={
+   A:['aiPurpose','aiUnit','aiRequiredStorage','aiMemoryMargin','trays','memoryGB'],B:['aiPurpose','activeWorkRate','aiFabricEfficiency','aiMemoryMargin','diskRead','diskWrite'],C:['activeWorkRate','requiredWorkRate','aiMemoryMargin','aiFabricEfficiency','meanBus','launchMargin'],D:['phase','trays','memoryGB','aiInputBufferGB','itKW'],E:['aiUnitRate','aiUnitsComputed','aiInputConsumedGB','itKW','aiProductGeneratedGB','aiProductQueueGB'],F:['aiUnitsComputed','aiInputConsumedGB','aiProductGeneratedGB','aiProductDeliveredGB','disposalStatus']}[phase];
+ if(purposeId(c.h)!=='text'&&id==='data')keys={
+   A:['aiPurpose','aiDeliverable','aiInputBytes','aiOutputBytes','aiRequiredStorage'],B:['aiInputBufferGB','aiProductQueueGB','aiProductDeliveredGB','diskRead','diskWrite'],C:['aiRequiredStorage','aiStorageMargin','requiredGoodput','accessGoodput','aiMemoryMargin'],D:['phase','aiInputBufferGB','aiProductGeneratedGB','aiProductDeliveredGB','storageKW'],E:['aiInputConsumedGB','aiProductGeneratedGB','aiProductQueueGB','aiProductDeliveredGB','goodputMbps'],F:['aiInputConsumedGB','aiProductGeneratedGB','aiProductQueueGB','aiProductDeliveredGB','disposalStatus']}[phase];
  if(phase==='F'&&id==='environment'&&c.s.referenceBody)keys=['disposalMode','altitudeKm','relSpeed','densityKgM3','entryDynamicPressurePa','entryReferenceDragMS2'];
  if(phase==='F'&&c.disposal?.method==='reentry'&&(id==='orbit'||id==='launch'))keys=keys.filter(k=>!['finalPerigee','finalApogee'].includes(k));
- const rows=keys.map(key=>readMetric(key,c));
+ if(id==='purpose'&&phase==='B'&&c.h.ai?.training)keys=['aiPurpose','aiTrainingGoal','aiArtifactGB','aiRequiredStorage','aiFabricEfficiency','servicePath'];
+ if(id==='conops'&&phase==='E'&&c.h.ai?.training)keys=['aiPurpose','aiTrainingTokens','aiInputBufferGB','aiArtifactGB','aiProductDeliveredGB'];
+ if(purposeId(c.h)==='agents'&&['conops','purpose'].includes(id))keys=[...keys,'agentWidth','agentResidentSlots','aiPeerMbps','aiPeerTrafficGB'];
+ const rows=keys.map(key=>readMetric(key,c));if(['purpose','conops'].includes(id)&&['A','C','E','F'].includes(phase))rows.push(...serviceRows(c));
  if(phase==='C')rows.push(...auditRows(id,c.audit));
  if(phase==='F')rows.push(...terminalRows(id,c));
- return {title:stage.title,description:stage.description,basis:phase==='A'?'Mission requirements and installed configuration':phase==='C'?'Installed design and end-of-service sizing envelope. Window and audited mission quantities are labeled separately.':phase==='F'?'Retirement trajectory and spacecraft channels within their modeled interval':'Shared mission clock · quantities at the selected instant unless labeled as window totals',rows,flows:linkedFlows(id,c),events:eventList(id,phase,c)};
+ return {title:stage.title,description:purposeStageDescription(id,phase,c.h),basis:phase==='A'?'Mission requirements and installed configuration':phase==='C'?'Installed design and end-of-service sizing envelope. Window and audited mission quantities are labeled separately.':phase==='F'?'Retirement trajectory and spacecraft channels within their modeled interval':'Shared mission clock · quantities at the selected instant unless labeled as window totals',rows,flows:linkedFlows(id,c),events:eventList(id,phase,c)};
 }
 function series(code,ctx){
  const data=ctx.samples??[];
@@ -349,7 +416,8 @@ function series(code,ctx){
 // Chronological day bins are reduced by minimum, maximum, incremental rate or cumulative stock.
 // A shared bin width gives both integrations a common horizontal time scale even if life differs.
 const missionTrend={
- conops:['Ground-delivered service','tok/s','rate',r=>r.tokensDelivered],
+ conops:['Returned customer product','Mbit/s','rate',r=>r.aiProductDeliveredGB*8000],
+ purpose:['Returned customer product','Mbit/s','rate',r=>r.aiProductDeliveredGB*8000],
  environment:['Mean absorbed environmental heat','kW','power',r=>r.energyKWh?.absorbed],
  orbit:['Shadow fraction','%','percent',r=>r.shadowSeconds],
  compute:['Mean IT power','kW','power',r=>r.energyKWh?.it],
@@ -380,10 +448,11 @@ function missionSeries(c,id,width){
 }
 const YEAR_SECONDS=365.25*86400;
 export function domainTrade(id,baselineContext,editedContext){
- const a=context(baselineContext,true),b=context(editedContext,true),keys=domains[id].stages.C.keys;
+ const a=context(baselineContext,true),b=context(editedContext,true),keys=purposeId(b.h)!=='text'&&['compute','data'].includes(id)?domainReadout(id,'C',{...editedContext,audit:null,sim:null}).rows.filter(r=>!r.key.startsWith('audit-')).map(r=>r.key):domains[id].stages.C.keys;
  const rows=keys.map(key=>{const m=readMetric(key,a),n=readMetric(key,b);return {key,label:m.label,unit:m.unit,note:m.note,baseline:m.value,edited:n.value,delta:Number.isFinite(m.value)&&Number.isFinite(n.value)?n.value-m.value:null}});
  if(a.audit&&b.audit){const left=auditRows(id,a.audit),right=auditRows(id,b.audit);for(const r of left){const s=right.find(x=>x.label===r.label);if(s)rows.push({key:r.key,label:r.label,unit:r.unit,note:r.note,baseline:r.value,edited:s.value,delta:s.value-r.value})}}
- const curves=domains[id].curves.map(key=>({key,label:registry[key].label,unit:registry[key].unit,baseline:series(key,a),edited:series(key,b)}));
+ const curveKeys=purposeId(b.h)!=='text'&&id==='compute'?['aiUnitRate','itKW']:purposeId(b.h)!=='text'&&id==='data'?['aiProductQueueGB','aiProductDeliveredGB']:domains[id].curves;
+ const curves=curveKeys.map(key=>({key,label:registry[key].label,unit:effectiveUnit(registry[key].unit,b),baseline:series(key,a),edited:series(key,b)}));
  const missionCurves=[];
  if(a.audit?.dayStats?.length&&b.audit?.dayStats?.length){
   const width=Math.max(1,Math.ceil(Math.max(a.audit.dayStats.length,b.audit.dayStats.length)/120)),[label,unit]=missionTrend[id];

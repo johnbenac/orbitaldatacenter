@@ -1,0 +1,22 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {phases,lifecycleNav,chapterPhase,phaseFromView,systemSelect,assemblyCard,inputPhase} from './dist/lifecycle.js';
+import {defaults,sizeDesign,inverseSolve} from './dist/design.js';
+import {createSimulation} from './dist/model.js';
+import {thermalInspector,requirementResults} from './dist/thermal-review.js';
+import {preparedFile,retainFile,fileLink,releaseFiles} from './dist/file-delivery.js';
+import {scenarioBlob,telemetryBlob,encodeScenario,decodeScenario} from './dist/exports.js';
+const d={...defaults,trayCount:18},h=sizeDesign(d),sim=createSimulation(h),t=7800,st=sim.at(t);
+const v={phase:'C',page:'overview',preset:'custom',thermalNode:'battery',thermalTargets:{batteryOpMinK:'derive'},thermalScope:'window',thermalPadding:2,thermalScale:'working',solve:'installed',t,overlays:['thermal']},data={schema:'odc-scenario/1',modelVersion:'3.0',design:d,view:v};
+assert.deepEqual(Object.keys(phases),['A','B','C','D','E','F']);
+for(const id of Object.keys(phases)){const nav=lifecycleNav(id);assert.equal(nav.match(/data-phase=/g).length,6);assert.equal(nav.match(/aria-current="step"/g).length,1);assert(nav.includes('data-phase="'+id+'" aria-current="step"'))}
+assert.equal(phaseFromView({page:'power',t:7800}),'B');assert.equal(phaseFromView({chapter:'insertion'}),'D');assert.equal(chapterPhase('commissioning'),'E');assert.equal(chapterPhase('deorbit'),'F');assert.equal(phaseFromView(v),'C');
+assert(inputPhase(h,v,inverseSolve(d),k=>'<input name="'+k+'">').includes('name="missionYears"'));assert(assemblyCard(h,v,st).includes('Temperature requirements'));assert(systemSelect('thermal','full').includes('value="full" selected'));
+const summary=sim.thermalWindow(0,86400),requirements=requirementResults(v,summary,d);
+assert.equal(requirements.length,1);assert.equal(requirements[0].specifiedRatingK,273);assert.equal(requirements[0].key,'batteryOpMinK');assert(thermalInspector(v,h,st,summary,'MET').includes('Use as input'));
+assert.deepEqual(decodeScenario(encodeScenario(data)),data);
+const ready=retainFile('scenario',scenarioBlob(data),'unit-scenario.json');const markup=fileLink('scenario','Save JSON');assert(markup.includes('href="'+ready.url+'" download="unit-scenario.json"'));assert.deepEqual(await (await fetch(ready.url)).json(),data);
+retainFile('csv',telemetryBlob([{elapsed_s:1,soc_pct:90}]),'unit.csv');assert.equal(preparedFile('scenario'),ready);assert.match(await(await fetch(preparedFile('csv').url)).text(),/soc_pct/);assert.throws(()=>retainFile('scenario',new Blob([]),'bad.json'));assert.equal(preparedFile('scenario'),ready);releaseFiles();
+const assets=JSON.parse(fs.readFileSync(new URL('./dist/assets.json',import.meta.url)));
+for(const f of ['lifecycle.js','lifecycle.css','thermal-review.js','thermal-view.js','thermal-limits.js','thermal-colors.js','file-delivery.js','subsystem-diagrams.js','subsystem-diagrams.css'])assert(assets.includes(f),f);
+console.log('A–F mapping, shared design, independent and derived temperature bounds, persistent native download URLs, and static asset manifest passed.');

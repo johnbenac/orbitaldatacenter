@@ -18,7 +18,9 @@ for(const key of ['generatedGB','deliveredGB','uploadedGB','unmetKWh','propellan
 near(end.queueGB+end.deliveredGB+end.droppedGB,baseline.initialQueueGB+end.generatedGB);
 assert.ok(audit.dayStats.every(s=>s.minSocPct>=0&&s.maxSocPct<=100&&s.maxJunctionK>150));
 assert.equal(audit.result.days,3);
-assert.equal(audit.result.firstCrossing,null);
+assert.equal(audit.result.firstCrossing.id,'battery');
+assert.equal(audit.result.firstCrossing.side,'low');
+assert.equal(audit.result.firstCrossing.time,audit.result.thermalQualifiedUntilS);
 const long=chronologicalAudit(dayTime(5.25));
 for(const key of ['prop','momentum','queue','energy','heat','usedImpulse'])for(let i=1;i<audit.seeds.length;i++)near(long.seeds[i][key],audit.seeds[i][key]);
 const failures=[
@@ -29,7 +31,7 @@ const failures=[
  [{cmgMomentumNms:2,dipoleAm2:10,cpOffsetM:1},/CMG|momentum|magnetic/i]
 ];
 for(const [over,pattern] of failures){
- const {result}=chronologicalAudit({...dayTime(1.25),...over});
+ const {result}=chronologicalAudit({...dayTime(1.25),batteryOpMinK:245,junctionOpMinK:240,...over});
  assert.match(result.firstCrossing.limit,pattern);
  assert.ok(result.firstCrossing.time>=0&&result.firstCrossing.time<DAY);
 }

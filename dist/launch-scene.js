@@ -1,6 +1,7 @@
 // Launch assemblies use metres and a +Y vehicle axis. The fairing radius profile
 // and stowed sections come from the sizing solver; the support equipment is illustrative.
 import * as T from './vendor/three.module.js';
+import {thermalMesh} from './thermal-view.js';
 import {fitOutBay,payloadFinishes} from './launch-art.js';
 const v=(x=0,y=0,z=0)=>new T.Vector3(x,y,z),clamp=x=>Math.max(0,Math.min(1,x));
 const group=(p,name)=>{const g=new T.Group();g.userData.part=name;p.add(g);return g;};
@@ -69,14 +70,14 @@ export function makeLaunch(h){
   if(/adapter|interface/.test(name)){cylinder(payload,0,y,0,section.radiusM*.81,section.radiusM,H,steel,'adapter');continue;}
   if(/bus|body|core|chassis/.test(name)){
    box(payload,0,y,0,w,H,dep,rib,'payload');
-   for(let i=0;i<5;i++){const cy=z0+H*(i+.5)/5;for(const side of [-1,1]){box(payload,side*w*.506,cy,0,w*.014,H*.18,dep*.88,i%3===0?finish.foil:finish.panels,'structure');box(payload,0,cy,side*dep*.506,w*.89,H*.18,dep*.014,i%2?finish.panels:finish.foil,'structure');}}
+   for(let i=0;i<5;i++){const cy=z0+H*(i+.5)/5;for(const side of [-1,1]){thermalMesh(box(payload,side*w*.506,cy,0,w*.014,H*.18,dep*.88,i%3===0?finish.foil:finish.panels,'structure'),'enclosure');thermalMesh(box(payload,0,cy,side*dep*.506,w*.89,H*.18,dep*.014,i%2?finish.panels:finish.foil,'structure'),'enclosure');}}
    for(let x of [-1,1])for(let z of [-1,1])box(payload,x*w*.49,y,z*dep*.49,w*.034,H,dep*.034,steel,'structure');
   }else if(/cassette|fold|wing|radiator|array|panel/.test(name)){
    box(payload,0,y,0,w*.92,H*.98,dep*.96,black,'payload');
-   for(let i=0;i<18;i++){const iz=(i+.5)/18-.5;box(payload,0,y,iz*dep,w*.997,H*.996,dep*.049,i<12?(i%2?blue:steel):fin,i<12?'solar':'radiator');}
+   for(let i=0;i<18;i++){const iz=(i+.5)/18-.5;const leaf=box(payload,0,y,iz*dep,w*.997,H*.996,dep*.049,i<12?(i%2?blue:steel):fin,i<12?'solar':'radiator');if(i>=12)thermalMesh(leaf,'radiator');}
    for(const u of [-1,1]){box(payload,u*w*.48,y,0,w*.022,H,dep,steel,'payload');for(let j=0;j<3;j++)box(payload,u*w*.498,z0+H*(j+.5)/3,0,w*.019,H*.038,dep*1.03,gold,'payload');}
    for(const side of [-1,1]){const front=side*dep*.517;
-    const cover=mesh(payload,new T.PlaneGeometry(w*.93,H*.95),finish.radiators,0,y,side*dep*.505,'radiator');cover.rotation.y=side<0?Math.PI:0;for(let j=0;j<5;j++)box(payload,(j-2)*w*.183,y,front,w*.012,H*.95,dep*.012,side>0?steel:rib,'payload');for(let k=0;k<7;k++)box(payload,0,z0+(k+.5)*H/7,front,w*.94,H*.009,dep*.011,steel,'payload');}
+    const cover=mesh(payload,new T.PlaneGeometry(w*.93,H*.95),finish.radiators,0,y,side*dep*.505,'radiator');cover.rotation.y=side<0?Math.PI:0;if(side>0)thermalMesh(cover,'radiator');for(let j=0;j<5;j++)box(payload,(j-2)*w*.183,y,front,w*.012,H*.95,dep*.012,side>0?steel:rib,'payload');for(let k=0;k<7;k++)box(payload,0,z0+(k+.5)*H/7,front,w*.94,H*.009,dep*.011,steel,'payload');}
    for(let x of [-1,1])for(let z of [-1,1])box(payload,x*w*.475,y,z*dep*.485,w*.034,H*.998,dep*.07,rib,'payload');
   }else{box(payload,0,y,0,w,H,dep,/engine/.test(name)?dark:ivory,'payload');}
  }

@@ -2,6 +2,7 @@ import {controls} from './design.js';
 import {pages,overlayNames} from './workspaces.js';
 
 const actionHelp={
+ thermallayer:'Switch between normal materials and temperature colors on modeled hardware.',tempbands:'Review specified hardware ratings or solve the temperature tolerance required by this mission.', 'thermal-audit':'Compute chronological operating and survival extrema for every modeled component.',phasecontrols:'Edit subsystem hardware and operating assumptions in the shared design.',subdetails:'Show or hide the numerical charts and engineering ledger below the subsystem schematic.',diagramplay:'Run or pause the mission clock to follow changes in the subsystem.',
  presetshelf:'Go to the five design points and compare their hardware in the same mission chapter.',share:'Create a link that restores this spacecraft, viewpoint, mission chapter and clock.',export:'Download the scenario, telemetry, static site, or a quantitative design review. Import a saved design here too.',
  coreview:'Open the deployed compute-core cutaway and inspect the chip-to-radiator heat path.',hardware:'Choose a compute tray, battery chemistry, solar cell, launcher and other technology presets. Edit the values that define this design point.',params:'Change hardware assumptions, operating policies or the quantity that the sizing solver computes.',compare:'Evaluate technology presets against the current design and compare their engineering margins.',
  layers:'Show or hide sunlight, Earth radiation, force, thrust and dimension overlays in the 3D view.',full:'Expand the vehicle viewport to fill the display. Press Escape to exit.',resetcam:'Return the selected camera to its original angle and zoom.',
@@ -91,7 +92,7 @@ export function installHelp({chartTip,eventTip}={}){
  if(active!==target){hide();active=target;target?.setAttribute?.('aria-describedby',tip.id)}tip.textContent=text;tip.hidden=false;
  const w=tip.offsetWidth,h=tip.offsetHeight;tip.style.left=Math.max(8,Math.min(innerWidth-w-8,x+12))+'px';tip.style.top=(y+h+22>innerHeight?Math.max(8,y-h-12):y+16)+'px';};
  function message(el,e){const d=el.dataset;
- if(d.tip)return d.tip;if(d.useLauncher)return 'Use this launcher for the current design and recompute clearance.';
+ if(d.tip)return d.tip;if(d.phase)return 'Open Phase '+d.phase+' using this same design.';if(d.rating)return 'Change the installed component’s temperature rating in kelvin.';if(d.boundRole)return 'Use a specified rating or derive a required temperature tolerance from observed extrema.';if(d.useLauncher)return 'Use this launcher for the current design and recompute clearance.';
  if(el.matches('.legend>span'))return 'Color key for '+el.textContent.trim()+'. Follow the matching marks or trace in the chart.';
  if(el.matches('.imagestate'))return 'Mission position of the shared cursor. In orbit this shows revolution count and altitude.';
  if(el.matches('.viewcaption'))return 'Selected spacecraft and its current flight state.';
@@ -128,6 +129,6 @@ if(d.metric)return explainMetric(d.metric,d.label,d.unit);
  const setLens=v=>{lens=v;const b=document.querySelector('[data-action="help"]');b?.setAttribute('aria-pressed',String(lens));document.body.classList.toggle('helplens',lens);if(!v)hide()};
  document.addEventListener('click',e=>{const el=locate(e);if(el?.dataset.action==='help'){e.preventDefault();e.stopImmediatePropagation();setLens(!lens);if(lens)show(el,e.clientX,e.clientY,'Inspection help is on. Tap a control or reading to learn about it. Tap Help again to resume normal controls.');return}if(pressed||(lens&&el)){e.preventDefault();e.stopImmediatePropagation();pressed=false;if(el)show(el,e.clientX,e.clientY,message(el,e));return}hide()},true);
  document.addEventListener('keydown',e=>{if(e.key==='Escape')setLens(false)});
- return {get lens(){return lens},component:(id,x,y)=>{if(id)show(document.getElementById('scene'),x,y,componentHelp[id]||'Select this component for its engineering readouts.');else hide()},hide};
+ return {get lens(){return lens},component:(id,x,y,row)=>{if(id){const live=row?row.label+' · '+row.temperatureK.toFixed(1)+' K · '+row.state+' band '+row.minK+'–'+row.maxK+' K · '+(row.status==='pass'?'in range':row.status)+' · ':'';show(document.getElementById('scene'),x,y,live+(componentHelp[id]||'Select this component for its engineering readouts.'));}else hide()},hide};
 }
 

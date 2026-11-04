@@ -42,7 +42,7 @@ globalThis.URL.createObjectURL=blob=>{exported=blob;return 'blob:geometry-checks
 const originalTimer=globalThis.setTimeout;
 globalThis.setTimeout=(handler,ms,...args)=>{const t=originalTimer(handler,ms,...args);if(ms===30000)t.unref();return t};
 const t=sim.story('contact').instant,view={page:'overview',chapter:'contact',camera:'spacecraft',preset:'reference',t,start:0,event:sim.story('contact')};
-await makePacket({scenario:{schema:'odc-scenario/1',modelVersion:'2',design:study,view},hardware:hw,sim,result:inverseSolve(study),snap:sim.at(t),day:sim.daySummary(0),events:sim.events(0,86400),audit});
+exported=await makePacket({scenario:{schema:'odc-scenario/1',modelVersion:'2',design:study,view},hardware:hw,sim,result:inverseSolve(study),snap:sim.at(t),day:sim.daySummary(0),events:sim.events(0,86400),audit});
 const zip=await JSZip.loadAsync(await exported.arrayBuffer());
 for(const file of ['design/fairing-fit.csv','design/fairing-stations.csv','design/stowed-stack.csv','design/enclosure-walls.csv','operations/chapter-samples.csv','operations/selected-story.json','operations/disposal.json','PDR.html'])assert.ok(zip.file(file),file);
 const metadata=JSON.parse(await zip.file('operations/selected-story.json').async('text'));assert.equal(metadata.chapter,'contact');assert.equal(metadata.elapsedSeconds,t);

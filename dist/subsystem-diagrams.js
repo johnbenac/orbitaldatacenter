@@ -1,0 +1,266 @@
+// Interactive engineering plates. Geometry is schematic except where dimensions are marked.
+import {presets} from './design.js';
+import {thermalNodes,qualifyNow} from './thermal-limits.js';
+import {thermalScales,temperatureColor} from './thermal-colors.js';
+import {R, MU, dot, cross, unit, groundSites} from './orbit.js';
+
+const esc=v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
+const nf=new Intl.NumberFormat('en-US',{maximumFractionDigits:1});
+const num=(x,digits=1)=>!Number.isFinite(x)?'—':digits===1?nf.format(x):x.toLocaleString('en-US',{maximumFractionDigits:digits});
+const val=(n,u,p=1)=>num(n,p)+(u?' '+u:'');
+const frac=x=>Math.min(1,Math.max(0,x||0));
+const each=(n,fn)=>Array.from({length:n},(_,i)=>fn(i)).join('');
+const P=(id,title,description,edit,inspect,details=[],event=null)=>({id,title,description,edit,inspect,details,event});
+const row=(name,v)=>[name,v];
+const tech=(d,key)=>presets[key]?.[d[key]]?.label?.split(' · ')[0]||String(d[key]??'');
+const T=(x,y,v,cl='sd-value',a='middle')=>`<text x="${x}" y="${y}" class="${cl}" text-anchor="${a}">${esc(v)}</text>`;
+const path=(d,cl)=>`<path d="${d}" class="${cl}"/>`;
+const rect=(x,y,w,h,cl,rx=0)=>`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rx}" class="${cl}"/>`;
+const circle=(x,y,r,cl)=>`<circle cx="${x}" cy="${y}" r="${r}" class="${cl}"/>`;
+const ellipse=(x,y,rx,ry,cl)=>`<ellipse cx="${x}" cy="${y}" rx="${rx}" ry="${ry}" class="${cl}"/>`;
+const named=(x,y,head,value)=>T(x,y,head,'sd-name')+T(x,y+19,value);
+const pick=(p,x,y,w,h,art)=>`<g class="sd-pick" data-sd-pick="${esc(p.id)}" role="button" tabindex="0" aria-label="${esc('Select '+p.title)}"><title>${esc(p.title)}</title>${rect(x,y,w,h,'sd-hit',6)}${art}</g>`;
+const flow=(id,d,color='cyan',live=true,arrow=true)=>`<path d="${d}" class="sd-wire sd-${color}${live?' is-flow':' is-idle'}" ${arrow?`marker-end="url(#${id}-${color})"`:''}/>`;
+const legend=(color,label)=>({color,label});
+const info=(title,subtitle,parts,art,legends,status)=>({title,subtitle,parts,art,legends,status});
+const safeId=v=>String(v).replace(/[^A-Za-z0-9_-]/g,'');
+let sequence=0;
+
+function defs(id){
+ const colors={cyan:'#76d9da',amber:'#f7b76a',violet:'#baa7ee',green:'#8bd5a6',steel:'#98aeba',red:'#ec967d'};
+ return `<defs>${Object.entries(colors).map(([name,color])=>`<marker id="${id}-${name}" orient="auto-start-reverse" markerUnits="userSpaceOnUse" refX="6" refY="3.5" markerWidth="7" markerHeight="7"><path d="M0 0L7 3.5L0 7Z" fill="${color}"/></marker>`).join('')}<pattern id="${id}-grid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0H0V20" fill="none" stroke="#365463" opacity=".32" stroke-width=".65"/></pattern><linearGradient id="${id}-earth" x1="0" x2="1"><stop stop-color="#111e2c"/><stop offset=".48" stop-color="#25536a"/><stop offset="1" stop-color="#428598"/></linearGradient></defs>`;
+}
+function glyph(type,x,y,size=1,level=.5){
+ const X=(d,c='sd-hardware')=>path(d,c);
+ let out='';
+ switch(type){
+ case 'chip':out=rect(-23,-21,46,42,'sd-metal',5)+rect(-16,-14,32,28,'sd-device',3)+rect(-10,-8,20,16,'sd-core',1)+each(6,i=>X(`M${-15+i*6} -27v5m0 44v5M-29 ${-15+i*6}h6m46 0h6`,'sd-trace'));break;
+ case 'ssd':out=each(3,i=>rect(-26,-21+i*14,52,11,'sd-metal',2)+circle(-17,-15+i*14,1.8,'sd-led')+X(`M-10 ${-15+i*14}h25`,'sd-line'));break;
+ case 'rack':out=rect(-24,-29,48,56,'sd-metal',3)+each(4,i=>rect(-18,-24+i*12,36,9,'sd-device',1)+circle(-12,-19+i*12,1.5,'sd-led')+X(`M-5 ${-19+i*12}h16`,'sd-line'));break;
+ case 'solar':out=X('M-34 -18L29 -23L34 12L-29 19Z','sd-array')+each(5,i=>X(`M${-23+i*10} ${-19-i*.75}l5 35`,'sd-cells'))+X('M-32 -6l63 -6m-61 17l63 -6','sd-cells')+X('M-4 18v7h20','sd-hardware');break;
+ case 'battery':out=rect(-14,-30,28,55,'sd-metal',3)+rect(-6,-34,12,5,'sd-terminal',1)+each(5,i=>rect(-9,15-i*8,18,5,i<Math.round(frac(level)*5)?'sd-charge':'sd-unfilled',1));break;
+ case 'dish':out=X('M-28 -20Q-31 12 3 15L23 -14Q-1 -6 -28 -20Z','sd-metal')+X('M-27 -19L8 -29L22 -14M-8 11L-13 26m-7 1h29m-15 -16l6 14','sd-hardware')+circle(8,-29,2.3,'sd-led');break;
+ case 'patch':out=X('M-25 -13l38 -8 13 26 -39 10Z','sd-metal')+X('M-15 -8l21 -5 8 13 -21 6Z','sd-gold')+X('M-15 18v7m7 -8v9','sd-hardware');break;
+ case 'optic':out=X('M-25 9l29 -27 17 15 -27 27Z','sd-metal')+ellipse(12,-12,12,6,'sd-lens')+X('M-9 20v7m-10 0H5','sd-hardware');break;
+ case 'radiator':out=X('M-29 -16L20 -24L31 14L-18 22Z','sd-rad')+each(7,i=>X(`M${-23+i*6} ${-15-i}l9 31`,'sd-rib'))+X('M-22 17l-7 5m5 0l-6 6','sd-hardware');break;
+ case 'cold':out=X('M-27 -8l34 -11 20 12 -34 13Z','sd-metal')+X('M-27 -8v13l20 12L27 5V-7M-7 6v11','sd-hardware')+X('M-16 -6l18 -6 8 4 -17 6','sd-liquid');break;
+ case 'pump':out=circle(0,0,21,'sd-metal')+circle(0,0,5,'sd-led')+each(4,i=>`<g transform="rotate(${i*90})">${X('M0 -7Q-12 -8 -11 -14Q-2 -20 4 -12Z','sd-pumpblade')}</g>`)+X('M-28 0h8m42 0h8','sd-hardware');break;
+ case 'wheel':out=ellipse(0,0,27,23,'sd-metal')+ellipse(0,0,20,16,'sd-device')+X('M-30 2Q0 -27 30 -2Q0 24 -30 2Z','sd-gimbal')+circle(0,0,4,'sd-led');break;
+ case 'torquer':out=X('M-30 -8h60v16h-60Z','sd-metal')+each(9,i=>X(`M${-22+i*5} -10q8 10 1 20`,'sd-winding'));break;
+ case 'engine':out=X('M-16 -21h32l-7 15 6 18 6 10h-42l7 -10 7 -18Z','sd-metal')+X('M-13 -17h26m-22 9h18m-19 15h20m-25 12h30','sd-line');break;
+ case 'blanket':out=each(3,i=>X(`M-24 ${-5+i*7}l29 -12 21 10 -28 13Z`,'sd-metal'))+X('M-14 -6l12 -5 13 5 -12 6Z','sd-gold');break;
+ case 'earth':out=circle(0,0,18,'sd-planet')+ellipse(0,0,8,18,'sd-meridian')+ellipse(0,0,18,6,'sd-meridian');break;
+ default:out=rect(-24,-15,48,30,'sd-metal',4)+X('M-15 -4h30m-30 8h30','sd-line');
+ }
+ return `<g transform="translate(${x} ${y}) scale(${size})">${out}</g>`;
+}
+function compute({h,d,s},id){
+ const parts=[
+ P('compute','Accelerator trays','Prompt prefill and token decoding share accelerator time. The estimator checks both compute and memory bandwidth.','trayCount','compute',[row('Installed',h.trays+' trays / '+h.chips+' accelerators'),row('Model',tech(d,'workload')),row('Decode on board',val(s.tokensPerSec,'tok/s',0)),row('Aggregate memory',val(h.memoryGB,'GB',0))]),
+ P('memory','Model memory','Weights, context and KV cache occupy accelerator memory for every active model replica.','context','compute',[row('Weight precision',val(d.bits,'bit')),row('Weights per replica',val(h.modelGB,'GB')),row('KV per replica',val(h.kvGB,'GB')),row('Batch',d.batch+' streams / replica')]),
+ P('storage','Solid-state recorder','Output text and bulk products share the recorder. Delivered bytes leave the queue when the terminal has a ground pass.','storageTB','storage',[row('Media',tech(d,'storage')),row('Installed / free',val(h.storageTB,'TB')+' / '+val(s.freeTB,'TB')),row('Queued text',val(s.textQueueGB,'GB')),row('Queued bulk data',val(s.bulkQueueGB,'GB'))]),
+ P('cooling','Cold plate','Power dissipated in the trays enters a pumped loop through the cold plates.','thermalResistanceKPerKw','radiator',[row('Cold plate',val(s.coldPlateK,'K')),row('Tray resistance',val(d.thermalResistanceKPerKw,'K/kW')),row('Compute draw',val(s.itKW,'kW'))])];
+ const art=path('M57 40H369V219H57Z','sd-boundary')+T(69,58,'COMPUTE ENCLOSURE','sd-over','start')+
+ flow(id,'M154 115H239','cyan',s.tokensPerSec>0)+flow(id,'M318 115H444','cyan',s.offeredMbps>0)+flow(id,'M279 146V183h77','amber',s.itKW>0)+
+ pick(parts[1],75,74,90,87,glyph('chip',119,108,.82)+named(120,152,'HBM',val(h.memoryGB,'GB',0)))+
+ pick(parts[0],218,66,115,100,glyph('rack',274,106,.94)+named(274,152,'Accelerators',h.trays+' trays'))+
+ pick(parts[2],424,76,105,96,glyph('ssd',477,111,1)+named(477,154,'Recorder',val(s.queueGB,'GB queued'))) +
+ pick(parts[3],355,166,84,65,glyph('cold',391,184,.72)+T(391,221,val(s.coldPlateK,'K'),'sd-value'))+
+ T(181,101,'READ','sd-over')+T(380,101,'WRITE','sd-over')+T(247,207,'Waste heat','sd-name');
+ return info('Compute payload','Accelerator memory, output storage and tray cooling',parts,art,[legend('cyan','Data'),legend('amber','Heat')],s.burst?'Burst active':'Standby');
+}
+
+function power({h,d,s},id){
+ const parts=[
+ P('array','Solar wings','The four wings feed the regulated bus. Generation depends on orientation, eclipse and elapsed cell age.','solarM2','solar',[row('Technology',tech(d,'pv')),row('Installed area',val(h.solarM2,'m²')),row('Generation',val(s.solarKW,'kW')),row('Curtailed',val(s.curtailedKW,'kW'))]),
+ P('battery','Battery pack','Surplus generation charges the pack. During a deficit the pack supplies demand within its energy and discharge limits.','batteryKWh','battery',[row('Chemistry',tech(d,'battery')),row('Available / installed',val(s.availableKWh,'kWh')+' / '+val(h.batteryKWh,'kWh')),row('Bus charge',val(s.chargeKW,'kW')),row('Bus discharge',val(s.dischargeKW,'kW'))]),
+ P('bus','Regulated bus','The bus balances solar generation, battery exchange and served electrical load.','socMin','battery',[row('Requested',val(s.loadKW,'kW')),row('Served',val(s.servedLoadKW,'kW')),row('Unserved',val(s.unmetKW,'kW')),row('Minimum SOC setting',val(d.socMin*100,'%'))]),
+ P('loads','Load branches','IT, communications and platform hardware draw from the same bus at the current mission instant.','duty','compute',[row('IT',val(s.itKW,'kW')),row('Terminal',val(s.terminalKW,'kW')),row('Pump and storage',val(s.pumpKW+s.storageKW,'kW')),row('CMGs and torquers',val(s.cmgKW+s.coilKW,'kW'))])];
+ const discharge=s.dischargeKW>.0001,charge=s.chargeKW>.0001;
+ const art=flow(id,'M141 86H264','amber',s.solarKW>0)+flow(id,discharge?'M144 183H218V142H262':'M263 143H218V183H145','green',discharge||charge)+path('M277 65V195','sd-busbar')+
+ pick(parts[0],39,44,130,91,glyph('solar',103,80,1.05)+named(103,121,'Solar wings',val(s.solarKW,'kW'))) +
+ pick(parts[1],52,151,109,93,glyph('battery',101,181,.83,s.socPct/100)+named(101,223,'Battery',val(s.socPct,'% SOC')))+
+ pick(parts[2],239,43,78,165,rect(268,62,17,138,'sd-conductor',4)+T(278,32,'DC BUS','sd-over')+T(276,221,val(s.servedLoadKW,'kW'),'sd-value'))+
+ pick(parts[3],412,39,125,177,[[71,'Compute',s.itKW],[129,'Terminal',s.terminalKW],[188,'Platform',Math.max(0,s.loadKW-s.itKW-s.terminalKW)]].map(([y,n,v])=>flow(id,`M287 ${y}H412`,'amber',v>.001)+circle(421,y,5,'sd-node')+T(435,y-2,n,'sd-name','start')+T(435,y+15,val(v,'kW'),'sd-value','start')).join(''))+T(179,172,discharge?'DISCHARGE':charge?'CHARGE':'IDLE','sd-over');
+ return info('Electrical distribution','Source, storage and load paths at the selected instant',parts,art,[legend('amber','Bus power'),legend('green','Pack exchange')],s.eclipse?'Eclipse':'Sunlit');
+}
+
+function comm({h,d,s,events},id){
+ const active=!!s.station,next=events.find(e=>e.type==='contact'&&e.end>=s.t)||events.find(e=>e.type==='contact');
+ const parts=[
+ P('payload','Payload downlink','The queue feeds the selected payload terminal after acquisition. Line rate and application goodput have separate budgets.','link','communications',[row('Terminal',s.groundLink||d.link),row('Line rate',val(s.lineMbps,'Mbit/s')),row('Application goodput',val(s.goodputMbps,'Mbit/s')),row('Queued payload',val(s.queueGB,'GB'))]),
+ P('command','Command uplink','Ground commands use the independent S-band uplink. The command channel has its own link budget and queue.','network','communications',[row('Ground command demand',val(s.commandDemandKbps,'kbit/s')),row('Delivered commands',val(s.commandGoodputKbps,'kbit/s')),row('Uplink physical rate',val(s.uplinkMbps,'Mbit/s')),row('Queued commands',val(s.uplinkQueueMB,'MB'))]),
+ P('station','Ground endpoint','The beam terminates at the visible station selected by the geometry solver. The elevation mask defines access.','elevationDeg','communications',[row('Network',tech(d,'network')),row('Current endpoint',s.station||'No contact'),row('Slant range',active?val(s.rangeKm,'km'):'—'),row('Elevation',active?val(s.elevationDeg,'°'):'—')],next)];
+ const art=path('M40 38H215V212H40Z','sd-boundary')+T(52,58,'SPACE SEGMENT','sd-over','start')+
+ pick(parts[0],49,66,157,71,glyph(s.groundLink==='Optical'||(!active&&d.link==='optical')?'optic':'dish',86,94,.68)+T(123,92,'Payload','sd-name','start')+T(123,112,s.groundLink||'Standby','sd-value','start'))+
+ pick(parts[1],49,139,157,68,glyph('patch',86,165,.66)+T(122,163,'S-band','sd-name','start')+T(122,182,'TT&C','sd-value','start'))+
+ flow(id,'M211 87Q355 52 470 109','cyan',s.goodputMbps>0)+flow(id,'M471 130Q363 188 213 167','violet',s.commandGoodputKbps>0)+T(330,49,val(s.goodputMbps,'Mbit/s'),'sd-value')+T(329,197,val(s.commandGoodputKbps,'kbit/s'),'sd-value')+
+ path('M400 190Q500 153 571 188','sd-horizon')+
+ pick(parts[2],433,83,120,137,glyph('dish',498,125,1.0)+named(498,202,s.station||'Ground network',active?val(s.rangeKm,'km'):groundSites(d.network).length+' sites'));
+ return info('Ground link geometry','Separate application downlink and S-band command uplink',parts,art,[legend('cyan','Downlink → ground'),legend('violet','Uplink → vehicle')],active?(s.acquired?'Link acquired':'Acquiring'):'Out of view');
+}
+
+function thermal({h,d,s,qualificationWindow,thermalScale},id){
+ const assessments=s.thermalQualification||qualifyNow(s,d),scale=thermalScale==='full'?'full':'working',stops=thermalScales[scale];
+ const nodes=[['junction','Junction','chip','junctionK','compute','junctionLimitK'],['coldPlate','Cold plate','cold','coldPlateK','radiator','thermalResistanceKPerKw'],['coolant','Coolant','pump','coolantK','radiator','thermalMode'],['radiator','Radiator','radiator','radiatorK','radiator','radiatorM2'],['battery','Battery','battery','batteryK','battery','batteryKWh'],['enclosure','Enclosure','blanket','enclosureOuterK','enclosure','blanketEffectiveEpsilon']];
+ const positions=[[75,92],[222,92],[370,92],[510,92],[124,191],[389,191]];
+ const parts=nodes.map(([key,label,,field,inspect,edit])=>{
+  const q=assessments.find(q=>q.id===key),meta=thermalNodes.find(n=>n.id===key),bounds=meta.keys[q.state],exposure=qualificationWindow?.rows?.find(r=>r.id===key&&r.state===q.state);
+  const description={junction:'The compute junction is the hot end of the linked path. Heat generated in the trays crosses the cold-plate interface.',coldPlate:'The cold plate couples the electronics to the pumped loop. Interface resistance raises the junction above radiator temperature.',coolant:'The pump carries heat from the cold plates to the radiator. Electrical pump losses enter the bus and thermal ledgers.',radiator:'Both radiator faces emit thermal radiation and absorb environmental heat. Net rejection drives the thermal state.',battery:'The pack is assessed at its modeled temperature and current operating or survival state.',enclosure:'The outer blanket exchanges heat with space. Occupied feedthroughs also conduct heat across the insulation.'}[key];
+  return {...P(key,label,description,edit,inspect,[row('Temperature',q.status==='unassessed'?'Unassessed':val(q.temperatureK,'K')),row('State',q.state+' · '+q.status),row('Currently',q.activity),row('Permitted range',num(q.minK)+'–'+val(q.maxK,'K')),row('Signed margin',val(q.marginK,'K')),...(exposure?[row('Time outside limits in window',val(exposure.lowSeconds+exposure.highSeconds,'s'))]:[])]),editLabel:edit===bounds.max?'Edit maximum':undefined,range:q,extraEdits:[[bounds.min,'Edit minimum'],[bounds.max,'Edit maximum']]};
+ });
+ const art=flow(id,'M112 92H185','amber',s.heatInputKW>0)+flow(id,'M257 92H329','amber',s.heatInputKW>0)+flow(id,'M409 92H472','cyan',s.coolantKgPerSec>0)+
+ path('M180 192H334','sd-boundary-line')+T(257,184,'BUS THERMAL NODE','sd-over')+
+ nodes.map(([key,label,type],i)=>{
+  const [x,y]=positions[i],q=assessments.find(q=>q.id===key),status=q.status;
+  const color=status==='unassessed'?null:temperatureColor(q.temperatureK,scale);
+  const fill=color===null?'#58636c':'#'+color.toString(16).padStart(6,'0');
+  const warning=status==='hot'||status==='cold';
+  const glyphMarkup=`<g class="sd-thermal-glyph" data-sd-thermal-node="${key}" data-sd-temperature-color="${fill}" style="--sd-temp:${fill}">${glyph(type,x,y,.72)}</g>`;
+  const flag=warning?`<g class="sd-limit-flag" aria-label="${status} excursion"><path d="M${x+21} ${y-15}l7 -12 7 12z" fill="#fff0c8" stroke="#18212a"/>${T(x+28,y-16,'!','sd-limit-symbol')}</g>`:'';
+  return pick(parts[i],x-53,y-43,106,92,glyphMarkup+flag+named(x,y+36,label,color===null?'Unassessed':val(q.temperatureK,'K')));
+ }).join('')+
+ T(294,31,d.thermalMode==='applied'?'INDEPENDENT HEAT EXPERIMENT':'PUMPED HEAT TRANSPORT','sd-over');
+ const violations=assessments.filter(q=>q.status==='hot'||q.status==='cold').length;
+ const key=`<div class="sd-temp-key" aria-label="Fixed temperature scale"><span class="sd-caption">TEMPERATURE · ${scale.toUpperCase()} RANGE</span><div class="sd-temp-ramp"><i style="background:linear-gradient(to right,${stops.map(([k,color],i)=>color+' '+(100*i/(stops.length-1))+'%').join(',')})"></i><div>${stops.map(([k],i)=>`<span>${i===0?'≤':i===stops.length-1?'≥':''}${k}</span>`).join('')}</div></div><span class="sd-temp-unit">K</span><span class="sd-temp-flag"><b>⚠</b> Outside active limits</span><span class="sd-temp-neutral"><i></i> Unassessed</span></div>`;
+ return {...info('Thermal circuit','Select a node to compare its temperature with the applicable design range',parts,art,[legend('amber','Equipment heat'),legend('cyan','Coolant transport')],violations?violations+' outside range':assessments.some(q=>q.status==='unassessed')?'Unassessed interval':'Within current ranges'),temperatureKey:key};
+}
+
+function orbit({d,s,day,events},id){
+ const parts=[
+ P('orbit','Orbital path','This cross-section looks along the orbit normal. The selected position and Sun vector are projected into that plane.','altitudeKm',null,[row('Semi-major altitude',val(d.altitudeKm,'km')),row('Eccentricity',num(d.ecc,4)),row('Inclination',val(d.inclinationDeg,'°')),row('Period',val(s.periodSec/60,'min'))]),
+ P('shadow','Earth shadow','The cylindrical umbra intersects the orbit plane on the anti-solar side. At a high beta angle, the orbit can miss the shadow entirely.','raanDeg',null,[row('Instant',s.eclipse?'Umbra':'Sunlight'),row('Solar beta',val(s.betaDeg,'°')),row('Eclipses in window',String(day.eclipseCount??'—')),row('Shadow duration',val(day.shadowSeconds/60,'min'))],events.find(e=>e.type==='eclipse'&&e.end>=s.t)||events.find(e=>e.type==='eclipse')),
+ P('vehicle','Spacecraft ephemeris','Perigee, apogee and the present vehicle position share the current propagation state.','meanAnomalyDeg',null,[row('Altitude',val(s.altitudeKm,'km')),row('Perigee / apogee',val(s.perigeeKm,'km')+' / '+val(s.apogeeKm,'km')),row('Ram velocity',val(s.relativeSpeedMs,'m/s',0)),row('Drag force',val(s.dragN,'N',5))])];
+ const pos=s.positionECI||[R+d.altitudeKm,0,0],vel=s.velocityECI||[0,7.5,0],normal=unit(cross(pos,vel)),sun=s.sunECI||[1,0,0],sd=dot(sun,normal),pr=sun.map((v,i)=>v-sd*normal[i]),ex=Math.hypot(...pr)>1e-6?unit(pr):unit(pos),ey=unit(cross(normal,ex));
+ const rr=Math.hypot(...pos),vp=dot(vel,vel),pd=dot(pos,vel),ev=pos.map((r,i)=>((vp-MU/rr)*r-pd*vel[i])/MU),ecc=Math.hypot(...ev),semi=1/(2/rr-vp/MU),scale=83/Math.max(R+250,semi>0&&ecc<.5?semi*(1+ecc):rr),cx=205,cy=127,re=R*scale,displayOrbit=s.t>=540&&ecc<.8&&semi>0;
+ const chart=(vec)=>[cx+scale*dot(vec,ex),cy-scale*dot(vec,ey)];
+ const orbitPath=displayOrbit?Array.from({length:121},(_,i)=>{const a=i*Math.PI/60,xx=Math.cos(a),yy=Math.sin(a),r=semi*(1-ecc*ecc)/(1+dot(ev,ex)*xx+dot(ev,ey)*yy);return (i?'L':'M')+(cx+scale*r*xx).toFixed(2)+' '+(cy-scale*r*yy).toFixed(2)}).join('')+'Z':'';
+ const [sx,sy]=chart(pos);
+ const shadowRx=re/Math.max(.0001,Math.abs(sd));
+ const art=`<defs><clipPath id="${id}-night"><rect x="23" y="29" width="${cx-23}" height="194"/></clipPath><clipPath id="${id}-globe"><circle cx="${cx}" cy="${cy}" r="${re}"/></clipPath></defs>`+
+ pick(parts[1],23,34,103,181,`<ellipse cx="${cx}" cy="${cy}" rx="${shadowRx}" ry="${re}" clip-path="url(#${id}-night)" class="sd-shadow"/>`+T(71,51,'UMBRA','sd-over'))+
+ pick(parts[0],cx-91,cy-92,182,184,`<circle cx="${cx}" cy="${cy}" r="${re}" fill="url(#${id}-earth)" stroke="#61919e"/>`+
+ `<g clip-path="url(#${id}-globe)">${[-.64,-.27,.16,.55].map(o=>ellipse(cx+o*re,cy,re*.35,re*1.1,'sd-meridian')).join('')}${[-.56,-.16,.25,.64].map(o=>ellipse(cx,cy+o*re,re*1.1,re*.16,'sd-meridian')).join('')}</g>`+path(orbitPath,'sd-orbit')+T(cx,cy+4,'EARTH','sd-world'))+
+ pick(parts[2],sx-15,sy-15,30,30,circle(sx,sy,7,'sd-satellite')+circle(sx,sy,2,'sd-white'))+
+ each(3,i=>flow(id,`M370 ${101+i*25}H307`,'amber',false))+T(340,81,'SUNLIGHT','sd-over')+
+ T(406,81,'SOLAR BETA','sd-over','start')+T(406,113,val(s.betaDeg,'°'),'sd-large','start')+
+ T(406,158,'24 H SHADOW','sd-over','start')+T(406,188,val(day.shadowSeconds/60,'min'),'sd-large','start')+
+ T(206,237,displayOrbit?'VIEW ALONG ORBIT NORMAL':'PRE-INSERTION POSITION','sd-over');
+ return info('Orbital plane','Earth-centered section through the flight path and eclipse geometry',parts,art,[legend('amber','Sun direction'),legend('cyan','Orbital path'),legend('violet','Umbra')],s.t<540?'Pre-insertion':s.eclipse?'In eclipse':'In sunlight');
+}
+
+function attitude({h,d,s},id){
+ const parts=[
+ P('torque','Disturbance torque','Aerodynamic drag, solar radiation pressure and gravity gradients load the attitude-control cluster.','cpOffsetM','cmg',[row('Ram silhouette',val(s.ramAreaM2,'m²')),row('Aerodynamic',val(s.dragTorqueNm,'N·m',5)),row('Solar / gravity',val(s.solarTorqueNm,'N·m',5)+' / '+val(s.gravityTorqueNm,'N·m',5)),row('CP offset',val(d.cpOffsetM,'m',3))]),
+ P('cmg','Four-CMG pyramid','Four spinning rotors exchange angular momentum with the spacecraft during pointing and acquisition. The cluster model tracks a reduced-order momentum envelope.','cmgMomentumNms','cmg',[row('Stored momentum',val(s.momentumNms,'N·m·s')),row('Cluster capacity',val(d.cmgMomentumNms,'N·m·s')),row('Pointing error',val(s.pointingErrorDeg,'°',4)),row('Electrical draw',val(s.cmgKW,'kW',3))]),
+ P('unload','Magnetic unloading','The torquers apply an external torque perpendicular to the local magnetic field. Available authority changes along the orbit.','dipoleAm2','cmg',[row('Coil state',s.desat?'Unloading':'Standby'),row('Local field',val(s.magFieldUT,'µT')),row('Available torque',val(s.unloadAuthorityNm,'N·m',5)),row('Applied unload',val(s.unloadTorqueNm,'N·m',5))])];
+ const art=pick(parts[0],26,43,143,155,path('M82 142V73M82 142L133 151M82 142L46 162','sd-axes')+flow(id,'M89 137L126 103','amber',s.torqueNm>.0001)+T(82,63,'Z','sd-over')+T(142,155,'X','sd-over')+T(39,178,'Y','sd-over')+named(102,201,'Disturbance',val(s.torqueNm,'N·m',4)))+
+ flow(id,'M164 119H213','amber',s.torqueNm>0)+
+ pick(parts[1],211,44,155,161,path('M284 56L338 111L287 161L232 114Z','sd-chassis')+[[284,76],[323,112],[287,151],[248,113]].map(([x,y])=>glyph('wheel',x,y,.65)).join('')+named(285,201,'CMG pyramid',val(s.momentumNms,'N·m·s'))) +
+ flow(id,'M362 118H420','violet',s.desat)+
+ pick(parts[2],425,54,127,155,glyph('torquer',490,115,1.05)+each(3,i=>path(`M${447+i*4} ${98-i*10}Q490 ${46-i*9} ${527-i*3} ${96-i*9}`,'sd-field'))+named(490,201,'Torquer coils',val(s.unloadTorqueNm,'N·m',4)))+T(286,29,'ROTOR CLUSTER · BODY FRAME','sd-over');
+ return info('Attitude actuators','Disturbance loading, momentum storage and external unloading',parts,art,[legend('amber','Torque input'),legend('violet','Magnetic unloading')],s.desat?'Desaturating':s.slewFraction>0?'Slewing':'Pointing');
+}
+
+function prop({h,d,s},id){
+ const parts=[
+ P('fuel','Fuel vessel','The fuel inventory falls with burn impulse. The cutaway encodes liquid volume fraction in a pressure-fed microgravity tank.','propellantKg','propellant',[row('Fuel mass',val(s.fuelKg,'kg')),row('Liquid volume',val(s.fuelKg/d.fuelDensity,'L')),row('Initial fuel',val(h.fuelKg,'kg')),row('Density',val(d.fuelDensity,'kg/L',3))]),
+ P('oxidizer','Oxidizer vessel','The second vessel supplies oxidizer at the selected engine mixture ratio. The tanks retain separate liquid masses.','mixtureRatio','propellant',[row('Oxidizer mass',val(s.oxidizerKg,'kg')),row('Liquid volume',val(s.oxidizerKg/d.oxidizerDensity,'L')),row('Initial oxidizer',val(h.oxidizerKg,'kg')),row('Oxidizer / fuel',num(d.mixtureRatio,3))]),
+ P('engine','Paired engines','The feed manifold supplies two pressure-fed engines. Only a scheduled chemical burn draws propellant.','engine','propulsion',[row('Engine package',tech(d,'engine')),row('Total thrust',val(d.thrustN,'N')),row('Delivered Isp',val(d.isp,'s')),row('Integrated impulse',val(s.burnImpulseNs,'N·s',0))]),
+ P('disposal','End-of-mission supply','Maintenance reserves propellant for disposal. Final retrograde thrust targets the selected perigee and a descending atmospheric interface.','disposalTargetPerigeeKm','propellant',[row('Disposal state',s.disposalStatus||'Scheduled'),row('Protected inventory',val(s.disposalProtectedKg,'kg')),row('Disposal target',val(s.disposalTargetPerigeeKm,'km')),row('Disposal used',val(s.disposalUsedKg,'kg'))])];
+ function tank(x,label,kg,p,halfWidth,col){const r=halfWidth,y=71,hgt=74,level=frac(s.tankFillPct/100),cid=id+'-'+p.id;
+  return pick(p,x-r-12,48,r*2+24,140,`<defs><clipPath id="${cid}"><rect x="${x-r}" y="${y}" width="${r*2}" height="${hgt}" rx="${r*.75}"/></clipPath></defs>`+rect(x-r,y,2*r,hgt,'sd-tank',r*.75)+`<rect x="${x-r}" y="${y+hgt*(1-level)}" width="${2*r}" height="${level*hgt}" class="sd-fill-${col}" clip-path="url(#${cid})"/>`+
+ path(`M${x-r} ${y+hgt*.48}H${x+r}m${-r-4} ${hgt*.52}v6h8v-6`,'sd-tankline')+named(x,175,label,val(kg,'kg')));}
+ const art=tank(105,'Fuel',s.fuelKg,parts[0],26,'amber')+tank(230,'Oxidizer',s.oxidizerKg,parts[1],31,'cyan')+T(164,39,'PRESSURIZED INVENTORY','sd-over')+
+ flow(id,'M108 151v5h184v-49h97','amber',s.burn)+flow(id,'M232 151v-7h48V92h109','cyan',s.burn)+
+ pick(parts[2],373,49,146,111,glyph('engine',419,90,.70)+glyph('engine',463,90,.70)+named(443,139,'Engine pair',s.burn?val(d.thrustN,'N'):'Valves closed'))+
+ pick(parts[3],316,184,232,48,rect(318,188,228,41,'sd-reserve',5)+T(330,205,'DISPOSAL ALLOCATION','sd-over','start')+T(330,222,val(s.disposalProtectedKg,'kg protected'),'sd-value','start'));
+ return info('Propellant feed system','Inventory, mixture ratio and protected disposal allocation',parts,art,[legend('amber','Fuel'),legend('cyan','Oxidizer'),legend('violet','Protected reserve')],s.burn?(s.burnKind||'chemical')+' burn':'Valves closed');
+}
+
+function mass({h,s},id){
+ const groups=[['compute','Compute',['compute','host','storage','switch'],'trayCount','compute'],['power','Power',['array','battery'],'batteryKWh','battery'],['thermal','Thermal',['radiator','coolant','blanket'],'radiatorM2','radiator'],['vehicle','Vehicle',['hinges','cmg','terminals','engine','tanks','shield','cables','structure','skin'],'structureMargin','structure'],['margin','Dry margin',['margin'],'structureMargin','structure'],['fluids','Fluids',['fuel','oxidizer','pressurant'],'propellantKg','propellant'],['adapter','Adapter',['adapter'],'adapterKg','adapter']];
+ const rows=groups.map(([id,title,keys,edit,inspect])=>{const items=h.massLedger.filter(r=>keys.includes(r.id)),kg=items.reduce((n,r)=>n+r.kg,0);return {id,title,items,kg,edit,inspect}});
+ const parts=rows.map(r=>P(r.id,r.title+' allocation','The launched stack includes all dry hardware, dry engineering margin, fuel, oxidizer, pressurant and the launch adapter exactly once.',r.edit,r.inspect,[row('Group mass',val(r.kg,'kg')),row('Stack fraction',val(100*r.kg/h.launchKg,'%')),...r.items.map(item=>row(item.label,val(item.kg,'kg')))]));
+ const cs=['violet','amber','cyan','steel','red','green','steel'];
+ const width=495, left=47, stripY=94;let x=left;
+ const seg=rows.map((r,i)=>{const w=width*r.kg/h.launchKg;const bar=rect(x,stripY,w,32,'sd-bar-'+cs[i]);x+=w;return pick(parts[i],x-w,stripY,w,32,bar);}).join('');
+ const labels=rows.map((r,i)=>{const xx=48+(i%4)*130,yy=168+Math.floor(i/4)*35;return pick(parts[i],xx-4,yy-14,123,28,rect(xx,yy-7,7,7,'sd-bar-'+cs[i],1)+T(xx+12,yy,r.title,'sd-name','start')+T(xx+12,yy+14,val(r.kg,'kg',0),'sd-value','start'));}).join('');
+ const dryX=left+width*h.dryKg/h.launchKg,wetX=left+width*h.wetKg/h.launchKg;
+ const art=path(`M${left} 75v-7H${dryX}v7M${wetX} 85v-8H542v8`,'sd-dim')+T((left+dryX)/2,57,val(h.dryKg,'kg dry'),'sd-name')+path(`M${left} 131v5H${wetX}v-5`,'sd-dim')+
+ T(left,27,'INSTALLED LAUNCH MASS','sd-over','start')+T(543,35,val(h.launchKg,'kg'),'sd-large','end')+seg+labels;
+ return info('Stack composition','Mass-proportional allocation of installed flight and launch hardware',parts,art,[legend('steel','Bar width ∝ mass'),legend('green','Loaded fluids')],val(s.wetKg,'kg in vehicle',0));
+}
+
+function launch({h,d,s},id){
+ const f=h.fairing;
+ const parts=[
+ P('fairing','Payload keep-in','The selected profile gives the available radius at each axial station. Mission overrides scale the source contour.','launcher','adapter',[row('Vehicle',h.launcherLabel),row('Basis',f.basis),row('Usable diameter',val(f.maxDiameterM,'m')),row('Usable height',val(f.heightM,'m'))]),
+ P('stack','Stowed assembly','Each folded section is tested at both ends and every intersecting taper station. The cassette includes all folded solar and radiator leaves.','solarM2','structure',[row('Stack length / diameter',val(h.stowedLengthM,'m')+' / '+val(h.stowedDiameterM,'m')),row('Limiting section',f.limitingPart),row('Minimum lateral gap',val(f.radialClearanceM,'m',3)),row('Axial gap',val(f.axialClearanceM,'m',3))]),
+ P('adapter','Launch interface','The adapter remains on the launch stack at separation. The payload allowance is independently editable for the target mission.','launchAllowanceKg','adapter',[row('Adapter',val(d.adapterKg,'kg')),row('Launcher reference',val(d.referenceKg,'kg',0)),row('Mission allowance',val(d.launchAllowanceKg,'kg',0)),row('Launch mass margin',val(h.massMarginKg,'kg',0))]),
+ P('trim','Insertion trim','The spacecraft uses its chemical engines to close the trim budget after separation. The mission clock drives achieved orbit and paid delta-v.','trimDv','propulsion',[row('Target altitude',val(d.altitudeKm,'km')),row('Achieved altitude',val(s.altitudeKm,'km')),row('Required trim',val(d.trimDv,'m/s')),row('Delivered trim',val(s.trimPaidDv,'m/s'))])];
+ const x=61,y=117,k=Math.min(330/Math.max(f.heightM,h.stowedLengthM),100/Math.max(f.maxDiameterM,h.stowedDiameterM)),xm=z=>x+z*k;
+ const prof=f.profile.map(([z,r])=>[xm(z),y-r*k]).concat(f.profile.slice().reverse().map(([z,r])=>[xm(z),y+r*k]));
+ const art=pick(parts[0],29,32,384,164,`<polygon points="${prof.map(p=>p.join(',')).join(' ')}" class="sd-profile"/>`+T(52,41,'KEEP-IN CROSS SECTION','sd-over','start'))+
+ path(`M40 ${y}H420`,'sd-centerline')+
+ f.stack.map((r,i)=>pick(i===0?parts[2]:parts[1],xm(r.z0M),y-r.radiusM*k,Math.max(9,r.lengthM*k),Math.max(12,2*r.radiusM*k),rect(xm(r.z0M),y-r.radiusM*k,r.lengthM*k,2*r.radiusM*k,'sd-stack-outline')+rect(xm(r.z0M),y-r.heightM*k/2,r.lengthM*k,r.heightM*k,'sd-stack-'+i))).join('')+
+ path(`M${x} 178v8H${xm(h.stowedLengthM)}v-8`,'sd-dim')+T((x+xm(h.stowedLengthM))/2,209,val(h.stowedLengthM,'m stack'),'sd-name')+
+ T(437,56,'LATERAL MARGIN','sd-over','start')+T(437,83,val(f.radialClearanceM,'m',2),f.radialClearanceM<0?'sd-large sd-bad':'sd-large','start')+
+ T(437,119,'AXIAL MARGIN','sd-over','start')+T(437,145,val(f.axialClearanceM,'m',2),f.axialClearanceM<0?'sd-large sd-bad':'sd-large','start')+
+ pick(parts[3],422,172,144,55,T(437,189,'INSERTION TRIM','sd-over','start')+T(437,214,val(s.trimPaidDv,'m/s'),'sd-name','start'));
+ return info('Stowed launch envelope','Stack dimensions measured forward from the adapter plane',parts,art,[legend('cyan','Tapered keep-in'),legend('steel','Folded hardware'),legend('amber','Terminal cap')],f.fit?'Fits modeled profile':'Envelope exceeded');
+}
+
+const builders={orbit,compute,comm,power,thermal,attitude,prop,mass,launch};
+export const schematicPages=Object.keys(builders);
+const indexes=Object.fromEntries(schematicPages.map((k,i)=>[k,String(i+1).padStart(2,'0')]));
+const norm=({hardware:h,state:s,day={},events=[],selected,instance,qualificationWindow,thermalScale})=>({h,d:h.input,s,day,events,selected,instance,qualificationWindow,thermalScale});
+function rangeBand(q){
+ if(!q||!Number.isFinite(q.minK)||!Number.isFinite(q.maxK)||q.minK>=q.maxK)return '';
+ const span=q.maxK-q.minK,padding=Math.max(10,span*.14),lo=q.minK-padding,hi=q.maxK+padding;
+ const pos=v=>100*frac((v-lo)/(hi-lo)),known=Number.isFinite(q.temperatureK)&&q.status!=='unassessed';
+ return `<div class="sd-range"><div class="sd-rangehead"><span>${esc(q.state)} range</span><b>${known?val(q.temperatureK,'K'):'Unassessed'}</b></div><div class="sd-rangetrack"><i style="left:${pos(q.minK)}%;right:${100-pos(q.maxK)}%"></i>${known?`<b class="${q.status==='pass'?'':'sd-outside'}" style="left:${pos(q.temperatureK)}%"></b>`:''}</div><div class="sd-rangeends"><span>${val(q.minK,'K')}</span><span>${val(q.maxK,'K')}</span></div></div>`;
+}
+function detail(part,selected){
+ const editText=part.editLabel||(part.edit?'Edit '+({trayCount:'tray count',batteryKWh:'pack size',solarM2:'array size',radiatorM2:'radiator area',launchAllowanceKg:'allowance',link:'terminal',isp:'specific impulse'}[part.edit]||'design input'):'');
+ return `<div class="sd-detail" data-sd-detail="${esc(part.id)}" ${selected?'':'hidden'}><div class="sd-description"><span class="sd-caption">SELECTED COMPONENT</span><h4>${esc(part.title)}</h4><p>${esc(part.description)}</p>${rangeBand(part.range)}<div class="sd-actions">${part.edit?`<button type="button" data-sd-edit="${esc(part.edit)}">${esc(editText)} <span aria-hidden="true">↗</span></button>`:''}${(part.extraEdits||[]).filter(([key])=>key!==part.edit).map(([key,label])=>`<button type="button" data-sd-edit="${esc(key)}">${esc(label)} <span aria-hidden="true">↗</span></button>`).join('')}${part.inspect?`<button type="button" data-sd-inspect="${esc(part.inspect)}">Inspect hardware <span aria-hidden="true">↗</span></button>`:''}${part.event?`<button type="button" data-sd-event="${esc(part.event.id)}">Select ${part.event.type==='eclipse'?'eclipse':'pass'} <span aria-hidden="true">→</span></button>`:''}</div></div><dl class="sd-readings">${part.details.map(([n,v])=>`<div><dt>${esc(n)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl></div>`;
+}
+export function renderSubsystemDiagram(page,context){
+ if(!builders[page])return '';
+ const c=norm(context),id='odc-sd-'+safeId(page)+'-'+(++sequence),model=builders[page](c,id),selected=model.parts.find(p=>p.id===c.selected)?.id??model.parts[0].id;
+ const statusTone=/exceeded|outside range|failed/i.test(model.status)?' sd-status-alert':/standby|out of view|unassessed|eclipse|closed|pre-insertion/i.test(model.status)?' sd-status-idle':'';
+ const t=Number.isFinite(c.s.t)?Math.abs(c.s.t):0,clock=(c.s.t<0?'−':'+')+Math.floor(t/86400)+'d '+[Math.floor(t%86400/3600),Math.floor(t/60)%60,Math.floor(t)%60].map(x=>String(x).padStart(2,'0')).join(':');
+ return `<section class="sd-sheet" data-sd-sheet="${page}" data-sd-selected="${selected}" aria-labelledby="${id}-title"><header class="sd-heading"><div><span class="sd-caption">SYSTEM PLATE &nbsp; / &nbsp; ${indexes[page]}</span><h3 id="${id}-title">${esc(model.title)}</h3><p>${esc(model.subtitle)}</p></div><span class="sd-status${statusTone}">${esc(model.status)}</span></header><div class="sd-figure"><svg class="sd-art" viewBox="0 0 590 250" role="group" aria-labelledby="${id}-svg-title"><title id="${id}-svg-title">${esc(model.title)} schematic. Select a component to inspect it or edit its design.</title>${defs(id)}<rect width="590" height="250" fill="url(#${id}-grid)"/>${model.art.replaceAll(`data-sd-pick="${selected}"`,`data-sd-pick="${selected}" aria-pressed="true"`)}</svg></div>${model.temperatureKey||''}<div class="sd-key"><div>${model.legends.map(l=>`<span class="sd-legend sd-${l.color}"><i></i>${esc(l.label)}</span>`).join('')}</div><span class="sd-clock">MET ${clock}</span></div><div class="sd-bottom"><div class="sd-selector"><span class="sd-caption">EXPLORE</span><div class="sd-tabs" role="group" aria-label="Select schematic component">${model.parts.map(p=>`<button type="button" data-sd-pick="${p.id}" aria-pressed="${p.id===selected}">${esc(p.title.replace(' allocation',''))}</button>`).join('')}</div><select aria-label="Select schematic component" data-sd-select>${model.parts.map(p=>`<option value="${p.id}" ${p.id===selected?'selected':''}>${esc(p.title)}</option>`).join('')}</select></div>${model.parts.map(p=>detail(p,p.id===selected)).join('')}</div></section>`;
+}
+function selectPart(sheet,id){
+ if(!Array.from(sheet.querySelectorAll('[data-sd-detail]')).some(el=>el.dataset.sdDetail===id))return;
+ sheet.dataset.sdSelected=id;
+ sheet.querySelectorAll('[data-sd-pick]').forEach(el=>el.setAttribute('aria-pressed',String(el.dataset.sdPick===id)));
+ sheet.querySelectorAll('[data-sd-detail]').forEach(el=>{el.hidden=el.dataset.sdDetail!==id});
+ const field=sheet.querySelector('[data-sd-select]');if(field)field.value=id;
+}
+export function bindSubsystemDiagram(container,{onEdit,onInspect,onEvent,onSelect}={}){
+ const choose=(sheet,key)=>{selectPart(sheet,key);onSelect?.(key,sheet.dataset.sdSheet)};
+ const click=e=>{
+  const el=e.target.closest('[data-sd-pick],[data-sd-edit],[data-sd-inspect],[data-sd-event]'),sheet=el?.closest('[data-sd-sheet]');
+  if(!sheet||!container.contains(sheet))return;
+  if(el.hasAttribute('data-sd-pick'))choose(sheet,el.dataset.sdPick);
+  else if(el.hasAttribute('data-sd-edit'))onEdit?.(el.dataset.sdEdit);
+  else if(el.hasAttribute('data-sd-inspect'))onInspect?.(el.dataset.sdInspect);
+  else if(el.hasAttribute('data-sd-event'))onEvent?.(el.dataset.sdEvent);
+ };
+ const keydown=e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches('g[data-sd-pick]')){e.preventDefault();choose(e.target.closest('[data-sd-sheet]'),e.target.dataset.sdPick)}};
+ const change=e=>{if(e.target.matches('[data-sd-select]'))choose(e.target.closest('[data-sd-sheet]'),e.target.value)};
+ container.addEventListener('click',click);container.addEventListener('keydown',keydown);container.addEventListener('change',change);
+ return ()=>{container.removeEventListener('click',click);container.removeEventListener('keydown',keydown);container.removeEventListener('change',change)};
+}
+export function updateSubsystemDiagram(container,page,context){
+ const current=container.matches('[data-sd-sheet]')?container:container.querySelector('[data-sd-sheet]');
+ const samePage=current?.dataset.sdSheet===page,selected=context.selected??(samePage?current.dataset.sdSelected:null);
+ const focused=current?.contains(document.activeElement)?document.activeElement:null,focusAttr=focused?.getAttributeNames().find(n=>n.startsWith('data-sd-')),key=focusAttr&&focused.getAttribute(focusAttr),tag=focused?.tagName;
+ const html=renderSubsystemDiagram(page,{...context,selected});let sheet;
+ if(current){const holder=document.createElement('template');holder.innerHTML=html;sheet=holder.content.firstElementChild;if(sheet)current.replaceWith(sheet);else current.remove();}
+ else{container.innerHTML=html;sheet=container.querySelector('[data-sd-sheet]');}
+ if(sheet&&samePage&&focusAttr){Array.from(sheet.querySelectorAll('['+focusAttr+']')).find(el=>el.tagName===tag&&el.getAttribute(focusAttr)===key)?.focus({preventScroll:true});}
+ return sheet;
+}

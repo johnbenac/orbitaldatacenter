@@ -1,4 +1,5 @@
 import * as T from './vendor/three.module.js';
+import {thermalMesh} from './thermal-view.js';
 const v=(x,y,z)=>new T.Vector3(x,y,z);
 const solid=(c,m=.24,r=.49)=>new T.MeshStandardMaterial({color:c,metalness:m,roughness:r});
 const dark=solid('#26303a'),silver=solid('#c4cdd0',.48,.35),white=solid('#d8d4c7',.25,.52),ivory=solid('#f4ede0',.22,.58),bronze=solid('#92764d',.43),gold=solid('#c3a16b',.47),black=solid('#0f171d'),amber=solid('#f0a044'),navy=solid('#223853'),steel=solid('#6f8489',.4),aqua=solid('#74b3af'),blue=solid('#3d77ad');
@@ -23,7 +24,7 @@ function box(p,x,y,z,w,h,d,m,id){let a=obj(p,boxG,m,x,y,z,id);a.scale.set(w,h,d)
 function cyl(p,x,y,z,rTop,rBot,height,m,id,n=16,open=false){const radius=Math.max(rTop,rBot,.00001),geom=cylinderGeom(+(rTop/radius).toFixed(5),+(rBot/radius).toFixed(5),n,open);let a=obj(p,geom,m,x,y,z,id);a.scale.set(radius,height,radius);return a;}
 const sphereG=new T.SphereGeometry(1,48,28);sphereG.userData.shared=true;
 function ell(p,x,y,z,a,b,c,m,id){let o=obj(p,sphereG,m,x,y,z,id);o.scale.set(a,b,c);return o;}
-function pipe(p,a,b,r,m,id){const d=b.clone().sub(a),c=a.clone().add(b).multiplyScalar(.5);let o=cyl(p,c.x,c.y,c.z,r,r,d.length(),m,id,6);o.quaternion.setFromUnitVectors(v(0,1,0),d.normalize());return o;}
+function pipe(p,a,b,r,m,id){const d=b.clone().sub(a),c=a.clone().add(b).multiplyScalar(.5);let o=cyl(p,c.x,c.y,c.z,r,r,d.length(),m,id,6);o.quaternion.setFromUnitVectors(v(0,1,0),d.normalize());if(id==='radiator')thermalMesh(o,'coolant');return o;}
 function strokes(p,segments,color,id,opacity=1){let points=[];for(const [a,b] of segments)points.push(...a,...b);const geo=new T.BufferGeometry();geo.setAttribute('position',new T.Float32BufferAttribute(points,3));const lines=new T.LineSegments(geo,new T.LineBasicMaterial({color,opacity,transparent:opacity<1}));if(id)lines.userData.part=id;p.add(lines);return lines;}
 function canvas(w,h){let c=document.createElement('canvas');c.width=w;c.height=h;return[c,c.getContext('2d')];}
 function tex(c){let t=new T.CanvasTexture(c);t.colorSpace=T.SRGBColorSpace;t.anisotropy=8;return t;}
@@ -70,13 +71,13 @@ for(let side of [-1,1])for(let y of [-1,1])box(root,side*w*.488,y*y0,0,beam*.6,b
 for(let side of [-1,1]){
  const cover=side>0?skin:enclosure,x=side*(w*.5+beam*.12),y=side*(y0+beam*.11),z=side*(l*.5+beam*.11);
  for(let k=0;k<4;k++){const cz=l*((k+.5)/4-.5);
-  box(cover,x,0,cz,beam*.18,hgt*.86,l*.232,k===1||k===3?foilMat:ivory,'structure');
-  box(cover,0,y,cz,w*.90,beam*.17,l*.232,(k+side)%2?foilMat:white,'structure');
+  thermalMesh(box(cover,x,0,cz,beam*.18,hgt*.86,l*.232,k===1||k===3?foilMat:ivory,'structure'),'enclosure');
+  thermalMesh(box(cover,0,y,cz,w*.90,beam*.17,l*.232,(k+side)%2?foilMat:white,'structure'),'enclosure');
   for(let edge of [-1,1]){box(cover,x+side*beam*.12,edge*hgt*.392,cz,beam*.052,beam*.15,l*.208,dark,'structure');box(cover,edge*w*.416,y+side*beam*.116,cz,beam*.14,beam*.052,l*.210,bronze,'structure');}
   for(let i=0;i<3;i++)box(cover,x+side*beam*.125,hgt*(.10-.11*i),cz+l*.04,beam*.058,beam*.12,l*.082,silver,'structure');
  }
  // End bulkhead insulation cartridges surround service feedthroughs and a latched equipment access door.
- for(let edge of [-1,1])box(cover,edge*w*.285,0,z,w*.41,hgt*.88,beam*.18,edge===side?foilMat:ivory,'structure');
+ for(let edge of [-1,1])thermalMesh(box(cover,edge*w*.285,0,z,w*.41,hgt*.88,beam*.18,edge===side?foilMat:ivory,'structure'),'enclosure');
  box(cover,0,0,z+side*beam*.12,w*.16,hgt*.66,beam*.09,dark,'structure');
  for(let j=0;j<6;j++)box(cover,0,(j-2.5)*hgt*.102,z+side*beam*.21,w*.14,beam*.19,beam*.12,silver,'structure');
  for(let j of [-1,1]){
@@ -98,7 +99,7 @@ const grid=[];for(let k=1;k<=5;k++)grid.push([[x-seg*.477+k*seg*.159,depth*.59,-
 for(let q of [-1,1])box(leaf,x,-depth*.4,q*panelW*.49,seg,depth*.86,Math.max(depth*.35,.019),silver,'solar');box(leaf,x,-depth*.85,0,seg,depth,depth*.82,silver,'solar');const surface=new T.Group();surface.add(...leaf.children.slice());leaf.add(surface);panels.push({surface,anchor:leaf,cx:x,cz:0,alongX:seg>panelW});}
 pipe(pivot,v(side*w*.1,-beam,0),v(side*w*.44,-beam*.15,panelW*.26),beam*.33,gold,'solar');}
 // Two double-sided radiator banks run fore and aft from independent roots.
-for(let sign of [-1,1]){const pivot=join(root,0,-y0*.45,sign*l*.50,'radiator');const bank=join(pivot,0,0,0,'radiator');const leaves=[];rads.push({bank,sign,leaves});const stem=w*.35;box(bank,0,0,sign*stem*.5,beam*1.65,beam,stem,steel,'radiator');for(let k=0;k<3;k++){let z=sign*radL/6,wid=radW;const previous=k?leaves[k-1]:bank,leaf=join(previous,0,0,sign*(k?radL/3:stem),'radiator'),surface=new T.Group();leaf.add(surface);leaves.push(leaf);panels.push({surface,anchor:leaf,cx:0,cz:z,alongX:radW>radL/3});box(surface,0,0,z,wid,beam*.49,radL/3*.98,steel,'radiator');face(surface,0,beam*.257,z,wid*.981,radL/3*.961,finMat,'radiator');let f=face(surface,0,-beam*.257,z,wid*.981,radL/3*.961,finMat,'radiator');f.rotation.x=Math.PI/2;let grid=[];for(let j=1;j<10;j++)grid.push([[-wid*.49+j*wid*.098,beam*.262,z-radL*.158],[-wid*.49+j*wid*.098,beam*.262,z+radL*.158]]);strokes(surface,grid,'#8a9799','radiator',.53);for(let x of [-1,1])box(surface,wid*.49*x,0,z,beam*.20,beam*.55,radL/3,white,'radiator');}for(let s of [-1,1])pipe(bank,v(s*w*.20,0,0),v(s*radW*.45,0,sign*stem),beam*.25,copper,'radiator');}
+for(let sign of [-1,1]){const pivot=join(root,0,-y0*.45,sign*l*.50,'radiator');const bank=join(pivot,0,0,0,'radiator');const leaves=[];rads.push({bank,sign,leaves});const stem=w*.35;box(bank,0,0,sign*stem*.5,beam*1.65,beam,stem,steel,'radiator');for(let k=0;k<3;k++){let z=sign*radL/6,wid=radW;const previous=k?leaves[k-1]:bank,leaf=join(previous,0,0,sign*(k?radL/3:stem),'radiator'),surface=new T.Group();leaf.add(surface);leaves.push(leaf);panels.push({surface,anchor:leaf,cx:0,cz:z,alongX:radW>radL/3});thermalMesh(box(surface,0,0,z,wid,beam*.49,radL/3*.98,steel,'radiator'),'radiator');thermalMesh(face(surface,0,beam*.257,z,wid*.981,radL/3*.961,finMat,'radiator'),'radiator');let f=thermalMesh(face(surface,0,-beam*.257,z,wid*.981,radL/3*.961,finMat,'radiator'),'radiator');f.rotation.x=Math.PI/2;let grid=[];for(let j=1;j<10;j++)grid.push([[-wid*.49+j*wid*.098,beam*.262,z-radL*.158],[-wid*.49+j*wid*.098,beam*.262,z+radL*.158]]);strokes(surface,grid,'#8a9799','radiator',.53);for(let x of [-1,1])box(surface,wid*.49*x,0,z,beam*.20,beam*.55,radL/3,white,'radiator');}for(let s of [-1,1])pipe(bank,v(s*w*.20,0,0),v(s*radW*.45,0,sign*stem),beam*.25,copper,'radiator');}
 // Tank pair with external bands, pressure domes and dedicated feed lines.
 const tankR=Math.min(w*.24,Math.cbrt(Math.max(.02,h.tankVolumeL/1000)/2/(4*Math.PI/3))*.9);for(let sign of [-1,1]){let x=sign*(w*.50+tankR*.68),uc=join(root,x,-hgt*.21,0,'propellant');ell(uc,0,0,0,tankR,tankR,tankR*1.32,gold,'propellant');for(let z of [-.49,.49]){let ring=new T.Mesh(new T.TorusGeometry(tankR*.93,beam*.13,10,48),dark);ring.position.z=z*tankR;uc.add(ring);}let fluid=ell(uc,0,0,0,tankR*.92,tankR*.92,tankR*1.22,sign<0?blue:copper,'propellant');fluid.visible=false;cells.push({fluid,tank:uc.children[0],sign});pipe(uc,v(0,0,-tankR*1.29),v(-sign*tankR*1.2,-beam,-l*.45),beam*.21,copper,'propellant');}
 // Reflector is a shallow paraboloid with crossed support rods and a feed horn.
@@ -116,13 +117,13 @@ for(let side of [-1,1]){
  for(let k=0;k<rows;k++){const pitch=hgt*.68/Math.max(1,rows),y=-hgt*.36+(k+.18)*pitch;
 
   const tray=box(rack,0,y,0,w*.36,Math.min(beam*.35,pitch*.22),l*.62,silver,'compute');tray.userData.installedTrayRow=true;trayRows.push(tray);
-  box(rack,0,y+Math.min(beam*.30,pitch*.27),0,w*.33,Math.min(beam*.16,pitch*.13),l*.57,copper,'compute');
-  for(let j=0;j<4;j++){const z=(j-1.5)*l*.13;box(rack,0,y+Math.min(beam*.53,pitch*.48),z,w*.28,Math.min(beam*.26,pitch*.19),l*.115,navy,'compute');const lamp=box(rack,side*w*.154,y+beam*.54,z+l*.024,beam*.14,beam*.17,beam*.28,lit,'compute');leds.push(lamp);}
+  thermalMesh(box(rack,0,y+Math.min(beam*.30,pitch*.27),0,w*.33,Math.min(beam*.16,pitch*.13),l*.57,copper,'compute'),'coldPlate');
+  for(let j=0;j<4;j++){const z=(j-1.5)*l*.13;thermalMesh(box(rack,0,y+Math.min(beam*.53,pitch*.48),z,w*.28,Math.min(beam*.26,pitch*.19),l*.115,navy,'compute'),'junction');const lamp=box(rack,side*w*.154,y+beam*.54,z+l*.024,beam*.14,beam*.17,beam*.28,lit,'compute');leds.push(lamp);}
   for(const z of [-1,1])pipe(rack,v(side*w*.12,y+beam*.32,z*l*.23),v(rx,y+beam*.32,z*l*.295),beam*.14,z>0?blue:copper,'radiator');
  }
  for(const z of [-1,1]){const p=v(side*w*.40,-hgt*.26,z*l*.295),bend=v(side*w*.40,-hgt*.26,z*l*.40),end=v(side*w*.225,-hgt*.115,z*l*.505);pipe(internal,p,bend,beam*.26,z>0?blue:copper,'radiator');pipe(internal,bend,end,beam*.26,z>0?blue:copper,'radiator');}
 }
-for(let j=0;j<4;j++){const x=(j-1.5)*w*.20;box(internal,x,-hgt*.06,l*.408,w*.185,hgt*.64,l*.13,black,'battery');box(internal,x,hgt*.277,l*.408,w*.177,beam*.4,l*.128,bronze,'battery');box(internal,x,hgt*.02,l*.48,w*.1,hgt*.40,beam*.2,aqua,'battery');}for(let j=0;j<5;j++)box(internal,0,-hgt*.33+j*hgt*.13,-l*.41,w*.76,beam*.7,l*.105,silver,'storage');
+for(let j=0;j<4;j++){const x=(j-1.5)*w*.20;thermalMesh(box(internal,x,-hgt*.06,l*.408,w*.185,hgt*.64,l*.13,black,'battery'),'battery');box(internal,x,hgt*.277,l*.408,w*.177,beam*.4,l*.128,bronze,'battery');thermalMesh(box(internal,x,hgt*.02,l*.48,w*.1,hgt*.40,beam*.2,aqua,'battery'),'battery');}for(let j=0;j<5;j++)box(internal,0,-hgt*.33+j*hgt*.13,-l*.41,w*.76,beam*.7,l*.105,silver,'storage');
 for(let i=0;i<4;i++){let a=i*Math.PI/2+Math.PI/4,r=w*.22,g=join(internal,r*Math.cos(a),hgt*.45,r*Math.sin(a),'cmg');g.rotation.z=Math.sin(a)*.55;let rotor=cyl(g,0,0,0,w*.103,w*.103,beam*.7,bronze,'cmg');let ring=new T.Mesh(new T.TorusGeometry(w*.114,beam*.19,10,48),ivory);ring.rotation.x=.4;g.add(ring);cmgs.push({g,rotor,a});}for(let s of [-1,1]){const engine=join(root,s*w*.28,-hgt*.21,-l*.53,'propulsion');let bell=cyl(engine,0,0,-w*.10,w*.080,w*.15,w*.25,dark,'propulsion',24,true);bell.rotation.x=Math.PI/2;const inner=cyl(engine,0,0,-w*.10,w*.072,w*.141,w*.245,solid('#232327',.22,.68),'propulsion',32,true);inner.rotation.x=Math.PI/2;inner.geometry=inner.geometry.clone();inner.geometry.userData.shared=false;
 const innerIdx=inner.geometry.index,innerNormals=inner.geometry.attributes.normal;
 for(let k=0;k<innerIdx.count;k+=3){const j=innerIdx.getX(k+1);innerIdx.setX(k+1,innerIdx.getX(k+2));innerIdx.setX(k+2,j);}

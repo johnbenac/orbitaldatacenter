@@ -3,7 +3,7 @@ import {defaults, sizeDesign, estimateLife, applyPreset, YEAR} from './dist/desi
 import {chronologicalAudit} from './dist/mission-worker.js';
 import {DAY} from './dist/orbit.js';
 import {createSimulation} from './dist/model.js';
-import {loadScenario, scenarios} from './dist/scenarios.js';
+import {loadScenario, scenarios} from './verification-fixtures.mjs';
 
 const near=(a,b,tolerance=1e-6)=>assert.ok(Number.isFinite(a)&&Number.isFinite(b)&&Math.abs(a-b)<=tolerance,`${a} vs ${b}`);
 const testDays=2.75;

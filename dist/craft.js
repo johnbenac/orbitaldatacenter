@@ -1,4 +1,5 @@
 import * as T from './vendor/three.module.js';
+import {deploymentLayout,leafPose} from './deployment.js';
 import {thermalMesh} from './thermal-view.js';
 const v=(x,y,z)=>new T.Vector3(x,y,z);
 const solid=(c,m=.24,r=.49)=>new T.MeshStandardMaterial({color:c,metalness:m,roughness:r});
@@ -34,10 +35,10 @@ cellMat.map=tex(c);[c,g]=canvas(512,256);g.fillStyle='#d9d8cf';g.fillRect(0,0,51
 function face(p,x,y,z,w,d,m,id){const a=obj(p,new T.PlaneGeometry(w,d),m,x,y,z,id);a.rotation.x=-Math.PI/2;a.userData.texturePlane=true;return a;}
 function join(p,x,y,z,id){let g=new T.Group();g.position.set(x,y,z);g.userData.part=id;p.add(g);return g;}
 function labelPlate(p,x,y,z,w,d,caption){const [c,g]=canvas(512,112);g.fillStyle='#e3e1d7';g.fillRect(0,0,512,112);g.fillStyle='#26343b';g.font='bold 60px monospace';g.fillText(caption,18,74);g.fillStyle='#bd6b21';g.fillRect(0,0,7,112);let m=solid('#fff');m.map=tex(c);return face(p,x,y,z,w,d,m,'structure');}
-export function makeCraft(h){textures();const root=new T.Group(),internal=new T.Group(),skin=new T.Group();root.add(skin,internal);let bw=h.bodyWidthM,bh=h.bodyHeightM,bl=h.bodyLengthM;const panelL=h.wingLengthM,panelW=h.wingWidthM,radL=h.radiatorLengthM,radW=h.radiatorWidthM;let wings=[],rads=[],panels=[],trayRows=[],cmgs=[],cells=[],leds=[],plumes=[];const gleam=[];const w=bw,hgt=bh,l=bl,beam=Math.min(w,hgt)*.052;const y0=hgt*.5;
+export function makeCraft(h){textures();const root=new T.Group(),internal=new T.Group(),skin=new T.Group();root.add(skin,internal);let bw=h.bodyWidthM,bh=h.bodyHeightM,bl=h.bodyLengthM;const panelL=h.wingLengthM,panelW=h.wingWidthM,radL=h.radiatorLengthM,radW=h.radiatorWidthM;let wings=[],rads=[],panels=[],trayRows=[],cmgs=[],cells=[],leds=[],plumes=[];const gleam=[];const w=bw,hgt=bh,l=bl,beam=Math.min(w,hgt)*.052;const y0=hgt*.5,kin=deploymentLayout(h),appendages=new T.Group();root.add(appendages);
 // Six dedicated, finite-thickness walls. Positive-axis covers lift away for the core section.
 const enclosure=new T.Group(),walls=[];root.add(enclosure);
-const wallT=Math.min(w,hgt,l)*.024;
+const wallT=Math.min(w,hgt,l)*.024,flexLoops=[];
 function wall(parent,axis,sign,width,height,depth,x,y,z){
  const spec=h.enclosure?.walls?.find(p=>p.axis===axis&&p.sign===sign);
  const apertures=spec?.portDiametersM??(axis==='x'?[.036,.036]:axis==='y'?[.036]:sign>0?[.052,.052]:[.052,.052,.065,.065]);
@@ -84,22 +85,22 @@ for(let side of [-1,1]){
   const zf=side*(l*.5+beam*.27),yf=-hgt*.115,xp=j*w*.225;
   const flange=cyl(cover,xp,yf,zf,beam*.88,beam*.88,beam*.32,dark,'radiator',32);flange.rotation.x=Math.PI/2;
   const gland=cyl(cover,xp,yf,zf+side*beam*.23,beam*.56,beam*.62,beam*.40,silver,'radiator',28);gland.rotation.x=Math.PI/2;
-  pipe(cover,v(xp,yf,zf),v(xp,yf,zf+side*beam*1.2),beam*.29,j<0?blue:copper,'radiator');
-  pipe(cover,v(xp,yf,zf+side*beam*1.2),v(j*w*.08,-y0*.45,side*(l*.5+w*.26)),beam*.29,j<0?blue:copper,'radiator');
+  const flex=join(cover,0,0,zf,'radiator');flexLoops.push({flex,side});pipe(flex,v(xp,yf,0),v(xp,yf,side*beam*1.2),beam*.29,j<0?blue:copper,'radiator');
+  pipe(flex,v(xp,yf,side*beam*1.2),v(j*w*.08,-y0*.45,side*(l*.5+w*.26)-zf),beam*.29,j<0?blue:copper,'radiator');
  }
 }
 for(let iz=0;iz<5;iz++){const z=(iz/4-.5)*l;for(let side of [-1,1])box(root,side*(w*.5+beam*.09),0,z,beam*.52,hgt+beam*.30,beam*.42,silver,'structure');box(root,0,-y0-beam*.07,z,w+beam*.42,beam*.43,beam*.38,silver,'structure');}
 labelPlate(skin,0,y0+beam*.235,-l*.12,w*.59,l*.09,'ODC / 01');
 // Four articulated solar wings. Each wing has three folding leaves, cell strings and a visible wiring spine.
-const mountZ=Math.max(l*.28,panelW*.73);for(let side of [-1,1])for(let aft of [-1,1]){const z=aft*mountZ;const y=beam*.2;for(const a of [-1,1])pipe(root,v(side*w*.47,a*y0*.60,aft*l*.43),v(side*w*.57,a*y*.85,z),beam*.29,silver,'structure');
-const pivot=join(root,side*w*.50,y0*.02,z,'solar');box(pivot,side*w*.20,0,0,w*.40,beam*1.25,beam*1.8,steel,'solar');for(let ring=-1;ring<=1;ring++){let a=cyl(pivot,side*w*(.24+ring*.06),0,0,beam*1.25,beam*1.25,beam*.42,ring===0?gold:silver,'solar');a.rotation.z=Math.PI/2;}
+const mounts=new T.Group(),guide=new T.Group();root.add(mounts,guide);const mountZ=kin.mountZ;for(let side of [-1,1])for(let aft of [-1,1]){const z=aft*mountZ;const y=beam*.2;for(const a of [-1,1])pipe(mounts,v(side*w*.47,a*y0*.60,aft*l*.43),v(side*w*.57,a*y*.85,z),beam*.29,silver,'structure');
+const pivot=join(mounts,side*w*.50,y0*.02,z,'solar');box(pivot,side*w*.20,0,0,w*.40,beam*1.25,beam*1.8,steel,'solar');for(let ring=-1;ring<=1;ring++){let a=cyl(pivot,side*w*(.24+ring*.06),0,0,beam*1.25,beam*1.25,beam*.42,ring===0?gold:silver,'solar');a.rotation.z=Math.PI/2;}
 const fold=join(pivot,side*w*.43,0,0,'solar');const bank=join(fold,0,0,0,'solar');const leaves=[];let previous=bank;wings.push({fold,bank,side,aft,leaves});
-const seg=panelL/3, depth=Math.max(beam*.42,.038);for(let tile=0;tile<3;tile++){const leaf=join(previous,side*(tile?seg:0),0,0,'solar');leaves.push(leaf);previous=leaf;const x=side*.5*seg;box(leaf,x,0,0,seg*.978,depth,panelW,bronze,'solar');face(leaf,x,depth*.55,0,seg*.97,panelW*.968,cellMat,'solar');const lower=face(leaf,x,-depth*.55,0,seg*.97,panelW*.968,navy,'solar');lower.rotation.x=Math.PI/2;
+const seg=panelL/3, depth=.024;for(let tile=0;tile<3;tile++){const leaf=join(previous,side*(tile?seg:0),0,0,'solar');leaves.push(leaf);previous=leaf;const x=side*.5*seg;box(leaf,x,0,0,seg*.978,depth,panelW,bronze,'solar');face(leaf,x,depth*.55,0,seg*.97,panelW*.968,cellMat,'solar');const lower=face(leaf,x,-depth*.55,0,seg*.97,panelW*.968,navy,'solar');lower.rotation.x=Math.PI/2;
 const grid=[];for(let k=1;k<=5;k++)grid.push([[x-seg*.477+k*seg*.159,depth*.59,-panelW*.48],[x-seg*.477+k*seg*.159,depth*.59,panelW*.48]]);for(let k=1;k<3;k++)grid.push([[x-seg*.48,depth*.59,-panelW*.48+k*panelW*.32],[x+seg*.48,depth*.59,-panelW*.48+k*panelW*.32]]);strokes(leaf,grid,'#bdab84','solar',.37);
 for(let q of [-1,1])box(leaf,x,-depth*.4,q*panelW*.49,seg,depth*.86,Math.max(depth*.35,.019),silver,'solar');box(leaf,x,-depth*.85,0,seg,depth,depth*.82,silver,'solar');const surface=new T.Group();surface.add(...leaf.children.slice());leaf.add(surface);panels.push({surface,anchor:leaf,cx:x,cz:0,alongX:seg>panelW});}
 pipe(pivot,v(side*w*.1,-beam,0),v(side*w*.44,-beam*.15,panelW*.26),beam*.33,gold,'solar');}
 // Two double-sided radiator banks run fore and aft from independent roots.
-for(let sign of [-1,1]){const pivot=join(root,0,-y0*.45,sign*l*.50,'radiator');const bank=join(pivot,0,0,0,'radiator');const leaves=[];rads.push({bank,sign,leaves});const stem=w*.35;box(bank,0,0,sign*stem*.5,beam*1.65,beam,stem,steel,'radiator');for(let k=0;k<3;k++){let z=sign*radL/6,wid=radW;const previous=k?leaves[k-1]:bank,leaf=join(previous,0,0,sign*(k?radL/3:stem),'radiator'),surface=new T.Group();leaf.add(surface);leaves.push(leaf);panels.push({surface,anchor:leaf,cx:0,cz:z,alongX:radW>radL/3});thermalMesh(box(surface,0,0,z,wid,beam*.49,radL/3*.98,steel,'radiator'),'radiator');thermalMesh(face(surface,0,beam*.257,z,wid*.981,radL/3*.961,finMat,'radiator'),'radiator');let f=thermalMesh(face(surface,0,-beam*.257,z,wid*.981,radL/3*.961,finMat,'radiator'),'radiator');f.rotation.x=Math.PI/2;let grid=[];for(let j=1;j<10;j++)grid.push([[-wid*.49+j*wid*.098,beam*.262,z-radL*.158],[-wid*.49+j*wid*.098,beam*.262,z+radL*.158]]);strokes(surface,grid,'#8a9799','radiator',.53);for(let x of [-1,1])box(surface,wid*.49*x,0,z,beam*.20,beam*.55,radL/3,white,'radiator');}for(let s of [-1,1])pipe(bank,v(s*w*.20,0,0),v(s*radW*.45,0,sign*stem),beam*.25,copper,'radiator');}
+for(let sign of [-1,1]){const pivot=join(root,0,-y0*.45,sign*l*.50,'radiator');const bank=join(pivot,0,0,0,'radiator');bank.rotation.z=-Math.PI/2;const leaves=[];rads.push({bank,sign,leaves});const stem=kin.radRoot-l*.5;box(bank,0,0,sign*stem*.5,beam*1.65,beam,stem,steel,'radiator');for(let k=0;k<3;k++){let z=sign*radL/6,wid=radW;const previous=k?leaves[k-1]:bank,leaf=join(previous,0,0,sign*(k?radL/3:stem),'radiator'),surface=new T.Group();leaf.add(surface);leaves.push(leaf);panels.push({surface,anchor:leaf,cx:0,cz:z,alongX:radW>radL/3});thermalMesh(box(surface,0,0,z,wid,beam*.49,radL/3*.98,steel,'radiator'),'radiator');thermalMesh(face(surface,0,beam*.257,z,wid*.981,radL/3*.961,finMat,'radiator'),'radiator');let f=thermalMesh(face(surface,0,-beam*.257,z,wid*.981,radL/3*.961,finMat,'radiator'),'radiator');f.rotation.x=Math.PI/2;let grid=[];for(let j=1;j<10;j++)grid.push([[-wid*.49+j*wid*.098,beam*.262,z-radL*.158],[-wid*.49+j*wid*.098,beam*.262,z+radL*.158]]);strokes(surface,grid,'#8a9799','radiator',.53);for(let x of [-1,1])box(surface,wid*.49*x,0,z,beam*.20,beam*.55,radL/3,white,'radiator');}for(let s of [-1,1])pipe(bank,v(s*w*.20,0,0),v(s*radW*.42,0,sign*(stem-.10)),beam*.25,copper,'radiator');}
 // Tank pair with external bands, pressure domes and dedicated feed lines.
 const tankR=Math.min(w*.24,Math.cbrt(Math.max(.02,h.tankVolumeL/1000)/2/(4*Math.PI/3))*.9);for(let sign of [-1,1]){let x=sign*(w*.50+tankR*.68),uc=join(root,x,-hgt*.21,0,'propellant');ell(uc,0,0,0,tankR,tankR,tankR*1.32,gold,'propellant');for(let z of [-.49,.49]){let ring=new T.Mesh(new T.TorusGeometry(tankR*.93,beam*.13,10,48),dark);ring.position.z=z*tankR;uc.add(ring);}let fluid=ell(uc,0,0,0,tankR*.92,tankR*.92,tankR*1.22,sign<0?blue:copper,'propellant');fluid.visible=false;cells.push({fluid,tank:uc.children[0],sign});pipe(uc,v(0,0,-tankR*1.29),v(-sign*tankR*1.2,-beam,-l*.45),beam*.21,copper,'propellant');}
 // Reflector is a shallow paraboloid with crossed support rods and a feed horn.
@@ -130,21 +131,59 @@ for(let k=0;k<innerIdx.count;k+=3){const j=innerIdx.getX(k+1);innerIdx.setX(k+1,
 for(let k=0;k<innerNormals.count;k++)innerNormals.setXYZ(k,-innerNormals.getX(k),-innerNormals.getY(k),-innerNormals.getZ(k));
 const throat=cyl(engine,0,0,w*.018,w*.071,w*.071,beam*.06,black,'propulsion',32);throat.rotation.x=Math.PI/2;
 let rim=cyl(engine,0,0,-w*.236,w*.151,w*.151,beam*.22,bronze,'propulsion',24,true);rim.rotation.x=Math.PI/2;const plume=new T.Mesh(trimPoleTriangles(new T.ConeGeometry(w*.125,w*1.7,32,1,true)),new T.MeshBasicMaterial({color:0x6ccaff,transparent:true,opacity:.43,side:T.FrontSide,depthWrite:false}));plume.position.z=-w*1.06;plume.rotation.x=-Math.PI/2;engine.add(plume);plumes.push(plume);}
-const foldCassette=h.fairing?.stack?.find(s=>/cassette/i.test(s.part));
-const cassetteLength=foldCassette?.lengthM??Math.max(panelW,panelL/3,radW,radL/3);
-const w0=Math.max(0,(h.fairing?.stack||[]).find(s=>/insulated bus/i.test(s.part))?.z0M??0);
-const cassetteCenter=foldCassette?(foldCassette.z0M+foldCassette.z1M)/2-w0-l/2:l/2+cassetteLength/2;
-const parentInverse=new T.Matrix4(),qFinal=new T.Quaternion(),scale=new T.Vector3(),unit=new T.Vector3(1,1,1),pose=new T.Matrix4();
-for(let i=0;i<panels.length;i++){const p=panels[i],slot=i<12?-.555+.05*i+.025:.045+.08*(i-12)+.04;
- const q=new T.Quaternion().setFromAxisAngle(v(0,1,0),p.alongX?Math.PI/2:0);
- const at=v(0,slot,cassetteCenter).sub(v(p.cx,0,p.cz).applyQuaternion(q));p.stow=new T.Matrix4().compose(at,q,unit);
+// A longitudinal frame spaces the cassette away from both wing saddles. Its
+// rails run along the cassette sides; the frame retracts after the last packet clears.
+const cassette=h.fairing?.stack.find(q=>/cassette/i.test(q.part)),cassStart=kin.center-(cassette?.lengthM||0)/2;
+guide.position.z=l/2;
+for(const x of [-1,1])pipe(guide,v(x*w*.20,0,0),v(x*w*.20,0,Math.max(.06,cassStart-l/2-.08)),.024,steel,'structure');
+for(const o of wings){const x1=w*.93,x2=kin.rootX-.022;
+ pipe(o.fold,v(0,0,0),v(o.side*(x2-x1),0,0),.024,steel,'solar');}
+const rz=v(0,0,1),ry=v(0,1,0),qY=new T.Quaternion(),offset=v(0,0,0);
+for(const [i,p] of panels.entries()){
+ p.descriptor=kin.descriptors[i];appendages.add(p.surface);p.surface.userData.leafIndex=i;
+ const solar=p.descriptor.type==='pv';p.surface.scale.set(solar?p.descriptor.width/kin.p:1,solar?1:Math.min(1,.113/beam),solar?1:p.descriptor.depth/kin.r);
 }
-function positionPanels(depl){const slide=Math.min(1,depl/.48),blend=slide*slide*(3-2*slide);
- if(blend>=1&&panels[0]?.deployed)return;
- root.updateMatrixWorld(true);
- for(const p of panels){p.deployed=blend>=1;
-  if(p.deployed){p.surface.position.set(0,0,0);p.surface.quaternion.identity();continue;}
-  parentInverse.copy(p.anchor.matrixWorld).invert();pose.copy(parentInverse).multiply(root.matrixWorld).multiply(p.stow);pose.decompose(p.surface.position,p.surface.quaternion,scale);p.surface.position.multiplyScalar(1-blend);p.surface.quaternion.slerp(qFinal,blend);
+// Six telescoping transfer carriages remain attached to the leading leaf
+// during extraction. PV carriages turn on outboard rails; radiator lift masts
+// carry their packets above the electronics deck before the roots dock.
+const carriages=[];
+for(let i=0;i<18;i+=3){
+ const d=panels[i].descriptor,id=d.type==='pv'?'solar':'radiator',rails=[];
+ for(let j=0;j<(d.type==='pv'?3:4);j++){const o=cyl(appendages,0,0,0,.015,.015,1,j===1?silver:bronze,id,12);o.userData.carriage=Math.floor(i/3);rails.push(o);}
+ carriages.push({i,rails});
+}
+const setSegment=(o,a,b)=>{const delta=b.clone().sub(a),len=delta.length();o.visible=len>.002;if(!o.visible)return;o.position.copy(a).lerp(b,.5);o.quaternion.setFromUnitVectors(v(0,1,0),delta.multiplyScalar(1/len));o.scale.y=len;};
+function positionGuides(progress){
+ for(const {i,rails}of carriages){const p=panels[i>=12?i+2:i],d=p.descriptor,pose=leafPose(kin,d,progress,h.input.solarTiltDeg),c=v(pose.x,pose.y,pose.z),pts=[];
+  const localX=v(1,0,0).applyQuaternion(p.surface.quaternion),localZ=v(0,0,1).applyQuaternion(p.surface.quaternion);
+  if(d.type==='pv'){
+   const initialRail=Math.min(kin.rootX,.44*(cassette?.widthM||kin.rootX*2)),x=d.side*(initialRail+(kin.rootX-initialRail)*Math.min(1,progress/.12)),z=d.end*Math.min(.38*l,kin.mountZ),from=v(x,c.y,c.z),dir=from.clone().sub(c),a=dir.dot(localX),b=dir.dot(localZ);
+   const scale=Math.min(Math.abs(a)>1e-8?d.width/(2*Math.abs(a)):1000,Math.abs(b)>1e-8?d.depth/(2*Math.abs(b)):1000);
+   const dock=c.clone().addScaledVector(localX,a*scale).addScaledVector(localZ,b*scale);
+   pts.push(v(d.side*w*.50,c.y,z),v(x,c.y,z),from,dock);
+  }else{
+   const start=d.end<0?.46:.69,q=Math.max(0,Math.min(1,(progress-start)/.23)),lift=Math.max(0,Math.min(1,(progress-start+.04)/.04)),lower=Math.max(0,Math.min(1,(q-.85)/.15)),reach=lift*(1-lower);
+   const seat=v(d.end*w*.28,.5*hgt+.12,0),base=v(d.end*(.55*Math.hypot(kin.rw,kin.r)+.20),seat.y,0),up=c.clone().addScaledVector(localX,localX.y>0?d.width/2:-d.width/2);
+   const head=Math.max(hgt*.50+h.input.kaDishM+.35,up.y+.24);const dock=v(up.x,up.y,up.z),mast=v(base.x,head,base.z),boom=v(dock.x,head,dock.z);
+   const seg=(a,b)=>{const q=Math.min(1,Math.max(0,(reach-a)/(b-a)));return q*q*(3-2*q);};
+   const foot=seat.clone().lerp(base,seg(0,.20)),onMast=foot.clone().lerp(mast,seg(.20,.45)),arm=onMast.clone().lerp(boom,seg(.45,.75));pts.push(seat,foot,onMast,arm,arm.clone().lerp(dock,seg(.75,1)));
+  }
+  rails.forEach((o,j)=>setSegment(o,pts[j],pts[j+1]));
  }
 }
-return{root,internal,skin,enclosure,walls,wings,panels,trayRows,positionPanels,rads,cmgs,cells,leds,dish,optic,patches,plumes,bw,bh,bl,wingspan:2*panelL+1.86*bw,spanZ:2*radL+bl+.7*bw};}
+let installedAt=null;
+function positionPanels(progress){
+ if(progress===installedAt)return;installedAt=progress;
+ const approach=Math.min(1,Math.max(0,(progress-.746)/.07));mounts.scale.set(.505+.495*approach,1,Math.min(1,l*.40/(mountZ+.28*panelW))+(1-Math.min(1,l*.40/(mountZ+.28*panelW)))*approach);
+ for(const item of [...flexLoops,...rads.map(r=>({side:r.sign,flex:r.bank.parent}))]){
+  const t=Math.min(1,Math.max(0,(progress-(item.side<0?.585:.815))/.065));item.flex.scale.z=.025+.975*t*t*(3-2*t);
+ }
+ guide.scale.z=Math.max(.018,1-Math.min(1,Math.max(0,(progress-.87)/.05)));
+
+ for(const p of panels){const pose=leafPose(kin,p.descriptor,progress,h.input.solarTiltDeg);
+  p.surface.quaternion.setFromAxisAngle(rz,pose.roll).multiply(qY.setFromAxisAngle(ry,pose.yaw));offset.set(p.cx*p.surface.scale.x,0,p.cz*p.surface.scale.z).applyQuaternion(p.surface.quaternion);
+  p.surface.position.set(pose.x,pose.y,pose.z).sub(offset);
+ }positionGuides(progress);
+}
+positionPanels(1);
+return{root,internal,skin,enclosure,walls,wings,panels,carriages,appendages,trayRows,positionPanels,rads,cmgs,cells,leds,dish,optic,patches,plumes,bw,bh,bl,wingspan:2*(panelL+kin.rootX),spanZ:2*(radL+kin.radRoot)};}

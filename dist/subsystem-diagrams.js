@@ -203,7 +203,7 @@ function launch({h,d,s},id){
  const prof=f.profile.map(([z,r])=>[xm(z),y-r*k]).concat(f.profile.slice().reverse().map(([z,r])=>[xm(z),y+r*k]));
  const art=pick(parts[0],29,32,384,164,`<polygon points="${prof.map(p=>p.join(',')).join(' ')}" class="sd-profile"/>`+T(52,41,'KEEP-IN CROSS SECTION','sd-over','start'))+
  path(`M40 ${y}H420`,'sd-centerline')+
- f.stack.map((r,i)=>pick(i===0?parts[2]:parts[1],xm(r.z0M),y-r.radiusM*k,Math.max(9,r.lengthM*k),Math.max(12,2*r.radiusM*k),rect(xm(r.z0M),y-r.radiusM*k,r.lengthM*k,2*r.radiusM*k,'sd-stack-outline')+rect(xm(r.z0M),y-r.heightM*k/2,r.lengthM*k,r.heightM*k,'sd-stack-'+i))).join('')+
+ f.stack.map((r,i)=>pick(i===0?parts[2]:parts[1],xm(r.z0M),y-r.radiusM*k,Math.max(9,r.lengthM*k),Math.max(12,2*r.radiusM*k),rect(xm(r.z0M),y-r.radiusM*k,r.lengthM*k,2*r.radiusM*k,'sd-stack-outline')+rect(xm(r.z0M),y-r.heightM*k/2,r.lengthM*k,r.heightM*k,'sd-stack-'+(r.part.includes('terminal')?4:r.part.includes('cassette')?3:r.part.includes('bus')?2:0)))).join('')+
  path(`M${x} 178v8H${xm(h.stowedLengthM)}v-8`,'sd-dim')+T((x+xm(h.stowedLengthM))/2,209,val(h.stowedLengthM,'m stack'),'sd-name')+
  T(437,56,'LATERAL MARGIN','sd-over','start')+T(437,83,val(f.radialClearanceM,'m',2),f.radialClearanceM<0?'sd-large sd-bad':'sd-large','start')+
  T(437,119,'AXIAL MARGIN','sd-over','start')+T(437,145,val(f.axialClearanceM,'m',2),f.axialClearanceM<0?'sd-large sd-bad':'sd-large','start')+
@@ -211,7 +211,72 @@ function launch({h,d,s},id){
  return info('Stowed launch envelope','Stack dimensions measured forward from the adapter plane',parts,art,[legend('cyan','Tapered keep-in'),legend('steel','Folded hardware'),legend('amber','Terminal cap')],f.fit?'Fits modeled profile':'Envelope exceeded');
 }
 
-const builders={orbit,compute,comm,power,thermal,attitude,prop,mass,launch};
+function conops({h,d,s,day,events},id){
+ const current=events.filter(e=>e.start<=s.t&&e.end>s.t).sort((a,b)=>(a.end-a.start)-(b.end-b.start))[0],next=events.find(e=>e.start>s.t);
+ const parts=[
+ P('schedule','Operating schedule','The orbit clock schedules compute bursts. Eclipse, access, periodic burns and CMG unloading change the available resources.','duty','compute',[row('Mission horizon',val(d.missionYears,'yr')),row('Scheduled duty',val(d.duty*100,'%')),row('Operating interval',val(s.periodSec*d.duty/60,'min/orbit')),row('Active episode',current?.label||'Between scheduled episodes')],current),
+ P('service','Compute service','The installed trays share prompt and decode work. The useful payload enters storage at the configured bytes per output token.','requiredTps','compute',[row('Required active output',val(d.requiredTps,'tok/s')),row('Installed active output',val(h.tokensPerSec,'tok/s')),row('Planned average',val(h.sustainedTps,'tok/s')),row('Delivered in this window',val(day.tokensDelivered,'tok',0))]),
+ P('access','Transfer opportunity','Ground visibility and acquisition start a transfer from the queued recorder. The shareable clock preserves the event and design state.','network','communications',[row('Access mask',val(d.elevationDeg,'°')),row('Windows today',String(day.contactCount??'—')),row('Transfer backlog',val(s.queueGB,'GB')),row('Next scheduled event',next?.label||'Outside this window')],events.find(e=>e.type==='contact'&&e.end>=s.t)),
+ P('retirement','Retirement plan','Chemical control protects disposal inventory. The selected retirement method sets the terminal maneuver and final state.','disposalDv','propulsion',[row('Disposal method',(d.disposalMethod||'reentry')),row('Protected stock',val(s.disposalProtectedKg,'kg')),row('Orbit-maintenance allocation',val(d.yearsSupply,'yr')),row('Mission state',s.disposalStatus||'Scheduled')])];
+ const art=T(42,37,'NOMINAL SPACECRAFT SERVICE','sd-over','start')+flow(id,'M102 95H200','cyan',s.t>=1200)+flow(id,'M266 95H362','cyan',s.tokensPerSec>0)+flow(id,'M421 95H487','violet',s.t>=s.disposalStart)+
+ pick(parts[0],34,57,105,115,circle(80,94,23,'sd-device')+path('M80 76v18l12 9','sd-hardware')+named(80,145,'Schedule',val(d.duty*100,'% duty')))+
+ pick(parts[1],179,53,107,115,glyph('rack',233,94,.8)+named(233,145,'Compute',val(s.itKW,'kW')))+
+ pick(parts[2],330,53,112,115,glyph('dish',386,91,.84)+named(386,145,'Transfer',val(s.goodputMbps,'Mbit/s')))+
+ pick(parts[3],463,53,100,115,glyph('engine',513,92,.76)+named(513,145,'Retire',s.disposalStatus||'Planned'))+
+ path('M80 185v10h432v-10','sd-dim')+T(296,220,'MISSION DURATION   '+num(d.missionYears,2)+' YEARS','sd-over');
+ return info('Concept of operations','Schedule computation, downlink and mission retirement',parts,art,[legend('cyan','Routine service'),legend('violet','Retirement')],current?.type||s.flightPhase||'Mission sequence');
+}
+
+function environment({h,d,s,day},id){
+ if(s.referenceBody){
+  const parts=[
+   P('ambient','Entry atmosphere','The descent model uses altitude-dependent atmospheric density along the surviving reference trajectory.','entryDensitySigmaPct',null,[row('Altitude',val(s.altitudeKm,'km')),row('Density',Number.isFinite(s.densityKgM3)?s.densityKgM3.toExponential(3)+' kg/m³':'—'),row('Density uncertainty',val(d.entryDensitySigmaPct,'% · 1σ'))]),
+   P('body','Reference body','The non-lifting reference body is propagated after the spacecraft model ends. Drag deceleration uses the selected ballistic coefficient.','entryBallisticKgM2',null,[row('Ballistic coefficient',val(d.entryBallisticKgM2,'kg/m²')),row('Relative speed',val(s.relativeSpeedMs,'m/s')),row('Dynamic pressure',val(s.entryDynamicPressurePa,'Pa')),row('Drag deceleration',val(s.entryReferenceDragMS2,'m/s²'))]),
+   P('ground','Entry target','The modeled terminal ground intersection is compared to the selected target on a rotating Earth.','targetToleranceKm',null,[row('Target latitude',val(d.targetLatDeg,'°')),row('Target longitude',val(d.targetLonDeg,'°')),row('Acceptance radius',val(d.targetToleranceKm,'km')),row('Target error',val(s.disposalTargetErrorKm,'km'))])
+  ];
+  const art=pick(parts[0],30,57,144,129,path('M60 85h65m-57 14h65m-61 14h62','sd-atmos-lines')+named(99,152,'Atmosphere',val(s.altitudeKm,'km altitude'))) +
+   flow(id,'M168 103H251','cyan',true)+pick(parts[1],219,60,144,130,glyph('blanket',291,99,1)+named(291,152,'Reference body',val(s.entryDynamicPressurePa,'Pa'))) +
+   flow(id,'M353 103H438','amber',true)+pick(parts[2],412,57,138,133,glyph('earth',484,98,1.25)+named(484,152,'Target area',val(d.targetToleranceKm,'km radius'))) +
+   T(290,218,'SPACECRAFT EQUIPMENT MODEL ENDED AT INTERFACE','sd-over');
+  return info('Atmospheric entry environment','Local air density, dynamic pressure and target location for the surviving reference body',parts,art,[legend('cyan','Relative flow'),legend('amber','Ground approach')],'Reference-body descent');
+ }
+ const exposed=s.t>=540&&!s.referenceBody,projected=s.deployment*h.radiatorM2/1000;
+ const parts=[
+ P('sun','Solar and Earth flux','Direct sunlight reaches the wings and radiator. Earth-reflected sunlight and longwave infrared enter the surface heat balance separately.','solarTiltDeg','solar',[row('Normal solar flux',exposed?val(s.solarIrradiance,'W/m²'):'Encapsulated'),row('Radiator albedo',exposed?val(s.albedoIrradiance,'W/m²'):'—'),row('Radiator IR',exposed?val(s.earthIRIrradiance,'W/m²'):'—'),row('Absorbed sunlight',exposed?val(projected*s.absorptivity*s.solarIrradiance*s.radiatorSunCos,'kW'):'—')]),
+ P('flow','Relative atmosphere','Density and atmospheric-relative speed act on the ram-facing silhouette, producing drag and a torque about the spacecraft mass center.','solarCyclePhase','structure',[row('Daily F10.7 proxy',val(s.f107Daily,'sfu')),row('81-day F10.7 proxy',val(s.f107Mean,'sfu')),row('Density',exposed&&Number.isFinite(s.densityKgM3)?s.densityKgM3.toExponential(3)+' kg/m³':'—'),row('Silhouette / drag',val(s.ramAreaM2,'m²')+' / '+val(s.dragN,'N',5))]),
+ P('field','Geomagnetic field','Magnetic torque depends on local field direction and the commanded spacecraft dipole. Unloading changes stored momentum.','dipoleAm2','cmg',[row('Local field',val(s.magFieldUT,'µT')),row('Installed dipole',val(d.dipoleAm2,'A·m²')),row('Unloading authority',val(s.unloadAuthorityNm,'N·m',4)),row('Coil input',val(s.coilKW,'kW'))]),
+ P('loads','Induced environment','Serving electrical demand heats the equipment. Battery conversion losses enter the pack, and moving joints and terminals draw from the same bus.','attitude','enclosure',[row('Equipment and pack to loop',val(s.heatInputKW,'kW')),row('Pack conversion loss',val(s.packLossKW,'kW')),row('Joint and terminal draw',val(s.jointKW+s.terminalKW,'kW')),row('Torque to CMGs',val(s.torqueNm,'N·m',5))])];
+ const art=T(39,33,'NATURAL DRIVERS','sd-over','start')+T(385,33,'SPACECRAFT RESPONSE','sd-over','start')+
+ pick(parts[0],35,46,139,49,circle(55,70,10,'sd-sun')+T(80,65,'Sun + Earth IR','sd-name','start')+T(80,85,val(s.earthIRIrradiance,'W/m² IR'),'sd-value','start'))+
+ pick(parts[1],35,108,156,51,path('M40 124h28m-20 6h22m-28 7h24','sd-atmos-lines')+T(80,124,'Thermosphere','sd-name','start')+T(80,144,val(s.relativeSpeedMs/1000,'km/s'),'sd-value','start'))+
+ pick(parts[2],35,175,148,52,glyph('torquer',54,193,.45)+T(80,190,'Local field','sd-name','start')+T(80,210,val(s.magFieldUT,'µT'),'sd-value','start'))+
+ flow(id,'M190 71H228L256 102','amber',s.solarKW>0)+flow(id,'M190 130H253','cyan',s.dragN>0)+flow(id,'M190 195H223L257 156','violet',s.unloadTorqueNm>0)+
+ pick(parts[3],249,85,111,99,glyph('chip',303,125,.94)+T(301,171,'Vehicle','sd-name'))+
+ flow(id,'M341 113H379L397 75H420','amber',s.solarKW>0)+flow(id,'M341 130H420','cyan',s.heatInputKW>0)+flow(id,'M341 149H376L398 193H420','violet',s.torqueNm>0)+
+ T(432,70,'Generation','sd-name','start')+T(432,89,val(s.solarKW,'kW'),'sd-value','start')+
+ T(432,127,'Loop heat','sd-name','start')+T(432,146,val(s.heatInputKW,'kW'),'sd-value','start')+
+ T(432,189,'Disturbance','sd-name','start')+T(432,208,val(s.torqueNm,'N·m',4),'sd-value','start');
+ return info('Environmental coupling','Natural forcing and onboard response at the shared mission instant',parts,art,[legend('amber','Radiation / generation'),legend('cyan','Flow / heat'),legend('violet','Field / torque')],s.referenceBody?'Reference-body descent':s.t<540?'Launch boundary':s.eclipse?'Earth shadow':'Sunlit orbit');
+}
+
+function data({h,d,s,day,events},id){
+ const parts=[
+ P('text','Output text','The tokenizer traffic model converts generated tokens to transmitted bytes before communication overhead.','bytesPerToken','compute',[row('Serialization',val(d.bytesPerToken,'B/tok')),row('Instantaneous generated text',val(s.tokensPerSec*d.bytesPerToken*8/1e6,'Mbit/s',4)),row('Text waiting',val(s.textQueueGB,'GB',4)),row('Text received',val(s.textDeliveredGB,'GB',4))]),
+ P('bulk','Bulk products','Imagery, checkpoints and model packages occupy the bulk recorder queue independently of text token rates.','bulkMbps','storage',[row('Bulk offered when active',val(d.bulkMbps,'Mbit/s')),row('Initial payload',val(d.initialQueueGB,'GB')),row('Bulk waiting',val(s.bulkQueueGB,'GB')),row('Bulk received',val(s.bulkDeliveredGB,'GB'))]),
+ P('recorder','Onboard recorder','Incoming products are limited by write rate and available capacity. The live queue gives the amount still awaiting offload.','storageTB','storage',[row('Raw / usable',val(h.storageTB,'TB')+' / '+val(h.usableTB,'TB')),row('Free capacity',val(s.freeTB,'TB')),row('Dropped bytes',val(s.droppedGB,'GB')),row('Current queue',val(s.queueGB,'GB'))]),
+ P('received','Ground receipt','Separate ground-received output from on-board generation. Transfers cannot deliver more bytes than the queued and newly arrived data.','linkCapMbps','communications',[row('Text goodput',val(s.textGoodputMbps,'Mbit/s')),row('Bulk goodput',val(s.bulkGoodputMbps,'Mbit/s')),row('Received output tokens',val(s.tokensDelivered,'tok',0)),row('Window downlink',val(day.deliveredGB,'GB'))],events.find(e=>e.type==='contact'&&e.end>=s.t))];
+ const art=T(37,36,'ONBOARD PRODUCTS','sd-over','start')+T(426,36,'GROUND RECEIPT','sd-over','start')+
+ pick(parts[0],32,51,110,79,glyph('chip',86,78,.63)+named(86,113,'Text',val(s.textQueueGB,'GB',3)))+
+ pick(parts[1],32,146,110,85,glyph('ssd',86,169,.67)+named(86,204,'Bulk',val(s.bulkQueueGB,'GB')))+
+ flow(id,'M139 81H179L204 107H238','cyan',s.tokensPerSec>0)+flow(id,'M139 172H179L204 144H238','violet',s.burst&&d.bulkMbps>0)+
+ pick(parts[2],234,77,102,127,glyph('rack',284,125,1.02)+named(284,176,'Recorder',val(s.queueGB,'GB')))+
+ flow(id,'M322 114H432','cyan',s.textGoodputMbps>0)+flow(id,'M322 139H432','violet',s.bulkGoodputMbps>0)+
+ pick(parts[3],431,81,120,123,glyph('dish',487,120,.92)+named(487,178,s.station||'Ground site',val(s.deliveredGB,'GB received')))+
+ T(379,99,'TEXT','sd-over')+T(379,162,'BULK','sd-over');
+ return info('Payload custody','Separate text and bulk queues from completed ground deliveries',parts,art,[legend('cyan','Output text'),legend('violet','Bulk payload')],s.goodputMbps>0?'Delivering':'Buffering');
+}
+
+const builders={conops,environment,orbit,compute,data,comm,power,thermal,attitude,prop,mass,launch};
 export const schematicPages=Object.keys(builders);
 const indexes=Object.fromEntries(schematicPages.map((k,i)=>[k,String(i+1).padStart(2,'0')]));
 const norm=({hardware:h,state:s,day={},events=[],selected,instance,qualificationWindow,thermalScale})=>({h,d:h.input,s,day,events,selected,instance,qualificationWindow,thermalScale});
@@ -223,7 +288,7 @@ function rangeBand(q){
 }
 function detail(part,selected){
  const editText=part.editLabel||(part.edit?'Edit '+({trayCount:'tray count',batteryKWh:'pack size',solarM2:'array size',radiatorM2:'radiator area',launchAllowanceKg:'allowance',link:'terminal',isp:'specific impulse'}[part.edit]||'design input'):'');
- return `<div class="sd-detail" data-sd-detail="${esc(part.id)}" ${selected?'':'hidden'}><div class="sd-description"><span class="sd-caption">SELECTED COMPONENT</span><h4>${esc(part.title)}</h4><p>${esc(part.description)}</p>${rangeBand(part.range)}<div class="sd-actions">${part.edit?`<button type="button" data-sd-edit="${esc(part.edit)}">${esc(editText)} <span aria-hidden="true">↗</span></button>`:''}${(part.extraEdits||[]).filter(([key])=>key!==part.edit).map(([key,label])=>`<button type="button" data-sd-edit="${esc(key)}">${esc(label)} <span aria-hidden="true">↗</span></button>`).join('')}${part.inspect?`<button type="button" data-sd-inspect="${esc(part.inspect)}">Inspect hardware <span aria-hidden="true">↗</span></button>`:''}${part.event?`<button type="button" data-sd-event="${esc(part.event.id)}">Select ${part.event.type==='eclipse'?'eclipse':'pass'} <span aria-hidden="true">→</span></button>`:''}</div></div><dl class="sd-readings">${part.details.map(([n,v])=>`<div><dt>${esc(n)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl></div>`;
+ return `<div class="sd-detail" data-sd-detail="${esc(part.id)}" ${selected?'':'hidden'}><div class="sd-description"><span class="sd-caption">SELECTED COMPONENT</span><h4>${esc(part.title)}</h4><p>${esc(part.description)}</p>${rangeBand(part.range)}<div class="sd-actions">${part.edit?`<button type="button" data-sd-edit="${esc(part.edit)}">${esc(editText)} <span aria-hidden="true">↗</span></button>`:''}${(part.extraEdits||[]).filter(([key])=>key!==part.edit).map(([key,label])=>`<button type="button" data-sd-edit="${esc(key)}">${esc(label)} <span aria-hidden="true">↗</span></button>`).join('')}${part.inspect?`<button type="button" data-sd-inspect="${esc(part.inspect)}">Inspect hardware <span aria-hidden="true">↗</span></button>`:''}${part.event?`<button type="button" data-sd-event="${esc(part.event.id)}">Select ${esc(part.event.type==='contact'?'pass':part.event.type==='eclipse'?'eclipse':'event')} <span aria-hidden="true">→</span></button>`:''}</div></div><dl class="sd-readings">${part.details.map(([n,v])=>`<div><dt>${esc(n)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl></div>`;
 }
 export function renderSubsystemDiagram(page,context){
  if(!builders[page])return '';

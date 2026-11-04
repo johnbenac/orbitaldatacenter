@@ -1,6 +1,6 @@
 import {icon} from './icons.js';
-import {designName,chapters} from './mission-guide.js';
-import {solveModes} from './design.js';
+import {designName} from './mission-presets.js';
+import {chapters} from './flight-chapters.js';
 import {pages,cfg} from './workspaces.js';
 
 const esc=x=>String(x??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
@@ -8,15 +8,15 @@ const n=(x,d=1)=>Number.isFinite(x)?x.toLocaleString('en-US',{maximumFractionDig
 export const phases={
  A:{label:'Mission inputs',title:'Define the mission',sub:'Choose the workload, orbit and design constraints that size the spacecraft.',native:'Concept and technology development'},
  B:{label:'Subsystem design',title:'Design the subsystems',sub:'Trace the components and flows inside each spacecraft subsystem.',native:'Preliminary design and technology completion'},
- C:{label:'Integrated vehicle',title:'Inspect the integrated vehicle',sub:'Explore the assembled spacecraft, inspect its thermal map and check how the subsystems fit together.',native:'Final design and fabrication'},
+ C:{label:'Integrated vehicle',title:'Analyze the integrated vehicle',sub:'Test design changes across the integrated vehicle, its environments and mission performance.',native:'Final design and fabrication'},
  D:{label:'Launch & insertion',title:'Launch and insertion',sub:'Check the stowed vehicle, move to the pad, and follow the stack into orbit.',native:'System assembly, integration and test, launch'},
  E:{label:'Operations',title:'Operate the spacecraft',sub:'Commission the vehicle and follow compute, downlink and station-keeping through a shared mission clock.',native:'Operations and sustainment'},
- F:{label:'Decommissioning',title:'Decommission the spacecraft',sub:'Inspect the reserved propellant, retrograde burn, coast and descending atmospheric interface.',native:'Closeout'}
+ F:{label:'Decommissioning',title:'Decommission the spacecraft',sub:'Review the selected disposal trajectory, expended propellant and achieved endpoint.',native:'Closeout'}
 };
 export const chapterPhase=id=>['integration','pad','ascent','insertion'].includes(id)?'D':id==='deorbit'?'F':'E';
 export function phaseFromView(v){
- if(v.page&&Object.hasOwn(cfg,v.page))return 'B';
  if(Object.hasOwn(phases,v.phase))return v.phase;
+ if(v.page&&Object.hasOwn(cfg,v.page))return 'B';
  return chapterPhase(v.chapter|| (v.t<1200?'integration':'operations'));
 }
 export function lifecycleNav(phase){return Object.entries(phases).map(([id,p])=>`<button class="phase-tab ${phase===id?'current':''}" data-phase="${id}" aria-current="${phase===id?'step':'false'}" data-tip="${esc(p.sub)}"><i>${id}</i><span><small>PHASE ${id}</small><strong>${esc(p.label)}</strong></span></button>`).join('')}
@@ -39,22 +39,7 @@ function footprint(h){
 export function designOutput(h,v,result){
  return `<div class="concept-top"><span class="guideflag">CURRENT DESIGN</span><strong>${esc(designName(v))}</strong></div>${footprint(h)}<div class="concept-readings">${[['Compute',n(h.itKw,1),'kW IT'],['Launch stack',n(h.launchKg/1000,2),'t'],['Array area',n(h.solarM2,0),'m²'],['Decode capacity',n(h.tokensPerSec,0),'tok/s']].map(([l,x,u])=>`<div><small>${l}</small><strong>${x} <em>${u}</em></strong></div>`).join('')}</div><p class="concept-fit">${icon(h.fit&&h.massMarginKg>=0?'check':'ruler',14)} ${h.fit&&h.massMarginKg>=0?'Within the selected single-launch envelope':'Exceeds a selected single-launch constraint'} · ${esc(h.launcherLabel)}</p>${v.solve==='installed'?'':`<p class="concept-fit">${esc(result.binding)} · ${n(result.achieved,2)} ${esc(result.unit)}</p>`}`;
 }
-export function inputPhase(h,v,r,inputRow){
- const keys=v.solve==='workload'?['requiredTps','workload','duty','missionYears','altitudeKm','launcher']:v.solve==='launch'?['launchAllowanceKg','launcher','missionYears','workload','altitudeKm','duty']:v.solve==='lifetime'?['propellantKg','solarM2','batteryKWh','duty','altitudeKm','trayCount']:['trayCount','workload','missionYears','altitudeKm','duty','launcher'];
- return `<div class="phase-input-layout"><section class="panel"><div class="panelhead"><h2>${icon('sliders-horizontal',16)} Mission definition</h2><button class="textbutton" data-action="hardware">All assumptions ${icon('chevron-right',12)}</button></div><div class="panelpad"><label class="sizing-line">Design from<select id="phase-solve" aria-label="Sizing method">${['installed','workload','launch','lifetime',...(!['installed','workload','launch','lifetime'].includes(v.solve)?[v.solve]:[])].map(k=>`<option value="${k}" ${v.solve===k?'selected':''}>${esc(({installed:'Installed hardware',workload:'Required workload',launch:'One launch allowance',lifetime:'Hardware endurance'})[k]||solveModes[k])}</option>`).join('')}</select></label><div class="definition-fields">${keys.map(k=>inputRow(k)).join('')}</div></div></section><section class="panel concept-panel" id="phase-output">${designOutput(h,v,r)}</section></div><div class="phase-handoff"><span>Use this design to size and inspect each subsystem.</span><button class="btn export" data-phase="B">Subsystem design ${icon('chevron-right',15)}</button></div>`;
-}
-export function assemblyCard(h,v,s){
- const rows=s.thermalQualification||[],valid=rows.filter(r=>r.status!=='unassessed'),bad=valid.filter(r=>r.status!=='pass'),worst=valid.reduce((a,b)=>!a||b.marginK<a.marginK?b:a,null);
- return `<aside class="chaptercard"><div class="chapterkicker"><span class="guideflag">INTEGRATED DESIGN</span><span>PHASE C</span></div><h2>${esc(designName(v))}</h2><p>Four solar wings supply the enclosed processor trays. Two radiator banks reject heat from the coolant loop. Inspect a surface or open the compute core to see the internal temperatures.</p><div class="chaptermetrics"><div><small>Installed compute</small><strong>${n(h.itKw)} <em>kW</em></strong></div><div><small>Dry mass</small><strong>${n(h.dryKg/1000,2)} <em>t</em></strong></div></div><div class="thermal-verdict ${bad.length?'outside':'within'}"><strong>${valid.length?bad.length?bad.length+' outside active limits':'Within active thermal limits':'Thermal state unassessed'}</strong><small>${worst?esc(worst.label)+' · '+esc(worst.state)+' · '+n(worst.marginK,1)+' K margin':''}</small></div><div class="column-actions"><button class="btn" data-camera="${v.camera==='core'?'spacecraft':'core'}">${icon('box',14)} ${v.camera==='core'?'See exterior':'Open compute core'}</button><button class="btn" data-action="tempbands">${icon('thermometer-sun',14)} Temperature requirements</button><button class="btn export" data-phase="D">Launch configuration ${icon('chevron-right',15)}</button></div></aside>`;
-}
-export function systemSelect(page,thermalScale="working"){
- return `<div class="system-switch"><label>Subsystem <select id="subsystem-choice" aria-label="Choose subsystem design">${Object.keys(cfg).map(k=>`<option value="${k}" ${k===page?'selected':''}>${esc(pages[k][0])}</option>`).join('')}</select></label>${page==='thermal'?'<label class="map-range">Map scale <select id="diagram-thermal-scale"><option value="working" '+(thermalScale==='working'?'selected':'')+'>245–305 K</option><option value="full" '+(thermalScale==='full'?'selected':'')+'>180–380 K</option></select></label>':''}<button class="btn" data-action="phasecontrols">${icon('sliders-horizontal',14)} Edit design</button><button class="btn" data-action="tempbands">${icon('thermometer-sun',14)} Thermal limits</button></div>`;
-}
 export function flightChapters(v){
- const current=chapterPhase(v.chapter),list=chapters.filter(c=>chapterPhase(c.id)===current);
+ const current=v.phase||chapterPhase(v.chapter),list=chapters.filter(c=>chapterPhase(c.id)===current);
  return `<nav class="flightpath" aria-label="Chapters in this lifecycle phase"><div class="pathlabel"><span class="guideflag">${current==='D'?'LAUNCH SEQUENCE':current==='E'?'OPERATING MODES':'CLOSEOUT SEQUENCE'}</span></div><div class="pathscroll"><div class="pathsteps">${list.map((c,i)=>`<button class="pathstep ${c.id===v.chapter?'active':''}" data-chapter="${c.id}" aria-current="${c.id===v.chapter?'step':'false'}" data-tip="${esc(c.intent)}"><i>${String(i+1).padStart(2,'0')}</i><span>${esc(c.short)}</span></button>`).join('')}</div></div></nav>`;
 }
-export function closeout(sim,s){const d=sim.disposal();if(!d)return '';
- return `<section class="panel phase-closeout"><div><span class="guideflag">DISPOSAL LEDGER</span><h3>${d.feasible?'Retrograde burn and entry':'Disposal feasibility'}</h3><p>${esc(d.reason||'Inspect the final maneuver and the atmospheric interface.')}</p></div><div class="closeout-points">${[['Ignition',d.start],['Cutoff',d.cutoff],['Entry interface',d.entry]].filter(x=>Number.isFinite(x[1])).map(([l,t])=>`<button class="chip" data-disposal-time="${t}" data-tip="Jump to ${l.toLowerCase()} and inspect the state of the spacecraft.">${l}</button>`).join('')}</div><button class="btn export" data-action="pdr">Prepare quantitative PDR ${icon('download',14)}</button></section>`;
-}
-

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {defaults} from './dist/design.js';
 import {createSimulation} from './dist/model.js';
+import {deploymentLayout} from './dist/deployment.js';
 import {ramSilhouette} from './dist/silhouette.js';
 import {chronologicalAudit} from './dist/mission-worker.js';
 import {groundSites,DAY,YEAR} from './dist/orbit.js';
@@ -10,7 +11,7 @@ const sim=createSimulation(defaults),pass=sim.events(0,DAY).find(e=>e.type==='co
 assert.ok(pre.station===null&&transfer.acquired&&post.station===null);assert.ok(transfer.goodputMbps>0&&transfer.terminalKW>pre.terminalKW&&transfer.cmgKW>pre.cmgKW);assert.ok(post.deliveredGB>pre.deliveredGB);
 for(const t of [0,600,1201,pass.start,pass.start+90,pass.end,43200,DAY,2*DAY]){const x=sim.at(t);near(sim.hardware.initialQueueGB+x.generatedGB,x.queueGB+x.deliveredGB+x.droppedGB,1e-6); near(x.wetKg,sim.hardware.dryKg+sim.hardware.pressurantKg+x.propellantKg);near(x.fuelKg+x.oxidizerKg,x.propellantKg);}
 const reboost=sim.events(0,DAY).find(e=>e.type==='reboost'),before=sim.at(reboost.start),after=sim.at(reboost.end+.01);assert.ok(after.propellantKg<before.propellantKg&&after.meanAltitudeKm>before.meanAltitudeKm);
-const h=sim.hardware;near(ramSilhouette(h,[0,1,0],1),h.solarM2+h.bodyWidthM*h.bodyLengthM);near(ramSilhouette(h,[1,0,0],1),h.radiatorM2+h.bodyHeightM*h.bodyLengthM);near(ramSilhouette(h,[0,0,1],1),h.bodyWidthM*h.bodyHeightM);
+const h=sim.hardware,plateArea=type=>deploymentLayout(h).descriptors.filter(v=>v.type===type).reduce((a,v)=>a+v.width*v.depth,0);near(ramSilhouette(h,[0,1,0],1),plateArea('pv')+h.bodyWidthM*h.bodyLengthM);near(ramSilhouette(h,[1,0,0],1),plateArea('rad')+h.bodyHeightM*h.bodyLengthM);near(ramSilhouette(h,[0,0,1],1),h.bodyWidthM*h.bodyHeightM);
 for(const [n,k] of [['polar',3],['svalbard',1],['global',6]])assert.equal(groundSites(n).length,k);
 near(burnMass(1e3,300,15),1000*(1-Math.exp(-15/(9.80665*300))));near(packStep(50,10,20,1,0,100,20,20,.90,.8).energy,37.5);
 const table=atmosphere({...defaults,solarCyclePhase:0,f107Floor:140,f107Ceiling:140,ap:15},{windowAgeYears:0,t:0,altitudeKm:500,sunRadial:0});near(table.densityKgM3/8.60e-13,1);

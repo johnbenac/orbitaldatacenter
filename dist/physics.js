@@ -1,3 +1,4 @@
+import {deploymentSchedule} from './deployment.js';
 import {ramSilhouette} from './silhouette.js';
 import {densities,observedFlux} from './density.js';
 import {clip,DEG,dot,cross,unit,R,YEAR,DAY} from './orbit.js';
@@ -18,8 +19,10 @@ export function atmosphere(d,g){
  const logRho=j=>(1-k)*Math.log(densities[j][col])+k*Math.log(densities[j][col+1]);const densityKgM3=Math.exp(logRho(index)+(logRho(index+1)-logRho(index))*frac)*(1+.18*g.sunRadial);
  return {densityKgM3,f107Daily:fDaily,f107Mean:f81,densityExtrapolated:g.altitudeKm>900,fluxSource:observed?'NOAA PSL / NRC Canada 2009–2019 monthly replay; daily and 81-day proxies':'Nominal F10.7 envelope'};
 }
+const stowed=deploymentSchedule(0),deployed=deploymentSchedule(1);
 export function surfaces(h,g,deployment,fluxOnly=false){
- const d=h.input,roll=(d.rollDeg??0)*DEG,tilt=(d.solarTiltDeg??0)*DEG,mode=String(d.attitude), ram=unit([g.velocityECI[0]+.00007292115*g.positionECI[1],g.velocityECI[1]-.00007292115*g.positionECI[0],g.velocityECI[2]]);
+ const motion=deployment<=0?stowed:deployment>=1?deployed:deploymentSchedule(deployment);
+ const d=h.input,roll=(d.rollDeg??0)*DEG,tilt=(d.solarTiltDeg??0)*DEG*motion.tracking,mode=String(d.attitude), ram=unit([g.velocityECI[0]+.00007292115*g.positionECI[1],g.velocityECI[1]-.00007292115*g.positionECI[0],g.velocityECI[2]]);
  let base=g.sunECI;
  if(/low.?drag/.test(mode))base=g.normal;
  else if(/nadir/.test(mode))base=g.radial;
@@ -30,14 +33,14 @@ export function surfaces(h,g,deployment,fluxOnly=false){
  const sunlit=g.eclipse?0:1,radSunCos=Math.abs(dot(rad,g.sunECI)),earthDisk=(R/(R+g.altitudeKm))**2;
  const earthView=earthDisk*(.22+.78*Math.abs(dot(rad,g.radial))),albedo=1361*.30*Math.max(0,g.sunRadial)*earthView,earthIR=237*earthView;
  const bodyUp=base.map((v,i)=>v*Math.cos(roll)+axis[i]*Math.sin(roll)),bodyZ=unit(cross(rad,bodyUp)),ramBody=[dot(ram,rad),dot(ram,bodyUp),dot(ram,bodyZ)],ramArea=fluxOnly?0:ramSilhouette(h,ramBody,deployment);
- const y=g.windowAgeYears,eps=d.emissivity*fraction(d.emissivityRetention,y),alpha=clip(d.absorptivity+(d.alphaGrowth||0)*y,0,1),solarKW=1.361*h.solarM2*normalCos*sunlit*deployment*d.pvEfficiency*(d.solarDelivery??.86)*fraction(d.pvRetention,y);
+ const y=g.windowAgeYears,eps=d.emissivity*fraction(d.emissivityRetention,y),alpha=clip(d.absorptivity+(d.alphaGrowth||0)*y,0,1),solarKW=1.361*h.solarM2*normalCos*sunlit*motion.pv*d.pvEfficiency*(d.solarDelivery??.86)*fraction(d.pvRetention,y);
  // Area-averaged solar exposure of a convex six-sided box; Earth-disk
  // loading blends the nadir projection with an isotropic hemispheric view.
  const boxArea=h.enclosure?.grossAreaM2||2*(h.bodyHeightM*h.bodyLengthM+h.bodyWidthM*h.bodyLengthM+h.bodyWidthM*h.bodyHeightM);
  const boxProjection=v=>h.bodyHeightM*h.bodyLengthM*Math.abs(dot(v,rad))+h.bodyWidthM*h.bodyLengthM*Math.abs(dot(v,bodyUp))+h.bodyWidthM*h.bodyHeightM*Math.abs(dot(v,bodyZ));
  const earthFraction=earthDisk*(.5*boxProjection(g.radial)/boxArea+.125),enclosureIRWm2=237*earthFraction,enclosureSolarWm2=1361*(sunlit*boxProjection(g.sunECI)/boxArea+.30*Math.max(0,g.sunRadial)*earthFraction);
  if(fluxOnly)return {enclosureSolarWm2,enclosureIRWm2};
- return {enclosureSolarWm2,enclosureIRWm2,pvNormalECI:pv,radiatorNormalECI:rad,ramBody,ramAreaM2:ramArea,solarIncidenceCos:normalCos,radiatorSunCos:radSunCos,earthView,solarKW,generationKW:solarKW,emissivity:eps,absorptivity:alpha,solarIrradiance:1361*sunlit,albedoIrradiance:albedo,earthIRIrradiance:earthIR,absorbedKW:h.radiatorM2*deployment*(alpha*(1361*sunlit*radSunCos+albedo)+eps*earthIR)/1000,emissionCoeff:Math.max(.15,h.radiatorM2*2*eps*deployment)*SIGMA/1000};
+ return {pvDeployment:motion.pv,radiatorDeployment:motion.radiator,deploymentStep:motion.step,deploymentTitle:motion.title,enclosureSolarWm2,enclosureIRWm2,pvNormalECI:pv,radiatorNormalECI:rad,ramBody,ramAreaM2:ramArea,solarIncidenceCos:normalCos,radiatorSunCos:radSunCos,earthView,solarKW,generationKW:solarKW,emissivity:eps,absorptivity:alpha,solarIrradiance:1361*sunlit,albedoIrradiance:albedo,earthIRIrradiance:earthIR,absorbedKW:h.radiatorM2*motion.radiator*(alpha*(1361*sunlit*radSunCos+albedo)+eps*earthIR)/1000,emissionCoeff:h.radiatorM2*2*eps*motion.radiator*SIGMA/1000};
 }
 export function linkBudget(d,g,pointingDeg,available){
  let mode=String(d.link||'auto').toLowerCase();

@@ -81,6 +81,8 @@ export function makeLaunch(h){
    for(let x of [-1,1])for(let z of [-1,1])box(payload,x*w*.475,y,z*dep*.485,w*.034,H*.998,dep*.07,rib,'payload');
   }else{box(payload,0,y,0,w,H,dep,/engine/.test(name)?dark:ivory,'payload');}
  }
+ const liveMount=group(payload,'payload');liveMount.position.y=(stack.find(q=>/insulated bus/i.test(q.part))?.z0M??.84)+h.bodyLengthM/2;liveMount.rotation.x=-Math.PI/2;
+ const referenceParts=payload.children.filter(o=>o!==liveMount&&o.userData.part!=='adapter');
  const historical=/saturn/i.test(d.launcher),glenn=/glenn/i.test(d.launcher);
  const baseR=R*(historical?1.18:star?1:.93),stage1=baseR*(historical?12.5:star?15.0:13.2),stage2=baseR*(historical?7.2:star?6.3:5.1),allH=stage1+stage2+maxH,baseY=-stage1-stage2;
  cylinder(lower,0,baseY+stage1*.50,0,baseR,baseR*.985,stage1,star?rib:ivory);
@@ -121,7 +123,7 @@ export function makeLaunch(h){
   const directCraft=commission||['deorbit','entry','infeasible'].includes(phase);
   const t=s.t,up=asc?clamp(t/540):0,level=asc?Math.max(0,s.altitudeKm||0):0;
   envelope.visible=integration;facility.visible=integration;tower.visible=pad||(asc&&t<26);lower.visible=pad||(asc&&t<215);upper.visible=!integration&&!directCraft;payload.visible=!directCraft;shell.visible=integration||pad||(asc&&(star||t<276))||(star&&insert);
-  const opening=reference?.80:integration?clamp((-600-t)/2400)*.90:asc&&!star?clamp((t-230)/46):star&&insert?clamp((t-540)/35):0;
+  referenceParts.forEach(o=>o.visible=reference);const opening=reference?.80:integration?clamp((-600-t)/2400)*.90:asc&&!star?clamp((t-230)/46):star&&insert?clamp((t-540)/35):0;
   moveHandlingFixtures(opening);halves.forEach(({g,side})=>{g.position.set(side*opening*R*(asc?3.7:2.25),asc?-opening*R*2:0,0);g.rotation.z=-side*opening*(asc?.9:.2);if(star&&!integration&&side<0){g.position.set(0,0,0);g.rotation.z=0;}});
   const stageDrop=asc?clamp((t-170)/45):0;lower.position.set(0,-stageDrop*stage1*.75,stageDrop*R);lower.rotation.z=stageDrop*.15;
   stage.position.set(0,0,0);stage.rotation.z=asc?-up*.76:insert?-.8:0;
@@ -136,5 +138,5 @@ export function makeLaunch(h){
   const backdrop=integration?'hangar':pad||asc&&level<15?'ground':asc&&level<95?'sky':'space';
   return {center,half:zoomH,environment:backdrop,directCraft,reference,phase,opening};
  }
- return {root,update,parts:{payload,shell,facility,tower,stage,lower,upper}};
+ return {root,update,parts:{payload,liveMount,shell,facility,tower,stage,lower,upper}};
 }

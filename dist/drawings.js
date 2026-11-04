@@ -1,3 +1,4 @@
+import {deploymentLayout} from './deployment.js';
 // Two independent drawing scales. All lengths passed to the projections are in metres.
 const fmt = x => Number(x).toFixed(2);
 const line = (x1, y1, x2, y2, cls='detail') => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="${cls}"/>`;
@@ -29,7 +30,7 @@ function stowed(h){
 }
 function deployed(h){
   const bw=h.bodyWidthM,bh=h.bodyHeightM,bl=h.bodyLengthM,wl=h.wingLengthM,ww=h.wingWidthM,rl=h.radiatorLengthM,rw=h.radiatorWidthM;
-  const mountZ=Math.max(bl*.28,ww*.73), solarRoot=.93*bw, radiatorRoot=bl*.5+.35*bw;
+  const {mountZ,rootX:solarRoot,radRoot:radiatorRoot}=deploymentLayout(h);
   // Orthographic view at 30 degrees to the array normal; the PV and radiators lie on perpendicular planes.
   const cs=Math.sqrt(3)/2,sn=.5,span=2*(solarRoot+wl),long=2*(radiatorRoot+rl);
   const maxX=Math.max((solarRoot+wl)*cs,rw*.5*sn+bh*.3,bw*.5*cs+bh*.5*sn),maxZ=Math.max(long/2,mountZ+ww/2);

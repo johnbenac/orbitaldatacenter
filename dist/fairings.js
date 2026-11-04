@@ -45,12 +45,20 @@ export function packedSections(g){
  }
  const adapterWidth=g.launcher==='glenn'?3.30:1.52;
  add('Separation adapter',adapterWidth,adapterWidth,.36,adapterWidth/2);
- add('Engine recess',w*.8,h*.8,.48);
- add('Insulated bus',w+.12,h+.12,l);
+ add('Engine recess',w*.8,h*.8,Math.max(.48,.03*l+.27*w+.035));
+ const tr=Math.min(.24*w,.9*Math.cbrt(Math.max(.02,(g.tankVolumeL||0)/1000)*3/(8*Math.PI)));
+ const tankEdge=Math.hypot(.50*w+.68*tr,.21*h)+tr;
+ const dishEdge=Math.hypot(w*.16+kaDishM*.5,h*.5+Math.min(w,h)*.052*3+kaDishM*.42);
+ const radius=Math.max(Math.hypot(w+.12,h+.12)/2,tankEdge,dishEdge);
+ add('Insulated bus',Math.max(w+.12,w+3.36*tr),h+.12,l,radius);
  const solarShort=Math.min(wingLengthM/3,wingWidthM),solarLong=Math.max(wingLengthM/3,wingWidthM);
  const radiatorShort=Math.min(radiatorLengthM/3,radiatorWidthM),radiatorLong=Math.max(radiatorLengthM/3,radiatorWidthM);
  // Rails on both sides, plus allowances for hinges, latches and fluid loops.
  const cassetteHeight=12*.05+6*.08+.18;
+ // The forward handling frame holds the cassette beyond the boom saddles and
+ // folded coolant swivels. Its length is charged to launch fit.
+ const standOff=.32;
+ add('Forward guide truss',.46*w,.40*h,standOff);
  add('Folded wing and radiator cassette',Math.max(solarShort,radiatorShort)+.12,cassetteHeight,Math.max(solarLong,radiatorLong)+.12);
  add('Parked terminals',Math.max(kaDishM,.45)+.12,.52,.30);
  return sections;

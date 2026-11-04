@@ -1,6 +1,6 @@
-import {defaults, sizeDesign} from './design.js';
-import {createSimulation} from './model.js';
-import {DAY, DEG, geometry} from './orbit.js';
+import {defaults, sizeDesign} from './dist/design.js';
+import {createSimulation} from './dist/model.js';
+import {DAY, DEG, geometry} from './dist/orbit.js';
 
 const sun=geometry(defaults,0).sunECI;
 const terminatorNode=(360+Math.atan2(sun[0],-sun[1])/DEG)%360;

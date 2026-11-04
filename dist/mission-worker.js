@@ -18,7 +18,7 @@ export function chronologicalAudit(design, progress = () => {}) {
   if(!yr.thermal)yr.thermal=newThermalSummary(sim.hardware.input,yr.startSeconds,step.end.t,'Chronological mission-year bin');
   yr.thermal.end=step.end.t;mergeThermal(yr.thermal,stats.thermal);mergeThermal(thermal,stats.thermal);
   stats.firstThermalViolation=stats.thermal.firstViolation;delete stats.thermal;
-  for(const k of ['shadowSeconds','contactSeconds','deliveredGB','generatedGB','uploadedGB','textDeliveredGB','textGeneratedGB','textDroppedGB','bulkDeliveredGB','tokensDelivered','commandDroppedMB','propellantUsedKg','unmetKWh'])yr[k]=(yr[k]||0)+stats[k];yr.minSocPct=Math.min(yr.minSocPct,stats.minSocPct);yr.maxJunctionK=Math.max(yr.maxJunctionK,stats.maxJunctionK);yr.peakQueueGB=Math.max(yr.peakQueueGB,stats.peakQueueGB);
+  for(const k of ['payloadServiceSeconds','activeComputeSeconds','shadowSeconds','contactSeconds','deliveredGB','generatedGB','uploadedGB','textDeliveredGB','textGeneratedGB','textDroppedGB','bulkDeliveredGB','tokensDelivered','commandDroppedMB','propellantUsedKg','unmetKWh'])yr[k]=(yr[k]||0)+stats[k];yr.minSocPct=Math.min(yr.minSocPct,stats.minSocPct);yr.maxJunctionK=Math.max(yr.maxJunctionK,stats.maxJunctionK);yr.peakQueueGB=Math.max(yr.peakQueueGB,stats.peakQueueGB);
   for(const [k,v] of Object.entries(stats.energyKWh)){energyKWh[k]=(energyKWh[k]||0)+v;yr.energyKWh[k]=(yr.energyKWh[k]||0)+v;}
   for(const [key,value] of Object.entries(stats.counts))eventTotals[key]=(eventTotals[key]||0)+value;
   for(const e of stats.edges)if(e.start===i*DAY&&previousEdges.some(p=>p.type===e.type&&p.label===e.label&&p.end===e.start))eventTotals[e.type+'Count']--;
@@ -29,6 +29,7 @@ export function chronologicalAudit(design, progress = () => {}) {
   peakQueueGB=Math.max(peakQueueGB,stats.peakQueueGB);if(!firstCrossing&&stats.firstCrossing)firstCrossing=stats.firstCrossing;
   if(i%8===0||i===totalDays-1)progress({days:i+1,totalDays});
  }
- finalState.projected=false;const result={days:totalDays,thermal,thermalQualifiedUntilS:thermal.firstViolation?.time??thermal.coveredSeconds,physicalLifetimeSeconds:firstCrossing?.time??thermal.coveredSeconds,annual,energyKWh,eventTotals,...eventTotals,burnCount:(eventTotals.trimCount||0)+(eventTotals.reboostCount||0)+(eventTotals.disposalCount||0),desatCount:eventTotals.desatCount||0,minSocPct:minSoc,minSocTime,maxJunctionK:maxTemp,maxJunctionTime,peakQueueGB,firstCrossing,finalState,dayStats};return {seeds,dayStats,result};
+ const terminal=seed?.plan?Object.fromEntries(Object.entries(seed.plan).filter(([k])=>k!=='samples')):null;
+ finalState.projected=false;const result={terminal,payloadServiceSeconds:annual.reduce((sum,y)=>sum+y.payloadServiceSeconds,0),activeComputeSeconds:annual.reduce((sum,y)=>sum+y.activeComputeSeconds,0),days:totalDays,thermal,thermalQualifiedUntilS:thermal.firstViolation?.time??thermal.coveredSeconds,physicalLifetimeSeconds:firstCrossing?.time??thermal.coveredSeconds,annual,energyKWh,eventTotals,...eventTotals,burnCount:(eventTotals.trimCount||0)+(eventTotals.reboostCount||0)+(eventTotals.disposalCount||0),desatCount:eventTotals.desatCount||0,minSocPct:minSoc,minSocTime,maxJunctionK:maxTemp,maxJunctionTime,peakQueueGB,firstCrossing,finalState,dayStats};return {seeds,dayStats,result};
 }
 if(typeof WorkerGlobalScope!=='undefined'&&self instanceof WorkerGlobalScope)self.onmessage=({data})=>{try{self.postMessage(chronologicalAudit(data,progress=>self.postMessage({progress})));}catch(e){self.postMessage({error:e.message});}};

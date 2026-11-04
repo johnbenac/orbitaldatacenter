@@ -34,14 +34,14 @@ function activity(n,s,op){
  case 'junction':return op?s.burst?'Powered compute burst':'Powered idle':'Accelerators unpowered';
  case 'coldPlate':return op?'Cold plate on circulating loop':'Loop in standby';
  case 'coolant':return op?'Pump circulating coolant':'Pump off / unserved';
- case 'radiator':return op?s.deployment<.999?'Partially exposed radiator':'Deployed passive radiator':'Radiator stowed';
+ case 'radiator':return op?(s.radiatorDeployment??s.deployment)<.999?'Partially exposed radiator':'Deployed passive radiator':s.deployment>0&&s.deployment<1?'Radiator in deployment cassette':'Radiator stowed';
  case 'battery':return op?s.chargeKW>s.dischargeKW?'Pack charging':'Pack discharging':'Pack in standby';
  default:return op?'Exposed passive insulation':'Payload under launch boundary';
  }
 }
 export function qualifyNow(s,d){
- const mask=s.thermalActivityMask??thermalActivityMask(s.t,s.itKW,s.servedPumpKW,s.deployment,s.chargeKW,s.dischargeKW);
- return thermalNodes.map(n=>{const op=!!(mask&(1<<n.index)),state=op?'operating':'survival',k=n.keys[state],minK=d[k.min],maxK=d[k.max],temperatureK=s[n.tempKey],observable=Number.isFinite(temperatureK)&&(s.terminatedAt==null||s.t<=s.terminatedAt+1e-7);
+ const mask=s.thermalActivityMask??thermalActivityMask(s.t,s.itKW,s.servedPumpKW,s.radiatorDeployment??s.deployment,s.chargeKW,s.dischargeKW);
+ return thermalNodes.map(n=>{const op=!!(mask&(1<<n.index)),state=op?'operating':'survival',k=n.keys[state],minK=d[k.min],maxK=d[k.max],temperatureK=s[n.tempKey],observable=!s.referenceBody&&Number.isFinite(temperatureK)&&(s.terminatedAt==null||s.t<=s.terminatedAt+1e-7);
   return {id:n.id,label:n.label,tempKey:n.tempKey,temperatureK,state,activity:observable?activity(n,s,op):'Outside propagated mission',minK,maxK,marginK:observable?Math.min(temperatureK-minK,maxK-temperatureK):null,status:!observable?'unassessed':temperatureK<minK?'cold':temperatureK>maxK?'hot':'pass'};});
 }
 export function newThermalSummary(d,start,end,provenance,log=false){

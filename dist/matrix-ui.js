@@ -1,3 +1,4 @@
+import {helpButton} from './input-help-ui.js';
 import {icon} from './icons.js';
 import {designName} from './mission-presets.js';
 import {domains,domainReadout} from './domain-analysis.js';
@@ -5,7 +6,7 @@ import {solveModes} from './design.js';
 import {designOutput,phases} from './lifecycle.js';
 const esc=v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
 const number=(v,d=2)=>Number.isFinite(v)?v.toLocaleString('en-US',{maximumFractionDigits:d}):'—';
-export const domainIds=['conops','environment','orbit','compute','data','comm','power','thermal','attitude','prop','mass','launch'];
+export const domainIds=Object.keys(domains);
 export const isEditable=p=>['A','B','C'].includes(p);
 export function domainNav(v,ref=null){
  return '<div class="navgroup"><div class="navlabel">MISSION DOMAINS</div>'+domainIds.map((id,i)=>{
@@ -14,13 +15,13 @@ export function domainNav(v,ref=null){
 }
 function disposalPicker(d,row,domain){
  const isReturn=d.disposalMethod!=='graveyard',keys=isReturn?['targetLatDeg','targetLonDeg','targetToleranceKm']:['graveyardAltitudeKm'];
- return `<section class="disposal-definition"><div class="bankheading"><span class="guideflag">END OF MISSION</span><span class="bankcaption">Disposal strategy</span></div><div class="strategy-picks">${[['reentry','Targeted reentry','globe'],['graveyard','Graveyard orbit','orbit']].map(([method,name,ic])=>`<button class="chip ${d.disposalMethod===method?'selected':''}" aria-pressed="${d.disposalMethod===method}" data-disposal-method="${method}">${icon(ic,13)} ${name}</button>`).join('')}</div><details ${['conops','prop','orbit'].includes(domain)?'open':''}><summary>${isReturn?'Ground target and tolerance':'Retirement orbit altitude'}</summary><div class="definition-fields">${keys.map(row).join('')}</div></details></section>`;
+ return `<section class="disposal-definition"><div class="bankheading"><span class="guideflag">END OF MISSION</span><span class="bankcaption">Disposal strategy</span>${helpButton('disposalMethod','a disposal method',d.disposalMethod)}</div><div class="strategy-picks">${[['reentry','Targeted reentry','globe'],['graveyard','Graveyard orbit','orbit']].map(([method,name,ic])=>`<button class="chip ${d.disposalMethod===method?'selected':''}" aria-pressed="${d.disposalMethod===method}" data-disposal-method="${method}">${icon(ic,13)} ${name}</button>`).join('')}</div><details ${['conops','prop','orbit'].includes(domain)?'open':''}><summary>${isReturn?'Ground target and tolerance':'Retirement orbit altitude'}</summary><div class="definition-fields">${keys.map(row).join('')}</div></details></section>`;
 }
 export function phaseA(h,v,r,row){
  let keys=domains[v.domain].inputs.filter(k=>!['disposalMethod','targetLatDeg','targetLonDeg','targetToleranceKm','graveyardAltitudeKm'].includes(k));
  if(v.domain==='conops'){const driver={workload:'requiredTps',launch:'launchAllowanceKg',lifetime:'propellantKg',installed:'trayCount'}[v.solve];if(driver)keys=[...new Set([driver,...keys])];if(v.solve==='lifetime')keys=keys.filter(k=>k!=='missionYears')}
  const initial=v.domain==='orbit'?8:6,more=keys.slice(initial);
- return `<div class="phase-input-layout"><section class="panel"><div class="panelhead"><h2>${icon(domains[v.domain].icon,16)} ${esc(domains[v.domain].label)} inputs</h2><button class="textbutton" data-action="hardware">All assumptions ${icon('chevron-right',12)}</button></div><div class="panelpad"><label class="sizing-line">Design from<select id="phase-solve" aria-label="Sizing method">${[...new Set(['installed','workload','launch','lifetime',v.solve])].map(k=>`<option value="${esc(k)}" ${v.solve===k?'selected':''}>${esc(solveModes[k])}</option>`).join('')}</select></label><div class="definition-fields">${keys.slice(0,initial).map(row).join('')}</div>${more.length?`<details><summary>More ${esc(domains[v.domain].label.toLowerCase())} inputs</summary><div class="definition-fields">${more.map(row).join('')}</div></details>`:''}${disposalPicker(h.input,row,v.domain)}</div></section><section class="panel concept-panel" id="phase-output">${designOutput(h,v,r)}</section></div>`;
+ return `<div class="phase-input-layout"><section class="panel"><div class="panelhead"><h2>${icon(domains[v.domain].icon,16)} ${esc(domains[v.domain].label)} inputs</h2><button class="textbutton" data-action="hardware">All assumptions ${icon('chevron-right',12)}</button></div><div class="panelpad"><div class="sizing-line"><label for="phase-solve">Design from</label>${helpButton('solve','a sizing method',v.solve)}<select id="phase-solve" aria-label="Sizing method">${[...new Set(['installed','workload','launch','lifetime',v.solve])].map(k=>`<option value="${esc(k)}" ${v.solve===k?'selected':''}>${esc(solveModes[k])}</option>`).join('')}</select></div><div class="definition-fields">${keys.slice(0,initial).map(row).join('')}</div>${more.length?`<details><summary>More ${esc(domains[v.domain].label.toLowerCase())} inputs</summary><div class="definition-fields">${more.map(row).join('')}</div></details>`:''}${disposalPicker(h.input,row,v.domain)}</div></section><section class="panel concept-panel" id="phase-output">${designOutput(h,v,r)}</section></div>`;
 }
 export function observationCard(v,ctx,clock){
  const {hardware:h,state:s}=ctx,p=v.phase,id=v.domain,m=domainReadout(id,p,ctx),stage=s.flightPhase||v.chapter;

@@ -35,7 +35,7 @@ assert.ok(excess.includes('Envelope exceeded'));assert.ok(excess.includes('sd-ba
 const alt=sizeDesign({...applyPreset(defaults,'compute','dgx'),trayCount:5,storageTB:32});
 const sized=renderSubsystemDiagram('compute',{hardware:alt,state:createSimulation(alt).at(2500),day:{},events:[]});
 assert.ok(sized.includes('5 trays / 40 accelerators'));
-console.log('Twelve schematic workspaces verified across prelaunch, powered flight, a ground pass and reboost. Confirmed unique SVG IDs, valid parameter actions, all mass allocations, thermal state/range displays and launcher fit failure.');
+console.log('Thirteen schematic workspaces verified across prelaunch, powered flight, a ground pass and reboost. Confirmed unique SVG IDs, valid parameter actions, all mass allocations, thermal state/range displays and launcher fit failure.');
 
 // Palette endpoints, midpoint interpolation, clipping and unassessed nodes are shared with the three.js view.
 const {thermalScales,temperatureColor}=await import('./dist/thermal-colors.js');

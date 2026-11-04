@@ -108,7 +108,7 @@ const dishD=Math.max(.3,h.input.kaDishM),base=join(root,w*.16,y0+beam,-l*.35,'co
 const parab=[],dishT=Math.max(.007,dishD*.014),profile=(i,dy)=>{const r=dishD*.5*i/16;return new T.Vector2(r,(r/dishD)**2*dishD*.65+dy);};
 for(let i=0;i<=16;i++)parab.push(profile(i,-dishT));for(let i=16;i>=0;i--)parab.push(profile(i,0));
 const reflector=obj(dish,trimPoleTriangles(new T.LatheGeometry(parab,64)),solid('#dcdacb',.55,.38),0,0,0,'communications');reflector.name='Closed reflector shell';const rim=new T.Mesh(new T.TorusGeometry(dishD*.499,Math.max(.014,dishD*.014),12,64),bronze);rim.rotation.x=Math.PI/2;rim.position.y=dishD*.162;dish.add(rim);for(let j=0;j<3;j++){let a=j*2*Math.PI/3;pipe(dish,v(dishD*.44*Math.cos(a),dishD*.12,dishD*.44*Math.sin(a)),v(0,dishD*.37,0),dishD*.013,steel,'communications');}cyl(dish,0,dishD*.37,0,dishD*.035,dishD*.063,dishD*.10,gold,'communications');
-const optic=join(root,-w*.2,y0+beam*1.8,l*.35,'communications');let ap=Math.max(.15,h.input.opticalApertureM);cyl(optic,0,ap*.45,0,ap*.68,ap*.8,ap,ivory,'communications');cyl(optic,0,ap*.98,0,ap*.63,ap*.63,beam*.2,black,'communications');cyl(optic,0,ap*1.01,0,ap*.46,ap*.46,beam*.12,blue,'communications');const patches=[-1,1].map(side=>box(skin,side*w*.49,y0*.52,l*.3,beam*.35,hgt*.14,w*.21,bronze,'communications'));
+const optic=join(root,-w*.2,y0+beam*1.8,l*.35,'communications');let ap=Math.max(.15,h.input.opticalApertureM);cyl(optic,0,ap*.45,0,ap*.68,ap*.8,ap,ivory,'communications');cyl(optic,0,ap*.98,0,ap*.63,ap*.63,beam*.2,black,'communications');cyl(optic,0,ap*1.01,0,ap*.46,ap*.46,beam*.12,blue,'communications');const patches=[-1,1].map(side=>box(root,side*w*.49,y0*.52,l*.3,beam*.35,hgt*.14,w*.21,bronze,'communications'));
 // Liquid-cooled tray section with cold plates, rack manifolds, supply/return branches and end-wall penetrations.
 for(let side of [-1,1]){
  const rack=join(internal,side*w*.225,0,0,'compute'),rx=side*w*.175;
@@ -119,12 +119,29 @@ for(let side of [-1,1]){
 
   const tray=box(rack,0,y,0,w*.36,Math.min(beam*.35,pitch*.22),l*.62,silver,'compute');tray.userData.installedTrayRow=true;trayRows.push(tray);
   thermalMesh(box(rack,0,y+Math.min(beam*.30,pitch*.27),0,w*.33,Math.min(beam*.16,pitch*.13),l*.57,copper,'compute'),'coldPlate');
-  for(let j=0;j<4;j++){const z=(j-1.5)*l*.13;thermalMesh(box(rack,0,y+Math.min(beam*.53,pitch*.48),z,w*.28,Math.min(beam*.26,pitch*.19),l*.115,navy,'compute'),'junction');const lamp=box(rack,side*w*.154,y+beam*.54,z+l*.024,beam*.14,beam*.17,beam*.28,lit,'compute');leds.push(lamp);}
+  for(let j=0;j<4;j++){const z=(j-1.5)*l*.13;const chip=thermalMesh(box(rack,0,y+Math.min(beam*.53,pitch*.48),z,w*.28,Math.min(beam*.26,pitch*.19),l*.115,navy,'compute'),'junction');if(side===1&&k===rows-1&&j===0)chip.userData.dataSource=true;const lamp=box(rack,side*w*.154,y+beam*.54,z+l*.024,beam*.14,beam*.17,beam*.28,lit,'compute');leds.push(lamp);}
   for(const z of [-1,1])pipe(rack,v(side*w*.12,y+beam*.32,z*l*.23),v(rx,y+beam*.32,z*l*.295),beam*.14,z>0?blue:copper,'radiator');
  }
  for(const z of [-1,1]){const p=v(side*w*.40,-hgt*.26,z*l*.295),bend=v(side*w*.40,-hgt*.26,z*l*.40),end=v(side*w*.225,-hgt*.115,z*l*.505);pipe(internal,p,bend,beam*.26,z>0?blue:copper,'radiator');pipe(internal,bend,end,beam*.26,z>0?blue:copper,'radiator');}
 }
-for(let j=0;j<4;j++){const x=(j-1.5)*w*.20;thermalMesh(box(internal,x,-hgt*.06,l*.408,w*.185,hgt*.64,l*.13,black,'battery'),'battery');box(internal,x,hgt*.277,l*.408,w*.177,beam*.4,l*.128,bronze,'battery');thermalMesh(box(internal,x,hgt*.02,l*.48,w*.1,hgt*.40,beam*.2,aqua,'battery'),'battery');}for(let j=0;j<5;j++)box(internal,0,-hgt*.33+j*hgt*.13,-l*.41,w*.76,beam*.7,l*.105,silver,'storage');
+for(let j=0;j<4;j++){const x=(j-1.5)*w*.20;thermalMesh(box(internal,x,-hgt*.06,l*.408,w*.185,hgt*.64,l*.13,black,'battery'),'battery');box(internal,x,hgt*.277,l*.408,w*.177,beam*.4,l*.128,bronze,'battery');thermalMesh(box(internal,x,hgt*.02,l*.48,w*.1,hgt*.40,beam*.2,aqua,'battery'),'battery');}// Model storage modules as removable drive sleds beside their independent data switch.
+const recorder=join(internal,w*.10,-hgt*.025,-l*.407,'storage'),avionics=join(internal,-w*.313,hgt*.05,-l*.401,'avionics');
+const driveCount=Math.max(1,Math.ceil(h.storageTB/h.input.diskModuleTB)),shownDrives=Math.min(12,driveCount),driveStep=Math.min(hgt*.145,hgt*.66/shownDrives),rackHeight=driveStep*shownDrives;
+for(const side of [-1,1])box(recorder,side*w*.269,0,0,w*.017,rackHeight+beam*.55,l*.137,steel,'storage');
+for(let j=0;j<shownDrives;j++){const y=(j+.5-shownDrives/2)*driveStep;
+ box(recorder,0,y,0,w*.512,driveStep*.80,l*.132,dark,'storage');box(recorder,0,y,-l*.069,w*.515,driveStep*.85,beam*.13,ivory,'storage');
+ box(recorder,-w*.14,y,-l*.074,w*.123,driveStep*.29,beam*.12,black,'storage');box(recorder,w*.205,y,-l*.074,beam*.30,driveStep*.27,beam*.12,aqua,'storage');
+ for(const k of [-1,0,1])box(recorder,k*w*.052,y,-l*.074,w*.022,driveStep*.29,beam*.10,bronze,'storage');
+}
+box(avionics,0,0,0,w*.20,hgt*.37,l*.13,navy,'avionics');
+for(let i=0;i<4;i++){const y=hgt*(.12-.080*i);box(avionics,0,y,-l*.066,w*.198,beam*.29,beam*.17,silver,'avionics');for(let j=0;j<3;j++)box(avionics,w*(j-1)*.056,y,-l*.070,w*.032,beam*.14,beam*.16,black,'avionics');}
+for(let i=0;i<3;i++){const y=hgt*(.055-i*.037);pipe(internal,v(-w*.214,y,-l*.38),v(-w*.165,y,-l*.38),beam*.078,i===1?copper:dark,'avionics');}
+// Three body-axis magnetic bars implement the installed torquer cluster.
+const torquers=[];
+for(let axis=0;axis<3;axis++){const p=join(internal,-w*.34+(axis===0?w*.11:0),hgt*.29,-l*.19+axis*l*.075,'torquer');
+ const len=Math.min(w*.31,l*.18),r=beam*.33,bar=cyl(p,0,0,0,r,r,len,bronze,'torquer',24);for(let n=0;n<4;n++)cyl(p,0,len*(n-1.5)*.19,0,r*1.10,r*1.10,len*.13,copper,'torquer',24);
+ if(axis===0)p.rotation.z=Math.PI/2;if(axis===2)p.rotation.x=Math.PI/2;torquers.push(p);
+}
 for(let i=0;i<4;i++){let a=i*Math.PI/2+Math.PI/4,r=w*.22,g=join(internal,r*Math.cos(a),hgt*.45,r*Math.sin(a),'cmg');g.rotation.z=Math.sin(a)*.55;let rotor=cyl(g,0,0,0,w*.103,w*.103,beam*.7,bronze,'cmg');let ring=new T.Mesh(new T.TorusGeometry(w*.114,beam*.19,10,48),ivory);ring.rotation.x=.4;g.add(ring);cmgs.push({g,rotor,a});}for(let s of [-1,1]){const engine=join(root,s*w*.28,-hgt*.21,-l*.53,'propulsion');let bell=cyl(engine,0,0,-w*.10,w*.080,w*.15,w*.25,dark,'propulsion',24,true);bell.rotation.x=Math.PI/2;const inner=cyl(engine,0,0,-w*.10,w*.072,w*.141,w*.245,solid('#232327',.22,.68),'propulsion',32,true);inner.rotation.x=Math.PI/2;inner.geometry=inner.geometry.clone();inner.geometry.userData.shared=false;
 const innerIdx=inner.geometry.index,innerNormals=inner.geometry.attributes.normal;
 for(let k=0;k<innerIdx.count;k+=3){const j=innerIdx.getX(k+1);innerIdx.setX(k+1,innerIdx.getX(k+2));innerIdx.setX(k+2,j);}
@@ -186,4 +203,4 @@ function positionPanels(progress){
  }positionGuides(progress);
 }
 positionPanels(1);
-return{root,internal,skin,enclosure,walls,wings,panels,carriages,appendages,trayRows,positionPanels,rads,cmgs,cells,leds,dish,optic,patches,plumes,bw,bh,bl,wingspan:2*(panelL+kin.rootX),spanZ:2*(radL+kin.radRoot)};}
+return{root,internal,skin,enclosure,walls,wings,panels,carriages,appendages,recorder,avionics,torquers,driveCount,shownDrives,trayRows,positionPanels,rads,cmgs,cells,leds,dish,optic,patches,plumes,bw,bh,bl,wingspan:2*(panelL+kin.rootX),spanZ:2*(radL+kin.radRoot)};}

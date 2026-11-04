@@ -7,6 +7,36 @@ const terran = {
 };
 export const fairings={
  terran,terranX:terran,
+ falconHeavy:{
+  outerDiameterM:5.2,basis:'Standard fairing · planning contour',source:'SpaceX · Falcon User’s Guide, May 2025, §4.1.3',
+  sourceUrl:'https://www.spacex.com/assets/media/falcon-users-guide-2025-05-09.pdf',
+  note:'The standard fairing shell is 5.2 m wide and 13.2 m high. This simplified 4.5 × 10.8 m fit profile is an assumption. Use the provider’s static-envelope CAD and the chosen payload adapter for a mission analysis.',
+  profile:[[0,2.25],[6.5,2.25],[8.1,1.99],[9.5,1.51],[10.8,.68]]
+ },
+ vulcan6:{
+  outerDiameterM:5.4,basis:'Guide stations · long static envelope',source:'ULA · October 2023 User’s Guide, Figure 4.3.1-2',
+  sourceUrl:'https://www.ulalaunch.com/docs/default-source/rockets/2023_vulcan_user_guide.pdf',
+  note:'Long 21.3 m external fairing. Heights use LV station 2596.66 in at the 1,575 mm interface as zero. Tabulated diameters from the figure are halved to obtain radii. The model interpolates the guide stations and omits negotiable extensions.',
+  profile:[[0,2.4385],[6.35,2.413],[11.938,2.3305],[14.986,1.816],[18.796,.3045]]
+ },
+ ariane64:{
+  outerDiameterM:5.4,basis:'Simplified long-fairing study profile',source:'Arianespace · Ariane 6 User’s Manual, Issue 2, Figure 5.3.1b',
+  sourceUrl:'https://www.arianespace.com/app/uploads/sites/4/2024/10/Mua-6_Issue-2_Revision-0_March-2021.pdf',
+  note:'Selected single-payload long fairing. A 4.6 m cylindrical keep-in and a simplified taper represent a conservative planning case inside the guide envelope. The mission-specific PAF and negotiable extensions are outside this model.',
+  profile:[[0,2.3],[10.5,2.3],[13.8,1.72],[15,1.445],[16,1.165],[17.5,.28]]
+ },
+ longMarch5B:{
+  outerDiameterM:5.2,basis:'Planning estimate · external shell known',source:'China Manned Space Agency · Long March 5B geometry',
+  sourceUrl:'https://en.cmse.gov.cn/news/202005/t20200506_46488.html',
+  note:'CMSA gives a 5.2 m diameter and 20.5 m external length. The 4.6 m usable diameter, 17 m usable height and taper are model assumptions.',
+  profile:[[0,2.3],[10.8,2.3],[13.3,2.15],[15.5,1.55],[17,.65]]
+ },
+ longMarch9:{
+  outerDiameterM:10,basis:'Concept assumption · no released interface',source:'CALT designer briefing · January 2023 LEO study',
+  sourceUrl:'https://english.www.gov.cn/news/topnews/202301/19/content_WS63c8b4ccc6d0a757729e5d88.html',
+  note:'The modeled 10 m outer fairing is based on the core diameter class. The 8.6 × 20 m usable envelope and taper are illustrative study assumptions.',
+  profile:[[0,4.3],[11,4.3],[15,3.95],[18,2.8],[20,1.15]]
+ },
  glenn:{
   adapterBoltCircleM:3.1699,interfaceMinKg:2300,interfaceMaxKg:37200,outerDiameterM:7,basis:'Historical dynamic envelope',source:'Blue Origin · October 2018 Rev C, Figure 5-4',
   sourceUrl:'https://yellowdragonblog.com/wp-content/uploads/2019/01/new_glenn_payload_users_guide_rev_c.pdf#page=61',

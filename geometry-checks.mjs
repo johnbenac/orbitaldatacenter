@@ -11,10 +11,11 @@ const near=(a,b,tol=1e-7)=>assert.ok(Math.abs(a-b)<=tol,`${a} vs ${b}`);
 const h=sizeDesign(defaults),e=h.enclosure;
 for(const id of Object.keys(fairings)){
  const model=sizeDesign(applyPreset(defaults,'launcher',id)),f=model.fairing;
- assert.equal(f.override,false);assert.ok(f.maxDiameterM<f.outerDiameterM);assert.ok(f.fit);
+ assert.equal(f.override,false);assert.ok(f.maxDiameterM<f.outerDiameterM);assert.equal(f.fit,f.radialClearanceM>=0&&f.axialClearanceM>=0);
  for(const [z,r] of f.profile)near(radiusAt(f.profile,z),r);
  const custom=sizeDesign({...model.input,fairingLengthM:f.heightM*.4});assert.ok(custom.fairing.override&&!custom.fit);
 }
+assert.ok(h.fairing.fit);assert.ok(!sizeDesign(applyPreset(defaults,'launcher','falconHeavy')).fairing.fit);
 const smallR=fairingFit({...defaults,radialPaddingM:0},[{part:'Test',z0M:3,z1M:4,lengthM:1,radiusM:2.39}]);
 assert.ok(smallR.fit);assert.ok(!fairingFit(defaults,smallR.stack).fit);
 assert.equal(new Set(e.walls.map(w=>w.axis+w.sign)).size,6);
@@ -44,7 +45,10 @@ globalThis.setTimeout=(handler,ms,...args)=>{const t=originalTimer(handler,ms,..
 const t=sim.story('contact').instant,view={page:'overview',chapter:'contact',camera:'spacecraft',preset:'reference',t,start:0,event:sim.story('contact')};
 exported=await makePacket({scenario:{schema:'odc-scenario/1',modelVersion:'2',design:study,view},hardware:hw,sim,result:inverseSolve(study),snap:sim.at(t),day:sim.daySummary(0),events:sim.events(0,86400),audit});
 const zip=await JSZip.loadAsync(await exported.arrayBuffer());
-for(const file of ['design/fairing-fit.csv','design/fairing-stations.csv','design/stowed-stack.csv','design/enclosure-walls.csv','operations/chapter-samples.csv','operations/selected-story.json','operations/disposal.json','PDR.html'])assert.ok(zip.file(file),file);
+for(const file of ['design/launch-vehicle.json','design/fairing-fit.csv','design/fairing-stations.csv','design/stowed-stack.csv','design/enclosure-walls.csv','operations/chapter-samples.csv','operations/selected-story.json','operations/disposal.json','PDR.html'])assert.ok(zip.file(file),file);
+const carrier=JSON.parse(await zip.file('design/launch-vehicle.json').async('text'));
+assert.equal(carrier.selection,hw.input.launcher);assert.equal(carrier.reference.referenceKg,hw.input.referenceKg);
+near(carrier.limitingMassScreenKg,hw.launchScreenMarginKg);assert.ok(carrier.reference.sourceUrl.startsWith('https://'));
 const metadata=JSON.parse(await zip.file('operations/selected-story.json').async('text'));assert.equal(metadata.chapter,'contact');assert.equal(metadata.elapsedSeconds,t);
 const report=await zip.file('PDR.html').async('text');assert.ok(report.includes('Global')||report.includes('Stowed payload clearance'));assert.ok(report.includes('Enclosure and heat transfer'));
-console.log('Five fairing presets, taper and motion allowances, six wall masses, signed shell heat balance, flight thermal channel, disposal allocation and generated quantitative PDR ZIP passed.');
+console.log('Ten fairing presets, taper and motion allowances, six wall masses, signed shell heat balance, flight thermal channel, disposal allocation and generated quantitative PDR ZIP passed.');

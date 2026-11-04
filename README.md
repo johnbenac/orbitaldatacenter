@@ -12,12 +12,12 @@ To deploy, upload the contents of `dist/` to an HTTP(S) static host, preserving 
 
 ## Navigate the mission
 
-The phase tabs select the kind of work. The domain navigation selects the subsystem or question. The same twelve domains are available in all six phases.
+The phase tabs select the kind of work. The domain navigation selects the subsystem or question. The same thirteen domains are available in all six phases.
 
 | Phase | Work in this phase |
 | --- | --- |
 | A · Mission inputs | Choose a starting design, size from an installed configuration, workload, launch allowance or lifetime requirement, and select the retirement route. |
-| B · Subsystem design | Select components on a schematic to inspect installed hardware and operating values. Follow buses, coolant loops, payload queues, actuator momentum, mass allocations or natural and induced environmental loads. |
+| B · Subsystem design | The Design section exposes installed assumptions and component schematics. The Analysis section below always shows the clock, charts, operating quantities and ledger. Follow buses, coolant loops, payload queues, actuator momentum, mass allocations or natural and induced environmental loads. |
 | C · Integrated vehicle | Inspect assembled hardware in 3D. Pin the current design and change one input to compare responses at matching mission times. Full chronological comparisons add whole-mission quantities and histories. |
 | D · Launch and insertion | Inspect the stowed stack, fairing fit and assembly clearances. Follow ascent, separation and trim in the launch chapters. |
 | E · Operations | Use the shared clock to inspect commissioning, compute bursts, ground contacts, reboost and momentum unloading. |
@@ -32,6 +32,10 @@ The thermal view maps six modeled nodes to fixed Kelvin color scales. Select a n
 ## Save, share and export
 
 Phase A includes five built-in design points, a new-mission action and a shelf for custom presets. **Save as preset** preserves design inputs, solver and thermal requirement settings. **Load preset** restores a preset JSON to the browser shelf. Downloaded presets are portable between browsers.
+
+In Phase A, hover or focus an input for selection advice. Its **?** button opens the basis, worked example where available, and links to the relevant source sections. **Model & sources** includes a searchable field guide. GEVS and the Goddard GOLD Rules anchor environmental verification and margin guidance. Worked study values, equipment references and mission requirements are identified separately.
+
+**Launch Vehicle** compares carrier configurations and their reference payload, fairing and recovery assumptions. **Launch & Insertion** follows the selected spacecraft on that carrier through integration and release. In design phases a change review shows replaced inputs, retained interfaces to check, updated coupled quantities and any exceeded sizing limits. Cancel or apply the proposal before switching hardware. A carrier change keeps the active sizing mode and the mission-specific allowance.
 
 **Share** restores the scenario, phase, domain, camera, clock and selected event. **Export & import** provides scenario JSON, telemetry CSV, a static-site bundle and the quantitative PDR ZIP. Scenario JSON and PDR packages can be imported from a design phase.
 
@@ -52,9 +56,13 @@ node mesh-checks.mjs
 node schematic-checks.mjs
 node thermal-test.mjs
 node scene-interaction-checks.mjs
+node domain-graphics-checks.mjs
 node domain-checks.mjs
 node matrix-checks.mjs
 node lifecycle-checks.mjs
+node coupling-ui-checks.mjs
+node launch-fleet-checks.mjs
+node input-guidance-test.mjs
 ```
 
 **Model & sources** documents equations, reference conditions, technology assumptions and model boundaries. **Numerical checks** provides reproducible comparisons in the workbench. Data volumes use decimal GB and TB, mission elapsed time is measured from the selected UTC epoch, and component temperatures use kelvin.

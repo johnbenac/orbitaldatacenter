@@ -1,6 +1,7 @@
 // Launch assemblies use metres and a +Y vehicle axis. The fairing radius profile
 // and stowed sections come from the sizing solver; the support equipment is illustrative.
 import * as T from './vendor/three.module.js';
+import {launchFleet} from './launch-fleet.js';
 import {thermalMesh} from './thermal-view.js';
 import {fitOutBay,payloadFinishes} from './launch-art.js';
 const v=(x=0,y=0,z=0)=>new T.Vector3(x,y,z),clamp=x=>Math.max(0,Math.min(1,x));
@@ -52,7 +53,7 @@ export function makeLaunch(h){
   for(let j=0;j<=8;j++){const phi=begin+angle*j/8;for(let k=1;k<inside.length-1;k++){const[a,y]=inside[k-1],[b,z]=inside[k],r0=a-R*.024,r1=b-R*.024;
    tube(g,v(r0*Math.sin(phi),y,r0*Math.cos(phi)),v(r1*Math.sin(phi),z,r1*Math.cos(phi)),j%4===0?R*.025:R*.014,j%4===0?steel:rib);}}
 
-  body.name='Fairing half shell';
+  body.name='Fairing half shell';g.userData.halfSide=side;
   for(const phi of [begin,begin+angle]){
    const poly=new T.Shape();section.forEach(([x,y],i)=>i?poly.lineTo(x,y):poly.moveTo(x,y));
    const cap=new T.ShapeGeometry(poly);cap.rotateY(phi-Math.PI*.5);const desired=v(Math.cos(phi),0,-Math.sin(phi)).multiplyScalar(phi===begin?-1:1);
@@ -83,14 +84,17 @@ export function makeLaunch(h){
  }
  const liveMount=group(payload,'payload');liveMount.position.y=(stack.find(q=>/insulated bus/i.test(q.part))?.z0M??.84)+h.bodyLengthM/2;liveMount.rotation.x=-Math.PI/2;
  const referenceParts=payload.children.filter(o=>o!==liveMount&&o.userData.part!=='adapter');
- const historical=/saturn/i.test(d.launcher),glenn=/glenn/i.test(d.launcher);
- const baseR=R*(historical?1.18:star?1:.93),stage1=baseR*(historical?12.5:star?15.0:13.2),stage2=baseR*(historical?7.2:star?6.3:5.1),allH=stage1+stage2+maxH,baseY=-stage1-stage2;
+ const fleet=launchFleet[d.launcher]||launchFleet.terran,glenn=/glenn/i.test(d.launcher);
+ const parallel=d.launcher==='falconHeavy',single=fleet.stages===1;
+ const baseR=fleet.diameterM/2,capH=outerProfile.at(-1)[1],bodyLength=Math.max(4*baseR,fleet.heightM-capH),
+  stage2=single?0:bodyLength*(star?.36:glenn?.26:.24),stage1=bodyLength-stage2,allH=bodyLength+capH,baseY=-bodyLength;
+
  cylinder(lower,0,baseY+stage1*.50,0,baseR,baseR*.985,stage1,star?rib:ivory);
  cylinder(lower,0,baseY+stage1*.095,0,baseR*1.006,baseR*.994,stage1*.185,dark);
  cylinder(lower,0,baseY+stage1*.966,0,baseR*1.009,baseR*1.012,stage1*.068,glenn?blue:steel);
  for(let i=1;i<8;i++)cylinder(lower,0,baseY+stage1*(.18+i*.086),0,baseR*1.001,baseR*1.001,baseR*.015,steel,undefined,64);
  for(let i=0;i<12;i++){const a=2*Math.PI*i/12;box(lower,baseR*.991*Math.sin(a),baseY+stage1*.52,baseR*.991*Math.cos(a),baseR*.043,stage1*.66,baseR*.043,rib);}
- cylinder(upper,0,-stage2*.5,0,R,baseR,stage2,star?rib:ivory);cylinder(upper,0,-stage2*.92,0,baseR*1.01,baseR*.998,stage2*.12,dark);
+ if(!single){cylinder(upper,0,-stage2*.5,0,R,baseR,stage2,star?rib:ivory);cylinder(upper,0,-stage2*.92,0,baseR*1.01,baseR*.998,stage2*.12,dark);}
  cylinder(upper,0,-skin,0,R*1.004,R*1.004,skin*3,steel);
  // Vehicle-family bands identify the stage without borrowing provider flight markings.
  const accent=star?steel:glenn?blue:dark;
@@ -99,13 +103,25 @@ export function makeLaunch(h){
  const faceMap=document.createElement('canvas');faceMap.width=256;faceMap.height=400;const pen=faceMap.getContext('2d');pen.fillStyle='#e2e4de';pen.fillRect(0,0,256,400);pen.fillStyle='#243c48';pen.font='bold 77px sans-serif';pen.fillText('ODC',18,96);pen.fillRect(20,120,216,11);pen.font='bold 45px sans-serif';pen.fillText('01',20,188);pen.fillStyle='#c67c47';pen.fillRect(20,320,216,23);
  const decal=mat('#fff',.12,.62);decal.map=new T.CanvasTexture(faceMap);decal.map.colorSpace=T.SRGBColorSpace;
  for(const a of [0,Math.PI]){const plate=mesh(lower,new T.PlaneGeometry(baseR*.62,baseR*.98),decal,baseR*1.007*Math.sin(a),baseY+stage1*.61,baseR*1.007*Math.cos(a),'launcher');plate.rotation.y=a;}
- const flames=[];
- function engines(p,r,y,count){for(let i=0;i<count;i++){
-   const theta=2*Math.PI*i/(count-1),center=i===count-1,rr=center?0:r*.60,x=rr*Math.sin(theta),z=rr*Math.cos(theta);
-   cylinder(p,x,y-r*.13,z,r*.14,r*.23,r*.36,dark);
-   const fire=group(p,'launcher');fire.position.set(x,y-r*.26,z);const q=cylinder(fire,0,-r*1.05,0,r*.20,.015,r*2.15,amber,undefined,18);cylinder(fire,0,-r*.40,0,r*.215,r*.12,r*.81,whiteHot,undefined,18);flames.push({fire,p});
-  }}
- engines(lower,baseR,baseY,historical?5:glenn?7:star?13:7);engines(upper,R,-stage2,3);
+ const flames=[],boosters=[];
+ function engines(p,r,y,count){
+  if(!count)return;
+  const rings=count>=25?[1,8,count-9]:count>6?[1,count-1]:[count],diam=r*(count>20?.12:count>8?.16:count>2?.22:.33);
+  for(let ring=0;ring<rings.length;ring++)for(let i=0;i<rings[ring];i++){
+   const n=rings[ring],theta=2*Math.PI*i/n+(ring%2?.15:0),rr=n===1?0:r*(rings.length===3&&ring===1?.37:n===2?.42:.69),x=rr*Math.sin(theta),z=rr*Math.cos(theta);
+   cylinder(p,x,y-diam*.65,z,diam*.62,diam,diam*1.30,dark,undefined,28);
+   const fire=group(p,p.userData.part);fire.position.set(x,y-diam*1.30,z);cylinder(fire,0,-diam*3.2,0,diam*.91,diam*.05,diam*6.4,amber,undefined,18);cylinder(fire,0,-diam*.92,0,diam*.94,diam*.49,diam*1.84,whiteHot,undefined,18);flames.push({fire,p});
+  }
+ }
+ engines(lower,baseR,baseY,fleet.coreEngines);if(!single)engines(upper,baseR,-stage2,fleet.upperEngines);
+ for(let i=0;i<fleet.boosters;i++){
+  const a=2*Math.PI*i/fleet.boosters+Math.PI/2,rb=baseR*(parallel?1:d.launcher==='vulcan6'?.30:.64),height=stage1*(parallel?1:d.launcher==='longMarch5B'?.72:.66);
+  const br=group(stage,'booster');br.userData.radiusM=rb;br.userData.lengthM=height;const rad=baseR+rb*1.015,dx=Math.sin(a),dz=Math.cos(a);br.position.set(dx*rad,baseY,dz*rad);
+  cylinder(br,0,height*.44,0,rb,rb*.99,height*.88,ivory,'booster');cylinder(br,0,height*.94,0,rb*.043,rb,height*.12,ivory,'booster');
+  cylinder(br,0,height*.11,0,rb*1.008,rb*1.004,height*.20,parallel?dark:rib,'booster');cylinder(br,0,height*.72,0,rb*1.008,rb*1.008,rb*.050,steel,'booster');
+  cylinder(br,0,height*.80,0,rb*1.013,rb*1.013,rb*.09,parallel?dark:blue,'booster');
+  engines(br,rb,0,parallel?fleet.coreEngines:d.launcher==='longMarch5B'?2:1);boosters.push({br,dx,dz,rad,rb});
+ }
  // Launch integration floor, transit cradle, bridge crane, and tower umbilicals.
  const unit=Math.max(maxH,R*4);
  const twx=-baseR*2.8,twz=-baseR*1.5,tw=baseR*.94,th=allH*.90;
@@ -116,27 +132,29 @@ export function makeLaunch(h){
  const lightPole=cylinder(tower,twx,baseY+th+baseR*1.7,twz,baseR*.037,baseR*.07,baseR*3.4,steel);cylinder(tower,twx,lightPole.position.y+baseR*1.75,twz,baseR*.08,baseR*.08,baseR*.16,whiteHot);
  const moveHandlingFixtures=fitOutBay({facility,tower,halves,unit,R,baseR,baseY,maxH,h,profile,box,tube,mesh,cylinder,mat,steel,rib,dark,gold,black});
  root.traverse(o=>{if(o.isMesh){o.receiveShadow=true;o.castShadow=o.geometry.type!=='PlaneGeometry'&&o.material.transparent!==true;}});
- function update(s,chapter){
+ function update(s,chapter,context={}){
   let phase=s.flightPhase||(s.t< -600?'integration':s.t<0?'pad':s.t<540?'ascent':s.t<900?'insertion':s.t<1200?'commissioning':'operations');
   const reference=!['integration','pad','ascent','insertion','commissioning','deorbit','entry','infeasible'].includes(phase);
-  const integration=phase==='integration'||reference,pad=phase==='pad',asc=phase==='ascent',insert=phase==='insertion',commission=phase==='commissioning';
+  const vehicleStudy=context.domain==='launcher'&&(reference||phase==='integration'),integration=!vehicleStudy&&(phase==='integration'||reference),pad=phase==='pad'||vehicleStudy,asc=phase==='ascent',insert=phase==='insertion',commission=phase==='commissioning';
   const directCraft=commission||['deorbit','entry','infeasible'].includes(phase);
   const t=s.t,up=asc?clamp(t/540):0,level=asc?Math.max(0,s.altitudeKm||0):0;
-  envelope.visible=integration;facility.visible=integration;tower.visible=pad||(asc&&t<26);lower.visible=pad||(asc&&t<215);upper.visible=!integration&&!directCraft;payload.visible=!directCraft;shell.visible=integration||pad||(asc&&(star||t<276))||(star&&insert);
-  referenceParts.forEach(o=>o.visible=reference);const opening=reference?.80:integration?clamp((-600-t)/2400)*.90:asc&&!star?clamp((t-230)/46):star&&insert?clamp((t-540)/35):0;
+  envelope.visible=integration||context.phase==='D'&&context.domain&&context.domain!=='launcher'&&context.domain!=='conops'&&(pad||asc&&t<230);facility.visible=integration;tower.visible=pad||(asc&&t<26);lower.visible=pad||(asc&&(single||t<215))||(single&&insert);upper.visible=!single&&!integration&&!directCraft;payload.visible=!directCraft;shell.visible=integration||pad||(asc&&(star||t<276))||(star&&insert);
+  referenceParts.forEach(o=>o.visible=reference);const opening=reference&&!vehicleStudy?.80:integration?clamp((-600-t)/2400)*.90:asc&&!star?clamp((t-230)/46):star&&insert?clamp((t-540)/35):0;
   moveHandlingFixtures(opening);halves.forEach(({g,side})=>{g.position.set(side*opening*R*(asc?3.7:2.25),asc?-opening*R*2:0,0);g.rotation.z=-side*opening*(asc?.9:.2);if(star&&!integration&&side<0){g.position.set(0,0,0);g.rotation.z=0;}});
-  const stageDrop=asc?clamp((t-170)/45):0;lower.position.set(0,-stageDrop*stage1*.75,stageDrop*R);lower.rotation.z=stageDrop*.15;
+  const stageDrop=asc&&!single?clamp((t-170)/45):0;const sideDrop=asc?clamp((t-128)/40):0;
+  for(const q of boosters){q.br.visible=pad||asc&&t<168;q.br.position.set(q.dx*(q.rad+sideDrop*baseR*3),baseY-sideDrop*stage1*.36,q.dz*(q.rad+sideDrop*baseR*3));q.br.rotation.z=q.dx*sideDrop*.16;}
+ lower.position.set(0,-stageDrop*stage1*.75,stageDrop*R);lower.rotation.z=stageDrop*.15;
   stage.position.set(0,0,0);stage.rotation.z=asc?-up*.76:insert?-.8:0;
   tower.position.y=asc?-Math.min(level*1000,allH*3):0;
-  upper.position.y=insert?-clamp((t-540)/60)*stage2*1.5:0;shell.position.y=star?upper.position.y:0;payload.position.x=star&&insert?clamp((t-540)/60)*R*2.8:0;
+  upper.position.y=insert?-clamp((t-540)/60)*stage2*1.5:0;if(single&&insert)lower.position.y=-clamp((t-540)/60)*baseR*4;shell.position.y=star?upper.position.y:0;payload.position.x=star&&insert?clamp((t-540)/60)*R*2.8:0;
   payload.position.y=insert?clamp((t-540)/60)*R*1.45:0;
-  flames.forEach(({fire,p})=>{fire.visible=asc&&(p===lower?t<170:t>177);fire.scale.y=.94+.07*Math.sin(t*4.1);});
+  flames.forEach(({fire,p})=>{fire.visible=asc&&(p===lower?(single||t<170):p===upper?t>177:t<128);fire.scale.y=.94+.07*Math.sin(t*4.1);});
   root.visible=!directCraft;
   const center=v(),zoomH=integration?Math.max(maxH,h.stowedLengthM)*.76:insert?Math.max(maxH*.62,h.stowedLengthM*.82):asc&&t>220?Math.max(stage2+maxH,allH*.51)*.59:allH*.59;
   if(integration){center.y=maxH*.49;center.x=-unit*.047;}else if(insert)center.y=payload.position.y+h.stowedLengthM*.33;else if(asc&&t>220)center.y=(maxH-stage2)*.5;else center.y=(maxH+baseY)*.5;
   if(!integration)center.applyAxisAngle(v(0,0,1),stage.rotation.z);
   const backdrop=integration?'hangar':pad||asc&&level<15?'ground':asc&&level<95?'sky':'space';
-  return {center,half:zoomH,environment:backdrop,directCraft,reference,phase,opening};
+  return {center,half:zoomH,environment:backdrop,directCraft,reference,vehicleStudy,phase,opening};
  }
- return {root,update,parts:{payload,liveMount,shell,facility,tower,stage,lower,upper}};
+ return {root,update,geometry:{heightM:allH,diameterM:baseR*2,upperLengthM:stage2,lowerLengthM:stage1,stages:fleet.stages,sideBoosters:boosters.length},parts:{payload,liveMount,shell,facility,tower,stage,lower,upper,boosters:boosters.map(q=>q.br)}};
 }

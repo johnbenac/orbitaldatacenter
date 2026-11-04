@@ -1,0 +1,76 @@
+// Pure camera and instrument definitions. Renderers read the resolved hardware
+// and flight instant; switching disciplines does not change the numerical state.
+import {launchFleet} from './launch-fleet.js';
+const defs={
+ conops:{label:'Mission operations',camera:'spacecraft',parts:[]},
+ environment:{label:'Environmental coupling',camera:'spacecraft',parts:['solar','radiator','structure'],vectors:['sun','albedo','ir','ram']},
+ orbit:{label:'Orbit & eclipse',camera:'orbit',parts:[]},
+ compute:{label:'Compute & storage',camera:'core',parts:['compute','storage'],close:true},
+ data:{label:'Data & delivery',camera:'core',parts:['storage','avionics','communications'],close:true},
+ comm:{label:'Communications',camera:'core',parts:['communications'],close:true},
+ power:{label:'Battery & power',camera:'spacecraft',parts:['solar','battery']},
+ thermal:{label:'Thermal',camera:'core',parts:[],close:true},
+ attitude:{label:'Attitude control',camera:'core',parts:['cmg','torquer'],close:true},
+ prop:{label:'Propellant',camera:'core',parts:['propellant','propulsion'],close:true},
+ mass:{label:'Mass budget',camera:'spacecraft',parts:['solar','radiator','structure','compute','storage','avionics','battery','cmg','torquer','propellant','propulsion','communications']},
+ launch:{label:'Launch & insertion',camera:'launch',parts:['fairing','adapter','payload','solar','radiator','structure']},
+ launcher:{label:'Launch vehicle',camera:'launch',parts:['launcher','booster','fairing']}
+};
+export const domainSceneSpecs=defs;
+export function recommendedDomainCamera(phase,domain){
+ if(phase==='F')return 'orbit';
+ if(phase==='D')return domain==='orbit'?'orbit':'launch';
+ return defs[domain]?.camera||'spacecraft';
+}
+export const sceneColors={
+ compute:'#68a0c5',storage:'#edbd76',avionics:'#6cd5c2',communications:'#85baf5',solar:'#6aa6c8',
+ radiator:'#a9b8c4',structure:'#b6c6cc',battery:'#8dcfa3',cmg:'#d3ad70',torquer:'#89bfbc',
+ propellant:'#b9a77c',propulsion:'#e6a56e',launcher:'#c6cfd4',booster:'#ce956b',fairing:'#cdc3a4',adapter:'#72bbac',payload:'#9ab6c0'
+};
+const f=(n,d=1)=>Number.isFinite(n)?n.toLocaleString('en-US',{maximumFractionDigits:d}):'—';
+const met=(x,unit,d=1)=>Number.isFinite(x)?f(x,d)+' '+unit:'—';
+const bit=x=>!Number.isFinite(x)?'—':x>=1000?met(x/1000,'Gbit/s',2):x>0&&x<1?met(x*1000,'kbit/s',2):met(x,'Mbit/s',2);
+const bytes=x=>!Number.isFinite(x)?'—':x>=1000?met(x/1000,'TB',2):met(x,'GB',2);
+function item(anchor,part,title,value,side){return {anchor,part,title,value,side,color:sceneColors[part]||'#d2d4c4'};}
+export function routeRates(h,s){
+ const text=Math.max(0,(s.tokensPerSec||0)*h.input.bytesPerToken*8/1e6),bulk=Math.max(0,(s.offeredMbps||0)-text);
+ return {text,bulk,offered:s.offeredMbps||0,write:Math.min(Math.max(0,s.offeredMbps||0),Math.max(0,h.diskWriteGBs)*8000),down:Math.max(0,s.goodputMbps||0),up:Math.max(0,s.commandGoodputKbps||0)/1000};
+}
+export function domainInstruments(key,h,s,{view='spacecraft',reference=false}={}){
+ const rd=routeRates(h,s),stage=s.flightPhase||'operations',inLaunch=['integration','pad','ascent','insertion'].includes(stage);
+ const link=s.station?(s.acquired?(s.groundLink||'Link')+' · '+bit(s.goodputMbps):'Acquiring · '+s.station):'Waiting for contact';
+ const launchRef=reference?'Design reference':stage,fmtI=(x,u)=>met(x,u,0);
+ if(view==='orbit'){
+  if(key==='orbit'||key==='launch'||key==='launcher'||key==='environment'||key==='conops')return [
+   item('orbitCraft','communications',inLaunch?'Insertion altitude':'Spacecraft',met(s.altitudeKm,'km')+' · '+(s.eclipse?'shadow':'sunlit'),'right'),
+   item('orbitGround','solar','Orbit plane','β '+met(s.betaDeg,'°')+' · '+met(s.periodSec/60,'min'),'left')
+  ];
+  if(key==='data'||key==='comm')return [item('orbitCraft','communications','Spacecraft link',link,'right'),...(s.station?[item('station','avionics',s.station,bit(s.goodputMbps)+' delivered','left')]:[])];
+  return [];
+ }
+ if(view==='launch'&&key!=='launch'&&key!=='launcher'&&key!=='conops'&&reference)return [];
+ switch(key){
+ case 'data':return [
+  {...item('avionics','avionics','Flight data switch',bit(rd.offered)+' offered','left'),detail:'Text '+bit(rd.text)+' · bulk '+bit(rd.bulk)},
+  {...item('storage','storage','Payload recorder',bytes(s.queueGB)+' queued','left'),detail:'Text '+bytes(s.textQueueGB)+' · bulk '+bytes(s.bulkQueueGB)},
+  {...item('activeTerminal','communications',s.station?String(s.station):'Downlink terminal',link,'right'),detail:bytes(s.deliveredGB)+' delivered to ground'}
+ ];
+ case 'compute':return [item('compute','compute','Accelerator trays',fmtI(s.tokensPerSec,'tok/s')+' · '+met(s.itKW,'kW'),'left'),item('storage','storage','Persistent media',met(s.freeTB,'TB free',2),'right')];
+ case 'power':return [item('solar','solar',(s.pvDeployment??s.deployment)===0?'Stowed solar array':s.eclipse?'Array · eclipse':'Array generation',met(s.solarKW,'kW',2),'left'),item('battery','battery','Battery pack',met(s.socPct,'%')+' · '+(s.chargeKW>.001?met(s.chargeKW,'kW in'):s.dischargeKW>.001?met(s.dischargeKW,'kW out'):'standby'),'right')];
+ case 'thermal':return [item('compute','compute','Junction',met(s.junctionK,'K'),'left'),item('coolant','radiator','Coolant loop',met(s.coolantK,'K'),'right'),item(view==='core'?'battery':'radiator',view==='core'?'battery':'radiator',view==='core'?'Battery':'Radiator',met(view==='core'?s.batteryK:s.radiatorK,'K'),'right')];
+ case 'comm':return [item('dish','communications','Steerable Ka reflector',s.groundLink==='Ka'&&s.station?link:met(h.input.kaDishM,'m aperture',2),'left'),item('optic','communications','Optical terminal',s.groundLink==='Optical'&&s.station?link:met(h.input.opticalApertureM,'m aperture',2),'right'),item('patch','avionics','S-band command',met(s.commandGoodputKbps,'kbit/s up',2),'left')];
+ case 'attitude':return [item('cmg','cmg','CMG cluster',met(s.momentumNms,'N·m·s')+' · '+met(s.cmgKW,'kW',2),'left'),item('torquer','torquer','Magnetic torquer',s.desat?'Unloading · '+met(s.unloadTorqueNm,'N·m',4):'Standby · '+met(s.unloadAuthorityNm,'N·m available',4),'right')];
+ case 'prop':return [item('fuel','propellant','Fuel tank',met(s.fuelKg,'kg',1),'left'),item('oxidizer','propellant','Oxidizer tank',met(s.oxidizerKg,'kg',1),'right'),item('engine','propulsion','Chemical engines',s.burn?'Firing · '+met(h.input.thrustN,'N'):'Idle · '+met(s.remainingDv,'m/s available'),'right')];
+ case 'environment':if(s.t<540)return [item('body','structure','Payload exposure','Encapsulated · '+stage,'right'),item('solar','solar','Array deployment',met((s.pvDeployment??0)*100,'% deployed',0),'left')];return [item('solar','solar','Direct illumination',s.eclipse?'Eclipse · 0 W/m²':met(s.solarIrradiance??1361,'W/m²',0),'left'),item('radiator','radiator','Absorbed environmental heat',met(s.absorbedKW,'kW',2),'right'),item('body','structure','Ram-facing area',met(s.ramAreaM2,'m²',2),'left')];
+ case 'mass':{const m=id=>h.massLedger.find(r=>r.id===id)?.kg;return [item('solar','solar','Array allocation',fmtI(m('array'),'kg'),'left'),item('radiator','radiator','Radiator allocation',fmtI(m('radiator'),'kg'),'right'),item('body','structure','Flight inventory',fmtI(s.wetKg,'kg wet'),'right')];}
+ case 'launch':return view==='launch'?[item('interface','adapter','Separation adapter',fmtI(h.input.adapterKg,'kg')+' · '+launchRef,'left'),item('payload','payload','Payload envelope',met(h.fairing?.radialClearanceM,'m radial margin',2),'right')]:[item('body','payload','Insertion state',met(s.altitudeKm,'km')+' · '+met(s.trimPaidDv,'m/s trim',2),'left')];
+ case 'launcher':{const fleet=launchFleet[h.input.launcher];return view==='launch'?[
+  item('rocket','launcher',fleet?.name||h.launcherLabel||'Launch vehicle',fmtI(h.input.referenceKg,'kg LEO reference'),'left'),
+  item('shroud','fairing','Payload enclosure',met(h.input.fairingM,'m usable diameter',2),'right'),
+  item('thrustDeck','booster',fleet?.boosters?'Side boosters':'Launch architecture',(fleet?.stages||0)+' axial stage'+(fleet?.stages===1?'':'s')+' · '+(fleet?.boosters||0)+' side boosters','left')
+ ]:[item('body','payload','Launched stack',fmtI(h.launchKg,'kg'),'right')];}
+ case 'conops':return view==='launch'?[item('payload','payload','Mission configuration',reference?'Stowed reference':stage+' · '+met(100*(s.deployment||0),'% deployed',0),'right')]:[item('compute','compute','Compute service',fmtI(s.tokensPerSec,'tok/s'),'left'),item('activeTerminal','communications','Ground delivery',link,'right')];
+ case 'orbit':return [item('body','structure','Flight state',fmtI(s.altitudeKm,'km')+' · '+(s.eclipse?'eclipse':'sunlit'),'right')];
+ default:return [];
+ }
+}

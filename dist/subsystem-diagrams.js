@@ -1,4 +1,6 @@
 // Interactive engineering plates. Geometry is schematic except where dimensions are marked.
+import {launchFleet} from './launch-fleet.js';
+import {launcherSilhouette} from './launch-fleet-ui.js';
 import {presets} from './design.js';
 import {thermalNodes,qualifyNow} from './thermal-limits.js';
 import {thermalScales,temperatureColor} from './thermal-colors.js';
@@ -211,6 +213,25 @@ function launch({h,d,s},id){
  return info('Stowed launch envelope','Stack dimensions measured forward from the adapter plane',parts,art,[legend('cyan','Tapered keep-in'),legend('steel','Folded hardware'),legend('amber','Terminal cap')],f.fit?'Fits modeled profile':'Envelope exceeded');
 }
 
+function launcher({h,d,s}){
+ const vehicle=launchFleet[d.launcher],reference=vehicle.referenceKg,stack=h.launchKg;
+ const parts=[
+  P('carrier','Carrier propulsion',vehicle.architecture,'launcher','launcher',[row('Provider',vehicle.provider),row('Status',vehicle.status),row('Axial stages',String(vehicle.stages)),row('Strap-on boosters',String(vehicle.boosters)),row('Recovery',vehicle.recovery)]),
+  P('delivery','Payload delivery stage',vehicle.stages===1?'The direct-injection core releases its payload.':'The upper stage carries the payload adapter to injection. The illustrative mission clock places release at MET 540 s.','trimDv','adapter',[row('Service boundary',s.t<540?'Spacecraft attached':'Spacecraft released'),row('Initial spacecraft wet mass',val(h.wetKg,'kg',0)),row('Launch-only adapter',val(d.adapterKg,'kg',0)),row('Target altitude',val(d.altitudeKm,'km'))]),
+  P('benchmark','Provider payload reference',vehicle.description,'launcher','launcher',[row('LEO reference',val(reference,'kg',0)),row('Reference conditions',vehicle.referenceOrbit),row('Reference headroom',val(h.launchReferenceMarginKg,'kg',0))]),
+  P('allowance','Mission allowance','The current manifest must meet the entered allowance, the catalogue reference mass screen and the tapered fairing fit.','launchAllowanceKg','payload',[row('Entered allowance',val(d.launchAllowanceKg,'kg',0)),row('Integrated stack',val(stack,'kg',0)),row('Governing mass headroom',val(h.launchScreenMarginKg,'kg',0)),row('Fairing fit',h.fit?'Fits profile':'Exceeds profile')])
+ ];
+ const max=Math.max(reference,d.launchAllowanceKg,stack),x=278,w=244,bar=(p,y,label,kg,cl)=>pick(p,x,y-23,w,48,
+  T(x,y-7,label,'sd-over','start')+T(x+w,y-7,val(kg/1000,'t',2),'sd-name','end')+rect(x,y,w,8,'sd-unfilled',2)+rect(x,y,w*kg/max,8,cl,2));
+ const art='<g transform="translate(46,3) scale(1.50)">'+launcherSilhouette(d.launcher)+'</g>'+
+  pick(parts[0],50,113,197,91,path('M100 171h40l14 -8h92','sd-dim')+T(152,153,'CORE + BOOSTERS','sd-over','start')+T(152,177,vehicle.boosters+' strap-ons','sd-name','start'))+
+  pick(parts[1],60,31,181,77,path('M100 70h39l15 -9h92','sd-dim')+T(152,50,vehicle.stages===1?'CORE RELEASE':'UPPER STAGE','sd-over','start')+T(152,77,s.t<540?'Attached':'Released','sd-name','start'))+
+  T(x,27,'PAYLOAD MASS COMPARISON','sd-over','start')+bar(parts[2],65,'LEO REFERENCE',reference,'sd-bar-steel')+
+  bar(parts[3],119,'MISSION ALLOWANCE',d.launchAllowanceKg,'sd-bar-violet')+bar(parts[3],173,'LAUNCHED STACK',stack,h.launchScreenMarginKg<0?'sd-bar-red':'sd-bar-green')+
+  T(x,212,'GOVERNING MARGIN','sd-over','start')+T(x+w,214,val(h.launchScreenMarginKg,'kg',0),h.launchScreenMarginKg<0?'sd-bad':'sd-name','end');
+ return info('Carrier architecture and payload capacity',vehicle.name+' · '+vehicle.status,parts,art,[legend('steel','Provider LEO reference'),legend('violet','Entered allowance'),legend('green','Integrated payload')],h.launchScreenFeasible?'Passes nominal launch screens':'Launch screen exceeded');
+}
+
 function conops({h,d,s,day,events},id){
  const current=events.filter(e=>e.start<=s.t&&e.end>s.t).sort((a,b)=>(a.end-a.start)-(b.end-b.start))[0],next=events.find(e=>e.start>s.t);
  const parts=[
@@ -276,7 +297,7 @@ function data({h,d,s,day,events},id){
  return info('Payload custody','Separate text and bulk queues from completed ground deliveries',parts,art,[legend('cyan','Output text'),legend('violet','Bulk payload')],s.goodputMbps>0?'Delivering':'Buffering');
 }
 
-const builders={conops,environment,orbit,compute,data,comm,power,thermal,attitude,prop,mass,launch};
+const builders={conops,environment,orbit,compute,data,comm,power,thermal,attitude,prop,mass,launch,launcher};
 export const schematicPages=Object.keys(builders);
 const indexes=Object.fromEntries(schematicPages.map((k,i)=>[k,String(i+1).padStart(2,'0')]));
 const norm=({hardware:h,state:s,day={},events=[],selected,instance,qualificationWindow,thermalScale})=>({h,d:h.input,s,day,events,selected,instance,qualificationWindow,thermalScale});

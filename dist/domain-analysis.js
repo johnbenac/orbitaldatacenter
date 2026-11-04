@@ -1,5 +1,6 @@
 // All quantities originate in the installed design, sizing envelope or time-resolved model.
 import {sizingEnvelope,ageProperties} from './design.js';
+import {launchFleet} from './launch-fleet.js';
 import {groundSites} from './orbit.js';
 
 const esc=v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
@@ -117,7 +118,16 @@ export const domains={
   ['Integration and injection','Follow the payload from stowed fit through separation and insertion trim.','phase stackLength radialClearance launchMass altitudeKm trimPaidDv'],
   ['Achieved operating orbit','Use the delivered state to compare the specified operating orbit and the post-injection mass.','targetAlt perigeeKm apogeeKm trimPaidDv wetKg launchMargin'],
   ['Mission delivery and terminal orbit','Compare original insertion parameters with the selected retirement trajectory.','targetAlt reqTrim trimPaidDv disposalMode finalPerigee finalApogee']
- ],'integration pad launch insertion trim deployment disposal coast entry impact graveyard')
+ ],'integration pad launch insertion trim deployment disposal coast entry impact graveyard'),
+ launcher:spec('Launch vehicle','rocket','Compare carrier architectures, provider-rated payloads, and the spacecraft mass each option can accept.',
+  'launcher launchAllowanceKg fairingM fairingLengthM radialPaddingM axialPaddingM adapterKg altitudeKm inclinationDeg','launcher launchAllowanceKg fairingM fairingLengthM','lvBenchmarkMargin lvScreenMargin',[
+  ['Choose the launch service','Select a flight-proven carrier or a development concept and compare its LEO reference with the mission allowance.','launcherName lvStatus referenceMass lvReferenceOrbit allowance'],
+  ['Carrier configuration','Inspect the core, strap-on propulsion and upper-stage arrangement that deliver the spacecraft.','launcherName lvStages lvBoosters lvRecovery lvArchitecture fitBasis'],
+  ['Launcher trade and manifest','Evaluate the same folded spacecraft against both mass screens and the selected fairing profile.','referenceMass allowance launchMass lvBenchmarkMargin launchMargin lvScreenMargin radialClearance axialClearance'],
+  ['Ascent and payload release','The launch vehicle carries the adapter and spacecraft through ascent. The spacecraft performs its own trim after separation.','phase launcherName lvHandoff launchMass adapterMass altitudeKm'],
+  ['Delivered spacecraft record','The original launch manifest stays fixed while the spacecraft consumes propellant in orbit.','launcherName launchMass initialWet adapterMass wetKg lvCarrierService'],
+  ['Carrier delivery closeout','Reconcile the original selected launch service with the spacecraft mass delivered at release and its recorded retirement outcome.','launcherName referenceMass launchMass initialWet adapterMass lvScreenMargin closureReason']
+ ],'integration pad launch insertion deployment disposal coast entry impact graveyard')
 };
 
 const registry={};
@@ -142,6 +152,17 @@ fields('e',[
  ['meanBus','Planning mean bus demand','kW'],['annualProp','Station-keeping propellant','kg/yr','propAnnual'],['annualImpulse','Annual drag impulse','N·s/yr','yearlyImpulse'],['supplyYears','Station-keeping coverage','yr'],['meanTraffic','Planning payload production','Mbit/s','traffic'],['requiredGoodput','Required goodput during access','Mbit/s','goodputNeeded'],['accessGoodput','Planned in-contact capacity','Mbit/s','linkGoodput'],['solarRequired','End-of-service array requirement','m²','solarNeeded'],['batteryNeeded','End-of-service pack requirement','kWh'],['radRequired','End-of-service radiator requirement','m²','radiatorNeeded'],['transportRise','Design junction transport rise','K','transportRiseK'],['designJunction','Design-state junction estimate','K','thermalK'],['propRequired','Propellant for allocated years','kg','propForCoverage'],['trimBudget','Ideal insertion trim consumption','kg','trimKg'],['disposalBudget','Protected disposal Δv','m/s','disposalBudgetDv'],['planLimit','Binding design constraint','','binding']
 ],'Planning envelope at requested mission age');
 function calc(id,label,unit,read,note='Calculated from model channels'){registry[id]={label,unit,note,read}}
+const lv=c=>launchFleet[c.d.launcher];
+calc('lvStatus','Programme status','',c=>lv(c).status,'Provider and agency references in the vehicle catalogue');
+calc('lvReferenceOrbit','Capacity reference conditions','',c=>lv(c).referenceOrbit,'Cited LEO reference');
+calc('lvStages','Axial propulsion stages','stages',c=>lv(c).stages);
+calc('lvBoosters','Strap-on boosters','boosters',c=>lv(c).boosters);
+calc('lvArchitecture','Carrier arrangement','',c=>lv(c).architecture);
+calc('lvRecovery','Recovery configuration','',c=>lv(c).recovery);
+calc('lvBenchmarkMargin','LEO reference minus launch stack','kg',c=>c.h.launchReferenceMarginKg,'Nominal provider-reference screen; mission orbit can differ');
+calc('lvScreenMargin','Governing launch mass headroom','kg',c=>c.h.launchScreenMarginKg,'Smaller of mission allowance and LEO reference, less launched mass');
+calc('lvHandoff','Launch service state','',c=>c.s.t<0?'Integrated on the ground':c.s.t<540?'Payload rides the carrier':'Payload released','Modeled release at MET 540 s; illustrative ascent clock');
+calc('lvCarrierService','Post-release carrier contribution','',()=>'Spacecraft propulsion and power after release','Carrier service ends at the modeled injection boundary');
 const pc=(id,label,key)=>calc(id,label,'%',c=>100*c.d[key],'Design input');
 pc('duty','Scheduled compute duty','duty');pc('reservePct','Spare SSD capacity','diskReserve');pc('codingPct','Application efficiency','codingEff');pc('dryMarginPct','Dry engineering margin','structureMargin');pc('floorPct','SOC operating floor','socMin');pc('targetPct','Design minimum SOC','targetSOC');
 const ratio=(a,b)=>b>0?100*a/b:null;
@@ -202,7 +223,7 @@ function context(ctx,needEnvelope=false){
  return {...ctx,h,d,s,day,e:e??{},audit:ctx.audit??ctx.sim?.audit??null};
 }
 const numberValue=x=>typeof x==='number'&&!Number.isFinite(x)?null:x??null;
-const nonSpacecraftFields=new Set(['phase','disposalStatus','altitudeKm','perigeeKm','apogeeKm','densityKgM3','dragN','t','disposalMode','closureReason','modelBoundary','endpointMET','finalPerigee','finalApogee','relSpeed','entryDynamicPressurePa','entryReferenceDragMS2','reqTrim','requiredOrbit','targetAlt','disposalPaidDv','disposalUsedKg','disposalRequiredDv','disposalProtectedKg','propellantUsedKg','tokensGenerated','tokensDelivered','generatedGB','deliveredGB','droppedGB','textDeliveredGB','bulkDeliveredGB','uploadedGB','burnImpulseNs']);
+const nonSpacecraftFields=new Set(['lvStatus','lvReferenceOrbit','lvStages','lvBoosters','lvRecovery','lvArchitecture','lvBenchmarkMargin','lvScreenMargin','lvHandoff','lvCarrierService','phase','disposalStatus','altitudeKm','perigeeKm','apogeeKm','densityKgM3','dragN','t','disposalMode','closureReason','modelBoundary','endpointMET','finalPerigee','finalApogee','relSpeed','entryDynamicPressurePa','entryReferenceDragMS2','reqTrim','requiredOrbit','targetAlt','disposalPaidDv','disposalUsedKg','disposalRequiredDv','disposalProtectedKg','propellantUsedKg','tokensGenerated','tokensDelivered','generatedGB','deliveredGB','droppedGB','textDeliveredGB','bulkDeliveredGB','uploadedGB','burnImpulseNs']);
 function readMetric(code,c){
  const metric=registry[code];if(!metric)throw new Error('Missing domain quantity '+code);
  const beyond=c.s.spacecraftModelEndedAt!=null&&c.s.t>c.s.spacecraftModelEndedAt+1e-6;
@@ -263,6 +284,7 @@ function linkedFlows(id,c){
  attitude:[F('Relative flow','Bus','Ram torque',s.dragTorqueNm,'N·m'),F('Moving reflector','CMGs','Slew torque',s.slewTorqueNm,'N·m'),F('Torquer coils','Magnetic field','Unloading torque',s.unloadTorqueNm,'N·m')],
  prop:[F('Fuel / oxidizer','Engines','Mass consumed since launch',s.propellantUsedKg,'kg'),F('Engines','Spacecraft','Cumulative impulse',s.burnImpulseNs,'N·s'),F('Disposal allocation','Terminal maneuver','Mass consumed in retirement',s.disposalUsedKg,'kg')],
  mass:[F('Dry allocations','Flight vehicle','Dry mass',h.dryKg,'kg'),F('Propulsion stores','Flight vehicle','Current consumables',s.propellantKg+h.pressurantKg,'kg'),F('Launch adapter','Stack at integration','Launch-only mass',d.adapterKg,'kg')],
+ launcher:[F('Provider reference','Stack comparison','LEO reference headroom',h.launchReferenceMarginKg,'kg'),F('Mission allowance','Integrated stack','Mass headroom',h.massMarginKg,'kg'),F('Launch manifest','Released vehicle','Initial spacecraft wet mass',h.wetKg,'kg')],
  launch:[F('Flight vehicle','Payload interface','Initial wet mass',h.wetKg,'kg'),F('Launcher allowance','Manifest','Mass allowance less stack',h.massMarginKg,'kg'),F('Spacecraft engines','Injection orbit','Delivered trim',s.trimPaidDv,'m/s')]
  };
  return (s.referenceBody||s.spacecraftModelEndedAt!=null&&s.t>s.spacecraftModelEndedAt)?[]:(all[id]??[]);
@@ -292,6 +314,7 @@ function auditRows(id,a){
  attitude:[['Magnetic unload episodes',a.desatCount,'events'],['CMG energy',E.cmg,'kWh'],['Magnetorquer energy',E.coils,'kWh']],
  prop:[['Propellant expended',end.propellantUsedKg,'kg'],['Terminal liquid inventory',end.propellantKg,'kg'],['Chemical burns',a.burnCount,'events']],
  mass:[['Terminal wet mass',end.wetKg,'kg'],['Terminal liquid inventory',end.propellantKg,'kg']],
+ launcher:[['Audited spacecraft propellant expended',end.propellantUsedKg,'kg']],
  launch:[['Integrated insertion trim',end.trimPaidDv,'m/s'],['Entered thermal interval',a.thermal?.coveredSeconds,'s']]
  };
  return map[id].filter(([,v])=>Number.isFinite(v)).map(([label,value,unit],i)=>({key:'audit-'+id+'-'+i,label,value,unit,note:'Full chronological mission'}));
@@ -337,6 +360,7 @@ const missionTrend={
  attitude:['Minimum momentum headroom','N·m·s','min',r=>r.minMomentumMarginNms],
  prop:['Remaining propellant','kg','stock',r=>r.propellantUsedKg],
  mass:['Remaining spacecraft wet mass','kg','stock',r=>r.propellantUsedKg],
+ launcher:['Carried spacecraft mass after release','kg','stock',r=>r.propellantUsedKg],
  launch:['Cumulative propulsion expenditure','kg','sum',r=>r.propellantUsedKg]
 };
 function missionSeries(c,id,width){
@@ -348,7 +372,7 @@ function missionSeries(c,id,width){
   const values=rows.slice(start,finish).map(get).filter(Number.isFinite);if(!values.length)continue;
   const sum=values.reduce((a,b)=>a+b,0);cumulative+=sum;
   let v;if(rule==='min')v=Math.min(...values);else if(rule==='max')v=Math.max(...values);
-  else if(rule==='stock')v=(id==='mass'?c.h.wetKg:c.h.propellantKg)-cumulative;
+  else if(rule==='stock')v=((id==='mass'||id==='launcher')?c.h.wetKg:c.h.propellantKg)-cumulative;
   else if(rule==='sum')v=cumulative;else v=sum/span*(rule==='power'?3600:rule==='percent'?100:1);
   points.push({t:to,v});
  }

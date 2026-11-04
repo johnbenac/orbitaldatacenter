@@ -372,13 +372,13 @@ const choices={
 };
 const specials={
  solve:['Sizing method','Choose the independent mission constraint first. The solver derives the dependent quantity within the workbench limits and reports the achieved margin.','seh trade smad'],
- missionPreset:['Mission starting point','Choose a starting design close to your service objective. Then replace its workload, network and hardware assumptions with the mission’s own estimates.','seh smad'],
- newPreset:['New mission','Start a named design from an explicit requirement set. Record its service target, epoch, configuration and assumptions so a later trade can be reproduced.','seh trade'],
- presetName:['Mission preset name','Use a short, distinctive configuration name that identifies the workload and maturity of the hardware baseline.','trade'],
- presetDescription:['Mission preset description','Record the design intent, distinguishing feature and assumptions that make this baseline useful for comparison.','trade'],
- savePreset:['Save a mission preset','Store the current design, solver choice and thermal requirement settings as a reusable baseline. Give experimental variants distinct names.','seh trade'],
- loadPreset:['Load a mission preset','Load a workbench preset JSON and inspect the solver, units, technology selections and mission scope before comparing results.','seh trade'],
- managePresets:['Manage the preset shelf','Keep reproducible reference points and independent variants. Export the JSON for a durable copy of the chosen design.','trade'],
+ missionPreset:['Mission designs','Choose the Earth customer service to start from its spacecraft and workload. Save a named design to revisit your own configuration.','seh smad'],
+ newPreset:['Choose a customer mission','Preview the service and starting spacecraft. Review the changes, then apply the mission and customize its design.','seh trade'],
+ presetName:['Saved design name','Use a short, distinctive configuration name that identifies the workload and maturity of the hardware baseline.','trade'],
+ presetDescription:['Saved design description','Record the design intent, distinguishing feature and assumptions that make this baseline useful for comparison.','trade'],
+ savePreset:['Save a named design','Store the current design, solver choice and thermal requirement settings as a reusable baseline. Give experimental variants distinct names.','seh trade'],
+ loadPreset:['Import a saved design','Load a workbench design file and inspect the solver, units, technology selections and mission scope before comparing results.','seh trade'],
+ managePresets:['Saved designs','Open a named copy, download it as JSON or unload it from this browser. Import a downloaded copy to use it again.','trade'],
  thermalRole:['Temperature rating or derived requirement','Use a supplier/project rating to evaluate hardware. Derive a required limit from the coldest or hottest covered state plus the chosen padding when specifying new hardware.','gevst thermalrules'],
  thermalScope:['Temperature coverage','Choose a selected 24-hour operating window for a local transient or an integrated whole mission for a design requirement. Confirm coverage of each activity state.','gevst thermalrules'],
  thermalPadding:['Requirement padding','Specify project uncertainty headroom in kelvin. Subtract it from the observed cold extreme or add it to the hot extreme for a derived requirement.','gevst thermalrules'],
@@ -400,13 +400,10 @@ for(const [key,title,advice,ids,example] of [
 ])catalog[key]={title,advice,ids:ids.split(' '),basis:'Current installed-design result or explicit workload estimator. Published references describe the component or performance boundary.',example};
 catalog.epoch.title='Epoch (UTC)';catalog.kvKB.title='KV cache per token (decimal kB)';catalog.diskModuleKg.title='Installed storage module mass';catalog.referenceKg.title='Provider reference payload';
 options('solve',Object.entries(choices).map(([id,advice])=>[id,advice,'seh trade smad','Workbench inverse-sizing method.']));
+
 options('missionPreset',[
- ['pathfinder','A compact four-tray demonstrator makes mass, power and storage changes easy to isolate.','seh perf',assume],
- ['reference','The balanced reference node is the starting spacecraft for comparing powered compute, Ka passes and eclipse recharge.','seh rf power',assume],
- ['optical','The relay begins with a large bulk backlog. Inspect optical acquisition, available downlink time and queue depletion.','tbird ground',assume],
- ['carrier','The larger carrier exercises thermal rejection, deployed geometry and fairing fit in a larger launch envelope.','thermal clear',assume],
- ['scale','The 981-chassis terrestrial comparison produces roughly 10 MW of IT load. Use this explicit launch-limit case to examine packaging and resource scaling.','dgx margin','Terrestrial chassis multiplied by a workbench study count.'],
- ['custom','Use a mission-specific input baseline. Record the source, conditions and maturity of each hardware estimate and inherited setting.','seh trade',missionBasis]
+ ['starter','Start with the spacecraft, workload and operating assumptions defined for the chosen Earth service.','seh trade',assume],
+ ['custom','Reopen an exact named design to reuse its saved hardware, workload and thermal requirements.','seh trade',missionBasis]
 ]);
 options('thermalRole',[
  ['input','Specify the allowable rating for this hardware and state. The current temperature and all modeled excursions are assessed against this rating.','gevst thermalrules',missionBasis],

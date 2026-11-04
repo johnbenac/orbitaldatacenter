@@ -18,7 +18,7 @@ await imp('app.js');
 const el=id=>document.getElementById(id), fire=async(data)=>{const e=new Element();e.dataset=data;await listeners.get('click')({target:e})},change=async(id,value,data={})=>{const q=new Element(id);Object.assign(q,{value,valueAsNumber:Number(value),dataset:data,tagName:'SELECT'});return listeners.get('change')({target:q})};
 const {decodeScenario}=await imp('exports.js');
 const snapshot=async()=>{await fire({action:'share'});const encoded=el('dialogbody').innerHTML.match(/#design=([A-Za-z0-9_-]+)/)[1];await fire({action:'close'});return decodeScenario(encoded)};
-const accept=async()=>{assert.equal(el('dialogtitle').textContent,'Review design change');assert.match(el('dialogbody').innerHTML,/Apply design change/);await fire({action:'applyimpact'})};
+const accept=async()=>{assert.equal(el('dialogtitle').textContent,'Review design change');assert.match(el('dialogbody').innerHTML,/data-action="applyimpact"/);await fire({action:'applyimpact'})};
 const {domainIds}=await imp('matrix-ui.js');
 await fire({domain:'power'});await change('',182,{param:'packWhKg'});const old=(await snapshot()).design;
 await change('','lfp',{param:'battery'});assert.match(el('dialogbody').innerHTML,/Edited preset values will be replaced/);assert.match(el('dialogbody').innerHTML,/Battery pack volume/);assert.match(el('dialogbody').innerHTML,/Retained assumptions to verify/);assert.match(el('dialogbody').innerHTML,/Same 24-hour window/);
@@ -38,7 +38,8 @@ await fire({phase:'C'});await fire({domain:'thermal'});await fire({domain:'data'
 await fire({phase:'D'});await fire({domain:'launcher'});const before=(await snapshot()).design;await fire({useLauncher:'terran'});assert.deepEqual((await snapshot()).design,before);
 console.log('All Phase B Design and Analysis sections, cited field help, coupled impact preview/cancel/apply, custom overrides, solver and allowance retention, flight locks and thermal layer isolation passed.');
 
-await fire({phase:'A'});await fire({domain:'conops'});assert.equal((el('purpose-brief').innerHTML.match(/class="purpose-shortcut /g)||[]).length,6);
+await fire({phase:'A'});await fire({domain:'conops'});assert(el('purpose-brief').hidden);assert(!el('purpose-host').hidden);assert.equal((el('purpose-host').innerHTML.match(/data-preview-purpose=/g)||[]).length,6);assert.doesNotMatch(el('presetshelf').innerHTML,/designstrip|data-design=/);
+await fire({previewPurpose:'finetune'});assert.equal((await snapshot()).view.domain,'conops');assert.equal((await snapshot()).design.aiPurpose,'text');
 const original=await snapshot();await fire({openPurpose:'agents'});assert.equal((await snapshot()).view.domain,'purpose');assert.equal((await snapshot()).design.aiPurpose,'text');
 await fire({usePurpose:'agents'});assert.match(el('dialogbody').innerHTML,/Earth customer|Agentic research/i);await fire({action:'cancelimpact'});assert.deepEqual((await snapshot()).design,original.design);
 await fire({usePurpose:'agents'});await accept();const agentMission=(await snapshot()).design;
@@ -51,3 +52,16 @@ await fire({openPurpose:'pretrain'});await fire({provisionPurpose:'pretrain'});a
 await fire({action:'ai-transfer'});await fire({artifactCase:'trillion'});assert.match(el('dialogbody').innerHTML,/2 TB/);assert.match(el('dialogbody').innerHTML,/26 min 40 s/);await fire({action:'close'});
 await fire({phase:'D'});await fire({usePurpose:'text'});assert.deepEqual((await snapshot()).design,trainingMission);assert.doesNotMatch(el('purpose-host').innerHTML,/data-provision-purpose/);
 console.log('Earth-purpose navigation, preview, cancel, fixed-install comparison, physical provisioning, CONOPS fields, trillion-parameter transfer and flight-phase locks passed.');
+
+await fire({phase:'A'});await fire({domain:'conops'});const beforeBrowsing=(await snapshot()).design;
+await fire({action:'newpreset'});assert.deepEqual((await snapshot()).design,beforeBrowsing,'Browsing starter choices is non-destructive');
+await fire({previewPurpose:'finetune'});await fire({provisionPurpose:'finetune'});await accept();
+const first=await snapshot();assert.equal(first.view.preset,'starter');assert.equal(first.view.aiPurpose,'finetune');assert.equal(first.view.modified,false);assert.equal(first.design.missionYears,beforeBrowsing.missionYears);
+await change('',first.design.trayCount+1,{param:'trayCount'});if(el('dialog').open)await accept();await fire({action:'resetpreset'});await accept();
+assert.deepEqual((await snapshot()).design,first.design,'Restoring the starter reproduces the selected hardware and mission context');
+await fire({action:'savepreset'});el('preset-name').value='My tuned spacecraft';el('preset-description').value='Reusable adapter study';await fire({action:'commitpreset'});
+const saved=(await snapshot()).view.preset;assert.match(saved,/^user-/);
+await fire({provisionPurpose:'agents'});await accept();assert.equal((await snapshot()).view.preset,'starter');
+await fire({action:'managepresets'});assert.match(el('dialogbody').innerHTML,/My tuned spacecraft/);assert(el('dialogbody').innerHTML.includes('data-design="'+saved+'"'));await fire({design:saved});await fire({action:'cancelimpact'});assert.equal(el('dialogtitle').textContent,'Saved designs');await fire({design:saved});await accept();
+const reopened=await snapshot();assert.equal(reopened.view.presetName,'My tuned spacecraft');assert.deepEqual(reopened.design,first.design);
+console.log('Single combined mission selector, reusable starter, exact named-design restore and cancel passed.');

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {aiPurposes} from './dist/ai-purpose.js';
-import {defaults,sizeDesign,normalizeDesign,applyAIPurpose,sizingEnvelope,inverseSolve,YEAR} from './dist/design.js';
+import {defaults,sizeDesign,normalizeDesign,applyPreset,applyAIPurpose,missionStarter,missionStarterContextKeys,sizingEnvelope,inverseSolve,YEAR} from './dist/design.js';
 import {createSimulation} from './dist/model.js';
 import {chronologicalAudit} from './dist/mission-worker.js';
 const D=86400,near=(a,b,tol=1e-6)=>assert.ok(Number.isFinite(a)&&Number.isFinite(b)&&Math.abs(a-b)<=tol*Math.max(1,Math.abs(b)),`${a} vs ${b}`);
@@ -11,6 +11,44 @@ for(const id of Object.keys(aiPurposes)){
  const d=applyAIPurpose(defaults,id,true),built=sizeDesign(d);assert.equal(built.input.aiPurpose,id);assert.deepEqual(built.errors,[]);
  assert.ok(built.ai.activeUnitsPerSec>=0);if(id==='batch'||id==='agents')assert.ok(built.launchScreenFeasible,id);
 }
+// Switching among any two starters must produce the same destination as a
+// fresh start with the same mission constraints, including nested technology.
+const purposeIds=Object.keys(aiPurposes);
+const retired10MW={
+ ...applyPreset(applyPreset(defaults,'launcher','starship'),'compute','dgx'),
+ trayCount:981,solarM2:86000,radiatorM2:31000,batteryKWh:15000,storageTB:512,propellantKg:45000,launchAllowanceKg:85000
+};
+const customContext={
+ epoch:'2032-05-12T03:30:00Z',altitudeKm:685,ecc:.002,inclinationDeg:63,raanDeg:87,argPeriDeg:14,meanAnomalyDeg:175,
+ solarDriver:'observed',solarCyclePhase:.6,f107Floor:80,f107Ceiling:205,ap:22,missionYears:3.5,yearsSupply:4,
+ disposalMethod:'graveyard',graveyardAltitudeKm:1150,disposalTargetPerigeeKm:95,targetLatDeg:15,targetLonDeg:147,
+ targetToleranceKm:55,targetSearchHours:42,entryBallisticKgM2:210,entryDensitySigmaPct:20,entryBallisticSigmaPct:9,
+ entryVelocitySigmaMs:7,entryAzimuthSigmaDeg:.11
+};
+assert.deepEqual(Object.keys(customContext).sort(),[...missionStarterContextKeys].sort());
+const tuned=Object.freeze({...applyPreset(applyPreset(retired10MW,'battery','lfp'),'workload','llama70'),paramsB:820,chipBW:801,packWhKg:71,
+ fairingM:11.7,fairingLengthM:27,trainingCalibration:'measured',validationObserved:1,earthPUE:2.5,
+ serviceRoute:'hybrid',serviceDeadlineS:88888,thermalMode:'applied',appliedHeatKw:3000,coreCoupling:19,...customContext});
+assert.ok(retired10MW.trayCount*retired10MW.trayKw>10000);
+for(const id of purposeIds){
+ const fresh=missionStarter(id);assert.deepEqual(fresh,normalizeDesign(fresh));assert.deepEqual(sizeDesign(fresh).errors,[]);
+ assert.deepEqual(Object.keys(fresh).sort(),Object.keys(defaults).sort());assert.ok(!Object.hasOwn(fresh,'coreCoupling'));
+ const expected={...fresh,...customContext};
+ for(const prior of [...purposeIds.map(k=>missionStarter(k)),retired10MW,tuned]){
+  const previous=Object.freeze({...prior,...customContext});
+  assert.deepEqual(missionStarter(id,previous),expected);
+  assert.deepEqual(applyAIPurpose(previous,id,true),expected);
+  assert.deepEqual(applyAIPurpose(previous,id,false),{...previous,aiPurpose:id});
+ }
+ const edited=missionStarter(id);edited.trayCount=1999;edited.validationObserved=1;
+ assert.deepEqual(missionStarter(id),fresh);assert.deepEqual(missionStarter(id,fresh),fresh);
+}
+assert.throws(()=>missionStarter('unknown'));assert.throws(()=>missionStarter('__proto__'));
+assert.equal(missionStarter('text').serviceOffersPerHour,3600);assert.equal(normalizeDesign({}).serviceOffersPerHour,120);
+assert.equal(missionStarter('voice',tuned).serviceRoute,'relay');
+assert.equal(missionStarter('agents',tuned).launcher,'glenn9');
+assert.equal(missionStarter('finetune',tuned).validationObserved,0);
+assert.equal(missionStarter('pretrain',tuned).artifactKind,'restart');
 const trillion=sizeDesign({...defaults,aiPurpose:'pretrain',pretrainParamsB:1000,trainingTokensB:1000,artifactBits:16,trainableFraction:.001});
 assert.equal(trillion.ai.residentWeights,2000);assert.equal(trillion.ai.totalWeightGB,2000);assert.equal(trillion.ai.adapterGB,2);assert.equal(trillion.ai.restartGB,14000);assert.equal(trillion.ai.uniqueCorpusGB,4000);
 assert.equal(sizeDesign({...trillion.input,artifactBits:4}).ai.totalWeightGB,500);

@@ -90,11 +90,30 @@ export const defaults=Object.fromEntries(controls.map(c=>[c.key,c.value]));
 for(const [key,entries] of Object.entries(presets)){const {label,...values}=entries[defaults[key]];Object.assign(defaults,values)}
 Object.assign(defaults,{epoch:'2026-11-04T00:00:00Z'});
 export function applyPreset(input,key,id){const preset=presets[key]?.[id];if(!preset)throw Error('Unknown '+key+' preset');const {label,...data}=preset;return {...input,...data,[key]:id}}
+// A starter specifies the whole spacecraft and service. Only the orbit, its
+// environment, the requested duration and the disposal mission carry forward.
+export const missionStarterContextKeys=Object.freeze([
+ 'epoch','altitudeKm','ecc','inclinationDeg','raanDeg','argPeriDeg','meanAnomalyDeg',
+ 'solarDriver','solarCyclePhase','f107Floor','f107Ceiling','ap','missionYears','yearsSupply',
+ 'disposalMethod','graveyardAltitudeKm','disposalTargetPerigeeKm','targetLatDeg','targetLonDeg',
+ 'targetToleranceKm','targetSearchHours','entryBallisticKgM2','entryDensitySigmaPct',
+ 'entryBallisticSigmaPct','entryVelocitySigmaMs','entryAzimuthSigmaDeg'
+]);
+// Expand the sparse recipe directly. Passing a previous full design here
+// would overwrite the selected technology's density, power or fairing data.
+const starterDesigns=Object.freeze(Object.fromEntries(Object.entries(aiPurposes).map(([id,p])=>
+ [id,Object.freeze(normalizeDesign({...p.suggestedBuild,aiPurpose:id}))]
+)));
+export function missionStarter(id,mission={}){
+ if(!Object.hasOwn(starterDesigns,id))throw Error('Unknown AI purpose');
+ const design={...starterDesigns[id]};
+ for(const key of missionStarterContextKeys)if(Object.hasOwn(mission,key))design[key]=mission[key];
+ return design;
+}
 export function applyAIPurpose(input,id,withBuild=false){
- const p=aiPurposes[id];if(!p)throw Error('Unknown AI purpose');
- let out={...input,aiPurpose:id};if(!withBuild)return out;
- for(const [k,val] of Object.entries(p.suggestedBuild))if(presets[k])out=applyPreset(out,k,val);
- return {...out,...p.suggestedBuild,aiPurpose:id};
+ if(withBuild)return missionStarter(id,input);
+ if(!Object.hasOwn(aiPurposes,id))throw Error('Unknown AI purpose');
+ return {...input,aiPurpose:id};
 }
 export function normalizeDesign(input={}){let out={...defaults};for(const key of Object.keys(presets)){if(input[key]&&presets[key][input[key]])out=applyPreset(out,key,input[key])}for(const [key,value] of Object.entries(input)){if(key in defaults && (typeof defaults[key]==='number'?Number.isFinite(value):typeof value==='string'))out[key]=value}if(launchFleet[out.launcher])out.referenceKg=launchFleet[out.launcher].referenceKg;return out}
 export function validateDesign(d){const errors=validateThermalLimits(d);for(const c of controls){if(c.options){if(!(d[c.key] in c.options))errors.push(c.label+' is unknown')}else if(!Number.isFinite(d[c.key])||d[c.key]<c.min||d[c.key]>c.max)errors.push(`${c.label} requires ${c.min}–${c.max} ${c.unit}`)}if((6378.137+d.altitudeKm)*(1-d.ecc)<=6378.137)errors.push('Perigee intersects Earth');if(d.socMax<=d.socMin)errors.push('SOC ceiling must exceed the floor');if(d.socInitial<d.socMin||d.socInitial>d.socMax)errors.push('Launch SOC must be between the operating limits');if(d.f107Floor>d.f107Ceiling)errors.push('Minimum solar flux must be at or below the maximum');if(d.trayIdleKw>d.trayKw)errors.push('Idle tray draw exceeds active draw');if(d.promptTokens>d.context)errors.push('Prompt exceeds configured context');if(!Number.isFinite(Date.parse(d.epoch)))errors.push('Epoch must be a valid UTC date');return errors}

@@ -1,4 +1,4 @@
-import {defaults,controls,presets,applyPreset,applyAIPurpose,sizeDesign,inverseSolve,solveModes,enumeratePresets,estimateLife,checks,sources,assumptions,validateDesign,ageProperties,YEAR} from './design.js';
+import {defaults,controls,presets,applyPreset,applyAIPurpose,missionStarter,missionStarterContextKeys,sizeDesign,inverseSolve,solveModes,enumeratePresets,estimateLife,checks,sources,assumptions,validateDesign,ageProperties,YEAR} from './design.js';
 import {createSimulation,modelNotes} from './model.js';
 import {impactOfChange,displaySetting} from './design-impact.js';
 import {helpButton,helpForElement,shortHint,helpBody,sourceGuideIndex} from './input-help-ui.js';
@@ -35,21 +35,23 @@ const plus=(n)=>n>=0?'+'+fmt(n):fmt(n);
 const clocks=t=>{const sec=Math.floor(Math.max(0,t)%DAY);return [Math.floor(sec/3600),Math.floor(sec/60)%60,sec%60].map(x=>String(x).padStart(2,'0')).join(':')};
 const time=t=>t<0?'T−'+clocks(-t):'D'+String(Math.floor(t/DAY)+1).padStart(3,'0')+' '+clocks(t);
 const cv={launch:['Launch configuration','rocket','04'],spacecraft:['Spacecraft','satellite','02'],orbit:['Earth Orbit','globe','01'],core:['Compute Core','cpu','03']};
-const defaultView={phase:'A',domain:'conops',purposePreview:null,studyDays:0,tradeKey:null,tradeBase:null,presetName:null,detail:false,thermalNode:'junction',thermalScope:'window',thermalPadding:0,thermalScale:'working',thermalAuto:true,thermalTargets:{},cameraStates:null,camera:'spacecraft',t:7800,preset:'reference',modified:false,chapter:'integration',instruments:false,start:0,scope:'day',mode:'size',solve:'installed',speed:30,event:null,overlays:[],inspect:null};
-let view={...defaultView},input={...defaults},hardware,sim,result,snap,samples=[],daySamples=[],events=[],day={},life,plotStart=0,plotEnd=DAY,scene=null,playing=false,lastTick=0,toastId,rebuildId,daysig='',eventFilter='all',modal=null,pickedRow='',initialShared=false;
+const defaultView={phase:'A',domain:'conops',purposePreview:null,studyDays:0,tradeKey:null,tradeBase:null,presetName:null,detail:false,thermalNode:'junction',thermalScope:'window',thermalPadding:0,thermalScale:'working',thermalAuto:true,thermalTargets:{},cameraStates:null,camera:'spacecraft',t:7800,preset:'starter',starterPurpose:'text',starterContext:null,modified:false,chapter:'integration',instruments:false,start:0,scope:'day',mode:'size',solve:'installed',speed:30,event:null,overlays:[],inspect:null};
+let view={...defaultView},input=missionStarter('text'),hardware,sim,result,snap,samples=[],daySamples=[],events=[],day={},life,plotStart=0,plotEnd=DAY,scene=null,playing=false,lastTick=0,toastId,rebuildId,daysig='',eventFilter='all',modal=null,pickedRow='',initialShared=false;
 let orderJob=null,packetOrderAbort=null,lastOrder=null;const serviceCache=new WeakMap();
 let initialChronology=false,help,referencePage=null,loadedPresets=[],tradeCache=null,tradeBusy=false,flightSyncError='',deferredFlightTime=null;
-const drafts=new Map();try{loadedPresets=readShelf(window.localStorage)}catch(err){toast('The saved mission shelf is unavailable: '+err.message)}
+try{loadedPresets=readShelf(window.localStorage)}catch(err){toast('The saved mission shelf is unavailable: '+err.message)}
 
 const controlByKey=Object.fromEntries(controls.map(c=>[c.key,c]));
 const solverKeys={workload:['trayCount','solarM2','radiatorM2','batteryKWh','storageTB','propellantKg'],launch:['trayCount'],lifetime:['missionYears'],solar:['solarM2'],radiator:['radiatorM2'],battery:['batteryKWh'],propellant:['propellantKg'],supply:['yearsSupply'],storage:['storageTB'],link:['requiredLineMbps'],throughput:[]};
 function toast(msg){$('toast').textContent=msg;$('toast').classList.add('on');clearTimeout(toastId);toastId=setTimeout(()=>$('toast').classList.remove('on'),3400)}
 function liveDate(t){return new Date(Date.parse(input.epoch)+t*1000).toISOString().slice(0,19).replace('T',' ')+' UTC'}
+function starterContext(d){return Object.fromEntries(missionStarterContextKeys.map(k=>[k,d[k]]))}
 function loadScenario(obj){
  if(obj?.schema!=='odc-scenario/1'||!obj.design||typeof obj.design!=='object')throw Error('Choose an Orbital Data Center scenario JSON or PDR package.');
  const h=sizeDesign(obj.design);if(h.errors.length)throw Error(h.errors[0]);
  const v=obj.view||{},domain=[v.domain,v.page,v.subsystem].find(k=>Object.hasOwn(domains,k))||'conops';
  input={...h.input};view={...defaultView,domain,phase:phaseFromView(v),preset:typeof v.preset==='string'?v.preset:'custom',presetName:typeof v.presetName==='string'?v.presetName.slice(0,64):null,modified:!!v.modified,
+  starterPurpose:Object.hasOwn(aiPurposes,v.starterPurpose)?v.starterPurpose:h.input.aiPurpose,starterContext:v.preset==='starter'?starterContext(missionStarter(h.input.aiPurpose,v.starterContext??h.input)):null,
   purposePreview:Object.hasOwn(aiPurposes,v.purposePreview)?v.purposePreview:null,studyDays:[1,7,30,60,90].includes(v.studyDays)?v.studyDays:0,detail:!!v.detail,instruments:!!v.instruments,thermalNode:thermalNodes.some(n=>n.id===v.thermalNode)?v.thermalNode:'junction',thermalScope:v.thermalScope==='mission'?'mission':'window',thermalScale:v.thermalScale==='full'?'full':'working',thermalAuto:v.thermalAuto!==false,thermalPadding:clamp(Number(v.thermalPadding)||0,0,100),thermalTargets:sanitizeTargets(v.thermalTargets),
   t:Number.isFinite(v.t)?Math.max(-3600,v.t):defaultView.t,start:Number.isFinite(v.start)?Math.max(0,v.start):0,scope:['day','now','mission'].includes(v.scope)?v.scope:'day',solve:Object.hasOwn(solveModes,v.solve)?v.solve:'installed',chapter:chapters.some(c=>c.id===v.chapter)?v.chapter:'operations',camera:Object.hasOwn(cv,v.camera)?v.camera:'spacecraft',cameraStates:v.cameraStates||null,
   overlays:Array.isArray(v.overlays)?v.overlays.filter(x=>Object.hasOwn(overlayNames,x)):[],speed:[1,10,30,120,600].includes(v.speed)?v.speed:30,event:v.event&&typeof v.event.label==='string'&&Number.isFinite(v.event.start)&&Number.isFinite(v.event.end)?v.event:null,inspect:typeof v.inspect==='string'?v.inspect:null,
@@ -57,20 +59,25 @@ function loadScenario(obj){
  if(v.tradeBase&&typeof v.tradeBase==='object'){const b=sizeDesign(v.tradeBase);if(!b.errors.length)view.tradeBase=b.input}
  referencePage=null;playing=false;initialChronology=!!v.chronological;
 }
-function scenario(){return {schema:'odc-scenario/1',modelVersion:'6.0',design:input,view:{...view,cameraStates:scene?.getCameraState?.()||view.cameraStates,t:Math.round(view.t*1000)/1000}}}
+function scenario(){return {schema:'odc-scenario/1',modelVersion:'7.0',design:input,view:{...view,cameraStates:scene?.getCameraState?.()||view.cameraStates,t:Math.round(view.t*1000)/1000}}}
 try{if(location.hash.startsWith('#design=')){loadScenario(decodeScenario(location.hash.slice(8)));initialShared=true}}catch(e){toast(e.message)}
 if(!initialShared){
  const q=new URLSearchParams(location.search),domain=q.get('domain')||q.get('subsystem'),phase=(q.get('phase')||'').toUpperCase(),chapter=chapters.find(c=>c.id===q.get('chapter'));
  view.domain=Object.hasOwn(domains,domain)?domain:'conops';view.phase=Object.hasOwn(phases,phase)?phase:chapter?chapterPhase(chapter.id):'A';view.chapter=chapter?.id||({D:'integration',F:'deorbit'})[view.phase]||'operations';
  const p=presetList.find(x=>x.id===q.get('preset'));if(p){input={...p.design};view.preset=p.id}
- const goal=q.get('purpose');if(Object.hasOwn(aiPurposes,goal)){input=applyAIPurpose(input,goal,q.get('build')==='suggested');view.modified=true}const preview=q.get('preview');if(Object.hasOwn(aiPurposes,preview))view.purposePreview=preview;
+ const goal=q.get('purpose');
+ if(Object.hasOwn(aiPurposes,goal)){
+  const useStarter=q.get('build')==='suggested'||(!p&&q.get('build')!=='current');
+  input=applyAIPurpose(input,goal,useStarter);if(useStarter){view.preset='starter';view.starterPurpose=goal}else view.modified=true;
+ }const preview=q.get('preview');if(Object.hasOwn(aiPurposes,preview))view.purposePreview=preview;
  const method=q.get('disposal');if(['graveyard','reentry'].includes(method)){input.disposalMethod=method;view.modified=view.modified||method!==defaults.disposalMethod}
+ if(view.preset==='starter')view.starterContext=starterContext(input);
  view.camera=Object.hasOwn(cv,q.get('camera'))?q.get('camera'):recommendedCamera(view.phase,view.domain);
 }
 function recalc(resolved=null){
  packetOrderAbort?.abort();orderJob?.abort();lastOrder=null;
  auditAbort?.abort();flightSyncError='';deferredFlightTime=null;tradeCache=null;view.chronological=false;
- result=resolved||inverseSolve(input,view.solve);hardware=result.hardware;sim=createSimulation(hardware);life=estimateLife(hardware);
+ result=resolved||inverseSolve(input,view.solve);hardware=result.hardware;view.aiPurpose=hardware.input.aiPurpose;sim=createSimulation(hardware);life=estimateLife(hardware);
  view.t=clamp(view.t,-3600,sim.duration);view.start=clamp(view.start,0,Math.max(0,sim.duration-DAY));
  daysig='';refreshSamples();snap=sim.at(view.t);
 }
@@ -183,7 +190,7 @@ function draw(){
  $('phase-extras').hidden=!!ref;$('phase-extras').innerHTML='';$('subsystem').innerHTML='';$('trade-input').hidden=!c;$('trade-output').hidden=!c;
  $('disposal-plot').hidden=!!ref||p!=='F';$('domain-readout').hidden=!!ref||p==='B';
  if(ref){$('subsystem').innerHTML=references();return}
- if(a){$('presetshelf').innerHTML=presetShelf(view,loadedPresets);$('phase-content').innerHTML=phaseA(hardware,view,result,k=>inputRow(k,false,'concept'));$('phase-extras').innerHTML=phaseHandoff('B',id)+sourceNote()}
+ if(a){$('presetshelf').innerHTML=presetShelf(view,loadedPresets,hardware);$('phase-content').innerHTML=phaseA(hardware,view,result,k=>inputRow(k,false,'concept'));$('phase-extras').innerHTML=phaseHandoff('B',id)+sourceNote()}
  if(b){$('system-choice').innerHTML=designSection();renderDiagram();$('engineering-toggle').innerHTML=diagramTools();$('phase-extras').innerHTML=phaseHandoff('C',id)}
  if(visual){
   scene?.setDomain?.(id,p);scene?.setChapter?.(view.chapter);chooseCamera(view.camera);scene?.update(hardware,snap);scene?.setOverlays(effectiveLayers());scene?.highlight(view.inspect||'');syncThermalToggle();viewerInfo();renderObservation();
@@ -203,12 +210,13 @@ function serviceFor(model,start){
 }
 function renderPurposePanels(){
  const id=view.domain,p=view.phase,ref=referencePage,host=$('purpose-host'),brief=$('purpose-brief'),studies=$('purpose-studies');
- host.hidden=!!ref||id!=='purpose';brief.hidden=!!ref||id!=='conops';studies.hidden=!!ref||id!=='purpose'||!isEditable(p);
+ const choosingInConops=p==='A'&&id==='conops';
+ host.hidden=!!ref||(id!=='purpose'&&!choosingInConops);brief.hidden=!!ref||id!=='conops'||choosingInConops;studies.hidden=!!ref||id!=='purpose'||!isEditable(p);
  if(!brief.hidden){const anchor=$(p==='A'?'presetshelf':p==='B'?'diagram-host':'trade-input');if(anchor.previousElementSibling!==brief)anchor.parentNode?.insertBefore(brief,anchor);brief.innerHTML=conopsPurpose(hardware,p)}
  if(!host.hidden){
   const anchor=$(p==='A'?'phase-content':p==='B'?'diagram-host':'trade-input');if(anchor.previousElementSibling!==host)anchor.parentNode?.insertBefore(host,anchor);
   const selectedId=isEditable(p)?view.purposePreview:null;
-  host.innerHTML=renderAIPurpose(hardware,p,{selectedId:selectedId||input.aiPurpose,snapshot:snap,state:snap,day,windowStart:view.start,sim,service:serviceFor(sim,view.start)});
+  host.innerHTML=renderAIPurpose(hardware,p,{context:choosingInConops?'conops':'purpose',selectedId:selectedId||input.aiPurpose,snapshot:snap,state:snap,day,windowStart:view.start,sim,service:choosingInConops?null:serviceFor(sim,view.start)});
   if(!studies.hidden){
    const toolsAnchor=$(p==='B'?'kpis':p==='A'?'phase-content':'trade-input');
    if(toolsAnchor.previousElementSibling!==studies)toolsAnchor.parentNode?.insertBefore(studies,toolsAnchor);
@@ -216,11 +224,16 @@ function renderPurposePanels(){
   }
  }
 }
-function usePurpose(id,withBuild){
+function markStarter(id,next){
+ view.preset='starter';view.presetName=null;view.starterPurpose=id;view.starterContext=starterContext(next);view.modified=false;
+ view.thermalTargets={};view.thermalPadding=0;view.thermalScope='window';view.tradeKey=null;view.tradeBase=null;
+}
+function usePurpose(id,withBuild,context=hardware.input){
  if(!isEditable(view.phase)||!Object.hasOwn(aiPurposes,id))return;
- const next=applyAIPurpose(hardware.input,id,withBuild);
- reviewProposal(next,{mode:'installed',label:aiPurposes[id].label+' · '+(withBuild?'suggested build':'installed hardware'),force:true,family:'aiPurpose',commit:resolved=>{
-  input=next;view.solve='installed';view.modified=true;view.event=null;view.purposePreview=id;playing=false;recalc(resolved);draw()
+ const next=withBuild?missionStarter(id,context):applyAIPurpose(hardware.input,id,false);
+ reviewProposal(next,{mode:'installed',label:aiPurposes[id].label+' · '+(withBuild?'mission and starting spacecraft':'current spacecraft'),force:true,family:'aiPurpose',starter:withBuild,commit:resolved=>{
+  input=next;view.solve='installed';if(withBuild)markStarter(id,next);else view.modified=true;
+  view.event=null;view.purposePreview=id;playing=false;recalc(resolved);draw()
  }});
 }
 function orderSeed(model,start){return {initialSeed:model.serviceSeed?.(start),seedProvenance:model.audit||start<60*DAY?'Chronological spacecraft state at order admission':'Representative-day initial inventory at order admission'}}
@@ -285,9 +298,9 @@ function setWindow(t){
 }
 let pendingImpact=null;
 function reopenEditor(origin){
- if(origin==='params')params();else if(origin==='editfield')fieldEditor(editKey);else if(origin==='phasecontrols')phaseControls();else if(origin==='fairings')fairingDialog();else if(origin==='limits')limitDialog();else if(origin==='compare')compare();
+ if(origin==='params')params();else if(origin==='editfield')fieldEditor(editKey);else if(origin==='phasecontrols')phaseControls();else if(origin==='fairings')fairingDialog();else if(origin==='limits')limitDialog();else if(origin==='compare')compare();else if(origin==='preset-shelf')shelfDialog();
 }
-function reviewProposal(next,{mode=view.solve,label,commit,force=false,drag=false,origin=modal,family=null}){
+function reviewProposal(next,{mode=view.solve,label,commit,force=false,drag=false,origin=modal,family=null,starter=false}){
  if(!isEditable(view.phase)||modal==='impact')return;
  const assessment=impactOfChange(input,next,view.solve,mode,result,family),{changes,domains,deltas,margins,newFailures,errors}=assessment;
  if(!changes.length&&mode===view.solve&&!force&&!errors.length){commit(assessment.proposed);return}
@@ -308,17 +321,23 @@ function reviewProposal(next,{mode=view.solve,label,commit,force=false,drag=fals
  const launchNote=launcher?'<div class="impact-banner '+(launcher.input.launchAllowanceKg>benchmark?'warn':'')+'"><b>Payload capacity at the reference orbit</b><p>Mission allowance '+fmt(launcher.input.launchAllowanceKg)+' kg · vehicle reference '+fmt(benchmark)+' kg. '+(launcher.input.launchAllowanceKg>benchmark?'The proposed allowance exceeds this vehicle’s published or concept benchmark. Review the mission-specific performance allocation.':'The provider or concept benchmark and the editable mission allowance refer to distinct assumptions. Confirm performance for the selected orbit and recovery mode.')+'</p></div>':'';
  const retained=assessment.retained||[],carry=retained.length?'<h3 class="gap">Retained assumptions to verify</h3>'+rowTable(['Field','Proposed design','Why it needs review'],retained.map(x=>tr([esc(x.label),val(x.key,x.value)+' '+esc(x.unit),esc(x.note)])).join('')):'';
  const purposeNote=family==='aiPurpose'&&assessment.proposed?'<div class="impact-banner"><b>'+esc(assessment.proposed.hardware.ai.label)+'</b><p>'+esc(aiPurposes[next.aiPurpose].description)+'</p><p>Operating estimate '+fmt(assessment.proposed.hardware.ai.activeUnitsPerSec,4)+' '+esc(assessment.proposed.hardware.ai.unit)+'/s · accelerator-memory margin '+plus(assessment.proposed.hardware.ai.memoryMarginGB)+' GB.</p></div>':'';
- const body=heading+info+launchNote+purposeNote+(conflict.length?'<p><b>Edited preset values will be replaced.</b> '+esc(conflict.map(x=>x.label).join(', '))+'.</p>':'')+
+ const startingNote=starter?'<p>This starting design sets the workload, spacecraft hardware, launcher and operating assumptions for '+esc(aiPurposes[next.aiPurpose].label)+'. It carries over your orbit, mission duration and disposal settings. The review below lists the proposed changes.</p>':'';
+ const fieldTable=changes.length?rowTable(['Field','Current','Proposed','Unit'],ins):'';
+ const inputs=starter&&changes.length?'<details class="gap"><summary>Review all '+changes.length+' input changes</summary>'+fieldTable+'</details>':fieldTable?'<h3>Input changes</h3>'+fieldTable:'';
+ const body=heading+startingNote+info+launchNote+purposeNote+(conflict.length?'<p><b>Edited preset values will be replaced.</b> '+esc(conflict.map(x=>x.label).join(', '))+'.</p>':'')+
  (mode!==view.solve?'<p>Sizing method changes from <b>'+esc(solveModes[view.solve])+'</b> to <b>'+esc(solveModes[mode])+'</b>.</p>':'')+
- (changes.length?'<h3>Input changes</h3>'+rowTable(['Field','Current','Proposed','Unit'],ins):'')+carry+
+ inputs+carry+
  (deltas.length?'<h3 class="gap">Coupled design results</h3>'+rowTable(['Quantity','Current','Proposed','Unit'],deltas.map(x=>tr([esc(x.label),fmt(x.before,4),fmt(x.after,4),esc(x.unit)])).join('')):'')+
  (violations.length?'<h3 class="gap">Margins requiring attention</h3>'+rowTable(['Sizing check','Current margin','Proposed margin'],violations.map(x=>tr([esc(x.label),rate(x.before),rate(x.after)])).join('')):'')+flight+
- '<p class="muted gap">'+esc(known)+'</p><div class="dialogrow gap impact-actions"><button class="btn" data-action="cancelimpact">Keep current design</button>'+(errors.length?'':'<button class="btn export" data-action="applyimpact">Apply design change</button>')+'</div>';
+ '<p class="muted gap">'+esc(known)+'</p><div class="dialogrow gap impact-actions"><button class="btn" data-action="cancelimpact">Keep current design</button>'+(errors.length?'':'<button class="btn export" data-action="applyimpact">'+(starter?'Use this mission and spacecraft':'Apply design change')+'</button>')+'</div>';
  pendingImpact={base:input,phase:view.phase,origin,commit:()=>commit(assessment.proposed),valid:!errors.length};open('Review design change',body,'impact');
 }
 function settleImpact(apply){
  const change=pendingImpact;if(!change)return;
- pendingImpact=null;close();if(apply&&change.valid&&change.base===input&&view.phase===change.phase)change.commit();else draw();reopenEditor(change.origin);
+ pendingImpact=null;close();
+ const accepted=apply&&change.valid&&change.base===input&&view.phase===change.phase;
+ if(accepted)change.commit();else draw();
+ if(!accepted||change.origin!=='preset-shelf')reopenEditor(change.origin);
 }
 function changeParam(key,val,deep=false,opts={}){
  if(lock(key))return;if(key==='aiPurpose'){usePurpose(val,false);return}
@@ -401,7 +420,7 @@ async function actions(a,el){switch(a){
  case 'ai-transfer':if(isEditable(view.phase))open('Model return budget',transferDesk(hardware),'ai-transfer');break;
  case 'cancelimpact':settleImpact(false);break;case 'applyimpact':settleImpact(true);break;
  case 'thermallayer':toggleThermal();break;
- case 'resetpreset':selectPoint(view.preset,true);break;
+ case 'resetpreset':if(view.preset==='starter')usePurpose(view.starterPurpose,true,view.starterContext||input);else selectPoint(view.preset,true);break;
  case 'guideclose':$('guide-dialog').close();break;
  case 'tempbands':limitDialog();break;
  case 'thermal-audit':await thermalAudit();break;
@@ -414,9 +433,9 @@ async function actions(a,el){switch(a){
  case 'missioncalc':await fullAudit();break;case 'comparemissions':await compareMissions();break;
  case 'retryflight':prepareFlight();break;case 'flightplay':if(playing){playing=false;draw()}else startFlight();break;
  case 'flightrestart':{const phase=view.phase,t=phase==='D'?sim.story(view.chapter)?.start:phase==='F'?sim.ignition:sim.story('operations').start;setTime(t??1200);startFlight();break}
- case 'newpreset':reviewProposal(defaults,{label:'Start a new mission',mode:'installed',force:view.modified,commit:newMission});break;case 'loadpreset':if(view.phase==='A')$('presetin').click();break;case 'savepreset':savePresetDialog();break;case 'commitpreset':storePreset();break;case 'managepresets':if(view.phase==='A')shelfDialog();break;
+ case 'newpreset':if(view.phase==='A'){if(modal)close();view.purposePreview=input.aiPurpose;goPage('conops');$('purpose-host').querySelector('[data-preview-purpose="'+view.purposePreview+'"]')?.focus({preventScroll:true})}break;case 'loadpreset':if(view.phase==='A')$('presetin').click();break;case 'savepreset':savePresetDialog();break;case 'commitpreset':storePreset();break;case 'managepresets':if(view.phase==='A')shelfDialog();break;
  case 'fairingcompare':fairingDialog();break;
- case 'presetshelf':if(modal)close();switchPhase('A');$('presetshelf').scrollIntoView({block:'center'});$('presetshelf').querySelector('.designcard.active')?.focus({preventScroll:true});break;
+ case 'presetshelf':switchPhase('A');goPage('conops');break;
  case 'coreview':if(modal)close();if(!['C','E','F'].includes(view.phase))switchPhase('C');chooseCamera('core');viewerInfo();break;
  case 'nav':document.body.classList.toggle('navshow');break;
  case 'share':{playing=false;const url=new URL(location.href);url.hash='design='+encodeScenario(scenario());open('Share this design','<p>This link restores the installed hardware, solver, mission instant, selected view, and event. Recipients need access to this hosted site.</p><textarea class="fullwide" rows="4" id="shareurl" readonly aria-label="Shareable scenario URL">'+esc(url.href)+'</textarea><div class="dialogrow gap"><button class="btn" data-action="json">Download JSON</button><button class="btn export" data-action="copy">'+icon('clipboard-copy',14)+' Copy link</button></div>','share');break}
@@ -452,7 +471,7 @@ document.addEventListener('click',async e=>{const el=e.target.closest('button,[d
  if(el.dataset.domain){goPage(el.dataset.domain);return}
  if(el.dataset.disposalMethod){if(view.phase==='A')changeParam('disposalMethod',el.dataset.disposalMethod,true);return}
  if(el.dataset.presetDownload){const p=loadedPresets.find(x=>x.id===el.dataset.presetDownload);if(p)presetDownload(p);return}
- if(el.dataset.presetUnload){if(view.phase!=='A')return;const id=el.dataset.presetUnload;commitShelf(loadedPresets.filter(p=>p.id!==id));drafts.delete(id);if(view.preset===id){view.preset='custom';view.modified=true}draw();shelfDialog();return}
+ if(el.dataset.presetUnload){if(view.phase!=='A')return;const id=el.dataset.presetUnload;commitShelf(loadedPresets.filter(p=>p.id!==id));if(view.preset===id){view.preset='custom';view.modified=true}draw();shelfDialog();return}
  if(el.dataset.useLauncher){useLauncher(el.dataset.useLauncher);return}
  if(el.dataset.saveFile){try{await saveWithPicker(el.dataset.saveFile);toast('File saved.')}catch(err){if(err.name!=='AbortError')toast(err.message)}return}
  if(el.dataset.thermalInstant){const t=Number(el.dataset.thermalInstant);if(Number.isFinite(t)){if(modal)close();view.phase='C';view.event=null;view.t=clamp(t,-3600,sim.duration);view.chapter='operations';view.start=dayStart(view.t);view.camera=['radiator','enclosure'].includes(view.thermalNode)?'spacecraft':'core';view.overlays=[...new Set([...view.overlays,'thermal'])];refreshSamples();draw()}return}
@@ -604,42 +623,41 @@ async function compareMissions(){
  finally{tradeBusy=false}
 }
 function selectPoint(id,reset=false){
- const item=presetList.find(x=>x.id===id)||loadedPresets.find(x=>x.id===id);if(!item||view.phase!=='A')return;
- const draft=reset?null:drafts.get(id);reviewProposal(draft?.input||item.design,{mode:draft?.solve||item.solver||'installed',label:(reset?'Restore ':'Load ')+item.name,force:reset,commit:()=>{if(reset){drafts.delete(id);view.modified=false}applyPoint(id)}});
+ if(view.phase!=='A')return;
+ const item=loadedPresets.find(x=>x.id===id)||(reset&&presetList.find(x=>x.id===id));if(!item)return;
+ reviewProposal(item.design,{mode:item.solver||'installed',label:(reset?'Restore ':'Open ')+item.name,force:reset||view.modified,commit:()=>{if(modal==='preset-shelf')close();activateRecord(item)}});
 }
-function applyPoint(id){
- const item=presetList.find(x=>x.id===id)||loadedPresets.find(x=>x.id===id);if(!item||view.phase!=='A')return;
- if(view.modified)drafts.set(view.preset,{input:{...input},solve:view.solve,thermalTargets:{...view.thermalTargets},thermalScope:view.thermalScope,thermalPadding:view.thermalPadding});
- const draft=drafts.get(id);auditAbort?.abort();view={...defaultView,phase:'A',domain:view.domain,preset:item.id,presetName:item.name,modified:!!draft,solve:draft?.solve||item.solver||'installed',thermalTargets:draft?.thermalTargets||item.thermalTargets||{},thermalScope:draft?.thermalScope||item.thermalScope||'window',thermalPadding:draft?.thermalPadding??item.thermalPadding??0};
- input={...(draft?.input||item.design)};recalc();draw();
+function activateRecord(item){
+ view={...defaultView,phase:'A',domain:view.domain,preset:item.id,presetName:item.name,solve:item.solver||'installed',thermalTargets:{...item.thermalTargets},thermalScope:item.thermalScope||'window',thermalPadding:item.thermalPadding||0};
+ input={...item.design};recalc();draw();
 }
 function commitShelf(next){
  try{writeShelf(window.localStorage,next);loadedPresets=next;return true}
  catch{loadedPresets=next;return false}
 }
-function activateRecord(item){drafts.delete(item.id);view.modified=false;applyPoint(item.id)}
 function savePresetDialog(){
- if(view.phase!=='A')return;const current=loadedPresets.find(p=>p.id===view.preset),name=(current?.name||presetList.find(p=>p.id===view.preset)?.name||view.presetName||'New mission')+' variant';
- open('Save as a mission preset',`<p>Save a named copy of these mission inputs and sizing choices. The saved file can be loaded into any copy of the workbench.</p><div class="fieldgrid"><label class="fieldbox">Preset name<input id="preset-name" class="forminput" maxlength="64" value="${esc(name.slice(0,64))}"></label><label class="fieldbox">Description<input id="preset-description" class="forminput" maxlength="320" placeholder="Mission purpose or design changes"></label></div><div class="callout gap">${esc(designName(view))} · ${fmt(hardware.itKw)} kW IT · ${input.disposalMethod==='graveyard'?'Graveyard orbit':'Targeted reentry'}</div><button class="btn export gap" data-action="commitpreset">Save copy and prepare JSON</button>`,'save-preset');
+ if(view.phase!=='A')return;const current=loadedPresets.find(p=>p.id===view.preset),name=(current?.name||designName({...view,modified:false},hardware))+' variant';
+ open('Save design as',`<p>Save the customer mission, hardware, sizing choices and thermal requirements together. You can reopen the design here or download a portable copy.</p><div class="fieldgrid"><label class="fieldbox">Design name<input id="preset-name" class="forminput" maxlength="64" value="${esc(name.slice(0,64))}"></label><label class="fieldbox">Description<input id="preset-description" class="forminput" maxlength="320" placeholder="Mission purpose or design changes"></label></div><div class="callout gap">${esc(designName(view))} · ${fmt(hardware.itKw)} kW IT · ${input.disposalMethod==='graveyard'?'Graveyard orbit':'Targeted reentry'}</div><button class="btn export gap" data-action="commitpreset">Save copy and prepare JSON</button>`,'save-preset');
 }
 function storePreset(){
  if(view.phase!=='A')return;const item=missionPreset({name:$('preset-name').value,description:$('preset-description').value,design:input,solver:view.solve,thermalTargets:view.thermalTargets,thermalPadding:view.thermalPadding,thermalScope:view.thermalScope}),added=addToShelf(loadedPresets,item);
- const persisted=commitShelf(added.shelf);activateRecord(added.record);presetDownload(added.record,persisted?'Saved to your preset shelf.':'Loaded for this session. Browser storage is unavailable. Save the JSON to keep this preset.');
+ const persisted=commitShelf(added.shelf);activateRecord(added.record);presetDownload(added.record,persisted?'Saved to your designs.':'Loaded for this session. Browser storage is unavailable. Download the JSON to keep this design.');
 }
-function presetDownload(p,detail='Loaded mission preset'){
- retainFile('preset',new Blob([JSON.stringify(p,null,2)],{type:'application/json'}),presetFileName(p.name),detail);readyDialog('preset','Download preset JSON');
+function presetDownload(p,detail='Saved mission design'){
+ retainFile('preset',new Blob([JSON.stringify(p,null,2)],{type:'application/json'}),presetFileName(p.name),detail);readyDialog('preset','Download design file');
 }
 function shelfDialog(){
- open('Your mission presets','<p>Download a saved mission or unload it from the browser shelf. A downloaded JSON can be loaded again.</p>'+loadedPresets.map(p=>`<div class="manage-row"><div><strong>${esc(p.name)}</strong><small>${esc(p.description||'Mission preset')}</small></div><button class="chip" data-preset-download="${esc(p.id)}">Download JSON</button><button class="chip" data-preset-unload="${esc(p.id)}">Unload</button></div>`).join('')+(!loadedPresets.length?'<p>No user presets loaded.</p>':'')+'<button class="btn gap" data-action="loadpreset">Load preset from disk</button>','preset-shelf');
-}
-function newMission(){
- if(view.phase!=='A')return;if(view.modified)drafts.set(view.preset,{input:{...input},solve:view.solve,thermalTargets:{...view.thermalTargets},thermalScope:view.thermalScope,thermalPadding:view.thermalPadding});auditAbort?.abort();
- const domain=view.domain;input={...defaults};view={...defaultView,domain,preset:'custom',presetName:'New mission',phase:'A'};recalc();draw();toast('New mission started with the editable reference technology assumptions.');
+ if(view.phase!=='A')return;
+ const rows=loadedPresets.map(p=>{
+  const current=p.id===view.preset&&!view.modified;
+  return '<div class="manage-row"><div><strong>'+esc(p.name)+'</strong><small>'+esc(aiPurposes[p.design.aiPurpose||'text'].label)+(p.description?' · '+esc(p.description):'')+'</small></div><button class="chip" data-design="'+esc(p.id)+'" '+(current?'disabled':'')+'>'+(current?'Open now':'Open design')+'</button><button class="chip" data-preset-download="'+esc(p.id)+'">Download JSON</button><button class="chip" data-preset-unload="'+esc(p.id)+'">Unload</button></div>';
+ }).join('');
+ open('Saved designs',(rows||'<p>Your named designs will appear here. Save the current mission or import a design file to get started.</p>')+'<div class="dialogrow gap"><button class="btn" data-action="loadpreset">Import design file</button><button class="btn" data-action="savepreset">Save current design as…</button></div>','preset-shelf');
 }
 $('presetin').onchange=async e=>{
  const files=Array.from(e.target.files||[]);e.target.value='';if(view.phase!=='A'||!files.length)return;
  try{let current=loadedPresets,last;for(const f of files){if(f.size>750000)throw Error('Choose a preset JSON under 750 kB.');const added=addToShelf(current,parsePreset(await f.text()));current=added.shelf;last=added.record}
-  reviewProposal(last.design,{mode:last.solver,label:'Load mission preset · '+last.name,force:view.modified,commit:()=>{const persisted=commitShelf(current);if(modal)close();activateRecord(last);toast(persisted?'Mission presets loaded.':'Loaded in this session. Browser storage is unavailable.')}});
+  reviewProposal(last.design,{mode:last.solver,label:'Import design · '+last.name,force:view.modified,commit:()=>{const persisted=commitShelf(current);if(modal)close();activateRecord(last);toast(persisted?'Saved designs imported.':'Loaded in this session. Browser storage is unavailable.')}});
  }catch(err){toast(err.message)}
 };
 function flightRange(){

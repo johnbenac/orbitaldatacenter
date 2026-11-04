@@ -15,7 +15,7 @@ export function helpForElement(el,design){
  if(!key&&['phase-solve','solve','quicksolve'].includes(id)){key='solve';option=el.value}
  if(!key&&d.disposalMethod){key='disposalMethod';option=d.disposalMethod}
  if(!key&&d.useLauncher){key='launcher';option=d.useLauncher}
- if(!key&&d.design){key='missionPreset';option=d.design}
+ if(!key&&d.design)key='loadPreset'
  if(!key)key=({epoch:'epoch',category:'technologyCompare','thermal-pad':'thermalPadding','thermal-scope':'thermalScope','thermal-node':'thermalNode','preset-name':'presetName','preset-description':'presetDescription'})[id]||({newpreset:'newPreset',savepreset:'savePreset',loadpreset:'loadPreset',resetpreset:'missionPreset',commitpreset:'savePreset',managepresets:'managePresets'})[d.action];
  if(!key)return null;
  if(!option&&el.tagName==='SELECT')option=el.value;

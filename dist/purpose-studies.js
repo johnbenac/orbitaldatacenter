@@ -1,4 +1,3 @@
-import {aiPurposes} from './ai-purpose.js';
 import {purposeDisplay} from './purpose-display.js';
 
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -11,8 +10,7 @@ const product={
 const display=(v,u='')=>typeof v==='number'?n(v)+(u?' '+esc(u):''):esc(v??'—')+(u?' '+esc(u):'');
 export function conopsPurpose(h,phase){
  const selected=h.input.aiPurpose,selectable='ABC'.includes(phase);
- const choices=selectable?'<div class="purpose-shortcuts">'+Object.keys(aiPurposes).map((id)=>'<button type="button" data-open-purpose="'+esc(id)+'" class="purpose-shortcut '+(selected===id?'current':'')+'" data-tip="Inspect '+esc(purposeDisplay[id].name)+' and its acceptance measures."><strong>'+esc(purposeDisplay[id].name)+'</strong><span>'+esc(product[id])+'</span></button>').join('')+'</div>':'';
- return '<section class="conops-purpose"><div class="purpose-heading"><div><span class="guideflag">PRIMARY EARTH CUSTOMER MISSION</span><h2>'+esc(purposeDisplay[selected].name)+'</h2><p>'+esc(product[selected])+'</p></div><button class="btn" data-open-purpose="'+esc(selected)+'">'+(selectable?'Review mission purpose':'Inspect mission purpose')+' ↗</button></div>'+choices+'</section>';
+ return '<section class="conops-purpose"><div class="purpose-heading"><div><span class="guideflag">PRIMARY EARTH CUSTOMER MISSION</span><h2>'+esc(purposeDisplay[selected].name)+'</h2><p>'+esc(product[selected])+'</p></div><button class="btn" data-open-purpose="'+esc(selected)+'">'+(selectable?'Review mission purpose':'Inspect mission purpose')+' ↗</button></div></section>';
 }
 export function studyHorizon(d,days=0){
  if([1,7,30,60,90].includes(days))return days;

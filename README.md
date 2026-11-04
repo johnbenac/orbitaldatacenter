@@ -16,7 +16,7 @@ The phase tabs select the kind of work. The domain navigation selects the subsys
 
 | Phase | Work in this phase |
 | --- | --- |
-| A · Mission inputs | Choose a starting design, size from an installed configuration, workload, launch allowance or lifetime requirement, and select the retirement route. |
+| A · Mission inputs | Choose a customer mission and its starting spacecraft, size from an installed configuration, workload, launch allowance or lifetime requirement, and select the retirement route. |
 | B · Subsystem design | The Design section exposes installed assumptions and component schematics. The Analysis section below always shows the clock, charts, operating quantities and ledger. Follow buses, coolant loops, payload queues, actuator momentum, mass allocations or natural and induced environmental loads. |
 | C · Integrated vehicle | Inspect assembled hardware in 3D. Pin the current design and change one input to compare responses at matching mission times. Full chronological comparisons add whole-mission quantities and histories. |
 | D · Launch and insertion | Inspect the stowed stack, fairing fit and assembly clearances. Follow ascent, separation and trim in the launch chapters. |
@@ -31,11 +31,13 @@ The thermal view maps six modeled nodes to fixed Kelvin color scales. Select a n
 
 ## Save, share and export
 
-Phase A includes five built-in design points, a new-mission action and a shelf for custom presets. **Save as preset** preserves design inputs, solver and thermal requirement settings. **Load preset** restores a preset JSON to the browser shelf. Downloaded presets are portable between browsers.
+Phase A starts with six customer missions. Each mission includes a workload, hardware configuration and starting operating assumptions. Review a mission to see its accelerator count, storage, power and physical constraints before applying it. Selecting the same starter twice reproduces the same spacecraft. The mission orbit, duration, environment and disposal settings carry over.
+
+The compact current-design bar provides **Save as…** and **Saved designs**. Named designs preserve inputs, sizing mode and thermal requirements. Open, import, download and unload them in **Saved designs**. Existing scenario links and earlier preset JSON files reopen their stored configuration.
 
 In Phase A, hover or focus an input for selection advice. Its **?** button opens the basis, worked example where available, and links to the relevant source sections. **Model & sources** includes a searchable field guide. GEVS and the Goddard GOLD Rules anchor environmental verification and margin guidance. Worked study values, equipment references and mission requirements are identified separately.
 
-**AI Data Center Purpose** assigns one Earth customer mission to a design: live text, live voice, batch inference, agentic research or engineering, fine-tuning, or training. Select a card in Phase A CONOPS or open the domain from the drawer. Preview a profile, compare the same installed machine under two orders, or review a suggested build. The design-change dialogue shows which inputs and physical quantities change. Flight phases inspect the committed goal. Prior saved designs open under live text.
+**AI Data Center Purpose** assigns one Earth customer mission to a design: live text, live voice, batch inference, agentic research or engineering, fine-tuning, or training. Select a card in Phase A CONOPS or open the domain from the drawer. Preview a mission and review its starting spacecraft. To study a different workload on installed equipment, use the secondary current-spacecraft action or the fixed-hardware comparison. The design-change dialogue shows which inputs and physical quantities change. Flight phases inspect the committed goal. Saved files that predate the purpose field open under live text.
 
 The service analysis records customer outcomes against the modeled direct contacts or an explicitly assumed relay allocation. The selected-day study and the optional multi-day order study have independent horizons. Training requires calibration evidence to claim target quality. The model transfer budget gives ideal active transfer times after the selected artifact is released. PDR exports include the installed compute estimate and selected-window customer metrics.
 

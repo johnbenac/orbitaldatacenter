@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
 import {aiPurposes} from './dist/ai-purpose.js';
-import {applyAIPurpose,controls,defaults,sizeDesign} from './dist/design.js';
+import {applyAIPurpose,controls,defaults,missionStarter,sizeDesign} from './dist/design.js';
 import {createSimulation} from './dist/model.js';
 import {evaluateService} from './dist/ai-service.js';
 import {primaryServiceMetric,renderAIPurpose} from './dist/ai-purpose-ui.js';
 import {purposeDisplay} from './dist/purpose-display.js';
 import {domainReadout,domainTrade,domains,purposeDomainFields,purposeTradeKeys} from './dist/domain-analysis.js';
 import {renderSubsystemDiagram} from './dist/subsystem-diagrams.js';
+import {conopsPurpose} from './dist/purpose-studies.js';
 import {workspaceFor} from './dist/workspaces.js';
 import {domainInstruments,recommendedDomainCamera} from './dist/domain-scene.js';
 
@@ -36,9 +37,30 @@ for(const id of ids){
   assert(html.includes('AI Data Center Purpose'));assert(html.includes(purposeDisplay[id].goal));assert(html.includes(purposeDisplay[id].phases['ABCDEF'.indexOf(ph)]));
   assert(html.includes(svc.metrics.find(q=>q.key===svc.primaryKey).label));assert(!/NaN|undefined|Infinity/.test(html));
   assert.equal((html.match(/data-preview-purpose=/g)||[]).length,editable?6:0);assert.equal(html.includes('data-use-purpose="'+selected+'"'),editable);assert.equal(html.includes('data-provision-purpose="'+selected+'"'),editable);
-  if(!editable)assert(!html.includes('Suggested physical build'));
+  if(editable){
+   const preview=html.slice(html.indexOf('data-purpose-preview'));
+   assert(!/<details/.test(preview.split('data-provision-purpose')[0]),'Review action must be visible on first inspection.');
+   assert(preview.indexOf('data-provision-purpose')<preview.indexOf('data-use-purpose'));
+   assert.equal((html.match(/class="ap-hardware"/g)||[]).length,6);
+   assert(html.indexOf('data-preview-purpose')<html.indexOf('data-purpose-assessment'));
+   assert(preview.includes('Earth deliverable')&&preview.includes('Stowed fairing'));
+  }else assert(!html.includes('data-purpose-preview')&&!html.includes('class="ap-primary"'));
  }
  const trade=domainTrade('purpose',c,c);assert(trade.rows.every(r=>r.delta===null||r.delta===0));assert.equal(trade.curves[0].unit,h.ai.unit+'/s');
  assert.equal(recommendedDomainCamera('D','purpose'),'launch');assert(domainInstruments('purpose',h,state).length>=3);
 }
-console.log('Six Earth-customer profiles × six phases: active objective, editable preview vs fixed flight record, source-backed service measure, workload-specific units and controls, suggested-build actions and mission schematic verified.');
+// An edited machine and a retained orbital context must produce the same preview as the start action.
+const custom=sizeDesign({...missionStarter('pretrain'),solarM2:8123,hostCores:1555,altitudeKm:609});
+for(const id of ids){
+ const expected=sizeDesign(missionStarter(id,custom.input));
+ const panel=renderAIPurpose(custom,'A',{selectedId:id,context:'conops'});
+ const preview=panel.slice(panel.indexOf('data-purpose-preview'));
+ assert.equal((panel.match(/data-preview-purpose=/g)||[]).length,6);
+ assert.equal((panel.match(/data-provision-purpose=/g)||[]).length,1);
+ assert(preview.includes(expected.launcherLabel)&&preview.includes(expected.chips+' accelerators'));
+ assert(preview.includes(expected.fairing.fit?'Stowed fairing fits':'Stowed fairing exceeded'));
+ assert(!/8,123 m²|1,555 cores/.test(preview));
+ assert(!panel.includes('data-purpose-assessment')&&panel.includes('Inspect service results'));
+ assert(!conopsPurpose(custom,'B').includes('data-preview-purpose'));
+}
+console.log('Six mission starters in a shared catalogue, canonical preview on edited hardware, primary build review, separate current-machine path, read-only flight records and all thirty-six purpose/phase interpretations verified.');

@@ -1,16 +1,17 @@
 import {aiPurposes} from './ai-purpose.js';
-import {applyAIPurpose,sizeDesign} from './design.js';
+import {missionStarter,presets,sizeDesign,sizingEnvelope} from './design.js';
 import {purposeDisplay,purposeId,purposeGlyph} from './purpose-display.js';
 const esc=v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
 const measured=(v,d=2)=>typeof v==='number'&&Number.isFinite(v)?v.toLocaleString('en-US',{maximumFractionDigits:d}):typeof v==='string'?v:'—';
 const value=(v,u,d=2)=>Number.isFinite(v)?measured(v,d)+(u?' '+u:''):typeof v==='string'?v:'—';
 const metric=(label,v,unit='',digits=2)=>'<div class="ap-metric"><dt>'+esc(label)+'</dt><dd>'+esc(value(v,unit,digits))+'</dd></div>';
 const datum=(label,text)=>'<div><dt>'+esc(label)+'</dt><dd>'+esc(text)+'</dd></div>';
-const cache=new WeakMap();
-function proposal(h,id,provision){
- let map=cache.get(h);if(!map){map=new Map();cache.set(h,map);}const key=id+'/'+Boolean(provision);
- if(!map.has(key))map.set(key,id===purposeId(h)&&!provision?h:sizeDesign(applyAIPurpose(h.input,id,provision)));
- return map.get(key);
+const nominal=new Map(),contextBuilds=new WeakMap();
+function starter(id,h){
+ let cache=nominal;
+ if(h){if(!contextBuilds.has(h))contextBuilds.set(h,new Map());cache=contextBuilds.get(h);}
+ if(!cache.has(id))cache.set(id,sizeDesign(missionStarter(id,h?.input)));
+ return cache.get(id);
 }
 export const primaryServiceMetric={text:'slaTurns',voice:'audibleTurns',batch:'qualifiedItems',agents:'verifiedTasks',finetune:'deliveredRun',pretrain:'deliveredRun'};
 const statuses={met:'Objective met',partial:'Partially met',unmet:'Objective missed',uncalibrated:'Calibration required',incompatible:'Incompatible artifact or base',unresolved:'Assessment unresolved',pending:'Deadline still open', 'no-offers':'No offers in interval'};
@@ -42,21 +43,55 @@ function appraisal(h,id,service,snap){
  if(notes.length||service.sources?.length)html+='<details><summary>Interpret this result and its references</summary><ul>'+notes.slice(0,5).map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul><p class="ap-sources">'+(service.sources||[]).filter(x=>typeof x?.url==='string'&&x.url.startsWith('https://')).map(x=>'<a href="'+esc(x.url)+'" target="_blank" rel="noopener noreferrer">'+esc(x.title)+' ↗</a>').join(' · ')+'</p></details>';
  return html+'</section>';
 }
-export function renderAIPurpose(h,phase='A',{snapshot,selectedId,service}={}){
- const active=purposeId(h),a=purposeDisplay[active]||purposeDisplay.text,editable=['A','B','C'].includes(phase);
- const id=editable&&Object.hasOwn(purposeDisplay,selectedId)?selectedId:active,p=purposeDisplay[id],i=Math.max(0,'ABCDEF'.indexOf(phase));
- const chain='<div class="ap-trace"><span>'+esc(a.input)+'</span><i>→</i><span>'+esc(a.process)+'</span><i>→</i><span>'+esc(a.output)+'</span></div>';
- const hero='<div class="ap-summary"><div class="ap-art">'+purposeGlyph(active)+'</div><div><span class="ap-kicker">Committed purpose · '+esc(a.family)+'</span><h3>'+esc(descriptor(active))+'</h3><p class="ap-goal">'+esc(a.goal)+'</p></div></div>';
- let body=hero+chain+'<p class="ap-note">'+esc(criteria(active,h.input))+'</p><p class="ap-guidance">'+esc(a.phases[i])+'</p>'+appraisal(h,active,service,snapshot);
- if(editable){
-  const cards=Object.keys(purposeDisplay).map(k=>{const d=purposeDisplay[k];
-   return '<button type="button" class="ap-card" data-preview-purpose="'+k+'" aria-pressed="'+(k===id)+'" style="--accent:'+d.accent+'">'+purposeGlyph(k)+'<span><small>'+esc(d.family)+(active===k?' · CURRENT':'')+'</small><strong>'+esc(descriptor(k))+'</strong><em>'+esc(d.shortGoal)+'</em></span></button>';}).join('');
-  body+='<section><div class="ap-novel"><h4>Explore customer missions</h4><small class="ap-kicker">06 profiles</small></div><div class="ap-grid">'+cards+'</div></section>';
-  const candidate=proposal(h,id,false),aic=candidate.ai||{},build=proposal(h,id,true),ab=build.ai||{},unit=aic.unit?aic.unit+'/s':'units/s';
-  body+='<section class="ap-proposal" data-purpose-preview="'+id+'"><small class="ap-kicker">Profile preview · '+esc(p.family)+'</small><h4>'+esc(descriptor(id))+'</h4><p>'+esc(p.goal)+'</p><dl class="ap-dossier">'+datum('Customer',p.customer)+datum('Earth deliverable',p.product)+datum('Qualification conditions',criteria(id,candidate.input))+datum('Installed active capacity',value(aic.activeUnitsPerSec,unit))+datum('Required mean pace',value(aic.requiredRate,unit))+(id==='agents'?datum('Parallel work within one task',value(aic.agentWorkerSlots,'resident slots')+' · '+value(aic.agentWaves,'waves/stage'))+datum('Internal bytes per task',value(aic.internalBytesPerTask/1e6,'MB')):'')+datum('Memory headroom',value(aic.memoryMarginGB,'GB'))+'</dl><div class="ap-actions"><button type="button" class="btn" data-use-purpose="'+id+'" '+(active===id?'disabled':'')+'>'+esc(active===id?'Current mission purpose':'Use purpose on current spacecraft')+'</button></div>';
-  body+='<details><summary>Suggested physical build · '+esc(descriptor(id))+' · '+esc(!build.fairing?.fit?'fairing exceeded':build.launchScreenMarginKg<0?'launch mass exceeded':'within launch screen')+'</summary><p class="ap-note">Review the workload and installed equipment proposed for this profile. Applying the build replaces the corresponding design inputs.</p><dl class="ap-dossier">'+datum('Compute hardware',build.trays+' trays · '+build.chips+' accelerators')+datum('Accelerator memory',value(ab.installedMemoryGB??build.memoryGB,'GB',0))+datum('Host / fabric',value(build.input.hostCores,'cores',0)+' / '+value(build.input.fabricGbps,'Gbit/s',0))+datum('Storage',value(build.storageTB,'TB'))+datum('Arrays / radiators',value(build.solarM2,'m²',0)+' / '+value(build.radiatorM2,'m²',0))+datum('Battery',value(build.batteryKWh,'kWh'))+datum('Launched stack',value(build.launchKg,'kg',0))+datum('Launch vehicle',build.launcherLabel||build.input.launcher)+datum('Governing launch headroom',value(build.launchScreenMarginKg,'kg',0))+datum('Fairing radial / axial margin',value(build.fairing?.radialClearanceM,'m',2)+' / '+value(build.fairing?.axialClearanceM,'m',2))+datum('Training or inference memory margin',value(ab.memoryMarginGB,'GB'))+'</dl><button type="button" class="btn" data-provision-purpose="'+id+'">Apply purpose and suggested build</button></details></section>';
- }else{
-  body+='<dl class="ap-dossier">'+datum('Customer',a.customer)+datum('Deliverable',a.product)+datum('Workload state',snapshot?.flightPhase||'Flight record')+'</dl>';
+const capacityNames={compute:'Compute pace',fairing:'Fairing envelope',propellant:'Station-keeping supply',mass:'Mission mass allowance',launcherReference:'Launcher mass reference',residentMemory:'Accelerator memory',solar:'Solar generation',battery:'Eclipse energy',thermal:'Heat rejection',storage:'Recorder capacity',serviceStorage:'Workload storage',diskLife:'Recorder endurance',downlink:'Return-link capacity',inputLink:'Input uplink',artifact:'Earth artifact compatibility'};
+function cardHardware(id,h){
+ const memory=h.ai.installedMemoryGB,second={text:value(h.solarM2,'m² solar'),voice:value(h.input.hostCores,'host cores'),batch:value(h.storageTB,'TB storage'),agents:value(h.input.fabricGbps,'Gbit/s fabric'),finetune:value(memory,'GB HBM'),pretrain:value(memory/1000,'TB HBM')};
+ return value(h.chips,'accelerators',0)+' · '+second[id];
+}
+function missionCards(selected,active){
+ return '<div class="ap-grid" role="group" aria-label="Choose a mission to preview">'+Object.entries(purposeDisplay).map(([id,p],index)=>{
+  const chosen=id===selected;
+  return '<button type="button" class="ap-card" data-preview-purpose="'+id+'" aria-pressed="'+chosen+'" style="--accent:'+p.accent+'"><span class="ap-cardhead">'+purposeGlyph(id)+'<small>0'+(index+1)+(id===active?' / ACTIVE PURPOSE':'')+'</small><span class="ap-indicator" aria-hidden="true"></span></span><strong>'+esc(p.name)+'</strong><em>'+esc(p.shortGoal)+'</em><span class="ap-hardware">'+esc(cardHardware(id,starter(id)))+'</span></button>';
+ }).join('')+'</div>';
+}
+function workloadFact(id,h){
+ const d=h.input,q=h.ai;
+ switch(id){
+  case 'text':return datum('Active decode estimate',value(h.tokensPerSec,'tok/s',0))+datum('Time to first token on Earth',value(d.ttftTargetS,'s')+' target');
+  case 'voice':return datum('Active work estimate',value(q.activeUnitsPerSec,'turns/s'))+datum('First audible response',value(d.voiceFirstAudioTargetS,'s')+' target');
+  case 'batch':return datum('Job input / return file',value(d.batchInputMB,'MB')+' / '+value(d.batchResultMB,'MB'))+datum('Earth receipt deadline',value(d.serviceDeadlineS/3600,'h')+' after offer');
+  case 'agents':return datum('Workers per assignment stage',value(d.agentFanout,'agents')+' · '+value(q.agentWaves,'waves'))+datum('Task receipt deadline',value(d.serviceDeadlineS/3600,'h')+' after offer');
+  default:return datum('Requested Earth artifact',value(q.artifactGB>=1000?q.artifactGB/1000:q.artifactGB,q.artifactGB>=1000?'TB':'GB',3)+' · '+({adapter:'adapter delta',full:'model weights',restart:'restart checkpoint'}[d.artifactKind]||d.artifactKind))+datum('Training time estimate',value(q.trainingDays,'days',3)+' / '+value(d.trainingBudgetDays,'days allowed'));
  }
- return '<section class="panel ai-purpose" style="--ap:'+a.accent+'" data-ai-purpose="'+active+'"><header class="panelhead"><h2>AI Data Center Purpose</h2><span class="guideflag">'+(editable?'DESIGN STUDY':'FLIGHT RECORD')+'</span></header><div class="panelpad">'+body+'</div></section>';
+}
+function preview(h,id){
+ const b=starter(id,h),p=purposeDisplay[id],q=b.ai,d=b.input,e=sizingEnvelope(b),f=b.fairing;
+ const constraint=capacityNames[e.binding]||e.binding,ratio=e.rates[e.binding],percent=Number.isFinite(ratio)?value(ratio*100,'%',1):'—';
+ let fit=f.fit?'Stowed fairing fits':'Stowed fairing exceeded';
+ if(!f.fit)fit+=' · '+[f.radialClearanceM<0?value(-f.radialClearanceM,'m radial'):'',f.axialClearanceM<0?value(-f.axialClearanceM,'m axial'):''].filter(Boolean).join(' / ');
+ const service='<dl class="ap-dossier ap-facts">'+datum('Earth deliverable',p.product)+workloadFact(id,b)+'</dl>';
+ const hardware='<p class="ap-fit '+(e.feasible?'ap-ok':'ap-short')+'"><b>'+esc(constraint)+'</b> · '+esc(percent)+' of sizing requirement</p><p class="ap-fit '+(f.fit?'':'ap-short')+'">'+esc(fit)+'</p>';
+ const details='<details><summary>Equipment and acceptance criteria</summary><dl class="ap-dossier">'+datum('Compute package',presets.compute[d.compute].label)+datum('Installed trays',value(b.trays,'trays')+' · '+value(q.installedMemoryGB,'GB HBM',0))+datum('Host and fabric',value(d.hostCores,'cores')+' · '+value(d.fabricGbps,'Gbit/s'))+datum('Storage / battery',value(b.storageTB,'TB')+' / '+value(b.batteryKWh,'kWh'))+datum('Solar / radiator area',value(b.solarM2,'m²')+' / '+value(b.radiatorM2,'m²'))+datum('Launched mass',value(b.launchKg,'kg',0))+datum('Launch mass headroom',value(b.launchScreenMarginKg,'kg',0))+datum('Memory headroom',value(q.memoryMarginGB,'GB'))+datum('Customer acceptance',criteria(id,d))+'</dl></details>';
+ const keep='<details class="ap-alternate"><summary>Use this purpose with installed hardware</summary><p class="ap-note">Apply the customer purpose to the spacecraft currently in the workspace.</p><button type="button" class="btn" data-use-purpose="'+id+'" '+(purposeId(h)===id?'disabled':'')+'>'+esc(purposeId(h)===id?'Already the active purpose':'Review purpose change')+'</button></details>';
+ return '<section class="ap-proposal" data-purpose-preview="'+id+'" style="--ap:'+p.accent+'"><div class="ap-novel"><small class="ap-kicker">Selected starting design</small>'+purposeGlyph(id)+'</div><h3>'+esc(p.name)+'</h3><p class="ap-goal">'+esc(p.goal)+'</p><p class="ap-buildline">'+esc(cardHardware(id,b))+'<span>'+esc(b.launcherLabel)+'</span></p>'+service+hardware+'<button type="button" class="btn ap-primary" data-provision-purpose="'+id+'">Review mission and spacecraft <span aria-hidden="true">→</span></button>'+details+keep+'</section>';
+}
+function committed(h,phase,snapshot,service,full=true){
+ const id=purposeId(h),p=purposeDisplay[id],i=Math.max(0,'ABCDEF'.indexOf(phase));
+ const hero='<div class="ap-summary"><div class="ap-art">'+purposeGlyph(id)+'</div><div><span class="ap-kicker">Active mission · '+esc(p.family)+'</span><h3>'+esc(p.name)+'</h3><p class="ap-goal">'+esc(p.goal)+'</p></div></div>';
+ const chain='<div class="ap-trace"><span>'+esc(p.input)+'</span><i>→</i><span>'+esc(p.process)+'</span><i>→</i><span>'+esc(p.output)+'</span></div>';
+ if(!full)return '<div class="ap-currentline"><span>Active mission · <b>'+esc(p.name)+'</b></span><button type="button" class="btn" data-open-purpose="'+id+'">Inspect service results ↗</button></div>';
+ return hero+chain+'<p class="ap-guidance">'+esc(p.phases[i])+'</p><p class="ap-note">'+esc(criteria(id,h.input))+'</p>'+appraisal(h,id,service,snapshot);
+}
+export function renderAIPurpose(h,phase='A',{snapshot,selectedId,service,context='purpose'}={}){
+ const active=purposeId(h),editable=['A','B','C'].includes(phase),id=editable&&Object.hasOwn(purposeDisplay,selectedId)?selectedId:active;
+ let body;
+ if(editable){
+  const intro='<div class="ap-intro"><span class="ap-kicker">Mission catalogue · 06 starting designs</span><h3>Choose a customer mission</h3><p>Each purpose has a starting spacecraft. Preview its equipment, Earth deliverable and sizing limits before reviewing the design.</p></div>';
+  body=intro+'<div class="ap-workbench">'+missionCards(id,active)+preview(h,id)+'</div>';
+  if(context==='conops')body+=committed(h,phase,snapshot,service,false);
+  else body+='<details class="ap-current"><summary>Active mission and measured service · '+esc(descriptor(active))+'</summary><div>'+committed(h,phase,snapshot,service)+'</div></details>';
+ }else{
+  body=committed(h,phase,snapshot,service)+'<dl class="ap-dossier">'+datum('Customer',purposeDisplay[active].customer)+datum('Earth deliverable',purposeDisplay[active].product)+datum('Flight state',snapshot?.flightPhase||'Flight record')+'</dl>';
+ }
+ return '<section class="panel ai-purpose" style="--ap:'+purposeDisplay[active].accent+'" data-ai-purpose="'+active+'"><header class="panelhead"><h2>AI Data Center Purpose</h2><span class="guideflag">'+(editable?'MISSION STARTERS':'FLIGHT RECORD')+'</span></header><div class="panelpad">'+body+'</div></section>';
 }

@@ -31,7 +31,12 @@ export function surfaces(h,g,deployment){
  const earthView=earthDisk*(.22+.78*Math.abs(dot(rad,g.radial))),albedo=1361*.30*Math.max(0,g.sunRadial)*earthView,earthIR=237*earthView;
  const bodyUp=base.map((v,i)=>v*Math.cos(roll)+axis[i]*Math.sin(roll)),bodyZ=unit(cross(rad,bodyUp)),ramBody=[dot(ram,rad),dot(ram,bodyUp),dot(ram,bodyZ)],ramArea=ramSilhouette(h,ramBody,deployment);
  const y=g.windowAgeYears,eps=d.emissivity*fraction(d.emissivityRetention,y),alpha=clip(d.absorptivity+(d.alphaGrowth||0)*y,0,1),solarKW=1.361*h.solarM2*normalCos*sunlit*deployment*d.pvEfficiency*(d.solarDelivery??.86)*fraction(d.pvRetention,y);
- return {pvNormalECI:pv,radiatorNormalECI:rad,ramBody,ramAreaM2:ramArea,solarIncidenceCos:normalCos,radiatorSunCos:radSunCos,earthView,solarKW,generationKW:solarKW,emissivity:eps,absorptivity:alpha,solarIrradiance:1361*sunlit,albedoIrradiance:albedo,earthIRIrradiance:earthIR,absorbedKW:h.radiatorM2*deployment*(alpha*(1361*sunlit*radSunCos+albedo)+eps*earthIR)/1000,emissionCoeff:Math.max(.15,h.radiatorM2*2*eps*deployment)*SIGMA/1000};
+ // Area-averaged solar exposure of a convex six-sided box; Earth-disk
+ // loading blends the nadir projection with an isotropic hemispheric view.
+ const boxArea=h.enclosure?.grossAreaM2||2*(h.bodyHeightM*h.bodyLengthM+h.bodyWidthM*h.bodyLengthM+h.bodyWidthM*h.bodyHeightM);
+ const boxProjection=v=>h.bodyHeightM*h.bodyLengthM*Math.abs(dot(v,rad))+h.bodyWidthM*h.bodyLengthM*Math.abs(dot(v,bodyUp))+h.bodyWidthM*h.bodyHeightM*Math.abs(dot(v,bodyZ));
+ const earthFraction=earthDisk*(.5*boxProjection(g.radial)/boxArea+.125),enclosureIRWm2=237*earthFraction,enclosureSolarWm2=1361*(sunlit*boxProjection(g.sunECI)/boxArea+.30*Math.max(0,g.sunRadial)*earthFraction);
+ return {enclosureSolarWm2,enclosureIRWm2,pvNormalECI:pv,radiatorNormalECI:rad,ramBody,ramAreaM2:ramArea,solarIncidenceCos:normalCos,radiatorSunCos:radSunCos,earthView,solarKW,generationKW:solarKW,emissivity:eps,absorptivity:alpha,solarIrradiance:1361*sunlit,albedoIrradiance:albedo,earthIRIrradiance:earthIR,absorbedKW:h.radiatorM2*deployment*(alpha*(1361*sunlit*radSunCos+albedo)+eps*earthIR)/1000,emissionCoeff:Math.max(.15,h.radiatorM2*2*eps*deployment)*SIGMA/1000};
 }
 export function linkBudget(d,g,pointingDeg,available){
  let mode=String(d.link||'auto').toLowerCase();

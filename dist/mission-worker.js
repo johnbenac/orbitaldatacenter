@@ -24,6 +24,6 @@ export function chronologicalAudit(design, progress = () => {}) {
   peakQueueGB=Math.max(peakQueueGB,stats.peakQueueGB);if(!firstCrossing&&stats.firstCrossing)firstCrossing=stats.firstCrossing;
   if(i%8===0||i===totalDays-1)progress({days:i+1,totalDays});
  }
- finalState.projected=false;const result={days:totalDays,annual,energyKWh,eventTotals,...eventTotals,burnCount:(eventTotals.trimCount||0)+(eventTotals.reboostCount||0),desatCount:eventTotals.desatCount||0,minSocPct:minSoc,minSocTime,maxJunctionK:maxTemp,maxJunctionTime,peakQueueGB,firstCrossing,finalState,dayStats};return {seeds,dayStats,result};
+ finalState.projected=false;const result={days:totalDays,annual,energyKWh,eventTotals,...eventTotals,burnCount:(eventTotals.trimCount||0)+(eventTotals.reboostCount||0)+(eventTotals.disposalCount||0),desatCount:eventTotals.desatCount||0,minSocPct:minSoc,minSocTime,maxJunctionK:maxTemp,maxJunctionTime,peakQueueGB,firstCrossing,finalState,dayStats};return {seeds,dayStats,result};
 }
 if(typeof WorkerGlobalScope!=='undefined'&&self instanceof WorkerGlobalScope)self.onmessage=({data})=>{try{self.postMessage(chronologicalAudit(data,progress=>self.postMessage({progress})));}catch(e){self.postMessage({error:e.message});}};

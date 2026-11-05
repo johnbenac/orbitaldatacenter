@@ -28,13 +28,17 @@ function leafGroups(h,deploy,attitude){
  // and the remaining material coiled on its translating tip drum.
  const pv=pose.wings.map(w=>{
   const exposed=w.span/(w.span+w.rolledLength);
-  return w.tip.map((v,i)=>v+(w.root[i]-v)*exposed/2);
+  const center=w.tip.map((v,i)=>v+(w.root[i]-v)*exposed/2);
+  center[1]+=(1-exposed)*w.rollRadius*Math.cos(w.pitch);
+  center[2]+=(1-exposed)*w.rollRadius*Math.sin(w.pitch);
+  return center;
  });
  const rad=pose.banks.map(b=>mean(g.descriptors.filter(d=>d.type==='rad'&&d.end===b.end).map(d=>xyz(leafPose(g,d,deploy,h.input.solarTiltDeg,attitude)))));
  const mechanisms=[...pose.wings.map(q=>q.root),...pose.banks.flatMap(q=>[q.root,q.elbow])];
  return {pv,rad,mechanisms};
 
 }
+const fixedCentroids=new WeakMap();
 function partsAt(h,deploy,attitude){
  const p=h.propulsion,d=h.input,w=h.bodyWidthM,b=h.bodyHeightM,l=h.bodyLengthM;
  const supplied=p.stations||{},rows=equipmentAllocations(h);
@@ -51,9 +55,16 @@ function partsAt(h,deploy,attitude){
   // Integration model may explicitly locate individual units (e.g. CMGs).
   const direct=supplied[row.wbs],preferred=(Array.isArray(direct?.[0])?direct:null);
   const centers=points[row.wbs]||preferred||[suppliedPoint(row.wbs,row.id)];
-  const count=h.trays??Math.ceil(h.input.trayCount);
-  const weights=['01.01','01.02'].includes(row.wbs)&&centers.length===2?[Math.ceil(count/2)/count,Math.floor(count/2)/count]:centers.map(()=>1/centers.length);
-  row.stationShares=weights;row.stationsM=centers;row.centroidM=mean(centers,weights);
+  if(preferred){
+   let fixed=fixedCentroids.get(centers);
+   if(!fixed){
+    const shares=row.wbs==='07.01'?h.enclosure.frameShares:centers.map(()=>1/centers.length);
+    fixed={stationsM:centers,stationShares:shares,centroidM:mean(centers,shares)};fixedCentroids.set(centers,fixed);
+   }
+   Object.assign(row,fixed);
+  }else{
+   row.stationShares=centers.map(()=>1/centers.length);row.stationsM=centers;row.centroidM=mean(centers);
+  }
  }
  return rows;
 }

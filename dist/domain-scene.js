@@ -57,7 +57,7 @@ export function domainInstruments(key,h,s,{view='spacecraft',reference=false}={}
  }
  if(view==='launch'&&key!=='launch'&&key!=='launcher'&&key!=='conops'&&reference)return [];
  switch(key){
- case 'mechanical':return [item('structure','structure','Spacecraft body',met(h.bodyLengthM,'m')+' long','left'),item('propellant','propellant','Liquid inventory',met(s.propellantKg,'kg'),'right')];
+ case 'mechanical':return [item('body','structure','Primary structure',met(h.bodyLengthM,'m')+' along launch axis','left'),item('solarRoot','solar','Solar bearing','Side-frame hardpoint','right'),item('radiatorRoot','radiator','Radiator root','Side-frame hardpoint','left')];
  case 'software':return [item('avionics','avionics','Flight computer',s.attitudeModeLabel||'Launch hold','left'),item('body','cmg','Body tracking error',met(s.attitudeSlewErrorDeg,'°',2),'right')];
  case 'avionics':return [item('avionics','avionics','Spacecraft flight computer',met(s.cdhKW*1000,'W'),'left'),item('activeTerminal','communications','Ground commands',met(s.commandGoodputKbps,'kbit/s'),'right')];
  case 'data':if(h.ai&&purposeId(h)!=='text')return [item('avionics','avionics','Customer input staged',bytes(s.aiInputBufferGB),'left'),item('storage','storage',purposeInfo(h).output,bytes(s.aiProductQueueGB)+' queued','left'),item('activeTerminal','communications','Returned to Earth',bytes(s.aiProductDeliveredGB),'right')];return [

@@ -169,7 +169,7 @@ export function designTeaching(phase,id,h,s){
    [reading('Spacecraft bolt circle',1000*spacecraftInterface.pcdM,'mm'),reading(native.diameterMeaning,native.diameterMm,'mm')],page('Watch this payload being loaded','launcher','D'),native.source);
  }
  case 'mechanical':{
-  if(A)return lesson('What must fold to fit this spacecraft into its ride?','Each wing rolls beside the bus. Each radiator bank folds onto its hinges. The longest dimension of the packed stack can be set by parked hardware extending beyond the main body.',
+  if(A)return lesson('What must fold to fit this spacecraft into its ride?','Each wing rolls beside the bus. Each radiator bank folds onto its hinges. The flat side walls carry the appendages. Look down the launch axis to see the room between the rectangular body and the circular payload envelope. Then check clearance where the fairing narrows along the stack.',
    [reading('Enclosed bus length',h.bodyLengthM,'m'),reading('Stowed stack with adapter',h.stowedLengthM,'m')],page('Inspect the limiting clearance','launch','A'),'mech');
   const wet=componentCentroid(h,h.propellantKg,0,true),empty=componentCentroid(h,0,0,true);
   return lesson('How far could the mass center shift as the tanks empty?','Hold the spacecraft folded and the adapter attached in both cases, then remove the liquid propellant. Comparing their mass-weighted centers isolates the effect of propellant inventory on balance.',

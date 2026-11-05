@@ -16,8 +16,7 @@ export function deployedPlan(h){
  const b1=Math.cos(.38),b2=Math.sin(.38),u=([x,y])=>x*b1-y*b2;
  const sx=155/Math.max(...leaves.flatMap(({c})=>c.map(q=>Math.abs(u(q)))),w),sz=68/Math.max(...leaves.flatMap(({c})=>c.map(q=>Math.abs(q[2]))),l*.5),k=Math.min(sx,sz),xy=q=>[cx+u(q)*k,cy-q[2]*k];
  let a='';
- for(const side of [-1,1])for(const end of [-1,1])a+=line(cx,cy-end*l*.28*k,cx+side*g.rootX*b1*k,cy-(g.center+end*g.mountZ)*k,steel);
- for(const side of [-1,1])a+=line(...xy([0,0,l/2]),...xy([0,side*g.rootY,g.radRoot]),steel);
+ for(const mount of g.mounts)for(const {foot,seat,role} of mount.supports)if(role==='root')a+=line(...xy(foot),...xy(seat),steel);
  for(const {d,c} of leaves){
   const seq=[0,1,3,2].map(i=>xy(c[i]).map(f).join(',')).join(' '),pv=d.type==='pv';
   a+=`<polygon points="${seq}" fill="${pv?solar:rad}" stroke="#c5d2ce" stroke-width=".65"/>`;
@@ -28,8 +27,8 @@ export function deployedPlan(h){
  }
  const bodyW=(w*b1+b*b2)*k;
  a+=`<rect x="${f(cx-bodyW/2)}" y="${f(cy-l*k/2)}" width="${f(bodyW)}" height="${f(l*k)}" fill="#d3dad2" stroke="#65747a" stroke-width=".8"/>`;
- a+=label(16,225,'■ Wings ±X',solar)+label(135,225,'■ Radiators +Z',rad)+label(272,225,'Thrust deck −Z',white);
- return panel('Deployed vehicle','Solar wings to port and starboard · twin forward radiators',a);
+ a+=label(16,225,'■ Wings ±X',solar)+label(135,225,'■ Banks ±Y',rad)+label(272,225,'Thrust deck −Z',white);
+ return panel('Deployed vehicle','Solar drives on ±X walls · hinged banks on ±Y walls',a);
 }
 export function propulsionSectionDrawing(h,snapshot={}){
  const p=h.propulsion,w=h.bodyWidthM,l=h.bodyLengthM;
@@ -40,7 +39,14 @@ export function propulsionSectionDrawing(h,snapshot={}){
  let s=`<rect x="${f(x)}" y="${f(y)}" width="${f(w*sc)}" height="${f(l*sc)}" fill="#20333c" stroke="#8ca1aa"/>`;
  const rect=(cx,cz,width,length,fill)=>`<rect x="${f(xx(cx-width/2))}" y="${f(yy(cz+length/2))}" width="${f(width*sc)}" height="${f(length*sc)}" rx="1" fill="${fill}" stroke="#789099" stroke-width=".65"/>`;
  const mid=p.equipmentCenterZ,len=p.equipmentLengthM;
- for(const side of [-1,1]){s+=rect(side*w*.225,mid,w*.38,len*.64,'#405964');for(let j=1;j<7;j++){const z=mid+(.32-j*.64/7)*len;s+=line(xx((side*.225-.176)*w),yy(z),xx((side*.225+.176)*w),yy(z),'#9caeb0','stroke-width=".7"');}}
+ // Project the real tray lattice along Y. Several rows can share a silhouette.
+ const rack=h.rackLayout,[sx,,sz]=rack.slotDimensionsM,[px,,pz]=rack.pitchM;
+ for(let bay=0;bay<rack.bays;bay++)for(let col=0;col<rack.columns;col++){
+  const cx=(col-(rack.columns-1)/2)*px,cz=rack.rackZ0M+(bay+.5)*pz;
+  s+=`<rect x="${f(xx(cx-sx/2))}" y="${f(yy(cz+sz/2))}" width="${f(sx*sc)}" height="${f(sz*sc)}" fill="none" stroke="#576d78" stroke-width=".5" stroke-dasharray="2 1"/>`;
+ }
+ const occupied=new Set();
+ for(const slot of rack.slots){const id=slot.bay+'/'+slot.column;if(occupied.has(id))continue;occupied.add(id);s+=rect(slot.x,slot.z,sx,sz,'#537a8b');}
  for(const cg of p.stations['04.01'].filter(o=>o[1]>0))s+=rect(cg[0],cg[2],p.installDims['04.01'][0],p.installDims['04.01'][2],'#625449');
  for(let i=0;i<4;i++)s+=rect((i-1.5)*w*.20,mid+len*.408,w*.185,len*.13,'#49928c');
  s+=rect(.10*w,mid-.407*len,.52*w,.13*len,'#5f6382')+rect(-.313*w,mid-.401*len,.20*w,.13*len,'#716283')+line(x,deck,xx(w/2),deck,steel);
@@ -65,7 +71,7 @@ export function propulsionSectionDrawing(h,snapshot={}){
   const edge=left?x:xx(w/2),end=left?92:306,y=yy(z);
   return line(edge,y,end,y,'#52707b')+label(left?end-3:end+3,y+3,name,'#b5c9cd',left?'end':'start',9);
  };
- s+=guide(true,mid+len*.408,'Battery packs')+guide(false,mid,'Compute racks')+guide(true,mid-len*.407,'Avionics / storage')+guide(false,p.tanks[1].z,'Liquid tanks');
+ s+=guide(true,mid+len*.408,'Battery packs')+guide(false,rack.slots[0].z,'Installed trays')+guide(true,mid-len*.407,'Avionics / storage')+guide(false,p.tanks[1].z,'Liquid tanks');
  s+=label(14,210,'● Fuel',fuel)+label(78,210,'● Oxidizer',ox)+label(160,210,'◌ Helium',gas)+label(376,210,'⊕ Deployed center of mass',white,'end');
  s+=label(14,227,'+Z launch-up · −Z adapter / exhaust','#adc0cd')+label(376,227,f(l)+' m bus','#adc0cd','end');
  return `<figure style="margin:0"><div style="display:grid;gap:.65rem;grid-template-columns:repeat(auto-fit,minmax(min(100%,315px),1fr))">${deployedPlan(h)}${panel('Launch-axis section','View across Y · helium projected from the interstice',s)}</div></figure>`;

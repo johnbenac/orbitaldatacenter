@@ -1,3 +1,4 @@
+import {renderLaunchStructure} from './launch-structure.js';
 import {buildEquipmentList,filterEquipmentRows} from './equipment-list.js';
 import {componentMassProperties,equipmentAllocations} from './component-stations.js';
 import {entryDensity} from './entry.js';
@@ -108,8 +109,8 @@ function disposal(h,s,context){
 }
 function stationName(r){
  if(r.stationsM.length===1)return esc(r.item);
- const labels=r.wbs==='06.08'?['Fuel ullage','Oxidizer ullage','Helium bottle']:['01.01','01.02'].includes(r.wbs)?['Port rack group','Starboard rack group']:[];
- return '<details data-station="'+r.wbs+'"><summary>'+esc(r.item)+'</summary><small>'+r.stationsM.map((p,i)=>esc(labels[i]||'Station '+(i+1))+' · '+f(r.massKg*r.stationShares[i])+' kg · '+vec(p)+' m').join('<br>')+'</small></details>';
+ const labels=r.wbs==='06.08'?['Fuel ullage','Oxidizer ullage','Helium bottle']:[];
+ return '<details data-station="'+r.wbs+'"><summary>'+esc(r.item)+'</summary><small>'+r.stationsM.map((p,i)=>esc(labels[i]||(['01.01','01.02'].includes(r.wbs)?'Tray ':'Station ')+(i+1))+' · '+f(r.massKg*r.stationShares[i])+' kg · '+vec(p)+' m').join('<br>')+'</small></details>';
 }
 function report(h,s,phase,key,filter){
  const p=stateFor(h,s,key),reg=buildEquipmentList(h,s),meta=new Map(reg.rows.map(r=>[r.wbs,r])),chosen=new Set(filterEquipmentRows(reg.rows,filter).map(r=>r.wbs));
@@ -123,7 +124,7 @@ function report(h,s,phase,key,filter){
 }
 export function renderMechanical(h,s,phase,context={}){
  const [title,desc]=phaseInfo[phase],key=sectionPhase(phase);
- return '<section class="mel mec" data-mechanical><header class="mel-header"><div><span class="mel-eyebrow">Mechanical design / Phase '+phase+'</span><h2>'+title+'</h2><p>'+desc+'</p></div></header><div class="mel-controls mech-filters"><label>Find component or part<input type="search" data-mech-find placeholder="Name, WBS, supplier or part number"></label><label>Subsystem<select data-mech-sub><option value="">All subsystems</option>'+buildEquipmentList(h).subsystems.map(r=>'<option>'+esc(r.name)+'</option>').join('')+'</select></label><label>Configuration viewed<select data-mech-pose>'+Object.entries(massCases).filter(([v])=>phase==='C'||v===key).map(([v,l])=>'<option value="'+v+'" '+(v===key?'selected':'')+'>'+l+'</option>').join('')+'</select></label></div><div data-mech-report>'+report(h,s,phase,key,{})+'</div></section>'+(phase==='F'?disposal(h,s,context):'');
+ return (['B','C','D'].includes(phase)?renderLaunchStructure(h,'mechanical',['B','C'].includes(phase)):'')+'<section class="mel mec" data-mechanical><header class="mel-header"><div><span class="mel-eyebrow">Mechanical design / Phase '+phase+'</span><h2>'+title+'</h2><p>'+desc+'</p></div></header><div class="mel-controls mech-filters"><label>Find component or part<input type="search" data-mech-find placeholder="Name, WBS, supplier or part number"></label><label>Subsystem<select data-mech-sub><option value="">All subsystems</option>'+buildEquipmentList(h).subsystems.map(r=>'<option>'+esc(r.name)+'</option>').join('')+'</select></label><label>Configuration viewed<select data-mech-pose>'+Object.entries(massCases).filter(([v])=>phase==='C'||v===key).map(([v,l])=>'<option value="'+v+'" '+(v===key?'selected':'')+'>'+l+'</option>').join('')+'</select></label></div><div data-mech-report>'+report(h,s,phase,key,{})+'</div></section>'+(phase==='F'?disposal(h,s,context):'');
 }
 const live=new WeakMap();
 export function bindMechanical(container,h,s,phase){

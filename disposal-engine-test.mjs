@@ -1,6 +1,6 @@
 import {DEPLOY_END_S} from './dist/commissioning-clock.js';
 import assert from 'node:assert/strict';
-import {defaults,normalizeDesign,sizeDesign} from './dist/design.js';
+import {defaults,applyPreset,normalizeDesign,sizeDesign} from './dist/design.js';
 import {createSimulation} from './dist/model.js';
 import {chronologicalAudit} from './dist/mission-worker.js';
 import {R,MU,YEAR,DAY} from './dist/orbit.js';
@@ -24,17 +24,18 @@ console.log('Disposal checks passed: fixed reachable target, miss and unreachabl
 
 if(process.argv.includes('--five-year')){
  for(const method of ['reentry','graveyard']){
-  const h=sizeDesign({...defaults,disposalMethod:method});
+  const h=sizeDesign({...applyPreset(defaults,'launcher','glenn'),disposalMethod:method});
   assert.ok(h.fit);const {result}=chronologicalAudit(h.input),p=result.terminal;
   assert.equal(p.targetMet,true);near(result.finalState.disposalUsedKg,p.usedKg);
   near(p.initialWet-result.finalState.wetKg,p.usedKg);
   near(p.initialWet*(-Math.expm1(-p.paidDv/(h.input.isp*9.80665))),p.usedKg,.001);
   near(result.payloadServiceSeconds,p.start-180-DEPLOY_END_S,.01);
   near(result.thermal.coveredSeconds,p.entry??p.end,.01);
+  // Regression anchors for the 4.03 t elongated reference spacecraft on New Glenn.
   if(method==='reentry'){
-   near(p.targetErrorKm,28.05,2);near(p.usedKg,123.46,.5);near(p.impact.speedMs,49.28,.5);near(p.footprint.semiMajorKm,426.9,2);assert.equal(result.impactCount,1);
+   near(p.targetErrorKm,32.16,2);near(p.usedKg,172.94,.5);near(p.impact.speedMs,49.28,.5);near(p.footprint.semiMajorKm,426.9,2);assert.equal(result.impactCount,1);
   }else{
-   near(p.finalPerigeeKm,899.41,1);near(p.finalApogeeKm,900.59,1);near(p.usedKg,167.49,.5);assert.equal(result.disposalCount,2);
+   near(p.finalPerigeeKm,898.83,1);near(p.finalApogeeKm,901.17,1);near(p.usedKg,233.63,.5);assert.equal(result.disposalCount,2);
   }
   console.log(method,JSON.stringify({usedKg:p.usedKg,paidDv:p.paidDv,targetErrorKm:p.targetErrorKm,finalPerigeeKm:p.finalPerigeeKm,finalApogeeKm:p.finalApogeeKm,actualSurfacePoint:p.impact,remainingKg:result.finalState.propellantKg}));
  }

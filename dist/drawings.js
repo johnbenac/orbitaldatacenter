@@ -37,10 +37,11 @@ function stowed(h){
   const parked=mechanismPose(kin,0);
   a+=rect(x+bus.z0M*k,y-h.bodyWidthM*k/2,h.bodyLengthM*k,h.bodyWidthM*k,'bus');
   for(const q of parked.wings){
-    a+=line(z0+Math.min(h.bodyLengthM*.42,q.root[2])*k,y-q.side*h.bodyWidthM*.49*k,z0+q.root[2]*k,y-q.root[0]*k,'mount');
     a+=rect(z0+(q.root[2]-kin.ww/2)*k,y-(q.root[0]+q.rollRadius)*k,kin.ww*k,2*q.rollRadius*k,'panel');
   }
   a+=rect(z0+kin.radRoot*k,y-kin.rw*k/2,kin.r*k,kin.rw*k,'thermal');
+  for(const m of kin.mounts)for(const {foot,seat} of m.supports)
+    a+=line(z0+foot[2]*k,y-foot[0]*k,z0+seat[2]*k,y-seat[0]*k,'mount');
   const L=h.stowedLengthM*k;
   a+=line(x,y+57,x,228,'guide')+line(x+L,y+57,x+L,228,'guide')+dim(x,224,x+L,`${fmt(h.stowedLengthM)} m stack`,false);
   a+=text(22,271,`Keep-in Ø ${fmt(f.maxDiameterM)} m  /  stack Ø ${fmt(h.stowedDiameterM)} m`,'measure');
@@ -50,7 +51,7 @@ function stowed(h){
 }
 function deployed(h){
   const bw=h.bodyWidthM,bh=h.bodyHeightM,bl=h.bodyLengthM,wl=h.wingLengthM,ww=h.wingWidthM,rl=h.radiatorLengthM,rw=h.radiatorWidthM;
-  const {mountZ,rootX:solarRoot,radRoot:radiatorRoot}=deploymentLayout(h);
+  const {mountZ,rootX:solarRoot}=deploymentLayout(h);
   // Project the same terminal vertices as the scene, including tracking and splay.
   const cs=Math.sqrt(3)/2,sn=.5,span=2*(solarRoot+wl),layout=deploymentLayout(h);
   const points=layout.descriptors.flatMap(d=>leafCorners(leafPose(layout,d,1,h.input.solarTiltDeg),d));
@@ -62,9 +63,7 @@ function deployed(h){
   const edge=(p,q,cls='detail')=>line(...project(p),...project(q),cls);
   let a=text(402,26,'02    DEPLOYED','eyebrow')+text(402,48,'Operating geometry','title');
   const pvY=0;
-  for(const side of [-1,1])for(const end of [-1,1])
-    a+=edge([side*bw*.5,pvY,end*bl*.28],[side*solarRoot,pvY,layout.center+end*mountZ],'mount');
-  for(const end of [-1,1])a+=edge([0,0,bl/2],[0,end*layout.rootY,radiatorRoot],'mount');
+  for(const m of layout.mounts)for(const {foot,seat,role} of m.supports)if(role==='root')a+=edge(foot,seat,'mount');
   for(const leaf of layout.descriptors){
     const c=leafCorners(leafPose(layout,leaf,1,h.input.solarTiltDeg),leaf);
     a+=poly([c[0],c[1],c[3],c[2]],leaf.type==='pv'?'panel':'thermal');

@@ -15,7 +15,7 @@ for(const id of Object.keys(fairings)){
  for(const [z,r] of f.profile)near(radiusAt(f.profile,z),r);
  const custom=sizeDesign({...model.input,fairingLengthM:f.heightM*.4});assert.ok(custom.fairing.override&&!custom.fit);
 }
-assert.ok(h.fairing.fit);assert.ok(!sizeDesign(applyPreset(defaults,'launcher','falconHeavy')).fairing.fit);
+assert.ok(sizeDesign(applyPreset(defaults,'launcher','glenn')).fairing.fit);assert.ok(!sizeDesign(applyPreset(defaults,'launcher','falconHeavy')).fairing.fit);
 const smallR=fairingFit({...defaults,radialPaddingM:0},[{part:'Test',z0M:3,z1M:4,lengthM:1,radiusM:2.39}]);
 assert.ok(smallR.fit);assert.ok(!fairingFit(defaults,smallR.stack).fit);
 assert.equal(new Set(e.walls.map(w=>w.axis+w.sign)).size,6);

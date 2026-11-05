@@ -1,3 +1,4 @@
+import {deploymentLayout} from './deployment.js';
 import * as T from './vendor/three.module.js';
 import {domainSceneSpecs,sceneColors,routeRates} from './domain-scene.js';
 const V=(x=0,y=0,z=0)=>new T.Vector3(x,y,z);
@@ -56,7 +57,7 @@ export function dataRoutes(craft,h){
  const root=new T.Group();root.name='Modeled data routes';const routes=[],w=h.bodyWidthM,b=h.bodyHeightM,l=h.bodyLengthM;
  const P=(x,y,z)=>V(x*w,y*b*craft.internal.scale.y+craft.internal.position.y,z*l);
  const inBus=o=>craft.root.worldToLocal(o.getWorldPosition(V()));
- const cpu=P(.24,.13,-.24),bulk=P(-.44,-.13,-.27),sw=inBus(craft.avionics),ssd=inBus(craft.recorder),top=P(-.27,.54,-.35);
+ const chip=h.rackLayout.slots.at(-1),cpu=V(chip.x,chip.y,chip.z),bulk=P(-.44,-.13,-.27),sw=inBus(craft.avionics),ssd=inBus(craft.recorder),top=P(-.27,.54,-.35);
  const targets={Ka:craft.dish,Optical:craft.optic,'S-band':craft.patches[0]};
  const smoothPath=points=>new T.CatmullRomCurve3(points,false,'centripetal');
  function add(key,points,channel=key,terminal=null){
@@ -91,13 +92,15 @@ export function hardwareAnchor(id,c,h,s){
  const w=h.bodyWidthM,y=h.bodyHeightM,l=h.bodyLengthM,P=(x,yy,z)=>V(w*x,y*yy,l*z);
  const centre=o=>o?.getWorldPosition(V());
  switch(id){
+ case 'compute':{const p=h.rackLayout.slots.at(-1);return c.root.localToWorld(V(p.x,p.y,p.z));}
  case 'storage':return centre(c.recorder);case 'avionics':return centre(c.avionics);
  case 'dish':return centre(c.dish);case 'optic':return centre(c.optic);case 'patch':return centre(c.patches[0]);
  case 'activeTerminal':return centre(s.groundLink==='Optical'?c.optic:s.groundLink==='S-band'?c.patches[0]:c.dish);
+ case 'solarRoot':case 'radiatorRoot':{const kind=id==='solarRoot'?'solar':'radiator',m=deploymentLayout(h).mounts.find(m=>m.kind===kind&&m.side===1);return c.root.localToWorld(V(...m.root));}
  case 'cmg':return centre(c.cmgs[0].g);case 'torquer':return centre(c.torquers[0]);
  case 'fuel':case 'oxidizer':case 'helium':return centre(c.tankMap[id]);case 'engine':return centre(c.engines[0]);
  case 'solar':case 'radiator':{const p=c.panels.find(v=>v.descriptor.type===(id==='solar'?'pv':'rad'));return p?.surface.getWorldPosition(V())||null;}
- default:{const pts={body:P(0,0,0),compute:P(.22,.20,-.17),battery:P(.2,.15,.435),coolant:P(.41,.18,.28)};
+ default:{const pts={body:P(0,0,0),battery:P(.2,.15,.435),coolant:P(.41,.18,.28)};
   return pts[id]?(id==='body'?c.root:c.internal).localToWorld(pts[id]):null;}
  }
 }

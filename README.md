@@ -61,6 +61,8 @@ The service analysis records customer outcomes against the modeled direct contac
 
 **Launch Vehicle** compares carrier configurations and their reference payload, fairing and recovery assumptions. **Launch & Insertion** follows the selected spacecraft on that carrier through integration and release. In design phases a change review shows replaced inputs, retained interfaces to check, updated coupled quantities and any exceeded sizing limits. Cancel or apply the proposal before switching hardware. A carrier change keeps the active sizing mode and the mission-specific allowance.
 
+**Mechanical Design** shows how each stowed solar roll and each rigid folded radiator transfers inertial load into a long face of the primary box. The cutaway, drawings, component stations, launch restraints, tray lattice and tapered fairing screen use the shared installation coordinates. Phase D offers end-on and side elevations of the stowed spacecraft. The live-text factory build pairs the revised spine with New Glenn for clearance in the forward taper. Explicit launcher selections in imported designs retain their original value.
+
 **Flight Software** follows the same mode executive and encoder feedback that drive the vehicle. Inspect priority, body and engine permissions, terminal lock, or the two-sided radiator exposure. Pointing guides show the achieved geometry. The acute angle to a radiator face normal is 90° at grazing incidence.
 
 **Share** restores the scenario, phase, domain, camera, clock and selected event. **Export & import** provides scenario JSON, telemetry CSV, a static-site bundle and the quantitative PDR ZIP. Scenario JSON and PDR packages can be imported from a design phase.
@@ -71,7 +73,7 @@ The quick mission preview uses representative days for later mission ages. **Run
 
 Open Phase E and select **Deploy spacecraft**, or use `?phase=E&domain=conops&chapter=commissioning`. The 20-minute study sequence begins at mission elapsed time 900 s. You can scrub it, pause it, select a stage or inspect the moving tip drum and radiator knuckle. At sequence end the clock pauses for verification. Continue to operations to follow the mission.
 
-Four roll-out solar blankets stay attached at their individual roots. Two forward radiator banks swing at their permanent root hinges, open their outer panels, latch and then admit coolant. The Sources and Architecture pages link the flight and supplier publications used for these mechanisms.
+Four roll-out solar blankets stay attached at their individual roots. Two side-mounted radiator banks swing at their permanent root hinges, open their outer panels, latch and then admit coolant. The Sources and Architecture pages link the flight and supplier publications used for these mechanisms.
 
 ## Local verification
 

@@ -4,7 +4,10 @@ import {createSimulation} from './dist/model.js';
 import {gyroCatalog,issGyros,gyroComparison,gyroCandidateDesign,sizeGyros,renderAvionics,renderGyroBenchmark} from './dist/flight-electronics.js';
 const near=(a,b,t=1e-7)=>assert.ok(Math.abs(a-b)<t,`${a} ≠ ${b}`);
 const h=sizeDesign(defaults),g=h.cmg;
-near(g.totalKg,152);near(g.plannedMomentumNms,80);
+// The longer equipment frame needs the 75-75 S catalog cluster for acquisition
+// and trim. Existing saved 80 N·m·s designs still install the smaller package.
+near(g.totalKg,4*69);near(g.plannedMomentumNms,150);assert.equal(g.model,'CMG 75-75 S');
+const previous=sizeGyros({...defaults,cmgMomentumNms:80});near(previous.totalKg,152);near(previous.plannedMomentumNms,80);
 near(h.massLedger.find(r=>r.id==='cmg').kg,g.totalKg+6+.0015*h.input.dipoleAm2);
 const cmp=gyroComparison(h,{wetKg:3000});near(cmp.iss.massFraction,.25936546,1e-6);near(cmp.iss.litresPerKg,7.02315,1e-4);
 near(cmp.scaledScalarMomentumNms,4*4760*3000/issGyros.stationKg);

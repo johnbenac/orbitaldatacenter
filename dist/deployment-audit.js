@@ -7,23 +7,23 @@ export const deploymentAudit={
     {
       "id": "pathfinder",
       "minLeafGapM": 0.094,
-      "minSolarRadiatorGapM": 0.75,
-      "minHardwareGapM": 0.039989649,
+      "minSolarRadiatorGapM": 0.83,
+      "minHardwareGapM": 0.080601569,
       "closestPair": [
-        "wing -1/1",
-        "wing -1/1 CylinderGeometry at -0.99,0.15,1.94"
+        "wing -1/-1 Wound photovoltaic blanket",
+        "bus hardware"
       ],
-      "closestAt": 0.2966666666666667,
+      "closestAt": 0,
       "closestCentersM": [
         [
-          -4.016,
-          0,
-          2.626
+          -1.182,
+          0.143,
+          -1.324
         ],
         [
-          -0.991,
-          0.149,
-          1.942
+          -0.902,
+          0.095,
+          -1.964
         ]
       ],
       "maxHingeGapM": 0,
@@ -34,28 +34,28 @@ export const deploymentAudit={
       "meshFitMarginM": 0.497326026,
       "fit": true,
       "radialClearanceM": 0.540811022,
-      "axialClearanceM": 5.49816693
+      "axialClearanceM": 4.351263393
     },
     {
       "id": "reference",
       "minLeafGapM": 0.094,
-      "minSolarRadiatorGapM": 0.878300682,
-      "minHardwareGapM": 0.032176299,
+      "minSolarRadiatorGapM": 0.966205063,
+      "minHardwareGapM": 0.071800065,
       "closestPair": [
-        "wing -1/1",
-        "wing -1/1 CylinderGeometry at -1.44,0.18,3.08"
+        "wing -1/-1 Wound photovoltaic blanket",
+        "bus hardware"
       ],
-      "closestAt": 0.13875,
+      "closestAt": 0,
       "closestCentersM": [
         [
-          -2.977,
-          0,
-          4.751
+          -1.596,
+          0.154,
+          -2.097
         ],
         [
-          -1.439,
-          0.176,
-          3.084
+          -1.302,
+          0.113,
+          -2.887
         ]
       ],
       "maxHingeGapM": 0,
@@ -63,31 +63,31 @@ export const deploymentAudit={
       "maxLengthErrorM": 0,
       "maxHoseLengthErrorM": 0.000001039,
       "deployClear": true,
-      "meshFitMarginM": 0.112585403,
-      "fit": true,
-      "radialClearanceM": 0.065390766,
-      "axialClearanceM": 3.226584589
+      "meshFitMarginM": -0.169310946,
+      "fit": false,
+      "radialClearanceM": -0.398573639,
+      "axialClearanceM": 1.0229933
     },
     {
       "id": "optical",
       "minLeafGapM": 0.094,
-      "minSolarRadiatorGapM": 0.878300682,
-      "minHardwareGapM": 0.032180669,
+      "minSolarRadiatorGapM": 0.966205063,
+      "minHardwareGapM": 0.071800065,
       "closestPair": [
-        "wing -1/1",
-        "wing -1/1 CylinderGeometry at -1.44,0.18,3.08"
+        "wing -1/-1 Wound photovoltaic blanket",
+        "bus hardware"
       ],
-      "closestAt": 0.13875,
+      "closestAt": 0,
       "closestCentersM": [
         [
-          -2.977,
-          0,
-          4.746
+          -1.596,
+          0.154,
+          -2.097
         ],
         [
-          -1.439,
-          0.176,
-          3.084
+          -1.302,
+          0.113,
+          -2.887
         ]
       ],
       "maxHingeGapM": 0,
@@ -95,31 +95,31 @@ export const deploymentAudit={
       "maxLengthErrorM": 0,
       "maxHoseLengthErrorM": 0.000001039,
       "deployClear": true,
-      "meshFitMarginM": 0.112585403,
-      "fit": true,
-      "radialClearanceM": 0.064331203,
-      "axialClearanceM": 3.226584589
+      "meshFitMarginM": -0.169310946,
+      "fit": false,
+      "radialClearanceM": -0.398573639,
+      "axialClearanceM": 1.0229933
     },
     {
       "id": "carrier",
       "minLeafGapM": 0.094,
-      "minSolarRadiatorGapM": 1.025204308,
-      "minHardwareGapM": 0.022096593,
+      "minSolarRadiatorGapM": 1.312176408,
+      "minHardwareGapM": 0.050567646,
       "closestPair": [
-        "radiator 1/0",
-        "bank 1 CylinderGeometry at -1.26,-0.86,1.90"
+        "wing -1/-1 Wound photovoltaic blanket",
+        "bus hardware"
       ],
-      "closestAt": 0.715,
+      "closestAt": 0,
       "closestCentersM": [
         [
-          0,
-          -1.672,
-          5.459
+          -2.148,
+          0.165,
+          -2.912
         ],
         [
-          -1.258,
-          -0.858,
-          1.898
+          -1.834,
+          0.159,
+          -3.801
         ]
       ],
       "maxHingeGapM": 0,
@@ -127,31 +127,31 @@ export const deploymentAudit={
       "maxLengthErrorM": 0,
       "maxHoseLengthErrorM": 0.000001039,
       "deployClear": true,
-      "meshFitMarginM": 0.07887193,
+      "meshFitMarginM": 0.17431877,
       "fit": true,
-      "radialClearanceM": 0.039341133,
-      "axialClearanceM": 6.022098427
+      "radialClearanceM": 0.010314018,
+      "axialClearanceM": 3.750966218
     },
     {
       "id": "scale",
       "minLeafGapM": 0.094,
-      "minSolarRadiatorGapM": 3.143003265,
-      "minHardwareGapM": 0.005027313,
+      "minSolarRadiatorGapM": 17.799706252,
+      "minHardwareGapM": 0.0278,
       "closestPair": [
-        "radiator -1/1",
-        "bank -1 CylinderGeometry at -13.85,2.53,5.14"
+        "radiator -1/0",
+        "bus hardware"
       ],
       "closestAt": 0,
       "closestCentersM": [
         [
           0,
-          3.345,
-          55.711
+          17.838,
+          14.899
         ],
         [
-          -13.853,
-          2.531,
-          5.139
+          -9.945,
+          17.255,
+          -50.742
         ]
       ],
       "maxHingeGapM": 0,
@@ -159,10 +159,10 @@ export const deploymentAudit={
       "maxLengthErrorM": 0,
       "maxHoseLengthErrorM": 0.000001039,
       "deployClear": true,
-      "meshFitMarginM": -143.831355691,
+      "meshFitMarginM": -155.302698749,
       "fit": false,
-      "radialClearanceM": -37.454221184,
-      "axialClearanceM": -143.900855691
+      "radialClearanceM": -31.927396021,
+      "axialClearanceM": -155.483536449
     }
   ]
 };

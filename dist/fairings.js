@@ -1,5 +1,5 @@
 import {adapterEnvelopeM,spacecraftInterface} from './payload-interface.js';
-import {deploymentLayout,terminalLayout} from './deployment.js';
+import {deploymentLayout,terminalLayout,terminalStations} from './deployment.js';
 // Coordinates are metres from the payload adapter interface plane, positive forward.
 const terran = {
  outerDiameterM:5.4,basis:'Planning estimate',source:'Relativity Space · Terran R architecture',
@@ -80,30 +80,38 @@ export function packedSections(g){
  add('Launch service stand-off',spacecraftInterface.outerM,spacecraftInterface.outerM,Math.max(.30,...(g.propulsion?.engines||[]).map(e=>-e.z-l*.5+.14)),Math.max(spacecraftInterface.outerM/2,adapterWidth/2));
  const nozzles=g.propulsion?.engines||[];
  const bellEdge=Math.max(0,...nozzles.map(e=>Math.hypot(e.x,e.y)+e.exitRadiusM));
- const a=g.opticalApertureM??0,term=terminalLayout(w,h,kaDishM,a);
+ const a=g.opticalApertureM??g.input?.opticalApertureM??0,term=terminalLayout(w,h,kaDishM,a);
  const dishEdge=Math.max(Math.hypot(w*.16+kaDishM*.52,h*.5+term.kaHeight-term.kaPin+.18*kaDishM),
   Math.hypot(w*.16+term.kaFork+.017*kaDishM,h*.5+term.kaHeight+.048*kaDishM),
   Math.hypot(w*.16+kaDishM*.063,h*.5+term.kaHeight-term.kaPin+kaDishM*.42),
   Math.hypot(w*.20+a*.89,h*.5+term.opticalHeight+Math.max(.05*a,1.04*a-term.opticalPin)));
- const k=deploymentLayout(g),spoolRadius=k.packedRollM+.018;
+ const k=deploymentLayout(g),spoolRadius=k.packedRollM+.019;
  const drumEnvelope=Math.hypot(k.rootX,k.packedRollM)+spoolRadius;
- const radHalfWidth=Math.max(k.rw/2,k.rw*.32+.32)+.012,radHalfHeight=k.rootY+k.hingeStand+.05;
- const radEnvelope=Math.hypot(radHalfWidth,radHalfHeight);
- const busRadius=Math.max(Math.hypot(w+.12,h+.12)/2,bellEdge,dishEdge,drumEnvelope);
- add('Insulated bus',Math.max(w+.12,2*(k.rootX+spoolRadius)),Math.max(h+.12,4*spoolRadius+.11),l,busRadius);
- // Heights of the final stations above the forward bus bulkhead. Rolls and banks
- // are beside one another on fixed hardpoints, not serial appendage compartments.
- const rollsEnd=k.center+k.mountZ+k.ww/2+.17-l/2,radEnd=k.radRoot+k.r+.13-l/2;
- const ends=[Math.min(rollsEnd,radEnd),Math.max(rollsEnd,radEnd)].filter(t=>t>0);
- let from=0;
- for(const t of ends){if(t-from<1e-6)continue;
-  const pv=rollsEnd>from+1e-7,rad=radEnd>from+1e-7;
-  const label=pv&&rad?'Side rolls and folded radiator banks':pv?'Solar roll end fittings':'Folded radiator tip restraints';
-  add(label,2*Math.max(pv?k.rootX+spoolRadius:0,rad?radHalfWidth:0),
-   2*Math.max(pv?2*spoolRadius+.055:0,rad?radHalfHeight:0),t-from,
-   Math.max(pv?drumEnvelope:0,rad?radEnvelope:0));
-  from=t;
+ const radHalfWidth=Math.max(k.rw/2+.025,k.rw*.32+.24),radHalfHeight=k.rootY+k.hingeStand+.115;
+ const bodyBase=z,bodyCenter=bodyBase+l/2;
+ // Each hardware group has its own axial interval. A radius is measured from
+ // the vehicle axis, so a side-mounted package consumes the circular segment
+ // at that face, without extruding its outermost corner along the entire bus.
+ function feature(part,lo,hi,widthM,heightM,radiusM){
+  const z0M=bodyCenter+lo,z1M=bodyCenter+hi;
+  sections.push({part,widthM,heightM,lengthM:hi-lo,radiusM,z0M,z1M});
  }
+ const panelBorder=Math.max(.032,Math.min(w,h)*.018);
+ const bodyEdge=Math.hypot(w/2+panelBorder,h/2+panelBorder);
+ add('Insulated bus',w+2*panelBorder,h+2*panelBorder,l,bodyEdge);
+ const frameEnd=Math.max(.005*l,.25*Math.min(w,h)*.052)+.01;
+ feature('Forward frame and fittings',l/2,l/2+frameEnd,w,h,bodyEdge);
+ if(bellEdge>0)feature('Engine bells',Math.min(...nozzles.map(e=>e.z)),-l/2,2*bellEdge,2*bellEdge,bellEdge);
+ for(const end of [-1,1]){
+  const station=k.center+end*k.mountZ;
+  feature('Side solar cassettes · '+(end<0?'aft':'forward'),station-k.ww/2-.17,station+k.ww/2+.17,
+   2*(k.rootX+spoolRadius),2*(k.packedRollM+spoolRadius),drumEnvelope);
+ }
+ feature('Face-mounted radiator packs',k.radRoot-.27,k.radRoot+k.r+.13,2*radHalfWidth,2*radHalfHeight,Math.hypot(radHalfWidth,radHalfHeight));
+ const {ka,optical}=terminalStations(w,l,{kaDishM,opticalApertureM:a});
+ const kaZ=.62*kaDishM+.035,opZ=1.05*a+.025;
+ feature('Parked terminal heads',Math.min(ka[1]-kaZ,optical[1]-opZ),Math.max(ka[1]+kaZ,optical[1]+opZ),2*Math.max(Math.abs(ka[0])+kaZ,Math.abs(optical[0])+opZ),
+  2*(h*.5+Math.max(term.kaHeight+.5*kaDishM,term.opticalHeight+1.04*a)),dishEdge);
  return sections;
 }
 
@@ -123,8 +131,9 @@ export function fairingFit(d,stack){
    ratio=Math.min(ratio,allowable/required);
   }
  }
- const axialClearanceM=heightM-stack.at(-1).z1M-axialPaddingM;
- ratio=Math.min(ratio,heightM/(stack.at(-1).z1M+axialPaddingM));
+ const stackHeightM=Math.max(...stack.map(section=>section.z1M));
+ const axialClearanceM=heightM-stackHeightM-axialPaddingM;
+ ratio=Math.min(ratio,heightM/(stackHeightM+axialPaddingM));
  const volumeM3=profile.slice(1).reduce((sum,[z,r],i)=>{const [z0,r0]=profile[i];return sum+Math.PI*(z-z0)*(r*r+r*r0+r0*r0)/3},0);
  return {...reference,profile,stack,maxDiameterM,heightM,referenceDiameterM,referenceHeightM,override,radialPaddingM,axialPaddingM,radialClearanceM,axialClearanceM,limitingPart,limitingZM,ratio,volumeM3,fit:radialClearanceM>=-1e-9&&axialClearanceM>=-1e-9};
 }

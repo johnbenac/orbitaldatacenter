@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {defaults,sizeDesign,inverseSolve,checks,presets,applyPreset,estimateLife,validateDesign,enumeratePresets} from './dist/design.js';
 import {DEPLOY_END_S} from './dist/commissioning-clock.js';
 import {createSimulation} from './dist/model.js';
-const reference=sizeDesign(defaults);for(const r of checks())assert.ok(r.pass,r.name);assert.deepEqual(reference.errors,[]);
+const reference=sizeDesign(applyPreset(defaults,'launcher','glenn'));for(const r of checks())assert.ok(r.pass,r.name);assert.deepEqual(reference.errors,[]);
 for(const [key,items] of Object.entries(presets))for(const [id,entry] of Object.entries(items)){const d=applyPreset(defaults,key,id),h=sizeDesign(d);assert.equal(h.input[key],id);assert.ok(Number.isFinite(h.wetKg));assert.ok(Math.abs(h.massLedger.reduce((v,r)=>v+r.kg,0)-h.launchKg)<1e-7)}
 for(const target of [10,10000,20000,100000]){const s=inverseSolve({...defaults,requiredTps:target},'workload');assert.ok(s.achieved>=target);assert.ok(s.hardware.trays%1===0)}
 const small=inverseSolve({...defaults,launchAllowanceKg:2000},'launch'),large=inverseSolve({...defaults,launchAllowanceKg:12000},'launch');assert.ok(small.hardware.launchKg<=2000);assert.ok(large.hardware.launchKg<=12000);assert.ok(small.achieved<=large.achieved);assert.ok(!inverseSolve({...defaults,launchAllowanceKg:100},'launch').feasible);

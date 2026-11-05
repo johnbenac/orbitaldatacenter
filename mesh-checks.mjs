@@ -25,7 +25,7 @@ assert.equal(poles,0);assert.equal(closed.size,7);assert.equal(craft.walls.lengt
 for(const wall of craft.walls){const {axis,sign,holes}=wall.userData.wall,dir=V();dir[axis]=sign;assert(new T.Raycaster(dir.clone().multiplyScalar(50),dir.clone().negate()).intersectObject(wall,false).length>0,wall.name);assert.equal(wall.material.side,T.FrontSide);
  for(const hole of holes){const ray=new T.Raycaster(new T.Vector3(hole.u,hole.v,1).applyMatrix4(wall.matrixWorld),dir.clone().negate());assert.equal(ray.intersectObject(wall,false).length,0,wall.name+' aperture');assert(ray.intersectObject(wall,true).length>0,wall.name+' gland');}}
 for(const [flightPhase,t]of[['integration',-3200],['pad',-60],['ascent',240],['insertion',560],['commissioning',1050],['operations',7800],['deorbit',90000]]){const f=launch.update({flightPhase,t,altitudeKm:80},flightPhase);assert(Number.isFinite(f.center.length()+f.half)&&f.half>0);}
-for(const trays of [4,12,16,26,981]){const variant=makeCraft({...h,trays});assert.equal(variant.trayRows.length,Math.min(28,trays));}
+for(const trays of [4,12,16,26,981]){const build=sizeDesign({...h.input,trayCount:trays}),variant=makeCraft(build);assert.equal(variant.trayRows.length,trays);assert.deepEqual(variant.trayRows,build.rackLayout.slots);}
 // All six mission builds retain one internal service bay and the paired −Z thrust deck.
 for(const purpose of ['text','voice','batch','agents','finetune','pretrain']){
  const hw=sizeDesign(missionStarter(purpose)),bus=makeCraft(hw),spec=hw.propulsion;

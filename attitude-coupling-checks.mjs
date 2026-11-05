@@ -31,7 +31,13 @@ near(Object.values(shifted.attitudeModeSeconds).reduce((a,b)=>a+b,0),DAY,1e-5);
 near(shifted.energyKWh.absorbed,shifted.energyKWh.radiatorDirectSolar+shifted.energyKWh.radiatorAlbedo+shifted.energyKWh.radiatorEarthIR,1e-6);
 const changing=createSimulation({...d,attitude:'lowdrag'}),second=changing.daySummary(0);
 assert.ok(Math.abs(day.energyKWh.solar-second.energyKWh.solar)>15);
-assert.ok(Math.abs(day.energyKWh.radiatorDirectSolar-second.energyKWh.radiatorDirectSolar)>2);
+// Both body policies regulate direct exposure. The achieved normals determine
+// absorbed heat in either case, including short slew transients between modes.
+for(const s of [...sample,...changing.window(DEPLOY_END_S,6000,81)]){
+ const alpha=Math.min(1,d.absorptivity+d.alphaGrowth*s.windowAgeYears);
+ const upper=Math.abs(dot(s.upperRadiatorNormalECI,s.sunECI)),lower=Math.abs(dot(s.lowerRadiatorNormalECI,s.sunECI));
+ near(s.radiatorDirectSolarKW,1.361*sim.hardware.radiatorM2*.5*alpha*(s.eclipse?0:upper+lower));
+}
 assert.ok(Math.abs(day.energyKWh.discharge-second.energyKWh.discharge)>1);
 assert.ok(sample.some(s=>Math.abs(s.radiatorK-changing.at(s.t).radiatorK)>.1));
 

@@ -89,7 +89,7 @@ export function buildEquipmentList(h,s=null) {
  add('06.06','fuel',d.engine==='aero'?'Aerozine-50 fuel at loading':'MMH fuel at loading',1,'charge','Loaded liquid mass divided by one plus the oxidizer-to-fuel ratio. Includes reserved and residual stock.',charge);
  add('06.07','oxidizer',d.engine==='aero'?'NTO oxidizer at loading':'MON-3 oxidizer at loading',1,'charge','Loaded liquid mass less the fuel charge.',charge);
  add('06.08','pressurant','Helium charge at loading',1,'charge','Initial regulated-system gas inventory from propulsion sizing. Vessel shell counted separately.',src.helium);
- add('07.01','structure','Primary frame and tray mounts',1,'frame','Enclosure frame allowance from gross structural area and installed tray count. Includes the ODC-LI-01 thrust-deck flange and retained upper fitting.',src.skin);
+ add('07.01','structure','Primary frame and tray mounts',1,'frame','Study subtotal for four axial longerons, transverse frames, launch restraint fittings, installed tray mounts and the retained aft interface. The six sandwich walls have their own mass row.',src.skin);
  add('07.02','skin','Sandwich enclosure walls',1,'set','Six unequal faces. Sum of individual structural wall masses after occupied cutouts.',src.skin);
  add('07.03','shield','Internal radiation shielding',1,'set','Net covered wall area × shielding areal mass.',src.shield);
  add('07.04','hinges','Wing and radiator deployment and tracking drives',1,'set','Four wing drives and two radiator assemblies share the area-scaled mechanism mass estimate. Each bank has a root cant drive, a latching outer hinge and a bounded span-axis trim drive with a rotary fluid interface. Installed mass and drive power are study allocations.',src.drive,[src.radiatorRotary]);

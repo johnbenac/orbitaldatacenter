@@ -26,3 +26,16 @@
 .iface-watch {margin-top:12px}
 
 .iface-native {display:block;width:min(100%,280px);margin:8px 0}
+
+.ls-panel{min-width:0;margin-bottom:14px;overflow:hidden}
+.arch-sheet .ls-panel{margin-bottom:0}
+.ls-pad{padding:14px 18px 16px}.ls-intro,.ls-details p,.ls-details li{margin:2px 0 10px;color:#bfccd1;font-size:13px;line-height:1.5}.ls-inspect{margin:0 0 12px}
+.ls-figures,.ls-dimensions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.ls-figures figure{margin:0;padding:10px;border:1px solid #354752;background:#132029;border-radius:6px}
+.ls-figures figcaption,.ls-dimensions small{font-size:11px;font-weight:600;color:#d5e3e7}
+.ls-figures svg{display:block;width:100%;max-height:196px}.ls-figures text{font:9px var(--mono,monospace);letter-spacing:.07em}
+.ls-figures p,.ls-dimensions p{font-size:11px;line-height:1.45;color:#acbec8;margin:5px 0 0}
+.ls-dimensions{margin-top:8px}.ls-dimensions article{padding:10px 12px;background:#19272c;border-radius:4px}.ls-dimensions small,.ls-dimensions strong,.ls-dimensions span{display:block}.ls-dimensions strong{font:19px var(--mono,monospace);color:#b7e2db;margin:3px 0}.ls-dimensions span{font-size:11px;color:#d6e1e6}
+.ls-details{border-top:1px solid #33434c;margin-top:12px;padding-top:9px}.ls-details summary{cursor:pointer;color:#b0d8d0;font-size:13px}.ls-details p{margin-top:10px}.ls-details ul{padding-left:17px}.ls-details a{color:#8dd1c7}
+.ls-details .arch-table{min-width:550px}.ls-details .arch-table td,.ls-details .arch-table th{padding:7px 9px;border-bottom:1px solid #35454e}
+@media(max-width:800px){.ls-figures,.ls-dimensions{grid-template-columns:repeat(auto-fit,minmax(min(185px,100%),1fr))}.ls-pad{padding:12px}}

@@ -15,7 +15,13 @@ for(const t of [0,600,1201,pass.start,pass.start+90,pass.end,43200,DAY,2*DAY]){c
 const reboost=sim.events(0,DAY).find(e=>e.type==='reboost'),before=sim.at(reboost.start),after=sim.at(reboost.end+.01);assert.ok(after.propellantKg<before.propellantKg&&after.meanAltitudeKm>before.meanAltitudeKm);
 const h=sim.hardware,plateArea=type=>deploymentLayout(h).descriptors.filter(v=>v.type===type).reduce((a,v)=>a+v.width*v.depth,0);const rad=plateArea('rad'),bodyY=h.bodyWidthM*h.bodyLengthM,bodyZ=h.bodyWidthM*h.bodyHeightM;
 near(ramSilhouette(h,[1,0,0],1),h.bodyHeightM*h.bodyLengthM);
-near(ramSilhouette(h,[0,1,0],1),plateArea('pv')+bodyY+rad*Math.SQRT1_2/2);
+// Along Y the two parked banks project onto each other. Their shared width
+// fits inside the spine, so only the projection beyond its forward end adds drag.
+const k=deploymentLayout(h),proj=Math.SQRT1_2,overhang=[0,1].reduce((sum,j)=>{
+ const start=k.radRoot+(k.r*j+.07+k.hingeStand)*proj,end=k.radRoot+(k.r*(j+1)-.07+k.hingeStand)*proj;
+ return sum+Math.max(0,end-Math.max(h.bodyLengthM/2,start));
+},0);
+near(ramSilhouette(h,[0,1,0],1),plateArea('pv')+bodyY+k.rw*overhang);
 const axialArea=ramSilhouette(h,[0,0,1],1);
 assert.ok(axialArea>=Math.max(bodyZ,rad*Math.SQRT1_2-.01)&&axialArea<=bodyZ+rad*Math.SQRT1_2+.01);
 

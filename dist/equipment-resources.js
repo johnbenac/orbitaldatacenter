@@ -7,7 +7,7 @@ const n=v=>Number.isFinite(v)?v:0;
 export function equipmentResources(r,h,s){
  const d=h.input,w=h.bodyWidthM,b=h.bodyHeightM,l=h.bodyLengthM,p=h.propulsion,q=r.quantity,id=r.wbs;
  const pkg=p.installDims?.[id],zdepth=p.equipmentLengthM??Math.max(.25,l/2-(p.forwardDeckZ??-.25*l));
- const tray=[w*.36,Math.max(.01,b*.68/Math.max(1,Math.ceil(h.trays/2))),zdepth*.62];
+ const tray=h.rackLayout.slotDimensionsM;
  const shell=[w,b,l],smallBox=[w*.20,b*.28,zdepth*.14],vessel=p.tanks[Math.max(0,Math.min(2,Number(id.slice(3))-3))];
  const tankDims=t=>Array(3).fill(2*t.radiusM);
  const memW=1000*h.acceleratorKw,hostW=1000*h.ai.hostKw,fabricW=1000*h.ai.fabricKw,itW=1000*h.itKw;
@@ -24,7 +24,7 @@ export function equipmentResources(r,h,s){
  if(id==='01.01'||id==='01.02'){
   const gpu=id==='01.01',W=gpu?memW:hostW;
   electric(W,itShare(W),'Active compute',gpu?'Accelerator tray count × active tray draw. Shared idle/active telemetry apportioned by installed active draw.':'Incremental host compute budget from the selected workload. Base host consumption is inside the tray allocation.',sizing);
-  envelope(tray,'Shared tray envelope','One installed tray allocation, shared by boards, host and cold plate. Rendered rows can represent several trays.');
+  envelope(tray,'Shared tray envelope',d.compute==='dgx'?'Published DGX H100 chassis dimensions. The flight and thermal integration is a study assumption.':'Study tray envelope shared by boards, host and cold plate. A separate pitch reserves installation and service clearance.',d.compute==='dgx'?{label:'NVIDIA · DGX H100/H200 chassis',url:'https://docs.nvidia.com/dgx/dgxh100-user-guide/introduction-to-dgxh100.html'}:model('rack-layout.js','Installed rack lattice'));
  }
  if(id==='01.03'){
   electric(h.storageKw*1000,n(s?.storageKW)*1000,'Recorder operating','Installed drive count × selected module draw. Storage is enabled at commissioning.',sizing);

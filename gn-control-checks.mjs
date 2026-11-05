@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {defaults} from './dist/design.js';
+import {defaults,applyPreset} from './dist/design.js';
 import {availableControl,localFieldUT,magneticControl} from './dist/momentum-control.js';
 import {createSimulation} from './dist/model.js';
 import {DAY,DEG,cross,dot} from './dist/orbit.js';
@@ -19,7 +19,14 @@ near(magneticControl([0,4,3],field,350,false,60).driveFraction,0);
 const limits={maneuverTorqueNm:12,maneuverMomentumNms:64},d={cmgTorqueNm:16,cmgMomentumNms:80};
 near(availableControl(limits,d,79,20).maneuverMomentumNms,1);near(availableControl(limits,d,79,20).maneuverTorqueNm,0);
 
-const base={...defaults,missionYears:.02,serviceRoute:'direct',link:'optical'},sim=createSimulation(base);
+const base={...applyPreset(defaults,'launcher','glenn'),missionYears:.02,serviceRoute:'direct',link:'optical'},sim=createSimulation(base);
+assert.ok(sim.hardware.fit);
+assert.equal(sim.at(DEPLOY_END_S+.01).burnPermitState,'firing');
+const compactCluster=createSimulation({...base,cmgMomentumNms:80});
+assert.equal(compactCluster.hardware.cmg.model,'CMG 40-60 S');
+const missedTrim=compactCluster.at(DEPLOY_END_S+.01);
+assert.equal(missedTrim.burnPermitState,'held');assert.match(missedTrim.burnHold,/CMG/);
+near(missedTrim.propellantKg,base.propellantKg);
 const pass=sim.events(0,DAY).find(e=>e.type==='contact'&&e.start>DEPLOY_END_S);
 const mid=(pass.start+pass.end)/2,lock=sim.at(mid);
 assert.ok(lock.directPayloadLock&&lock.goodputMbps>0);assert.ok(lock.lockErrorDeg<=lock.beamwidthDeg/2);

@@ -22,12 +22,29 @@ export function deploymentLayout(h){
  if(cache.has(h))return cache.get(h);
  const w=h.bodyWidthM,bh=h.bodyHeightM,l=h.bodyLengthM,ww=h.wingWidthM,wl=h.wingLengthM,rw=h.radiatorWidthM,r=h.radiatorLengthM/2+.14;
  const coreRadiusM=.125,blanketGaugeM=.002,packedRollM=Math.sqrt(coreRadiusM**2+blanketGaugeM*wl/Math.PI);
- const radRoot=l/2+.43,rootY=bh*.5+.16,hingeStand=.082;
- // If a large roll reaches the folded radiator's Y band, clear its full
- // radius in X. Size the fore/aft gap for the swinging release fingers.
- const rollGap=2*packedRollM+.18>=rootY?packedRollM+.14:.145;
- const rootX=Math.max(w/2+.28,rw/2+rollGap),mountZ=ww/2+.145+.54*packedRollM,center=-l/2+ww/2+mountZ+.15;
- const g={w,bh,l,ww,wl,rw,r,rootX,mountZ,center,radRoot,rootY,hingeStand,packedRollM,coreRadiusM,blanketGaugeM,descriptors:[]};
+ // Hardware attaches to the four long faces. Z measures station along the launch spine.
+ const radRoot=l/2-r-.16,rootY=bh/2+.24,hingeStand=.082;
+ const rootX=w/2+packedRollM+.12,mountZ=ww/2+.145+.54*packedRollM,center=0;
+ const mounts=[],g={w,bh,l,ww,wl,rw,r,rootX,mountZ,center,radRoot,rootY,hingeStand,packedRollM,coreRadiusM,blanketGaugeM,mounts,descriptors:[]};
+ const support=(foot,seat,role)=>({foot,seat,role});
+ for(const side of [-1,1])for(const end of [-1,1]){
+  const z=center+end*mountZ,x=side*rootX,root=[x,0,z],footX=side*w/2;
+  const supports=[support([footX,0,z],root,'root')];
+  for(const j of [-1,1]){
+   const station=z+j*(ww/2+.078);
+   supports.push(support([footX,packedRollM,station],[x,packedRollM,station],'restraint'));
+  }
+  mounts.push({id:'wing '+side+'/'+end,kind:'solar',face:(side>0?'+':'−')+'X',side,end,root,supports,stowedCenter:[x,packedRollM,z]});
+ }
+ for(const end of [-1,1]){
+  const side=-end,ry=side*rootY,sy=side*bh/2,root=[0,ry,radRoot],supports=[];
+  for(const j of [-1,1]){
+   const x=j*rw*.32,boltX=j*rw*.20,station=radRoot+r-.18;
+   supports.push(support([x,sy,radRoot],[x,ry,radRoot],'root'));
+   supports.push(support([boltX,sy,station],[boltX,ry+side*(hingeStand+.035),station],'restraint'));
+  }
+  mounts.push({id:'bank '+end,kind:'radiator',face:(side>0?'+':'−')+'Y',side,end,root,supports,stowedCenter:[0,ry,radRoot+r/2]});
+ }
  for(const side of [-1,1])for(const end of [-1,1])g.descriptors.push({type:'pv',side,end,j:0,width:wl,depth:ww,thickness:.006,normalOffset:0});
  for(const end of [-1,1])for(const j of [0,1])g.descriptors.push({type:'rad',end,j,width:rw,depth:r-.14,thickness:.07,normalOffset:0});
  cache.set(h,g);return g;
@@ -74,6 +91,11 @@ export function leafCorners(p,d){const [a,,b]=leafAxes(p),width=p.width??d.width
 
 // Radius of the swept head below its elevation pin bounds deck clearance at
 // every commanded azimuth. Includes the finite reflector rim / optical barrel.
+export function terminalStations(w,l,d){
+ const kaX=.16*w,opX=-.20*w,kaR=.61*d.kaDishM+.065,opR=1.05*d.opticalApertureM+.065,z=-l/2+Math.max(kaR,opR)+.12;
+ const axialGap=Math.sqrt(Math.max(0,(kaR+opR+.04)**2-(kaX-opX)**2));
+ return {ka:[kaX,z],optical:[opX,z+axialGap]};
+}
 export function terminalLayout(w,b,diameter,aperture){
  const beam=Math.min(w,b)*.052,D=diameter,A=aperture;
  const kaPin=.37*D,kaHeadRadius=Math.hypot(.52*D,kaPin-.15*D);

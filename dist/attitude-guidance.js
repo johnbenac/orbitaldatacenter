@@ -1,8 +1,8 @@
 // Quaternions [x,y,z,w] actively rotate body vectors into Earth-centred inertial axes.
 // Guided rigid-body kinematics. Drives and body pointing are advanced from the previous
 // inventory checkpoint so scrubbing, replay and integration follow the same trajectory.
-import {DEG,clip,cross,dot,unit} from './orbit.js';
-import {deploymentSchedule,bankNormal,terminalLayout} from './deployment.js';
+import {R as earthRadiusKm,DEG,clip,cross,dot,unit} from './orbit.js';
+import {deploymentSchedule,deploymentLayout,bankNormal,terminalLayout,terminalStations} from './deployment.js';
 
 export const guidanceReferences=[
  ['ISS solar tracking rotary joints','https://www.nasa.gov/wp-content/uploads/2022/06/508318main_iss_ref_guide_nov2010.pdf'],
@@ -19,22 +19,22 @@ export function attitudeLimits(h){
  if(limitCache.has(h))return limitCache.get(h);
  const d=h.input,w=h.bodyWidthM,b=h.bodyHeightM,l=h.bodyLengthM;
  const mp=h.solarM2*d.pvKgM2,mr=h.radiatorM2*d.radKgM2;
- const bus=Math.max(1,h.dryKg+h.propellantKg-mp-mr),span=h.wingLengthM,root=w/2+.28;
- const wingX2=root*root+root*span+span*span/3,wingZ2=(h.wingWidthM*.62)**2+h.wingWidthM**2/12;
- const rr=h.radiatorLengthM,rz=l/2+.43,ry=b/2+.16;
+ const bus=Math.max(1,h.dryKg+h.propellantKg-mp-mr),span=h.wingLengthM,k=deploymentLayout(h),root=k.rootX;
+ const wingX2=root*root+root*span+span*span/3,wingZ2=k.mountZ**2+h.wingWidthM**2/12;
+ const rr=h.radiatorLengthM,rz=k.radRoot,ry=k.rootY;
  const rY2=ry*ry+ry*rr*Math.SQRT1_2+rr*rr/6,rZ2=rz*rz+rz*rr*Math.SQRT1_2+rr*rr/6,rX2=h.radiatorWidthM**2/12;
  const inertia=[bus*(b*b+l*l)/12+mp*wingZ2+mr*(rY2+rZ2),bus*(w*w+l*l)/12+mp*(wingX2+wingZ2)+mr*(rX2+rZ2),bus*(b*b+w*w)/12+mp*wingX2+mr*(rX2+rY2)];
  const maxI=Math.max(1,...inertia),H=.8*d.cmgMomentumNms,T=.8*d.cmgTorqueNm;
  const bodyRateDegS=Math.min(.8,H/maxI/DEG),bodyAccelDegS2=T/maxI/DEG;
  // Keep each swept panel entirely within its own side of the bank pair. Include
  // the hinge offset, sheet edge and clearance for fittings. Wider banks need more cant.
- const bankHalfWidthM=h.radiatorWidthM/2+.18,bankClearanceY=ry-.26;
- const bankCantDeg=clip(safeAcos(bankClearanceY/bankHalfWidthM)/DEG+1,45,85);
+ const bankHalfWidthM=h.radiatorWidthM/2+.18,bankClearanceY=Math.max(.02,ry-b/2-.135-.25*Math.min(.40,.052*Math.min(w,b)));
+ const bankCantDeg=clip(safeAcos(bankClearanceY/bankHalfWidthM)/DEG+1,45,89.96);
  // The upper bank shares the +Y deck with two moving terminals. Bound each
  // swept head by a sphere, then test it against the bank's full rotary cylinder.
  const fixture=terminalLayout(w,b,d.kaDishM,d.opticalApertureM);
- const targets=[[.16*w,fixture.kaHeight-.16,-.85*l-.43,.61*d.kaDishM+.065],
-  [-.2*w,fixture.opticalHeight-.16,-.15*l-.43,1.05*d.opticalApertureM+.065]];
+ const mounts=terminalStations(w,l,d),targets=[[mounts.ka[0],fixture.kaHeight+b/2-ry,mounts.ka[1]-rz,.61*d.kaDishM+.065],
+  [mounts.optical[0],fixture.opticalHeight+b/2-ry,mounts.optical[1]-rz,1.05*d.opticalApertureM+.065]];
  function clearsTerminals(cant){
   const c=Math.cos(cant*DEG),s=Math.sin(cant*DEG);
   return targets.every(([x,y,z,r])=>y*s+z*c+r<0||Math.hypot(x,y*c-z*s)>bankHalfWidthM+r);
@@ -176,17 +176,21 @@ export function bankTrimTravel(cant,l,upper=false){
  return clearance>=1?l.radiatorTrimStopDeg:Math.asin(clip(clearance,0,1))/DEG;
 }
 function bankDrive(sign,fraction,oldPitch,oldRoll,ctx){
- const {u,dt,hold,park,cold,g,sun,earth,l}=ctx;
+ const {u,dt,hold,park,cold,g,sun,earth,l,sunriseSlew}=ctx;
  if(u<1){
   const pitch=sign*45*fraction;
   return {pitch,roll:0,pitchGoal:pitch,rollGoal:0,limit:0,pitchRate:dt&&oldPitch!=null?(pitch-oldPitch)/dt:0,rollRate:0};
  }
- const previous=oldRoll??0;
- // Unwind before bringing a wide bank back toward the bus for a burn.
- const pitchGoal=hold?(oldPitch??sign*45):park?(Math.abs(previous)>.01?(oldPitch??sign*45):sign*45):sign*(sign<0?l.upperBankCantDeg:l.bankCantDeg);
+ const previous=oldRoll??0,coldCant=g.eclipse&&cold;
+ // A warm radiator deploys steeply to give span trim its clearance from the wall.
+ // In cold eclipse the root can cant back toward Earth after the roll clears the wall.
+ const targetCant=park||coldCant?45:(sign<0?l.upperBankCantDeg:l.bankCantDeg);
+ const allowedThere=park?0:bankTrimTravel(targetCant,l,sign<0);
+ const unwind=Math.abs(previous)>allowedThere+.01;
+ const pitchGoal=hold||unwind?(oldPitch??sign*45):sign*targetCant;
  const [pitch,pitchRate]=moveAngle(pitchGoal,oldPitch,dt,l.radiatorRateDegS);
  const limit=bankTrimTravel(pitch,l,sign<0);
- const rollGoal=hold?previous:park?0:trimGoal(g.eclipse?earth:sun,pitch,limit,previous,g.eclipse&&cold);
+ const rollGoal=hold?previous:park||unwind?0:trimGoal(g.eclipse&&!sunriseSlew?earth:sun,pitch,limit,previous,coldCant);
  const [roll,rollRate]=moveAngle(rollGoal,oldRoll,dt,l.radiatorTrimRateDegS);
  return {pitch,roll,pitchGoal,rollGoal,limit,pitchRate,rollRate};
 }
@@ -219,11 +223,20 @@ export function attitudeGuidance(h,g,options={}){
  const coldThresholdK=Math.max(d.radiatorOpMinK??203,d.coolantOpMinK??233)+8;
  const loopTemperatureK=o.loopTemperatureK??d.initialCoreK??293;
  const cold=loopTemperatureK<=coldThresholdK||(old?.cold===true&&loopTemperatureK<coldThresholdK+5);
- const ctx={u,dt,hold,park,cold,g,sun,earth,l};
+ // Wide fold-flat panels track from a steep deployed cant. A warm loop
+ // can begin trimming for sunrise before the finite-rate joint is illuminated.
+ // Extrapolate the short outgoing coast to the cylindrical umbra boundary.
+ let sunriseSlew=false;
+ if(g.eclipse&&!cold&&g.positionECI&&g.velocityECI){
+  const r=g.positionECI,v=g.velocityECI,rs=dot(r,g.sunECI),vs=dot(v,g.sunECI),radialSlope=dot(r,v)-rs*vs;
+  const lead=40,perp2=dot(r,r)-rs*rs+2*lead*radialSlope+lead*lead*(dot(v,v)-vs*vs);
+  sunriseSlew=dot(r,r)-rs*rs<earthRadiusKm**2&&radialSlope>0&&perp2>=earthRadiusKm**2;
+ }
+ const ctx={u,dt,hold,park,cold,g,sun,earth,l,sunriseSlew};
  const up=bankDrive(-1,m.upperRoot,old?.upper,old?.upperRoll,ctx),lo=bankDrive(1,m.lowerRoot,old?.lower,old?.lowerRoll,ctx);
  const upper=up.pitch,lower=lo.pitch;
  const upperN=bankNormal(upper*DEG,up.roll*DEG),lowerN=bankNormal(lower*DEG,lo.roll*DEG);
- const radiatorControlLaw=hold?'Hold last encoder position':u<1?'Deployment interlock':park?'Park for thrust':!g.eclipse?'Turn emitting faces edge-on to sunlight':cold?'Cold loop · turn faces toward Earth':'Warm loop · minimize Earth infrared';
+ const radiatorControlLaw=hold?'Hold last encoder position':u<1?'Deployment interlock':park?'Park for thrust':!g.eclipse?'Turn emitting faces edge-on to sunlight':sunriseSlew?'Warm loop · prepoint for shadow exit':cold?'Cold loop · turn faces toward Earth':'Warm loop · minimize Earth infrared';
  const sight=g.stationECI&&g.station?toBody(unit(g.stationECI.map((v,i)=>v-g.positionECI[i]))):null;
  const terminal=mode==='contact'?o.terminal:null,aim=terminal&&sight?coneTarget(sight):Y;
  // A receiver near zenith follows a curved path even between adjacent replay

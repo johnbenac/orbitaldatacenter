@@ -6,6 +6,19 @@ import {demiseScreen,renderMechanical,exportMechanical} from './dist/mechanical-
 import {createSimulation} from './dist/model.js';
 import {releaseFiles} from './dist/file-delivery.js';
 
+// Physical growth must exhaust a row of real, non-overlapping slots before it lengthens the core.
+const {rackLayout:rack,input:rInput,...baseHull}=sizeDesign(missionStarter('text'));
+const filled=sizeDesign({...rInput,trayCount:rack.capacity});
+assert.equal(filled.bodyLengthM,baseHull.bodyLengthM);assert.equal(filled.bodyWidthM,baseHull.bodyWidthM);assert.equal(filled.bodyHeightM,baseHull.bodyHeightM);
+assert.equal(filled.rackLayout.slots.length,rack.capacity);
+assert.equal(new Set(filled.rackLayout.slots.map(q=>[q.x,q.y,q.z].join(','))).size,rack.capacity);
+assert.deepEqual(filled.propulsion.stations['01.02'],filled.rackLayout.slots.map(q=>[q.x,q.y,q.z]));
+assert(sizeDesign({...rInput,trayCount:rack.capacity+1}).bodyLengthM>filled.bodyLengthM);
+for(const q of filled.rackLayout.slots){
+ const [x,y,z]=filled.rackLayout.slotDimensionsM;
+ assert(Math.abs(q.x)+x/2<filled.bodyWidthM/2&&Math.abs(q.y)+y/2<filled.bodyHeightM/2);
+ assert(q.z-z/2>=rack.rackZ0M&&q.z+z/2<=rack.rackZ1M);
+}
 const near=(a,b)=>assert.ok(Math.abs(a-b)<1e-8*Math.max(1,Math.abs(b)),a+' ≠ '+b);
 const purposes=['text','voice','batch','agents','finetune','pretrain'];
 const inputs=purposes.map(id=>missionStarter(id));

@@ -17,7 +17,7 @@ function source(id,title,url,locator,kind='Technical reference'){
  return record;
 }
 source('flightio','NASA · LADEE flight computer and telemetry','https://technology.nasa.gov/patent/TOP2-239','Integrated avionics functional description · command ingest, telemetry output and engineering data');
-source('gyroref','Airbus · CMG 40-60 S','https://www.airbus.com/sites/g/files/jlcbta136/files/2022-10/AVIONICS-CMG40-60S-v6_2022.pdf','Interface and performance tables · per-unit mass, torque, momentum, dimensions and typical draw');
+source('gyroref','Airbus · CMG 75-75 S','https://www.airbus.com/sites/g/files/jlcbta136/files/2022-10/AVIONICS-CMG75-75S-v7_2022.pdf','Interface and performance tables · per-unit mass, torque, momentum, dimensions and typical draw');
 source('seh','NASA Systems Engineering Handbook','https://www.nasa.gov/reference/4-0-system-design-processes/','Rev 2, §§4.1–4.4 · stakeholder expectations, requirements, logical decomposition and design solution');
 source('trade','NASA Systems Engineering Handbook','https://www.nasa.gov/reference/6-0-crosscutting-technical-management/','Rev 2, §6.8 · decision analysis and comparison of alternatives');
 source('smad','Larson & Wertz · Space Mission Analysis and Design','https://link.springer.com/book/9780792359012','3rd ed., 1999 · ISBN 978-0-7923-5901-2 · publisher catalog, print and licensed library access','Published handbook');
@@ -167,7 +167,7 @@ group('gnc actuator drag',assume,[
  ['dipoleAm2','Use the combined commanded magnetic dipole and verify authority against the field component perpendicular to it.','1,000 A·m² perpendicular to 30 µT gives 0.030 N·m. Parallel alignment gives zero.']
 ]);
 group('gyroref seh',hardware,[
- ['cmgMomentumNms','Enter required directional momentum capacity for pointing, tracking and the time between unloads. Four catalog units are sized to this envelope with a 50% directional planning factor.','80 N·m·s selects four 40 N·m·s units with 160 N·m·s scalar sum. Compare the candidates against observed demand in Attitude Control.'],
+ ['cmgMomentumNms','Enter required directional momentum capacity for pointing, tracking and the time between unloads. Four catalog units are sized to this envelope with a 50% directional planning factor.','The reference uses four 75 N·m·s units. A 50% directional allowance yields 150 N·m·s for the extended flight article. Compare the candidates against observed demand in Attitude Control.'],
  ['cmgTorqueNm','Allocate torque for the worst commanded axis. The controller uses the selected cap. Four units must also satisfy the momentum requirement.']
 ]);
 group('thermosphere radioflux fluxarchive',assume,[

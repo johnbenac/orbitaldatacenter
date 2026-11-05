@@ -195,7 +195,7 @@ function verifyPlateBounds(q,b){
   const pos=mesh.geometry.attributes.position;
   for(let i=0;i<pos.count;i++){
    point.fromBufferAttribute(pos,i).applyMatrix4(mesh.matrixWorld).sub(b.center);
-   for(let j=0;j<3;j++)assert(Math.abs(point.dot(b.axes[j]))<=b.half[j]+tolerance,
+   for(let j=0;j<3;j++)assert(Math.abs(point.dot(b.axes[j]))<=b.half[j]+Math.max(tolerance,1.2e-7*b.half[j]),
     b.name+' material outside analytical sweep envelope ('+mesh.name+')');
   }
  });

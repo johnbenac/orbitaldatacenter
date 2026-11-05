@@ -112,16 +112,17 @@ export function makeLaunch(h){
   roll.rotation.x=Math.PI/2;
   for(const side of [-1,1]){
    const cheek=cylinder(parked,x,y+rad,z+side*(kin.ww/2+.055),rad+.009,rad+.009,.035,steel,'solar',32);cheek.rotation.x=Math.PI/2;
-   tube(parked,v(q.side*hw*.47,side*hh*.21,Math.min(bl*.42,Math.max(-bl*.42,z+side*.28*bl))),v(x-q.side*.08,0,z+side*.19),Math.min(.065,.022*hw),steel,'structure');
   }
  }
  for(const d of kin.descriptors.filter(d=>d.type==='rad')){
   const q=leafPose(kin,d,0),panel=thermalMesh(box(parked,q.x,q.y,q.z,d.width,d.thickness,d.depth,fin,'radiator'),'radiator');panel.rotation.x=q.pitch;
-  if(!d.j)for(const j of [-1,1]){
-   const ry=-d.end*kin.rootY,xx=j*kin.rw*.32;
-   tube(parked,v(j*hw*.34,-d.end*hh*.29,bl*.48),v(xx,ry,kin.radRoot),Math.min(.065,.022*hw),steel,'structure');
-   tube(parked,v(xx,ry+d.end*.19,kin.radRoot),v(xx,ry+d.end*.19,kin.radRoot+kin.r-.18),.03,steel,'structure');
-  }
+ }
+ // Side-panel fittings share the exact fastener stations of the flight model.
+ for(const mount of kin.mounts)for(const {foot,seat,role} of mount.supports){
+  const brace=tube(parked,v(...foot),v(...seat),role==='root'?.037:.030,steel,'structure');
+  brace.name=mount.face+' '+(role==='root'?'bearing support':'launch restraint');
+  const pv=mount.kind==='solar';
+  box(parked,...foot,pv?.026:.18,pv?.16:.026,.18,rib,'structure');
  }
  const referenceParts=payload.children.filter(o=>o!==liveMount&&o.userData.part!=='adapter');
  const fleet=launchFleet[d.launcher]||launchFleet.terran,glenn=/glenn/i.test(d.launcher);

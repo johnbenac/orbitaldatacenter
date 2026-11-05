@@ -13,7 +13,7 @@ function certify(s,g){
  close(dot(s.pvNormalECI,x),0);close(dot(s.pvNormalECI,y),Math.cos(wing));close(dot(s.pvNormalECI,z),Math.sin(wing));
  for(const [bank,sign] of [['upper',-1],['lower',1]]){
   const p=s[bank+'RadiatorPitchDeg'],r=s[bank+'RadiatorRollDeg'],n=s[bank+'RadiatorNormalECI'];
-  assert.ok(sign*p>=45-1e-9&&sign*p<=85);assert.ok(Math.abs(r)<=105);
+  assert.ok(sign*p>=45-1e-9&&sign*p<=attitudeLimits(h).bankCantDeg+1e-9);assert.ok(Math.abs(r)<=105);
   const local=bankNormal(p*DEG,r*DEG),layout=deploymentLayout(h);
   for(const desc of layout.descriptors.filter(q=>q.type==='rad'&&q.end===sign)){
    const mesh=leafAxes(leafPose(layout,desc,1,0,s))[1];

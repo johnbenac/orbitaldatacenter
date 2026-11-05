@@ -4,15 +4,15 @@ import {icon} from './icons.js';
 const format=(x,d=1)=>Number.isFinite(x)?x.toLocaleString('en-US',{maximumFractionDigits:d}):'—';
 const clock=s=>Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0');
 const guides={
- hold:'The release fittings carry launch loads. Each blanket is wound at its own wing root. Both radiator banks are folded at their installed pivots.',
+ hold:'The release fittings carry launch loads. Two end locks support each wound blanket against its ±X wall. Two distal locks and a pair of root bearings hold each folded radiator against its ±Y wall.',
  release:'The launch restraints release before any blanket pays out. The wing roots and radiator hinge brackets remain attached to the spacecraft.',
  rollout:'The two edge booms recover their tubular cross-section. They push the tip mandrel outward as the photovoltaic blanket unwinds between the booms.',
  tension:'The wing tips reach full extension and the blankets take tension. The root drives remain at their deployment angle.',
- 'upper-root':'The first radiator swings outward as a folded pair. Follow its inboard hinge on the forward frame.',
+ 'upper-root':'The first radiator swings outward as a folded pair. Follow its inboard hinge on the +Y side of the primary structure.',
  'upper-tip':'The outer panel opens around the knuckle at the end of the inner panel. The flexible feed and return lines follow the joint.',
  'upper-latch':'The first bank reaches its stop and latches. Its flow path can now be admitted to the coolant loop.',
  'upper-flow':'Coolant is admitted to the first bank. The other bank remains folded and isolated.',
- 'lower-root':'The second bank swings away from the forward frame with its outer panel still folded.',
+ 'lower-root':'The second bank swings away from the −Y side wall with its outer panel still folded.',
  'lower-tip':'The second outer panel opens around its own hinge. The first bank stays latched.',
  'lower-latch':'The second bank reaches its stop and latches. Its coolant branch is ready to open.',
  'lower-flow':'Both radiator banks are latched. The second branch joins the circulating loop.',

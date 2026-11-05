@@ -1,7 +1,7 @@
 import {spacecraftInterface} from './payload-interface.js';
 import {flightInterfaceGeometry} from './payload-interface-mesh.js';
 import * as T from './vendor/three.module.js';
-import {deploymentLayout,mechanismPose,terminalLayout} from './deployment.js';
+import {deploymentLayout,mechanismPose,terminalLayout,terminalStations} from './deployment.js';
 import {thermalMesh} from './thermal-view.js';
 const v=(x,y,z)=>new T.Vector3(x,y,z);
 const solid=(c,m=.24,r=.49)=>new T.MeshStandardMaterial({color:c,metalness:m,roughness:r});
@@ -37,7 +37,7 @@ cellMat.map=tex(c);[c,g]=canvas(512,256);g.fillStyle='#d9d8cf';g.fillRect(0,0,51
 function face(p,x,y,z,w,d,m,id){const a=obj(p,new T.PlaneGeometry(w,d),m,x,y,z,id);a.rotation.x=-Math.PI/2;a.userData.texturePlane=true;return a;}
 function join(p,x,y,z,id){let g=new T.Group();g.position.set(x,y,z);g.userData.part=id;p.add(g);return g;}
 function labelPlate(p,x,y,z,w,d,caption){const [c,g]=canvas(512,112);g.fillStyle='#e3e1d7';g.fillRect(0,0,512,112);g.fillStyle='#26343b';g.font='bold 60px monospace';g.fillText(caption,18,74);g.fillStyle='#bd6b21';g.fillRect(0,0,7,112);let m=solid('#fff');m.map=tex(c);return face(p,x,y,z,w,d,m,'structure');}
-export function makeCraft(h){textures();const root=new T.Group(),internal=new T.Group(),skin=new T.Group();root.add(skin,internal);let bw=h.bodyWidthM,bh=h.bodyHeightM,bl=h.bodyLengthM;const panelL=h.wingLengthM,panelW=h.wingWidthM,radL=h.radiatorLengthM,radW=h.radiatorWidthM;let wings=[],rads=[],panels=[],trayRows=[],cmgs=[],cells=[],leds=[],plumes=[],engines=[];const propulsion=h.propulsion;const gleam=[];const w=bw,hgt=bh,l=bl,beam=Math.min(w,hgt)*.052;const y0=hgt*.5,kin=deploymentLayout(h),appendages=new T.Group();root.add(appendages);
+export function makeCraft(h){textures();const root=new T.Group(),internal=new T.Group(),skin=new T.Group();root.add(skin,internal);let bw=h.bodyWidthM,bh=h.bodyHeightM,bl=h.bodyLengthM;const panelL=h.wingLengthM,panelW=h.wingWidthM,radL=h.radiatorLengthM,radW=h.radiatorWidthM;let wings=[],rads=[],panels=[],trayRows=[],cmgs=[],cells=[],leds=[],plumes=[],engines=[];const propulsion=h.propulsion;const gleam=[];const w=bw,hgt=bh,l=bl,beam=Math.min(.17,Math.min(w,hgt)*.052);const y0=hgt*.5,kin=deploymentLayout(h),appendages=new T.Group();root.add(appendages);
 // Six dedicated, finite-thickness walls. Positive-axis covers lift away for the core section.
 const enclosure=new T.Group(),walls=[];root.add(enclosure);
 const wallT=Math.min(w,hgt,l)*.024,flexLoops=[];
@@ -48,7 +48,7 @@ function wall(parent,axis,sign,width,height,depth,x,y,z){
  const holes=apertures.map((diameter,i)=>{
   if(axis==='x')return {u:(i?1:-1)*u*.28,v:vv*.07,d:diameter};
   if(axis==='z'&&sign<0){const exit=propulsion.engines[i];return {u:-exit.x,v:exit.y,d:diameter,engine:true};}
-  if(axis==='y')return {u:-.18*w,v:.27*vv,d:diameter};
+  if(axis==='y')return i?{u:(i===1?-1:1)*kin.rw*.32,v:-sign*(kin.radRoot-.16),d:diameter,coolant:true}:{u:-.18*w,v:.30*vv,d:diameter};
   return {u:(i%2?1:-1)*.22*w,v:hgt*(i<2?-.20:.20),d:diameter};
  });
  const shape=new T.Shape().moveTo(-u/2,-vv/2).lineTo(u/2,-vv/2).lineTo(u/2,vv/2).lineTo(-u/2,vv/2).closePath();
@@ -64,8 +64,8 @@ function wall(parent,axis,sign,width,height,depth,x,y,z){
  const shell=obj(parent,g,steel,x,y,z,'structure');if(axis==='x')shell.rotation.y=sign*Math.PI/2;else if(axis==='y')shell.rotation.x=-sign*Math.PI/2;else if(sign<0)shell.rotation.y=Math.PI;
  shell.name=spec?.id||axis+(sign>0?'+':'−')+' thermal wall';shell.userData.wall={axis,sign,holes};walls.push(shell);
  // Metal gland sleeves fill the bores. Dielectric gaskets seat against the dry shell and carry the blankets around the cable or pipe.
- for(const q of holes){const a=join(shell,q.u,q.v,0,q.engine?'propulsion':axis==='z'?'radiator':'structure'),r=q.d*.5;
-  const sleeve=cyl(a,0,0,0,r*.986,r*.986,wallT+beam*1.12,axis==='z'?copper:dark,undefined,30);sleeve.rotation.x=Math.PI/2;
+ for(const q of holes){const a=join(shell,q.u,q.v,0,q.engine?'propulsion':q.coolant?'radiator':'structure'),r=q.d*.5;
+  const sleeve=cyl(a,0,0,0,r*.986,r*.986,wallT+beam*1.12,q.coolant||q.engine?copper:dark,undefined,30);sleeve.rotation.x=Math.PI/2;
   const gasket=new T.Mesh(new T.TorusGeometry(r*1.15,r*.25,10,36),black);gasket.position.z=wallT*.50+beam*.08;a.add(gasket);
   const flange=cyl(a,0,0,wallT*.5+beam*.36,r*1.50,r*1.50,beam*.14,steel,undefined,30);flange.rotation.x=Math.PI/2;
  }
@@ -105,23 +105,41 @@ for(let side of [-1,1]){
 }
 for(let iz=0;iz<5;iz++){const z=(iz/4-.5)*l;for(let side of [-1,1])box(root,side*(w*.5+beam*.09),0,z,beam*.52,hgt+beam*.30,beam*.42,silver,'structure');box(root,0,-y0-beam*.07,z,w+beam*.42,beam*.43,beam*.38,silver,'structure');}
 labelPlate(skin,0,y0+beam*.235,-l*.12,w*.59,l*.09,'ODC / 01');
+// Full-depth transverse frames directly behind each mounting station connect to the corner longerons.
+const stations=[...new Set(kin.mounts.flatMap(m=>m.supports.map(p=>p.foot[2])))];
+for(const z of stations)for(const side of [-1,1]){
+ box(root,side*(w/2-.034),0,z,.068,hgt,.094,silver,'structure').name='Transverse hardpoint frame';
+ box(root,0,side*(hgt/2-.034),z,w,.068,.094,silver,'structure').name='Transverse hardpoint frame';
+}
 // Each wing is attached to a fixed tracking saddle. The web pays out over
 // the mandrel while its two strain-energy slit-tube booms recover their shape.
 const mechanismAudit={wings:[],banks:[]};
-const frameRadius=Math.min(.065,.022*w);
+
 const yAxis=v(0,1,0),xAxis=v(1,0,0);
 function pin(parent,x,y,z,r,len,mat,axis,id){
  const o=cyl(parent,x,y,z,r,r,len,mat,id,32);if(axis==='x')o.rotation.z=-Math.PI/2;if(axis==='z')o.rotation.x=Math.PI/2;return o;
 }
 function marker(parent,x,y,z){const o=new T.Object3D();o.position.set(x,y,z);parent.add(o);return o;}
 function beamTo(o,a,b){const delta=b.clone().sub(a);o.position.copy(a).add(b).multiplyScalar(.5);o.scale.y=delta.length();o.visible=o.scale.y>.000001;if(o.visible)o.quaternion.setFromUnitVectors(yAxis,delta.normalize());}
+// The restraint plunger bridges a hardpoint doubler and a reinforced end fitting.
+// It retracts toward the primary frame before the associated mechanism is released.
+function faceSupport(parent,support,axis,hardware){
+ const [x,y,z]=support.foot,[ex,ey,ez]=support.seat,solar=axis==='x',lock=support.role==='restraint';
+ const sx=Math.sign(ex-x),sy=Math.sign(ey-y),length=Math.hypot(ex-x,ey-y),radius=lock?.044:.067;
+ const base=join(parent,x,y,z,'structure');
+ const plate=box(base,0,0,0,solar?.035:radius*3,solar?radius*3:.035,radius*3.5,silver,'structure');plate.name='Hardpoint load-spreading plate';
+ const guide=pin(base,sx*.04,sy*.04,0,radius*1.18,.09,steel,axis,'structure');guide.name=lock?'Captive restraint housing':'Bearing pedestal';
+ const slider=join(base,0,0,0,hardware);
+ const rod=pin(slider,sx*length/2,sy*length/2,0,radius*(lock?.60:1),length,lock?gold:steel,axis,hardware);rod.name=lock?'Retracting launch lock':'Face-mounted bearing';
+ slider.userData.retractAxis=axis;
+ return slider;
+}
 for(const d of kin.descriptors.filter(q=>q.type==='pv')){
  const start=appendages.children.length;
  const {side,end}=d,z=kin.center+end*kin.mountZ,rx=side*kin.rootX,id='solar';
  const base=join(appendages,rx,0,z,id),table=join(base,0,0,0,id);
- for(const j of [-1,1]){
-  pipe(appendages,v(side*w*.47,j*hgt*.21,Math.min(l*.42,Math.max(-l*.42,z+j*.28*l))),v(rx-side*.08,0,z+j*.19),frameRadius,silver,'structure');
- }
+ const points=kin.mounts.find(m=>m.kind==='solar'&&m.end===end&&m.side===side).supports;
+ const saddles=points.map(p=>faceSupport(appendages,p,'x',id)).slice(1);
  pin(base,-side*.10,0,0,.105,.18,dark,'x',id);pin(base,0,0,0,.072,.18,gold,'x',id);
  box(table,0,0,0,.11,.08,panelW+.18,steel,id);
  const tip=join(table,0,0,0,id),reel=join(tip,0,0,0,id);
@@ -135,13 +153,12 @@ for(const d of kin.descriptors.filter(q=>q.type==='pv')){
  const surface=join(table,0,0,0,id),front=face(surface,0,.003,0,1,panelW,cellMat,id),back=face(surface,0,-.003,0,1,panelW,navy,id);back.rotation.x=Math.PI/2;
  const grid=new T.BufferGeometry(),gridPts=new Float32Array((Math.ceil(kin.wl/.31)+Math.ceil(panelW/.23)+6)*6);
  grid.setAttribute('position',new T.BufferAttribute(gridPts,3));const lines=new T.LineSegments(grid,new T.LineBasicMaterial({color:'#778c99',transparent:true,opacity:.65}));lines.frustumCulled=false;table.add(lines);
- const booms=[],axles=[],saddles=[];
+ const booms=[],axles=[];
  for(const j of [-1,1]){
   const zc=j*(panelW*.5+.035);
   const boom=cyl(table,0,0,zc,.033,.033,1,bronze,id,24);booms.push(boom);
   axles.push(cyl(tip,0,0,zc,.029,.029,1,steel,id,12));
-  const bracket=join(base,side*.008,.068,j*(panelW*.5+.10),id);
-  box(bracket,0,kin.packedRollM*.5,-j*.022,.046,kin.packedRollM+.036,.045,gold,id);saddles.push(bracket);
+
  }
  wings.push({side,end,table,tip,reel,roll,front,back,discs,stripe,surface,booms,axles,grid,gridPts,lines,saddles});
  for(const o of appendages.children.slice(start))o.userData.assembly='wing '+side+'/'+end;
@@ -161,11 +178,15 @@ for(const end of [-1,1]){
  const mount=join(appendages,0,ry,rz,id),pitchFrame=join(mount,0,0,0,id);
  const bank=join(pitchFrame,0,0,0,id),knuckle=join(bank,0,0,kin.r,id);
  const ap=kin.rw*.32;
+ const points=kin.mounts.find(m=>m.kind==='radiator'&&m.end===end).supports;
+ const clips=[];
+ for(const p of points){const element=faceSupport(appendages,p,'y',id);if(p.role==='restraint')clips.push(element);}
  for(const j of [-1,1]){
-  pipe(appendages,v(j*w*.34,sign*hgt*.29,l*.48),v(j*ap,ry,rz),frameRadius,steel,'structure');
   pin(mount,j*ap,0,0,.074,.20,bronze,'x',id);
   pin(knuckle,j*ap,0,0,.060,.16,bronze,'x',id);
  }
+ // The rotating pitch cradle transmits span-bearing reactions to both wall trunnions.
+ box(pitchFrame,0,0,-.012,2*ap,.091,.092,steel,id).name='Root pitch crosshead';
  const motor=pin(mount,ap+.12,0,0,.106,.13,navy,'x',id);
  motor.name='Radiator root pitch actuator';
  const union=pin(pitchFrame,0,0,0,.093,.14,steel,'z',id);
@@ -175,6 +196,10 @@ for(const end of [-1,1]){
  for(const [j,frame] of [bank,knuckle].entries()){
   const d=kin.descriptors.find(q=>q.type==='rad'&&q.end===end&&q.j===j),off=end*kin.hingeStand;
   const p=join(frame,0,off,kin.r/2,id);box(p,0,0,0,d.width,d.thickness-.008,d.depth,steel,id);
+  for(const k of [-1,1]){
+   const z=j===0?kin.r/2-.18:-kin.r/2+.18;
+   pin(p,k*kin.rw*.20,0,z,.061,d.thickness-.001,bronze,'y',id).name='Captive launch bolt bushing';
+  }
   for(const side of [-1,1]){const skin=thermalMesh(face(p,0,side*(d.thickness*.5-.002),0,d.width,d.depth,finMat,id),'radiator');if(side<0)skin.rotation.x=Math.PI/2;}
   for(const k of [-1,1]){
    const xa=k*ap,mat=k<0?blue:copper;
@@ -190,19 +215,9 @@ for(const end of [-1,1]){
     pipe(bank,v(port,0,.07),v(xa,off,.085),.018,mat,id);
    }
    flexible(src,dst,k,mat,owner);
-   if(!j)pipe(appendages,v(k*w*.22,sign*hgt*.20,l*.51),v(xa,ry+off,rz-.16),.021,mat,id);
+   if(!j)pipe(appendages,v(xa,sign*hgt*.5,rz-.16),v(xa,ry+off,rz-.16),.021,mat,id);
   }
   panels.push({surface:p,descriptor:d});
- }
- // The fixed launch rails occupy the center corridor between both banks.
- // Long keeper arms fold down alongside the rails before the bank can move.
- const clips=[];
- for(const j of [-1,1]){
-  const xx=j*Math.min(ap*.54,w*.31),railY=sign*.066,tipZ=rz+kin.r-.18;
-  pipe(appendages,v(xx,railY,l*.49),v(xx,railY,tipZ),frameRadius*.69,silver,'structure');
-  const latch=join(appendages,xx,railY,tipZ,id),reach=kin.rootY-.066-.133;
-  const arm=pipe(latch,v(0,0,0),v(0,sign*reach,0),.024,steel,id);arm.name='Folding launch keeper';
-  box(latch,0,sign*reach,0,.074,.08,.083,gold,id);clips.push(latch);
  }
  for(const o of appendages.children.slice(start))o.userData.assembly='bank '+end;
  rads.push({end,pitchFrame,bank,knuckle,clips});
@@ -258,14 +273,15 @@ function pedestal(x,z,span,pinHeight,scale){
  }
  return {head,turntable};
 }
-const kaGimbal=pedestal(w*.16,-l*.35,terminal.kaFork,terminal.kaHeight,dishD),dish=kaGimbal.head;
+const stationsRF=terminalStations(w,l,h.input);
+const kaGimbal=pedestal(...stationsRF.ka,terminal.kaFork,terminal.kaHeight,dishD),dish=kaGimbal.head;
 const reflectorHead=join(dish,0,-terminal.kaPin,0,'communications');
 for(const side of [-1,1])pipe(dish,v(side*(terminal.kaFork-.027*dishD),0,0),v(side*dishD*.455,-terminal.kaPin+dishD*.13,0),dishD*.022,steel,'communications');
 // The continuous finite-thickness shell runs from inner rim to axis and back along the outer skin.
 const parab=[],dishT=Math.max(.007,dishD*.014),profile=(i,dy)=>{const r=dishD*.5*i/16;return new T.Vector2(r,(r/dishD)**2*dishD*.65+dy);};
 for(let i=0;i<=16;i++)parab.push(profile(i,-dishT));for(let i=16;i>=0;i--)parab.push(profile(i,0));
 const reflector=obj(reflectorHead,trimPoleTriangles(new T.LatheGeometry(parab,64)),solid('#dcdacb',.55,.38),0,0,0,'communications');reflector.name='Closed reflector shell';const rim=new T.Mesh(new T.TorusGeometry(dishD*.499,Math.max(.014,dishD*.014),12,64),bronze);rim.rotation.x=Math.PI/2;rim.position.y=dishD*.162;reflectorHead.add(rim);for(let j=0;j<3;j++){let a=j*2*Math.PI/3;pipe(reflectorHead,v(dishD*.44*Math.cos(a),dishD*.12,dishD*.44*Math.sin(a)),v(0,dishD*.37,0),dishD*.013,steel,'communications');}cyl(reflectorHead,0,dishD*.37,0,dishD*.035,dishD*.063,dishD*.10,gold,'communications');
-const opticalGimbal=pedestal(-w*.2,l*.35,terminal.opticalFork,terminal.opticalHeight,ap),optic=opticalGimbal.head,barrel=join(optic,0,-terminal.opticalPin,0,'communications');
+const opticalGimbal=pedestal(...stationsRF.optical,terminal.opticalFork,terminal.opticalHeight,ap),optic=opticalGimbal.head,barrel=join(optic,0,-terminal.opticalPin,0,'communications');
  cyl(barrel,0,ap*.45,0,ap*.68,ap*.8,ap,ivory,'communications');cyl(barrel,0,ap*.98,0,ap*.63,ap*.63,ap*.08,black,'communications');cyl(barrel,0,ap*1.01,0,ap*.46,ap*.46,ap*.05,blue,'communications');
  function pointTerminals(ka,opt){
   for(const [g,a] of [[kaGimbal,ka],[opticalGimbal,opt]]){
@@ -274,20 +290,38 @@ const opticalGimbal=pedestal(-w*.2,l*.35,terminal.opticalFork,terminal.opticalHe
   }
  }
  const patches=[-1,1].map(side=>box(root,side*w*.49,y0*.52,l*.3,beam*.35,hgt*.14,w*.21,bronze,'communications'));
-// Liquid-cooled tray section with cold plates, rack manifolds, supply/return branches and end-wall penetrations.
-for(let side of [-1,1]){
- const rack=join(internal,side*w*.225,0,0,'compute'),rx=side*w*.175;
- box(rack,-rx*.90,-hgt*.04,0,beam*.35,hgt*.72,l*.62,navy,'compute');
- for(const z of [-1,1])pipe(rack,v(rx,-hgt*.37,z*l*.295),v(rx,hgt*.34,z*l*.295),beam*.31,z>0?blue:copper,'radiator');
- const rackTrays=side<0?Math.ceil(h.trays/2):Math.floor(h.trays/2),rows=Math.min(14,rackTrays);
- for(let k=0;k<rows;k++){const pitch=hgt*.68/Math.max(1,rows),y=-hgt*.36+(k+.18)*pitch;
-
-  const tray=box(rack,0,y,0,w*.36,Math.min(beam*.35,pitch*.22),l*.62,silver,'compute');tray.userData.installedTrayRow=true;trayRows.push(tray);
-  thermalMesh(box(rack,0,y+Math.min(beam*.30,pitch*.27),0,w*.33,Math.min(beam*.16,pitch*.13),l*.57,copper,'compute'),'coldPlate');
-  for(let j=0;j<4;j++){const z=(j-1.5)*l*.13;const chip=thermalMesh(box(rack,0,y+Math.min(beam*.53,pitch*.48),z,w*.28,Math.min(beam*.26,pitch*.19),l*.115,navy,'compute'),'junction');if(side===1&&k===rows-1&&j===0)chip.userData.dataSource=true;const lamp=box(rack,side*w*.154,y+beam*.54,z+l*.024,beam*.14,beam*.17,beam*.28,lit,'compute');leds.push(lamp);}
-  for(const z of [-1,1])pipe(rack,v(side*w*.12,y+beam*.32,z*l*.23),v(rx,y+beam*.32,z*l*.295),beam*.14,z>0?blue:copper,'radiator');
+// The rack drawing uses the MEL's occupied slots in body metres. A batch
+// per material avoids a separate draw call for every tray in the large builds.
+const rack=join(internal,0,0,0,'compute'),cabinet=h.rackLayout;
+rack.scale.z=l/propulsion.equipmentLengthM;rack.position.z=-propulsion.equipmentCenterZ*rack.scale.z;
+const [tw,th,td]=cabinet.slotDimensionsM,slots=cabinet.slots;
+function slotBoxes(parent,stations,offset,size,material,part){
+ const pos=[],norm=[],index=[],vtx=boxG.attributes.position,ns=boxG.attributes.normal;
+ for(const {x,y,z} of stations){
+  const j=pos.length/3;for(const i of boxG.index.array)index.push(j+i);
+  for(let i=0;i<vtx.count;i++){
+   pos.push(x+offset[0]+vtx.getX(i)*size[0],y+offset[1]+vtx.getY(i)*size[1],z+offset[2]+vtx.getZ(i)*size[2]);
+   norm.push(ns.getX(i),ns.getY(i),ns.getZ(i));
+  }
  }
- for(const z of [-1,1]){const p=v(side*w*.40,-hgt*.26,z*l*.295),bend=v(side*w*.40,-hgt*.26,z*l*.40),end=v(side*w*.225,-hgt*.115,z*l*.505);pipe(internal,p,bend,beam*.26,z>0?blue:copper,'radiator');pipe(internal,bend,end,beam*.26,z>0?blue:copper,'radiator');}
+ const geom=new T.BufferGeometry();geom.setAttribute('position',new T.Float32BufferAttribute(pos,3));geom.setAttribute('normal',new T.Float32BufferAttribute(norm,3));geom.setIndex(index);
+ return obj(parent,geom,material,0,0,0,part);
+}
+const shellBatch=slotBoxes(rack,slots,[0,-.16*th,0],[tw,.68*th,td],steel,'compute');shellBatch.userData.installedTrayRow=true;
+thermalMesh(slotBoxes(rack,slots,[0,.22*th,0],[.94*tw,.09*th,.92*td],copper,'compute'),'coldPlate');
+const chipBatch=thermalMesh(slotBoxes(rack,slots,[0,.36*th,0],[.72*tw,.18*th,.7*td],navy,'compute'),'junction');chipBatch.userData.dataSource=true;
+for(let k=0;k<8;k++){const selected=slots.filter((_,i)=>i%8===k);if(selected.length)leds.push(slotBoxes(rack,selected,[.43*tw,.21*th,-.4*td],[.065*tw,.18*th,.1*td],lit,'compute'));}
+trayRows=slots;
+const railX=cabinet.columns*cabinet.pitchM[0]/2,railY=cabinet.rows*cabinet.pitchM[1]/2;
+for(const side of [-1,1]){
+ const x=side*railX,mid=(cabinet.rackZ0M+cabinet.rackZ1M)/2;
+ for(const sign of [-1,1])box(rack,x,sign*railY,mid,.035,.035,cabinet.rackZ1M-cabinet.rackZ0M,silver,'structure');
+ for(let i=0;i<=cabinet.bays;i++){const z=cabinet.rackZ0M+i*cabinet.pitchM[2];box(rack,x,0,z,.025,2*railY,.025,steel,'structure');}
+ const headerX=x+side*.047;
+ pipe(rack,v(headerX,-railY,cabinet.rackZ0M),v(headerX,-railY,cabinet.rackZ1M),.018,side>0?blue:copper,'radiator');
+ const port=v(side*kin.rw*.32,-y0,kin.radRoot-.16);
+ const bend=v(headerX,-railY,port.z);
+ pipe(rack,bend,port,.02,side>0?blue:copper,'radiator');
 }
 for(let j=0;j<4;j++){const x=(j-1.5)*w*.20;thermalMesh(box(internal,x,-hgt*.06,l*.408,w*.185,hgt*.64,l*.13,black,'battery'),'battery');box(internal,x,hgt*.277,l*.408,w*.177,beam*.4,l*.128,bronze,'battery');thermalMesh(box(internal,x,hgt*.02,l*.48,w*.1,hgt*.40,beam*.2,aqua,'battery'),'battery');}// Model storage modules as removable drive sleds beside their independent data switch.
 const recorder=join(internal,w*.10,-hgt*.025,-l*.407,'storage'),avionics=join(internal,-w*.313,hgt*.05,-l*.401,'avionics');
@@ -372,12 +406,12 @@ function positionPanels(progress,attitude){
   w.grid.setDrawRange(0,at/3);w.grid.attributes.position.needsUpdate=true;
   for(const [j,boom] of w.booms.entries()){const z=(j?1:-1)*(panelW*.5+.035);
    beamTo(boom,v(0,0,z),v(side*m.span,0,z));beamTo(w.axles[j],v(0,0,z),v(0,m.rollRadius,z));
-   w.saddles[j].rotation.x=(j?1:-1)*Math.PI*.45*Math.min(1,Math.max(0,(progress-.015)/.025));
+   w.saddles[j].scale.x=1-.96*Math.min(1,Math.max(0,(progress-.015)/.025));
   }
  });
  if(!radiatorsChanged)return;
  rads.forEach((r,i)=>{const m=k.banks[i];r.pitchFrame.rotation.x=m.rootPitch;r.bank.rotation.z=m.roll;r.knuckle.rotation.x=m.outerPitch-m.rootPitch;
-  for(const clip of r.clips)clip.rotation.x=r.end*Math.PI/2*Math.min(1,Math.max(0,(progress-(r.end<0?.42:.665))/.025));
+  for(const clip of r.clips)clip.scale.y=1-.96*Math.min(1,Math.max(0,(progress-(r.end<0?.42:.665))/.025));
  });
  appendages.updateWorldMatrix(true,true);hoses.forEach(updateHose);
 }

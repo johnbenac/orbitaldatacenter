@@ -109,7 +109,7 @@ function cameraFrame(){
  assert.ok(camera,'Expected the scene camera to aim at a pivot');
  const eye=camera.position.clone(),radius=eye.distanceTo(pivot);
  const height=2*(camera.isPerspectiveCamera?radius:1)/camera.projectionMatrix.elements[5];
- return {eye,pivot,radius,height};
+ return {eye,pivot,radius,height,orthographic:camera.isOrthographicCamera===true};
 }
 scene.setBayView('overview',false);
 for(const [view,chapter,t,phase] of [['spacecraft','operations',6402,'E'],['spacecraft','commissioning',1700,'E'],['spacecraft','operations',1700,'C'],['launch','integration',-1500,'D']]){
@@ -128,6 +128,15 @@ for(const [view,chapter,t,phase] of [['spacecraft','operations',6402,'E'],['spac
  assert.ok(Math.abs(rotated.radius/panned.radius-1)<1e-8,`${chapter}: drag changed the orbit radius`);
  assert.ok(rotated.pivot.distanceTo(panned.pivot)<1e-8,`${chapter}: drag moved the pan target`);
 }
+// Both projections follow the same payload station. End-on looks along its
+// launch axis and side elevation is perpendicular, with no perspective distortion.
+scene.setDomain('mechanical','D');scene.setView('launch');scene.setChapter('integration');scene.update(h,sim.at(-3600));
+scene.setBayView('endOn',false);const endOn=cameraFrame();
+scene.setBayView('sideOn',false);const sideOn=cameraFrame();
+assert(endOn.orthographic&&sideOn.orthographic);
+assert(endOn.pivot.distanceTo(sideOn.pivot)<1e-7);
+assert(Math.abs(endOn.eye.clone().sub(endOn.pivot).normalize().dot(sideOn.eye.clone().sub(sideOn.pivot).normalize()))<1e-6);
+scene.setBayView('overview',false);
 const shadow=sim.at(6402),original=structuredClone(shadow);
 assert.ok(shadow.eclipse);assert.equal(shadow.solarKW,0);
 scene.setDomain('conops','E');scene.setChapter('operations');scene.setView('spacecraft');scene.update(h,shadow);

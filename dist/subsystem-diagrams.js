@@ -3,6 +3,7 @@ import {DEPLOY_END_S} from './commissioning-clock.js';
 import {aiPurposes} from './ai-purpose.js';
 import {purposeInfo,purposeId} from './purpose-display.js';
 import {launchFleet} from './launch-fleet.js';
+import {launchSiteFor} from './launch-sites.js';
 import {launcherSilhouette} from './launch-fleet-ui.js';
 import {presets} from './design.js';
 import {thermalNodes,qualifyNow} from './thermal-limits.js';
@@ -223,9 +224,9 @@ function mass({h,s},id){
 }
 
 function launch({h,d,s},id){
- const f=h.fairing;
+ const f=h.fairing,pad=launchSiteFor(d.launcher,d.launchSite);
  const parts=[
- P('fairing','Payload keep-in','The selected profile gives the available radius at each axial station. Mission overrides scale the source contour.','launcher','adapter',[row('Vehicle',h.launcherLabel),row('Basis',f.basis),row('Usable diameter',val(f.maxDiameterM,'m')),row('Usable height',val(f.heightM,'m'))]),
+ P('fairing','Payload keep-in','The selected profile gives the available radius at each axial station. Mission overrides scale the source contour.','launcher','adapter',[row('Vehicle',h.launcherLabel),row('Launch complex',pad.name+' · '+pad.range),row('Basis',f.basis),row('Usable diameter',val(f.maxDiameterM,'m')),row('Usable height',val(f.heightM,'m'))]),
  P('stack','Stowed assembly','Each folded section is tested at both ends and every intersecting taper station. The launch envelope includes the rolled solar wings on their saddles and the folded forward radiator banks.','solarM2','structure',[row('Stack length / diameter',val(h.stowedLengthM,'m')+' / '+val(h.stowedDiameterM,'m')),row('Limiting section',f.limitingPart),row('Minimum lateral gap',val(f.radialClearanceM,'m',3)),row('Axial gap',val(f.axialClearanceM,'m',3))]),
  P('adapter','Launch interface','The adapter remains on the launch stack at separation. The payload allowance is independently editable for the target mission.','launchAllowanceKg','adapter',[row('Adapter',val(d.adapterKg,'kg')),row('Launcher reference',val(d.referenceKg,'kg',0)),row('Mission allowance',val(d.launchAllowanceKg,'kg',0)),row('Launch mass margin',val(h.massMarginKg,'kg',0))]),
  P('trim','Insertion trim','The spacecraft uses its chemical engines to close the trim budget after separation. The mission clock drives achieved orbit and paid delta-v.','trimDv','propulsion',[row('Target altitude',val(d.altitudeKm,'km')),row('Achieved altitude',val(s.altitudeKm,'km')),row('Required trim',val(d.trimDv,'m/s')),row('Delivered trim',val(s.trimPaidDv,'m/s'))])];
@@ -238,22 +239,24 @@ function launch({h,d,s},id){
  T(437,56,'LATERAL MARGIN','sd-over','start')+T(437,83,val(f.radialClearanceM,'m',2),f.radialClearanceM<0?'sd-large sd-bad':'sd-large','start')+
  T(437,119,'AXIAL MARGIN','sd-over','start')+T(437,145,val(f.axialClearanceM,'m',2),f.axialClearanceM<0?'sd-large sd-bad':'sd-large','start')+
  pick(parts[3],422,172,144,55,T(437,189,'INSERTION TRIM','sd-over','start')+T(437,214,val(s.trimPaidDv,'m/s'),'sd-name','start'));
- return info('Stowed launch envelope','Stack dimensions measured forward from the adapter plane',parts,art,[legend('cyan','Tapered keep-in'),legend('steel','Folded hardware'),legend('amber','Terminal cap')],f.fit?'Fits modeled profile':'Envelope exceeded');
+ return info('Stowed launch envelope',pad.name+' · '+pad.region+' · measured forward from the adapter plane',parts,art,[legend('cyan','Tapered keep-in'),legend('steel','Folded hardware'),legend('amber','Terminal cap')],f.fit?'Fits modeled profile':'Envelope exceeded');
 }
 
 function launcher({h,d,s}){
- const vehicle=launchFleet[d.launcher],reference=vehicle.referenceKg,stack=h.launchKg;
+ const vehicle=launchFleet[d.launcher],reference=vehicle.referenceKg,stack=h.launchKg,pad=launchSiteFor(d.launcher,d.launchSite);
  const parts=[
   P('carrier','Carrier propulsion',vehicle.architecture,'launcher','launcher',[row('Provider',vehicle.provider),row('Status',vehicle.status),row('Axial stages',String(vehicle.stages)),row('Strap-on boosters',String(vehicle.boosters)),row('Recovery',vehicle.recovery)]),
   P('delivery','Payload delivery stage',vehicle.stages===1?'The direct-injection core releases its payload.':'The upper stage carries the payload adapter to injection. The illustrative mission clock places release at MET 540 s.','trimDv','adapter',[row('Service boundary',s.t<540?'Spacecraft attached':'Spacecraft released'),row('Initial spacecraft wet mass',val(h.wetKg,'kg',0)),row('Launch-only adapter',val(d.adapterKg,'kg',0)),row('Target altitude',val(d.altitudeKm,'km'))]),
   P('benchmark','Provider payload reference',vehicle.description,'launcher','launcher',[row('LEO reference',val(reference,'kg',0)),row('Reference conditions',vehicle.referenceOrbit),row('Reference headroom',val(h.launchReferenceMarginKg,'kg',0))]),
-  P('allowance','Mission allowance','The current manifest must meet the entered allowance, the catalogue reference mass screen and the tapered fairing fit.','launchAllowanceKg','payload',[row('Entered allowance',val(d.launchAllowanceKg,'kg',0)),row('Integrated stack',val(stack,'kg',0)),row('Governing mass headroom',val(h.launchScreenMarginKg,'kg',0)),row('Fairing fit',h.fit?'Fits profile':'Exceeds profile')])
+  P('allowance','Mission allowance','The current manifest must meet the entered allowance, the catalogue reference mass screen and the tapered fairing fit.','launchAllowanceKg','payload',[row('Entered allowance',val(d.launchAllowanceKg,'kg',0)),row('Integrated stack',val(stack,'kg',0)),row('Governing mass headroom',val(h.launchScreenMarginKg,'kg',0)),row('Fairing fit',h.fit?'Fits profile':'Exceeds profile')]),
+  P('launchpad','Launch complex',pad.siteNote,'launchSite','launcher',[row('Launch complex',pad.name),row('Range',pad.range),row('Location',pad.region+' · '+pad.country),row('Evidence',pad.statusLabel),row('Coordinate basis',pad.pinBasis)])
  ];
  const max=Math.max(reference,d.launchAllowanceKg,stack),x=278,w=244,bar=(p,y,label,kg,cl)=>pick(p,x,y-23,w,48,
   T(x,y-7,label,'sd-over','start')+T(x+w,y-7,val(kg/1000,'t',2),'sd-name','end')+rect(x,y,w,8,'sd-unfilled',2)+rect(x,y,w*kg/max,8,cl,2));
  const art='<g transform="translate(46,3) scale(1.50)">'+launcherSilhouette(d.launcher)+'</g>'+
   pick(parts[0],50,113,197,91,path('M100 171h40l14 -8h92','sd-dim')+T(152,153,'CORE + BOOSTERS','sd-over','start')+T(152,177,vehicle.boosters+' strap-ons','sd-name','start'))+
   pick(parts[1],60,31,181,77,path('M100 70h39l15 -9h92','sd-dim')+T(152,50,vehicle.stages===1?'CORE RELEASE':'UPPER STAGE','sd-over','start')+T(152,77,s.t<540?'Attached':'Released','sd-name','start'))+
+  pick(parts[4],35,195,211,40,T(50,209,'LAUNCH COMPLEX','sd-over','start')+T(50,227,pad.name.split(' · ')[0],'sd-name','start'))+
   T(x,27,'PAYLOAD MASS COMPARISON','sd-over','start')+bar(parts[2],65,'LEO REFERENCE',reference,'sd-bar-steel')+
   bar(parts[3],119,'MISSION ALLOWANCE',d.launchAllowanceKg,'sd-bar-violet')+bar(parts[3],173,'LAUNCHED STACK',stack,h.launchScreenMarginKg<0?'sd-bar-red':'sd-bar-green')+
   T(x,212,'GOVERNING MARGIN','sd-over','start')+T(x+w,214,val(h.launchScreenMarginKg,'kg',0),h.launchScreenMarginKg<0?'sd-bad':'sd-name','end');

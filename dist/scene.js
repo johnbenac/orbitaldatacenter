@@ -11,7 +11,8 @@ import {focusHardware,dataRoutes,hardwareAnchor} from './hardware-focus.js';
 import {launchContextBadge} from './launch-context.js';
 import {softRenderer} from './software-scene.js';
 import {deploymentSchedule,deploymentLayout,leafPose,leafCorners,mechanismPose,leafAxes} from './deployment.js';
-import {ascentTrack} from './trajectory.js';
+import {ascentTrack,launchPath} from './launch-path.js';
+import {launchSiteFor} from './launch-sites.js';
 import {geometry,groundSites,R,DEG,MU} from './orbit.js';
 const V=(x=0,y=0,z=0)=>new T.Vector3(x,y,z),Y=V(0,1,0),TAU=Math.PI*2,clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const cameraView=s=>/launch|fairing/i.test(s)?'launch':/earth|orbit/i.test(s)?'orbit':/core/i.test(s)?'core':'spacecraft';
@@ -29,6 +30,7 @@ export function createScene(container,{onPick=()=>{},onHover=()=>{},onThermalSca
  const triad=createTriad(container);
  let framedDesign=null,bodyPoints=[],deploymentLens='vehicle';
  const scene=new T.Scene(),craftGroup=new T.Group(),orbit=new T.Group();scene.add(craftGroup,orbit);const orthCamera=new T.OrthographicCamera(-10,10,10,-10,.001,5000),launchCamera=new T.PerspectiveCamera(34,1,.04,2000);let camera=orthCamera;const hemi=new T.HemisphereLight(0xe5f4ff,0xb8a58f,1.52),key=new T.DirectionalLight(0xffedcf,3.2),rim=new T.DirectionalLight(0xabcfff,1.95);key.position.set(-4,8,5);rim.position.set(7,2,-6);scene.add(hemi,key,rim,key.target);if(gpu){renderer.shadowMap.type=T.PCFSoftShadowMap;key.shadow.mapSize.set(1024,1024);key.shadow.normalBias=.028;}
+ let launchLens='wide';
  let domain='',phase='',focus='',craftFocus=null,launchFocus=null,custody=null,stagingBounds=null,chapter='',launch=null,launchKey='',launchFrame=null;let view='spacecraft',size,h={},s={},craft=null,pose={spacecraft:[...defaultPose.spacecraft,1],core:[...defaultPose.core,1],orbit:[...defaultPose.orbit,1],launch:[...defaultPose.launch,1]},w=0,ht=0,selected='',layers=[],annotation=new T.Group(),selection=new T.Group(),beamGroup=new T.Group(),arrowSig='',pickables=[],raf=0,alive=true,orbitSig='',stationSig='',texture=null, lastPaint=0,frameKey='',meshKey='',overlayStale=true;
  const pan=Object.fromEntries(Object.keys(defaultPose).map(k=>[k,V()]));let halfAtFocus=1;
  let thermalScale='working',craftSkin=null,launchSkin=null,showLegend=true,legendMode='',hoverHit=null,selectedHit=null;
@@ -37,7 +39,7 @@ export function createScene(container,{onPick=()=>{},onHover=()=>{},onThermalSca
  const backdrop=createEarthBackdrop(earth,atmosphere);let flightFrame=null;
  function skyVisible(){return flightFrame&&view!=='orbit'&&s.altitudeKm>0&&!s.referenceBody&&(view==='launch'?launchFrame?.environment==='space':s.t>=540);}
  function bodyCamera(){return view==='core'||chapter==='commissioning'&&deploymentLens!=='vehicle';}
- const trace=new T.Group();orbit.add(trace);const mark=new T.Mesh(new T.SphereGeometry(.011,12,8),new T.MeshBasicMaterial({color:0xffb363}));orbit.add(mark);const ring=new T.Mesh(new T.RingGeometry(.021,.024,40),new T.MeshBasicMaterial({color:0xffb363,side:T.DoubleSide,depthWrite:false}));orbit.add(ring);const sites=new T.Group();spin.add(sites);const stationMat=new T.MeshBasicMaterial({color:0x92ddcd});stationMat.userData.shared=true;const trackBeam=line(orbit,[V(),V()],0x7dedd4,.9);
+ const trace=new T.Group();orbit.add(trace);const originPin=new T.Mesh(new T.SphereGeometry(.0085,12,8),new T.MeshBasicMaterial({color:0x7ee0d9}));spin.add(originPin);originPin.visible=false;const mark=new T.Mesh(new T.SphereGeometry(.011,12,8),new T.MeshBasicMaterial({color:0xffb363}));orbit.add(mark);const ring=new T.Mesh(new T.RingGeometry(.021,.024,40),new T.MeshBasicMaterial({color:0xffb363,side:T.DoubleSide,depthWrite:false}));orbit.add(ring);const sites=new T.Group();spin.add(sites);const stationMat=new T.MeshBasicMaterial({color:0x92ddcd});stationMat.userData.shared=true;const trackBeam=line(orbit,[V(),V()],0x7dedd4,.9);
  const groundTrail=new T.Group(),orbitAxes=new T.Group();let trailStamp='';
  spin.add(groundTrail);orbit.add(orbitAxes);
  for(const [dir,color] of [[V(1,0,0),0xf79d89],[V(0,1,0),0xa2db96],[V(0,0,1),0x8dc8ff]])arrow(orbitAxes,V(),dir,.10,color);
@@ -85,7 +87,7 @@ export function createScene(container,{onPick=()=>{},onHover=()=>{},onThermalSca
     if(shadows){const r=launchFrame.half*1.65;key.target.position.copy(launchFrame.center);key.position.copy(key.target.position).addScaledVector(illumination,r*2.6);const c=key.shadow.camera;c.left=-r;c.right=r;c.top=r;c.bottom=-r;c.near=.1;c.far=r*6;c.updateProjectionMatrix();}}
    scene.userData.lightState={sun:illumination,ambient:world?.21:displayLaunch?.33:shadow?.27:.45,direct:shadow?0:1.06,rim:world?.05:shadow?.20:.38};
  }
- function setCamera(){if(!w||!ht)return;let [az,elevation,zoom]=pose[view];if(chapter==='commissioning'&&view==='spacecraft')az+=1.68;if(view==='orbit'&&onPhaseF()&&disposalPlan?.feasible){
+ function setCamera(){if(!w||!ht)return;let [az,elevation,zoom]=pose[view];if(view==='launch'&&h.input?.launcher==='starship'&&launchFrame&&!launchFrame.directCraft&&s.t>=-600)az+=launchLens==='ship'?.94:2.46;if(chapter==='commissioning'&&view==='spacecraft')az+=1.68;if(view==='orbit'&&onPhaseF()&&disposalPlan?.feasible){
   const pt=disposalPlan.method==='reentry'?(disposalPlan.impact||disposalPlan.target):disposalPlan.groundTrack?.at(-1);
   if(pt){const d=disposalPlan.method==='graveyard'&&graveFocus?graveFocus:surface(pt,1).applyAxisAngle(Y,s.earthRotationRad||0);az+=Math.atan2(d.x,d.z)-defaultPose.orbit[0];elevation=clamp(elevation+Math.asin(d.y)-defaultPose.orbit[1],-1.48,1.48);}
  }
@@ -95,11 +97,11 @@ export function createScene(container,{onPick=()=>{},onHover=()=>{},onThermalSca
  }
  const offset=focus&&['core','spacecraft'].includes(view)?({data:[-.27,.31],comm:[.15,.21],attitude:[.23,.22],prop:[.18,-.38],compute:[.42,-.05],power:[-.18,.06]})[focus]:null;
  if(offset){az+=offset[0];elevation=clamp(elevation+offset[1],-1.48,1.48);}
- const el=elevation-(view==='launch'&&launchFrame?.environment==='ground'?.31:0);const bodyOrbit=view==='core'||view==='spacecraft',viewUp=bodyOrbit?V(0,0,1):Y;const dir=bodyOrbit?V(Math.sin(az)*Math.cos(el),-Math.cos(az)*Math.cos(el),Math.sin(el)):V(Math.sin(az)*Math.cos(el),Math.sin(el),Math.cos(az)*Math.cos(el));if(bodyOrbit&&skyVisible()&&!bodyCamera()){dir.applyQuaternion(flightFrame.orbitalToBody);viewUp.applyQuaternion(flightFrame.orbitalToBody);}
+ const el=elevation-(view==='launch'&&launchFrame?.environment==='ground'?.10:0);const bodyOrbit=view==='core'||view==='spacecraft',viewUp=bodyOrbit?V(0,0,1):Y;const dir=bodyOrbit?V(Math.sin(az)*Math.cos(el),-Math.cos(az)*Math.cos(el),Math.sin(el)):V(Math.sin(az)*Math.cos(el),Math.sin(el),Math.cos(az)*Math.cos(el));if(bodyOrbit&&skyVisible()&&!bodyCamera()){dir.applyQuaternion(flightFrame.orbitalToBody);viewUp.applyQuaternion(flightFrame.orbitalToBody);}
  const aspect=w/ht;const launchConfig=view==='launch'&&launchFrame&&!launchFrame.directCraft,look=launchConfig?launchFrame.center.clone():V();let half;if(launchConfig)half=Math.max(launchFrame.half,launchFrame.half*.85/aspect);else if(view==='orbit')half=Math.max(1.32,1.37/aspect);else if(view==='core'||view==='spacecraft'&&domainSceneSpecs[focus]?.close)half=Math.max(h.bodyHeightM*.82+h.bodyLengthM*.20,(h.bodyLengthM*.64+h.bodyWidthM*.7)/aspect);else if(size){half=Math.max(size.fitHeight*.5,size.fitWidth*.5/aspect);}else half=10;
  if(focus==='prop'&&view==='core'){look.copy(craft.root.localToWorld(V(0,0,-h.bodyLengthM*.07)));half*=1.04;}
  if(focus==='data'&&view!=='launch'&&view!=='orbit'){look.copy(craft.root.localToWorld(V(0,0,-h.bodyLengthM*.16)));half*=.88;}
- if(launchConfig&&phase==='D'&&focus==='launch'&&!launchFrame.reference&&['pad','ascent','insertion'].includes(s.flightPhase)){
+ if(launchConfig&&phase==='D'&&s.t>40&&focus==='launch'&&!launchFrame.reference&&['pad','ascent','insertion'].includes(s.flightPhase)){
   const ends=launch.parts.stage.localToWorld(V(0,s.flightPhase==='insertion'?-h.bodyLengthM*.45:-(launch.geometry.upperLengthM||h.stowedLengthM)*.30,0));
   const payload=launch.parts.payload.localToWorld(V(0,h.stowedLengthM*.55,0));look.copy(ends).lerp(payload,.57);
   half=Math.max(h.fairing.heightM*.82,ends.distanceTo(payload)*.71,h.stowedDiameterM*1.7/aspect);
@@ -108,6 +110,17 @@ export function createScene(container,{onPick=()=>{},onHover=()=>{},onThermalSca
   craft.root.updateWorldMatrix(true,false);const coreOnly=domainSceneSpecs[focus].close;
   look.copy(craft.root.localToWorld(V(0,0,coreOnly?0:(h.stowedLengthM-h.bodyLengthM)*.32)));
   half=coreOnly?Math.max(h.bodyHeightM*1.30,h.bodyLengthM*.72/aspect):Math.max(h.stowedLengthM*.73,h.bodyWidthM*1.9/aspect);
+ }
+ if(launchConfig&&phase==='D'&&launchLens==='base'&&launch.parts.boosterBase&&s.t<100&&s.t>=-600){
+  look.copy(launch.parts.boosterBase.getWorldPosition(V()));half=Math.max(launch.geometry.diameterM*.5,2)*3.9;
+ }
+ if(launchConfig&&phase==='D'&&launchLens==='ship'&&h.input.launcher==='starship'&&s.t>=-600){
+  const geo=launch.geometry,shipHeight=geo.heightM-geo.lowerLengthM;look.copy(launch.parts.upper.localToWorld(V(0,shipHeight*.5-geo.upperLengthM,0)));
+  half=Math.max(shipHeight*.56,geo.diameterM/aspect);
+ }
+ if(launchConfig&&phase==='D'&&launchLens==='pad'&&s.t>=-600&&s.t<35){
+  const g=launch.geometry,r=g.diameterM/2;look.copy(launch.parts.tower.localToWorld(V(0,-g.lowerLengthM-g.upperLengthM-r*1.8,0)));
+  half=Math.max(12,r*6.4);
  }
  if(view==='spacecraft'&&!domainSceneSpecs[focus]?.close&&(s.deployment>=.995||chapter==='commissioning')){
   if(framedDesign!==h){const layout=deploymentLayout(h);
@@ -142,6 +155,9 @@ export function createScene(container,{onPick=()=>{},onHover=()=>{},onThermalSca
    if(id==='orbitGround')return s.positionECI?eci(s.positionECI,1/R).normalize():null;return null;
   }
   if(view==='launch'&&launch&&launchFrame&&!launchFrame.directCraft){const {payload,liveMount,stage,upper,shell}=launch.parts;
+   if(id==='boosterBase')return launch.parts.boosterBase?.getWorldPosition(V());
+   if(id==='padWorks')return launch.parts.tower.localToWorld(V(0,-launch.geometry.upperLengthM-launch.geometry.lowerLengthM-launch.geometry.diameterM*.9,0));
+   if(id==='hotstage')return launch.parts.lower.localToWorld(V(0,-launch.geometry.upperLengthM,0));
    if(id==='interface')return payload.localToWorld(V(0,.18,0));
    if(id==='payload')return liveMount.getWorldPosition(V());
    if(id==='thrustDeck'){const q=launch.parts.boosters?.[0];return q&&q.visible?q.localToWorld(V(0,launch.geometry.lowerLengthM*.51,0)):launch.parts.lower.localToWorld(V(0,-launch.geometry.upperLengthM-launch.geometry.lowerLengthM*.75,0));}
@@ -164,6 +180,13 @@ export function createScene(container,{onPick=()=>{},onHover=()=>{},onThermalSca
    const detail=deploymentLens==='hinge'||(deploymentLens==='vehicle'&&s.deployment>=.46&&s.deployment<.92);
    entries=detail?[mark('radiator-root',bank.root,'left','Radiator root',Math.round(Math.abs(bank.rootPitch)*180/Math.PI)+'° from stow','#f1ac65'),mark('radiator-elbow',bank.elbow,'right','Outer hinge',Math.round(180-Math.abs(bank.outerPitch-bank.rootPitch)*180/Math.PI)+'° open','#a5d2c8')]:
     [mark('solar-root',wing.root,'left','Fixed wing saddle','Body attachment','#9ed2bf'),mark('solar-tip',wing.tip,'right','Moving tip drum',wing.span.toFixed(2)+' m paid out','#94bfe5')];
+  }else if(view==='launch'&&phase==='D'&&['launcher','launch','conops'].includes(focus)&&['pad','ascent'].includes(s.flightPhase)&&s.t<35){
+   const site=launchSiteFor(h.input.launcher,h.input.launchSite),star=h.input.launcher==='starship',falcon=h.input.launcher==='falconHeavy';
+   const caption=(anchor,side,title,value,color)=>({anchor,side,title,value,color});
+   entries=launchLens==='ship'?[caption('shroud','right','Starship V3','Tiled windward face and four flaps','#a7c8d1'),caption('hotstage','left','Ship engine bay','Three sea-level and three vacuum Raptors','#e1ca9c')]:launchLens==='pad'?[caption('padWorks','left','Exhaust routing',site.name,'#9fdace')]:
+    launchLens==='base'?[caption('boosterBase','right',falcon?'Landing legs':'Super Heavy',falcon?'Retracted during ascent':'Aft skirt and Raptor cluster','#cbb798')]:
+    [caption('hotstage','right',star?'Hot-staging interface':falcon?'Center core':'Stage interface',star?'Ship / Super Heavy':falcon?'Three Merlin cores':h.launcherLabel,'#b8d4db'),
+     caption('padWorks','left','Launch mount',site.name+' · '+site.region,'#cca874')];
   }else entries=domainInstruments(focus,h,s,{view,reference:launchFrame?.reference});
   const slots={left:[],right:[]};
   craft.root.updateWorldMatrix(true,true);if(launch&&view==='launch')launch.root.updateWorldMatrix(true,true);
@@ -188,7 +211,7 @@ export function createScene(container,{onPick=()=>{},onHover=()=>{},onThermalSca
    });
   }
  }
- function render(){raf=0;if(!alive||!w||!ht||!craft||!container.getClientRects().length)return;setCamera();tags.replaceChildren();if(view==='spacecraft'&&layers.includes('dimensions')){let p=V(0,0,Math.max(h.wingWidthM*1.15,h.bodyLengthM*.7)).applyMatrix4(craft.root.matrixWorld).project(camera);label((p.x+1)*w/2,(1-p.y)*ht/2,`PV span ${craft.wingspan.toFixed(1)} m`);}if(view==='orbit'&&orbitAxes.visible){
+ function render(){raf=0;if(!alive||!w||!ht||!craft||!container.getClientRects().length)return;setCamera();if(view==='launch')launch?.faceLaunchClouds?.(camera);tags.replaceChildren();if(view==='spacecraft'&&layers.includes('dimensions')){let p=V(0,0,Math.max(h.wingWidthM*1.15,h.bodyLengthM*.7)).applyMatrix4(craft.root.matrixWorld).project(camera);label((p.x+1)*w/2,(1-p.y)*ht/2,`PV span ${craft.wingspan.toFixed(1)} m`);}if(view==='orbit'&&orbitAxes.visible){
    for(const [id,dir] of [['+X',V(.105,0,0)],['+Y',V(0,.105,0)],['+Z',V(0,0,.105)]]){
     const world=orbitAxes.localToWorld(dir);if(world.dot(camera.position)<1)continue;
     const p=world.project(camera);label((p.x+1)*w/2,(1-p.y)*ht/2,id);
@@ -211,10 +234,10 @@ export function createScene(container,{onPick=()=>{},onHover=()=>{},onThermalSca
  const ro=new ResizeObserver(resize);ro.observe(container);
  function plotOrbit(){
   const flight=s.flightPhase,ascent=['integration','pad','ascent'].includes(flight),returning=['deorbit','entry'].includes(flight),instant=returning?Math.floor(s.t/5):Math.floor(s.t/3600);
-  const stamp=[meshKey,h.input.epoch,h.input.altitudeKm,h.input.ecc,h.input.raanDeg,h.input.meanAnomalyDeg,h.input.argPeriDeg,h.input.inclinationDeg,flight,instant].join('/');
+  const stamp=[meshKey,h.input.launcher,h.input.launchSite,h.input.epoch,h.input.altitudeKm,h.input.ecc,h.input.raanDeg,h.input.meanAnomalyDeg,h.input.argPeriDeg,h.input.inclinationDeg,flight,instant].join('/');
   if(stamp===orbitSig)return;orbitSig=stamp;clear(trace);
   if(ascent){
-   const insertion=geometry(h.input,540),pts=Array.from({length:91},(_,i)=>eci(ascentTrack(insertion,i*6).positionECI,1/R));
+   const insertion=launchPath(h.input),pts=Array.from({length:91},(_,i)=>eci(ascentTrack(insertion,i*6).positionECI,1/R));
    line(trace,pts,0xefc07a,.94);return;
   }
   if(returning&&s.positionECI&&s.velocityECI){
@@ -228,7 +251,8 @@ export function createScene(container,{onPick=()=>{},onHover=()=>{},onThermalSca
  function setupStations(){if(stationSig===h.input.network)return;stationSig=h.input.network;clear(sites);for(const st of groundSites(h.input.network)){let a=st.lat*DEG,b=st.lon*DEG;let m=new T.Mesh(new T.SphereGeometry(.006,8,5),stationMat);m.position.set(Math.cos(a)*Math.cos(b),Math.sin(a),-Math.cos(a)*Math.sin(b)).multiplyScalar(1.004);sites.add(m);}}
  function updateOrbit(){
   if(view!=='orbit')return;
-  setupStations();plotPhaseF();plotOrbit();trace.visible=!(onPhaseF()&&disposalPlan?.feasible);
+  setupStations();plotPhaseF();plotOrbit();
+  originPin.visible=phase==='D';if(originPin.visible){const loc=launchSiteFor(h.input.launcher,h.input.launchSite);originPin.position.copy(surface({latDeg:loc.lat,lonDeg:loc.lon},1.003));}trace.visible=!(onPhaseF()&&disposalPlan?.feasible);
   if(s.positionECI){mark.position.copy(eci(s.positionECI,1/R));ring.position.copy(mark.position);}
   spin.rotation.y=s.earthRotationRad||0;atmosphere.material.uniforms.solar.value.copy(eci(s.sunECI));trackBeam.visible=!!s.stationECI;
   if(s.stationECI){trackBeam.geometry.setFromPoints([mark.position,eci(s.stationECI,1/R)]);trackBeam.material.color.setHex(s.goodputMbps>0?0x79edd3:0x7e8e98);trackBeam.material.opacity=s.goodputMbps>0?.98:.50;}
@@ -291,7 +315,7 @@ export function createScene(container,{onPick=()=>{},onHover=()=>{},onThermalSca
  }
  function updateLaunch(){
   if(view!=='launch'){if(launch)launch.root.visible=false;launchFrame=null;return;}
-  const signature=[meshKey,h.input.launcher,h.input.fairingM,h.input.fairingLengthM,h.stowedLengthM].join('/');
+  const signature=[meshKey,h.input.launcher,h.input.launchSite,h.input.fairingM,h.input.fairingLengthM,h.stowedLengthM].join('/');
   if(signature!==launchKey){if(launch){launchSkin?.destroy();launchSkin=null;launchFocus?.destroy();launchFocus=null;scene.remove(launch.root);disposeGroup(launch.root);}launch=makeLaunch(h);scene.add(launch.root);launchKey=signature;}
   launchFrame=launch.update(s,chapter,{domain:focus,phase});
  }
@@ -323,7 +347,7 @@ export function createScene(container,{onPick=()=>{},onHover=()=>{},onThermalSca
   if(active&&craftGroup.visible){craftFocus?.clear();craftSkin??=thermalSkin(craft.root);craftSkin.apply(s.thermalQualification,gpu?renderer.getPixelRatio():1,thermalScale);}
   else{craftSkin?.clear();if(focus){craftFocus??=focusHardware(craft.root);craftFocus.apply(focus,selected);}else craftFocus?.clear();}
   if(active&&packed){launchFocus?.clear();launchSkin??=thermalSkin(launch.root);launchSkin.apply(s.thermalQualification,gpu?renderer.getPixelRatio():1,thermalScale);}
-  else{launchSkin?.clear();if(focus&&launch?.root.visible){launchFocus??=focusHardware(launch.root);launchFocus.apply(focus,selected);}else launchFocus?.clear();}
+  else{launchSkin?.clear();if(focus&&launch?.root.visible&&!(phase==='D'&&['launcher','launch'].includes(focus)&&['pad','ascent'].includes(s.flightPhase))){launchFocus??=focusHardware(launch.root);launchFocus.apply(focus,selected);}else launchFocus?.clear();}
   if((focus==='data'||focus==='purpose')&&craftGroup.visible&&view!=='orbit'&&!s.referenceBody){if(!custody){custody=dataRoutes(craft,h);craft.root.add(custody.root);}custody.update(s,true,focus);}else if(custody)custody.update(s,false);
   refreshLegend();
  }
@@ -387,6 +411,7 @@ export function createScene(container,{onPick=()=>{},onHover=()=>{},onThermalSca
  cv.addEventListener('wheel',e=>{e.preventDefault();zoom(Math.exp(clamp(-e.deltaY*.0015,-.5,.5)));},{passive:false});cv.addEventListener('keydown',keyMove);
  setBg();resize();return {update,setView,
   setDeploymentLens(value){if(deploymentLens===value)return;deploymentLens=value;if(craft)request();},
+  setLaunchLens(id){launchLens=['pad','base','ship'].includes(id)?id:'wide';request()},
   setDomain(id,missionPhase){
    const next=Object.hasOwn(domainSceneSpecs,id)?id:'',nextPhase=String(missionPhase||'');
    if(domain===next&&phase===nextPhase)return;domain=next;phase=nextPhase;focus=['C','D','E'].includes(phase)?domain:'';

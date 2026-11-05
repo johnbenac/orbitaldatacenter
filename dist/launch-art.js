@@ -70,21 +70,6 @@ export function fitOutBay(ctx){
  }
  // Off-axis service cabinets and a grated platform at the hall wall give the floor physical scale.
  for(let j=0;j<4;j++){const x=(j*.16+.57)*u,z=-u*.67;box(facility,x,floor+u*.086,z,u*.12,u*.17,u*.094,graphite);box(facility,x,floor+u*.085,z+u*.052,u*.104,u*.142,u*.011,steel);box(facility,x,floor+u*.115,z+u*.064,u*.088,u*.024,u*.006,black);box(facility,x-.029*u,floor+u*.11,z+u*.068,u*.016,u*.007,u*.005,glow);}
- // Launch pad surroundings: concrete apron, flame trench, transfer road, service buildings and tank farm.
- const padFloor=baseY-baseR*.74;
- plane(tower,0,padFloor-.04*baseR,0,baseR*1000,baseR*1000,mat('#6a7767'),-Math.PI/2);
- plane(tower,0,padFloor,0,baseR*210,baseR*150,painted(768,768,(g,w,h)=>{
-  g.fillStyle='#586656';g.fillRect(0,0,w,h);const rand=rng();for(let i=0;i<7200;i++){g.fillStyle=rand()>.5?'rgba(103,112,87,.23)':'rgba(55,64,55,.28)';g.fillRect(rand()*w,rand()*h,.5+rand()*3,.5+rand()*2);}
-  g.fillStyle='#717875';g.fillRect(0,h*.48,w,h*.029);g.fillRect(w*.48,0,w*.022,h);g.fillStyle='#9ea39a';g.fillRect(w*.37,h*.34,w*.28,h*.25);g.fillStyle='#565c58';g.fillRect(w*.41,h*.37,w*.17,h*.016);
- }),-Math.PI/2);
- plane(tower,0,baseY-baseR*.04,0,baseR*18,baseR*14,deck,-Math.PI/2);
- for(let i=0;i<4;i++){
-  const xx=(i*4.1+4)*baseR,zz=-baseR*9.4;const diam=baseR*(i%2?1.4:1.05);
-  cylinder(tower,xx,padFloor+diam*1.45,zz,diam,diam,diam*2.9,rib,'pad',42);const dome=mesh(tower,new T.SphereGeometry(1,40,20),rib,xx,padFloor+diam*2.86,zz,'pad');dome.scale.set(diam,diam*.36,diam);cylinder(tower,xx,padFloor+.13*diam,zz,diam*1.055,diam*1.055,diam*.23,graphite);
-  tube(tower,v(xx,padFloor+.44*diam,zz),v(xx+4.15*baseR,padFloor+.44*diam,zz),baseR*.084,rib);
- }
-
- for(let i=0;i<4;i++){let x=(-12-i*4.7)*baseR,z=(-6-i%2*4)*baseR;box(tower,x,padFloor+1.1*baseR,z,4.2*baseR,2.2*baseR,3.5*baseR,iron);box(tower,x,padFloor+2.24*baseR,z,4.4*baseR,.18*baseR,3.7*baseR,rib);}
  return opening=>fixtures.forEach(({f,side})=>{f.position.x=side*opening*R*2.25;});
 }
 export function payloadFinishes(){

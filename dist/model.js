@@ -1,10 +1,11 @@
+import {ascentTrack,launchPath} from './launch-path.js';
 import {DEPLOY_START_S,DEPLOY_END_S,deploymentProgress,deploymentMET,deploymentPowerKW} from './commissioning-clock.js';
 import {DEPLOYMENT_STAGES,deploymentSchedule} from './deployment.js';
 import {relayGate} from './ai-service-inputs.js';
 import {qualifyNow,thermalActivityMask,accumulateThermal,newThermalSummary} from './thermal-limits.js';
 import {solveOuter,enclosureHeat} from './enclosure.js';
 import {entryDensity,surfacePoint} from './entry.js';
-import {ENTRY_KM,disposalRequirement,disposalIgnition,planDisposal,trajectoryAt,ascentTrack} from './trajectory.js';
+import {ENTRY_KM,disposalRequirement,disposalIgnition,planDisposal,trajectoryAt} from './trajectory.js';
 import {propulsionReview} from './spacecraft-architecture.js';
 import {sizeDesign} from './design.js';
 import {DAY,YEAR,R,MU,TAU,DEG,geometry,clip,dot,unit} from './orbit.js';
@@ -51,7 +52,7 @@ export function createSimulation(design){
    deficit=(t>=540?Math.max(0,d.trimDv-s.trimPaid):d.trimDv)+s.pendingImpulse/Math.max(1,wet);
   const delta=-2*(R+d.altitudeKm)*deficit/circular,minA=(R+120)/(1-d.ecc),low=R+d.altitudeKm+delta<minA;
   const offset=Math.max(delta,minA-R-d.altitudeKm);let track=null;
-  if(t<540){insertionState??=geometry(d,540,offset);track=ascentTrack(insertionState,t);}
+  if(t<540){insertionState??=launchPath(d,offset);track=ascentTrack(insertionState,t);}
   else if(s.plan?.samples?.length)track=trajectoryAt(s.plan,t);
   const atTime=finished(t,s)?s.plan.end:t,g=geometry(d,atTime,offset,track);g.t=t;g.windowAgeYears=Math.max(0,atTime/YEAR);g.flightPhase=phase(t,s);g.orbitLost=t>=540&&low&&!s.plan?.feasible;if(g.orbitLost||s.plan||t<540){g.station=null;g.stationECI=null;}return g;
  };

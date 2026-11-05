@@ -3,6 +3,7 @@
 import {controls,defaults,presets,solveModes} from './design.js';
 import {thermalNodes} from './thermal-limits.js';
 import {fairings} from './fairings.js';
+import {launchSites,launchSitesFor} from './launch-sites.js';
 import {launchFleet} from './launch-fleet.js';
 import {serviceSources} from './ai-service.js';
 
@@ -278,6 +279,7 @@ const selectFields={
  pv:['Compare beginning-of-life conversion, EOL retention and deployed mass at the same temperature, incidence and exposure assumptions.','power margin'],
  coating:['Compare solar absorptance and IR emittance at launch and after mission exposure. Use installed-finish data from comparable samples.','thermal coatings'],
  engine:['Select a compatible fuel, oxidizer, mixture ratio and pressure-fed engine set. Keep thrust, delivered Isp, fluid density and feed constraints together.','prop atv rocket'],
+ launchSite:['Select a complex documented for the chosen vehicle. Check the site status, latitude and direct-ascent geometry against the requested orbit.','clear elements'],
  launcher:['Compare payload allowance, tapered keep-in profile, recovery mode and maturity for the specified orbit. Set a separate mission-specific mass allowance.','clear margin'],
  network:['Choose sites that the orbit can see above the elevation mask. Compare actual contact durations with the planning access fraction.','ground critical'],
  solarDriver:['Use a nominal solar-cycle sensitivity case or replay the historical flux series. Both drive atmospheric density independently of photovoltaic irradiance.','radioflux fluxarchive thermosphere'],
@@ -359,6 +361,11 @@ options('disposalMethod',[
  ['reentry','Target the return site and tolerance, then inspect the feasible burn, atmosphere crossing, ground miss and reference-body footprint. ORSAT treats more detailed breakup and demise physics.','debris orsat entry','Simplified single-body ballistic study with project-specified target and uncertainty.'],
  ['graveyard','Set a raised circular target. Check both finite burns, protected propellant and achieved apsides. Select the actual disposal region using the applicable mission rules and environment.','transfer debris','Two-burn planning case with a user-defined disposal orbit.']
 ]);
+opts.launchSite={};
+for(const item of Object.values(launchSites)){
+ const key='pad-'+item.id,ref=item.sources[0];source(key,ref.title,ref.url,item.range+' · '+item.name,'Launch site evidence');
+ opts.launchSite[item.id]={advice:item.siteNote,basis:item.pinBasis+' · '+item.statusLabel,ids:[key]};
+}
 opts.launcher={};
 for(const [key,fleet] of Object.entries(launchFleet)){
  const refId='launcher-'+key,pkgId='profile-'+key,profile=fairings[key];

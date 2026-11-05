@@ -4,6 +4,8 @@ import {aiPurposes} from './ai-purpose.js';
 import {purposeId,purposeInfo} from './purpose-display.js';
 import {sizingEnvelope,ageProperties} from './design.js';
 import {launchFleet} from './launch-fleet.js';
+import {launchReferenceFor,launchSiteFor} from './launch-sites.js';
+import {launchPath} from './launch-path.js';
 import {groundSites} from './orbit.js';
 
 const esc=v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
@@ -123,22 +125,22 @@ export const domains={
   ['Terminal flight mass','Reconcile the final vehicle mass, protected stock and actual disposal consumption.','dryMass pressurant propellantKg wetKg disposalUsedKg wetResidual']
  ],'launch insertion trim reboost maneuver disposal impact graveyard'),
  launch:spec('Launch & insertion','rocket','Tapered payload keep-in, manifest allowance and achieved injection orbit.',
-  'launcher launchAllowanceKg fairingM fairingLengthM radialPaddingM axialPaddingM adapterKg trimDv','fairingM fairingLengthM launchAllowanceKg radialPaddingM','altitudeKm trimPaidDv',[
-  ['Launcher and interface','Select the launcher and enter the mission-specific payload mass and geometry limits.','launcherName referenceMass allowance profileD profileH reqTrim'],
-  ['Stowed geometry','Compare actual hardware sections with the usable profile from the adapter plane forward.','stackLength stackDiameter radialClearance axialClearance limitingPart fitBasis'],
-  ['Single-launch feasibility','Check lateral and axial clearances independently of mass allowance and insertion trim.','launchMass launchMargin radialClearance axialClearance trimBudget requiredOrbit'],
-  ['Integration and injection','Follow the payload from stowed fit through separation and insertion trim.','phase stackLength radialClearance launchMass altitudeKm trimPaidDv'],
-  ['Achieved operating orbit','Use the delivered state to compare the specified operating orbit and the post-injection mass.','targetAlt perigeeKm apogeeKm trimPaidDv wetKg launchMargin'],
-  ['Mission delivery and terminal orbit','Compare original insertion parameters with the selected retirement trajectory.','targetAlt reqTrim trimPaidDv disposalMode finalPerigee finalApogee']
+  'launcher launchSite launchAllowanceKg fairingM fairingLengthM radialPaddingM axialPaddingM adapterKg trimDv','fairingM fairingLengthM launchAllowanceKg radialPaddingM','altitudeKm trimPaidDv',[
+  ['Launcher and interface','Select the launcher and enter the mission-specific payload mass and geometry limits.','launcherName padName padLocation padStatus referenceMass allowance profileD profileH reqTrim'],
+  ['Stowed geometry','Compare actual hardware sections with the usable profile from the adapter plane forward.','padName stackLength stackDiameter radialClearance axialClearance limitingPart fitBasis'],
+  ['Single-launch feasibility','Check lateral and axial clearances independently of mass allowance and insertion trim.','padName padHeading padPlaneGap padPositionGap launchMass launchMargin radialClearance axialClearance trimBudget requiredOrbit'],
+  ['Integration and injection','Follow the payload from stowed fit through separation and insertion trim.','phase padName padLocation padHeading padPlaneGap stackLength radialClearance launchMass altitudeKm trimPaidDv'],
+  ['Achieved operating orbit','Use the delivered state to compare the specified operating orbit and the post-injection mass.','targetAlt perigeeKm apogeeKm padName trimPaidDv wetKg launchMargin'],
+  ['Mission delivery and terminal orbit','Compare original insertion parameters with the selected retirement trajectory.','targetAlt reqTrim trimPaidDv padName disposalMode finalPerigee finalApogee']
  ],'integration pad launch insertion trim deployment disposal coast entry impact graveyard'),
  launcher:spec('Launch vehicle','rocket','Compare carrier architectures, provider-rated payloads, and the spacecraft mass each option can accept.',
-  'launcher launchAllowanceKg fairingM fairingLengthM radialPaddingM axialPaddingM adapterKg altitudeKm inclinationDeg','launcher launchAllowanceKg fairingM fairingLengthM','lvBenchmarkMargin lvScreenMargin',[
-  ['Choose the launch service','Select a flight-proven carrier or a development concept and compare its LEO reference with the mission allowance.','launcherName lvStatus referenceMass lvReferenceOrbit allowance'],
-  ['Carrier configuration','Inspect the core, strap-on propulsion and upper-stage arrangement that deliver the spacecraft.','launcherName lvStages lvBoosters lvRecovery lvArchitecture fitBasis'],
-  ['Launcher trade and manifest','Evaluate the same folded spacecraft against both mass screens and the selected fairing profile.','referenceMass allowance launchMass lvBenchmarkMargin launchMargin lvScreenMargin radialClearance axialClearance'],
-  ['Ascent and payload release','The launch vehicle carries the adapter and spacecraft through ascent. The spacecraft performs its own trim after separation.','phase launcherName lvHandoff launchMass adapterMass altitudeKm'],
-  ['Delivered spacecraft record','The original launch manifest stays fixed while the spacecraft consumes propellant in orbit.','launcherName launchMass initialWet adapterMass wetKg lvCarrierService'],
-  ['Carrier delivery closeout','Reconcile the original selected launch service with the spacecraft mass delivered at release and its recorded retirement outcome.','launcherName referenceMass launchMass initialWet adapterMass lvScreenMargin closureReason']
+  'launcher launchSite launchAllowanceKg fairingM fairingLengthM radialPaddingM axialPaddingM adapterKg altitudeKm inclinationDeg','launcher launchAllowanceKg fairingM fairingLengthM','lvBenchmarkMargin lvScreenMargin',[
+  ['Choose the launch service','Select a flight-proven carrier or a development concept and compare its LEO reference with the mission allowance.','launcherName padName padStatus lvStatus referenceMass lvReferenceOrbit allowance'],
+  ['Carrier configuration','Inspect the core, strap-on propulsion and upper-stage arrangement that deliver the spacecraft.','launcherName padName padLocation padStatus lvStages lvBoosters lvRecovery lvArchitecture fitBasis'],
+  ['Launcher trade and manifest','Evaluate the same folded spacecraft against both mass screens and the selected fairing profile.','padName referenceMass allowance launchMass lvBenchmarkMargin launchMargin lvScreenMargin radialClearance axialClearance'],
+  ['Ascent and payload release','The launch vehicle carries the adapter and spacecraft through ascent. The spacecraft performs its own trim after separation.','phase launcherName padName padLocation padStatus padHeading lvHandoff launchMass adapterMass altitudeKm'],
+  ['Delivered spacecraft record','The original launch manifest stays fixed while the spacecraft consumes propellant in orbit.','launcherName padName launchMass initialWet adapterMass wetKg lvCarrierService'],
+  ['Carrier delivery closeout','Reconcile the original selected launch service with the spacecraft mass delivered at release and its recorded retirement outcome.','launcherName padName referenceMass launchMass initialWet adapterMass lvScreenMargin closureReason']
  ],'integration pad launch insertion deployment disposal coast entry impact graveyard'),
  mechanical:spec('Mechanical Design','box','Equipment accommodation, structure, mechanisms, mass properties and atmospheric entry.',
   'trayCount propellantKg batteryKWh shieldKgM2 skinKgM2','trayCount propellantKg batteryKWh skinKgM2','wetKg propellantKg',[
@@ -227,6 +229,15 @@ function serviceRows(c){
  return [...rows.map(q=>({key:'service-'+q.key,label:q.label,unit:q.unit||'',value:q.value??null,note:q.note||'Earth service replay · selected window'})),{key:'service-status',label:'Earth service assessment',unit:'',value:status,note:'Selected offer window · Earth receipt and qualification'}];
 }
 const lv=c=>launchFleet[c.d.launcher];
+const selectedPad=c=>launchSiteFor(c.d.launcher,c.d.launchSite);
+const paths=new WeakMap();
+function ascent(c){if(!paths.has(c.h))paths.set(c.h,launchPath(c.d));return paths.get(c.h);}
+calc('padName','Launch complex','',c=>{const p=selectedPad(c);return p.name+' · '+p.range;},'Vehicle-specific pad assignment or labeled site study');
+calc('padLocation','Launch-site geography','',c=>{const p=selectedPad(c);return p.region+' · '+p.country+' · '+Math.abs(p.lat).toFixed(2)+'° '+(p.lat<0?'S':'N')+' / '+Math.abs(p.lon).toFixed(2)+'° '+(p.lon<0?'W':'E');},'Approximate pad or regional map reference');
+calc('padStatus','Pad and vehicle status','',c=>selectedPad(c).statusLabel,'Evidence for the selected vehicle and launch complex');
+calc('padHeading','Direct-ascent heading','°',c=>ascent(c).headingDeg,'Inertial tangent at the rotating pad, clockwise from local north');
+calc('padPlaneGap','Target-plane mismatch','°',c=>ascent(c).planeErrorDeg,'Angle between the site-derived insertion plane and the requested orbit');
+calc('padPositionGap','Target position mismatch at release','km',c=>ascent(c).gapKm,'Distance between the site-derived and requested positions at MET 540 s');
 calc('lvStatus','Programme status','',c=>lv(c).status,'Provider and agency references in the vehicle catalogue');
 calc('lvReferenceOrbit','Capacity reference conditions','',c=>lv(c).referenceOrbit,'Cited LEO reference');
 calc('lvStages','Axial propulsion stages','stages',c=>lv(c).stages);
@@ -509,8 +520,9 @@ function metricTable(rows){
 }
 export function renderDomainReadout(id,phase,ctx){
  const m=domainReadout(id,phase,ctx),events=m.events;
+ const ref=['launch','launcher'].includes(id)?launchReferenceFor(ctx.hardware.input.launcher):null;
  const schedule=['D','E','F'].includes(phase)?`<details class="da-fold"><summary>Relevant modeled intervals <small>${events.length} in view</small></summary>${events.length?`<div class="da-scroll"><table class="da-table"><thead><tr><th>Episode</th><th>Start MET</th><th>End MET</th><th>Duration</th></tr></thead><tbody>${events.map(e=>`<tr><td>${esc(e.label??e.type)}</td><td>${met(e.start)}</td><td>${met(e.end)}</td><td>${fmt(e.end-e.start)} s</td></tr>`).join('')}</tbody></table></div>`:'<p class="da-empty">No matching interval in the selected window.</p>'}</details>`:'';
- return `<section class="da-review" aria-label="${esc(m.title)}"><header><small>PHASE ${phase} &nbsp;/&nbsp; ${esc(domains[id].label.toUpperCase())}</small><h3>${esc(m.title)}</h3><p>${esc(m.description)}</p></header>${metricTable(m.rows)}${flowPanel(id,m.flows)}${schedule}<footer>${esc(m.basis)}</footer></section>`;
+ return `<section class="da-review" aria-label="${esc(m.title)}"><header><small>PHASE ${phase} &nbsp;/&nbsp; ${esc(domains[id].label.toUpperCase())}</small><h3>${esc(m.title)}</h3><p>${esc(m.description)}</p></header>${metricTable(m.rows)}${flowPanel(id,m.flows)}${schedule}<footer>${esc(m.basis)}${ref?` <a href="${esc(ref.url)}" target="_blank" rel="noopener noreferrer">${esc(ref.title)} ↗</a>`:''}</footer></section>`;
 }
 function tradePlot(curve){
  const values=[...curve.baseline,...curve.edited];if(!values.length)return '';

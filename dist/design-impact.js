@@ -6,6 +6,7 @@ const dependencies={
  hkPeriodS:['Command & Data Handling','Electrical Power'],hkRecorderMB:['Command & Data Handling','Mechanical Design'],
  commandKbps:['Communications','Command & Data Handling'],cmgMomentumNms:['Attitude Determination & Control','Mechanical Design','Electrical Power','Mass Budget'],cmgTorqueNm:['Attitude Determination & Control','Propulsion','Electrical Power'],
  aiPurpose:['AI Data Center Purpose','Mission CONOPS','Compute & Storage','Data & Delivery','Communications','Electrical Power','Thermal','Mass Budget'],
+ launchSite:['Launch Vehicle','Launch & Insertion','Orbit & Eclipse'],
  launcher:['Launch Vehicle','Launch & Insertion','Mass Budget','Orbit & Eclipse'],battery:['Electrical Power','Thermal','Mass Budget','Mechanical Design','Launch & Insertion'],
  compute:['Compute & Storage','Data & Delivery','Electrical Power','Thermal','Mass Budget'],workload:['Compute & Storage','Data & Delivery','Communications','Electrical Power'],
  storage:['Compute & Storage','Data & Delivery','Electrical Power','Mass Budget'],pv:['Electrical Power','Environment','Attitude Determination & Control','Mass Budget'],coating:['Thermal','Environment','Electrical Power'],

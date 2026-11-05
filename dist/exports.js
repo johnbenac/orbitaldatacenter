@@ -16,6 +16,8 @@ import {DEPLOYMENT_STAGES,deploymentLayout,deploymentSchedule,mechanismPose} fro
 import {deploymentMET} from './commissioning-clock.js';
 import {fieldGuidance,guidanceSources} from './input-guidance.js';
 import {launchFleet} from './launch-fleet.js';
+import {launchPath} from './launch-path.js';
+import {launchPropulsionFor} from './launch-sites.js';
 import {launcherFits} from './launch-fleet-ui.js';
 import {missionPreset,designName} from './mission-presets.js';
 import {environmentFlows} from './domain-analysis.js';
@@ -36,7 +38,8 @@ export async function makePacket({scenario,hardware,sim,result,snap,day,events,o
  const guidance=Object.keys(d).map(key=>{const g=fieldGuidance(key,d,{option:d[key]});return g?{parameter:key,value:d[key],unit:controls.find(c=>c.key===key)?.unit||'',advice:g.advice,basis:g.basis,example:g.example||'',references:g.sources.map(s=>s.id+' · '+s.title+(s.locator?' · '+s.locator:'')+' '+s.url).join(' | ')}:null}).filter(Boolean);
  z.file('reference/input-guidance.csv',csv(guidance));z.file('reference/guidance-sources.json',json(guidanceSources));
  const fleetScreen=launcherFits(hardware).map(({vehicle:v,fairing:f,referenceMarginKg,missionMarginKg,screenMarginKg,selected})=>({vehicle:v.name,status:v.status,selected,reference_orbit:v.referenceOrbit||v.orbit,reference_payload_kg:v.referenceKg,mission_allowance_kg:d.launchAllowanceKg,stack_kg:hardware.launchKg,reference_headroom_kg:referenceMarginKg,allowance_headroom_kg:missionMarginKg,governing_mass_margin_kg:screenMarginKg,radial_clearance_m:f.radialClearanceM,axial_clearance_m:f.axialClearanceM,stowed_fit:f.fit,envelope_basis:f.basis,envelope_source:f.sourceUrl,performance_source:v.sourceUrl}));
- z.file('design/launcher-comparison.csv',csv(fleetScreen));z.file('design/launch-vehicle.json',json({selection:d.launcher,reference:launchFleet[d.launcher],missionAllowanceKg:d.launchAllowanceKg,launchedKg:hardware.launchKg,referenceHeadroomKg:d.referenceKg-hardware.launchKg,allowanceHeadroomKg:hardware.massMarginKg,limitingMassScreenKg:Math.min(d.referenceKg,d.launchAllowanceKg)-hardware.launchKg}));
+ const ascent=launchPath(d);
+ z.file('design/launcher-comparison.csv',csv(fleetScreen));z.file('design/launch-vehicle.json',json({selection:d.launcher,reference:launchFleet[d.launcher],launchSite:ascent.site,stagePropellants:launchPropulsionFor(d.launcher),siteInsertion:{angles:ascent.angles,departureHeadingDeg:ascent.headingDeg,planeErrorDeg:ascent.planeErrorDeg,positionErrorKm:ascent.gapKm},missionAllowanceKg:d.launchAllowanceKg,launchedKg:hardware.launchKg,referenceHeadroomKg:d.referenceKg-hardware.launchKg,allowanceHeadroomKg:hardware.massMarginKg,limitingMassScreenKg:Math.min(d.referenceKg,d.launchAllowanceKg)-hardware.launchKg}));
  const service=evaluateService(sim,view.start,Math.min(86400,sim.duration-view.start)),goal=aiPurposes[d.aiPurpose];
  z.file('ai-mission/earth-service-window.json',json(service));z.file('ai-mission/customer-metrics.csv',csv(service.metrics));
  z.file('ai-mission/installed-compute.json',json(hardware.ai));

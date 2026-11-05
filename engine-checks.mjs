@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {launchPath} from './dist/launch-path.js';
 import {defaults} from './dist/design.js';
 import {createSimulation} from './dist/model.js';
 import {DEPLOY_END_S} from './dist/commissioning-clock.js';
@@ -28,8 +29,8 @@ assert.ok(post.bulkDeliveredGB>0 && post.tokensDelivered<post.deliveredGB*1e9/de
 const start=120*DAY+.6*DAY;long.daySummary(start);for(const [field,tol] of [['queueGB',.001],['propellantKg',.001],['socPct',.001],['momentumNms',.01],['junctionK',.01]])near(long.at(121*DAY-.001)[field],long.at(121*DAY+.001)[field],tol);
 const shorter=createSimulation({...defaults,missionYears:1});near(shorter.at(.5*YEAR).propellantKg,long.at(.5*YEAR).propellantKg);
 const audit=chronologicalAudit({...defaults,missionYears:.008}),ae=createSimulation({...defaults,missionYears:.008}).at(.008*YEAR);near(audit.result.finalState.propellantKg,ae.propellantKg);near(audit.result.finalState.deliveredGB,ae.deliveredGB,.0001);assert.ok(audit.result.contactCount>0&&audit.result.eclipseCount>0&&audit.result.maxJunctionK>=ae.junctionK);assert.ok(audit.result.dayStats.length===3);
-const t0=sim.at(0),insert=sim.at(540);near(t0.altitudeKm,0,1e-8);near(sim.at(-120).altitudeKm,0,1e-8);near(sim.at(539.999).altitudeKm,insert.altitudeKm,.001);
-for(let i=0;i<3;i++){near(sim.at(539.999).positionECI[i],insert.positionECI[i],.009);near(sim.at(539.999).velocityECI[i],insert.velocityECI[i],.0001);}
+const siteMission=createSimulation({...defaults,...launchPath(defaults).angles}),t0=siteMission.at(0),insert=siteMission.at(540);near(t0.altitudeKm,0,1e-8);near(siteMission.at(-120).altitudeKm,0,1e-8);near(siteMission.at(539.999).altitudeKm,insert.altitudeKm,.001);
+for(let i=0;i<3;i++){near(siteMission.at(539.999).positionECI[i],insert.positionECI[i],.009);near(siteMission.at(539.999).velocityECI[i],insert.velocityECI[i],.0001);}
 const missionModel=createSimulation({...defaults,missionYears:.008}),plan=missionModel.disposal(),beforeIgn=missionModel.at(plan.start),cut=missionModel.at(plan.cutoff),entry=missionModel.at(plan.entry),final=missionModel.at(missionModel.duration);
 assert.ok(plan.feasible&&plan.cutoff>plan.start&&plan.entry>plan.cutoff);near(cut.perigeeKm,plan.goal,.0001);near(entry.altitudeKm,120,.0001);near(cut.propellantKg,entry.propellantKg);near(entry.propellantKg,final.propellantKg);near(beforeIgn.propellantKg-cut.propellantKg,plan.usedKg,.00001);near(cut.disposalPaidDv,9.80665*defaults.isp*Math.log(beforeIgn.wetKg/cut.wetKg),.000001);near((plan.cutoff-plan.start)*defaults.thrustN,plan.usedKg*9.80665*defaults.isp,.001);
 assert.equal(entry.flightPhase,'entry');assert.ok(entry.velocityECI.reduce((a,v,i)=>a+v*entry.positionECI[i],0)<0);assert.equal(cut.tokensPerSec,0);

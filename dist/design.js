@@ -6,6 +6,7 @@ import {serviceControls} from './ai-service-inputs.js';
 import {thermalControls,validateThermalLimits} from './thermal-limits.js';
 import {geometry} from './orbit.js';
 import {densities} from './density.js';
+import {launchSites,launchSiteFor} from './launch-sites.js';
 import {launchFleet} from './launch-fleet.js';
 import {fairings,packedSections,fairingFit, radiusAt} from './fairings.js';
 import {sizePropulsion,installPropulsion,propulsionReview,propulsionSources} from './spacecraft-architecture.js';
@@ -56,12 +57,13 @@ export const presets={
  pv:{multijunction:{label:'Triple-junction III–V',pvEfficiency:.30,pvRetention:.98,pvKgM2:2.6},silicon:{label:'Crystalline silicon',pvEfficiency:.225,pvRetention:.968,pvKgM2:2.2}},
  coating:{osr:{label:'Optical solar reflector',emissivity:.85,absorptivity:.09,emissivityRetention:.997,alphaGrowth:.004},paint:{label:'White silicate paint',emissivity:.90,absorptivity:.17,emissivityRetention:.994,alphaGrowth:.008}},
  engine:{mmh:{label:'MMH / MON-3 · pressure-fed',isp:305,thrustN:880,mixtureRatio:1.65,fuelDensity:.88,oxidizerDensity:1.44},aero:{label:'Aerozine-50 / NTO · pressure-fed',isp:296,thrustN:890,mixtureRatio:1.60,fuelDensity:.903,oxidizerDensity:1.443}},
- launcher:Object.fromEntries(Object.entries(launchFleet).map(([id,v])=>{const p=fairings[id].profile;return [id,{label:v.name,referenceKg:v.referenceKg,fairingM:2*Math.max(...p.map(s=>s[1])),fairingLengthM:p.at(-1)[0]}]})),
+ launcher:Object.fromEntries(Object.entries(launchFleet).map(([id,v])=>{const p=fairings[id].profile;return [id,{label:v.name,launchSite:launchSiteFor(id).id,referenceKg:v.referenceKg,fairingM:2*Math.max(...p.map(s=>s[1])),fairingLengthM:p.at(-1)[0]}]})),
  network:{global:{label:'Global · six ground sites'},polar:{label:'Polar · three high-latitude sites'},svalbard:{label:'Single site · Svalbard'}},
 };
 const numeric=(group,rows)=>rows.map(([key,label,unit,min,max,step,value])=>({group,key,label,unit,min,max,step,value}));
 const select=(key,label,group,options,value)=>({key,label,group,options,value});
 export const controls=[...aiControls,...serviceControls,...Object.entries(presets).map(([key,entries])=>select(key,({pv:'Solar cells',engine:'Engine package',compute:'Compute tray',workload:'Language model',storage:'Storage module',battery:'Battery chemistry',coating:'Radiator finish',launcher:'Launch vehicle',network:'Ground network'})[key],'Technology',Object.fromEntries(Object.entries(entries).map(([id,v])=>[id,v.label])),Object.keys(entries)[0])),
+ select('launchSite','Launch site and pad','Launch and insertion',Object.fromEntries(Object.values(launchSites).map(s=>[s.id,s.range+' · '+s.name])),launchSiteFor('terran').id),
  ...numeric('Flight avionics',[
  ['commandKbps','Ground command offering','kbit/s',0,256,1,16],['uplinkBufferMB','Ground command queue','MB',1,8192,1,128],
  ['hkPeriodS','Housekeeping sample period','s',.1,60,.1,1],['hkRecorderMB','Onboard housekeeping recorder','MB',1,8192,1,256]]),
@@ -124,7 +126,7 @@ export function applyAIPurpose(input,id,withBuild=false){
  if(!Object.hasOwn(aiPurposes,id))throw Error('Unknown AI purpose');
  return {...input,aiPurpose:id};
 }
-export function normalizeDesign(input={}){let out={...defaults};for(const key of Object.keys(presets)){if(input[key]&&presets[key][input[key]])out=applyPreset(out,key,input[key])}for(const [key,value] of Object.entries(input)){if(key in defaults && (typeof defaults[key]==='number'?Number.isFinite(value):typeof value==='string'))out[key]=value}if(launchFleet[out.launcher])out.referenceKg=launchFleet[out.launcher].referenceKg;return out}
+export function normalizeDesign(input={}){let out={...defaults};for(const key of Object.keys(presets)){if(input[key]&&presets[key][input[key]])out=applyPreset(out,key,input[key])}for(const [key,value] of Object.entries(input)){if(key in defaults && (typeof defaults[key]==='number'?Number.isFinite(value):typeof value==='string'))out[key]=value}if(launchFleet[out.launcher]){out.referenceKg=launchFleet[out.launcher].referenceKg;out.launchSite=launchSiteFor(out.launcher,out.launchSite).id;}return out}
 export function validateDesign(d){const errors=validateThermalLimits(d);for(const c of controls){if(c.options){if(!(d[c.key] in c.options))errors.push(c.label+' is unknown')}else if(!Number.isFinite(d[c.key])||d[c.key]<c.min||d[c.key]>c.max)errors.push(`${c.label} requires ${c.min}–${c.max} ${c.unit}`)}if((6378.137+d.altitudeKm)*(1-d.ecc)<=6378.137)errors.push('Perigee intersects Earth');if(d.socMax<=d.socMin)errors.push('SOC ceiling must exceed the floor');if(d.socInitial<d.socMin||d.socInitial>d.socMax)errors.push('Launch SOC must be between the operating limits');if(d.f107Floor>d.f107Ceiling)errors.push('Minimum solar flux must be at or below the maximum');if(d.trayIdleKw>d.trayKw)errors.push('Idle tray draw exceeds active draw');if(d.promptTokens>d.context)errors.push('Prompt exceeds configured context');if(!Number.isFinite(Date.parse(d.epoch)))errors.push('Epoch must be a valid UTC date');return errors}
 export const ageProperties=(d,y)=>({pv:d.pvEfficiency*d.pvRetention**y,battery:d.batteryKWh*d.batteryRetention**y,emissivity:d.emissivity*d.emissivityRetention**y,absorptivity:Math.min(1,d.absorptivity+d.alphaGrowth*y)});
 export const physics={solarPower:(area,eff,angle,visible=1,delivery=1)=>SOLAR*area*eff*Math.max(0,Math.cos(rad(angle)))*visible*delivery, emission:(area,t,em,faces=1)=>area*faces*em*SIGMA*t**4,battery:(initial,charge,discharge,ec,ed)=>initial+ec*charge-discharge/ed,deliverGB:(queueGB,goodputMbps,seconds)=>Math.min(queueGB,goodputMbps*seconds/8000),drag:(rho,v,cd,area)=>.5*rho*v*v*cd*area,rocket:(kg,isp,dv)=>kg*(-Math.expm1(-dv/(G0*isp))),chipCount:(required,peak,eff)=>Math.ceil(required/(peak*eff))};

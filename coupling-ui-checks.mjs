@@ -89,11 +89,20 @@ console.log('Deployment handoff, one-clock milestones, physical hinge inspection
 // A phase-C comparison can run and scrub the same flight director without changing the design.
 await fire({phase:'C'});await fire({domain:'attitude'});
 assert.match(el('guidepanel').innerHTML,/Play analysis/);
-await fire({attitudeTime:'9642'});const held=await snapshot();
-assert.match(el('attitude-strip').innerHTML,/Canberra/);assert.match(el('attitude-history').innerHTML,/data-attitude-time/);
+const {createSimulation}=await imp('model.js');const tested=await snapshot();
+const contact=createSimulation(tested.design).events(0,86400).find(e=>e.type==='contact'&&e.start>DEPLOY_END_S);assert.ok(contact);
+await fire({attitudeTime:String((contact.start+contact.end)/2)});const held=await snapshot();
+assert.ok(el('attitude-strip').innerHTML.includes(contact.station));assert.match(el('attitude-history').innerHTML,/data-attitude-time/);
 await fire({camera:'orbit'});const switched=await snapshot();assert.equal(switched.view.t,held.view.t);assert.deepEqual(switched.design,held.design);
 assert.match(el('attitude-strip').innerHTML,/Earth-centered view/);
 await fire({action:'flightplay'});assert.match(el('guidepanel').innerHTML,/Pause/);await fire({action:'flightplay'});
 await fire({phase:'B'});assert.match(el('system-choice').innerHTML,/Flight pointing modes and actuator design/);
 assert.equal(el('attitude-strip').hidden,true);assert.equal(el('attitude-history').hidden,true);
 console.log('Pointing mode design, orbital scrub, camera continuity, coupled telemetry and analysis playback passed.');
+
+await fire({phase:'A'});await fire({domain:'launcher'});await fire({useLauncher:'starship'});await accept();
+const launch=(await snapshot()).design;assert.equal(launch.launchSite,'starbase-pad2');
+await change('', 'ksc-starship',{param:'launchSite'});await fire({action:'cancelimpact'});assert.equal((await snapshot()).design.launchSite,'starbase-pad2');
+await fire({watchLiftoff:''});await fire({launchTime:'4'});await fire({launchLens:'ship'});
+const clock=await snapshot();assert.equal(clock.view.t,4);assert.equal(clock.view.launchLens,'ship');assert.equal(clock.view.speed,1);assert.match(el('guidepanel').innerHTML,/Starbase/);
+console.log('Site-coupled launcher selection, cancel, liftoff clock, lens and share persistence passed.');

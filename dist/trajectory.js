@@ -119,15 +119,3 @@ export function trajectoryAt(plan,t){
  const positionECI=z.slice(0,3),velocityECI=z.slice(3,6);
  return {positionECI,velocityECI,...elements(positionECI,velocityECI),trajectoryWetKg:z[6]};
 }
-// Kinematic upper-stage ascent terminating at the design's insertion state.
-// The pad is inferred from that state. It is not a catalogued launch complex.
-export function ascentTrack(end,t){
- const tf=540,p=end.positionECI,v=end.velocityECI,u=unit(p),r=Math.hypot(...p),vr=dot(u,v),trans=v.map((x,i)=>x-u[i]*vr),along=unit(trans);
- const sweep=Math.hypot(...trans)/r*tf*.48,pad=u.map((x,i)=>x*Math.cos(sweep)-along[i]*Math.sin(sweep)),padV=[-spin*pad[1],spin*pad[0],0];
- if(t<0){const c=Math.cos(spin*t),s=Math.sin(spin*t),p=[(c*pad[0]-s*pad[1])*R,(s*pad[0]+c*pad[1])*R,pad[2]*R];return {positionECI:p,velocityECI:[-spin*p[1],spin*p[0],0],perigeeKm:0,apogeeKm:0};}
- const k=clip(t/tf,0,1),q=k*k,q3=q*k,h=[2*q3-3*q+1,q3-2*q+k,-2*q3+3*q,q3-q],h1=[(6*q-6*k)/tf,3*q-4*k+1,(-6*q+6*k)/tf,3*q-2*k];
- const dir=pad.map((x,i)=>h[0]*x+h[1]*tf*padV[i]+h[2]*u[i]+h[3]*tf*trans[i]/r),norm=Math.hypot(...dir),n=unit(dir);
- const dn=pad.map((x,i)=>h1[0]*x+h1[1]*padV[i]+h1[2]*u[i]+h1[3]*trans[i]/r),pd=dot(dn,n);
- const radius=R+h[2]*(r-R)+h[3]*tf*vr,rd=h1[2]*(r-R)+h1[3]*vr;
- return {positionECI:n.map(x=>x*radius),velocityECI:n.map((x,i)=>rd*x+radius*(dn[i]-pd*x)/norm),perigeeKm:0,apogeeKm:radius-R};
-}

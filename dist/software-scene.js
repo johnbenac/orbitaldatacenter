@@ -37,7 +37,29 @@ for(let y=ylo;y<=yhi;y++){let w0=ca*(xlo+.5-x2)+da*(y+.5-y2),w1=cb*(xlo+.5-x2)+d
  }else{
   const tx=Math.max(0,Math.min(tw-1,Math.floor(u*tw))),ty=Math.max(0,Math.min(th-1,Math.floor((1-v)*th))),q=(ty*tw+tx)*4;
   alpha*=data[q+3]/255;if(alpha<.003)continue;rr=data[q]*illum;gg=data[q+1]*illum;bb=data[q+2]*illum;
- }}if(mat.userData.hatch?.value){const phase=((x+y)*canvas.width/width)%9,stripe=phase<1?.72:phase<2?(2-phase)*.72:0;rr+=(255-rr)*stripe;gg+=(255-gg)*stripe;bb+=(255-bb)*stripe;}let kk=k*4;if(alpha<1){if(img[kk+3]){rr=img[kk]*(1-alpha)+rr*alpha;gg=img[kk+1]*(1-alpha)+gg*alpha;bb=img[kk+2]*(1-alpha)+bb*alpha;}}img[kk]=rr;img[kk+1]=gg;img[kk+2]=bb;img[kk+3]=Math.max(img[kk+3],alpha*255);if(mat.depthWrite!==false)depth[k]=z;}}}}
-;const context=[],focused=[];scene.traverseVisible(o=>{if(o.material?.userData.domainGhost){context.push(o);return;}if(o.material?.userData.domainFront){focused.push(o);return;}draw(o);});for(const o of context)draw(o);for(const o of focused)draw(o);
+ }}if(mat.userData.hatch?.value){const phase=((x+y)*canvas.width/width)%9,stripe=phase<1?.72:phase<2?(2-phase)*.72:0;rr+=(255-rr)*stripe;gg+=(255-gg)*stripe;bb+=(255-bb)*stripe;}const kk=k*4,dst=img[kk+3]/255,coverage=alpha+dst*(1-alpha);
+ if(coverage>0&&alpha<1){const w=alpha/coverage,v=1-w;rr=img[kk]*v+rr*w;gg=img[kk+1]*v+gg*w;bb=img[kk+2]*v+bb*w;}
+ img[kk]=rr;img[kk+1]=gg;img[kk+2]=bb;img[kk+3]=255*coverage;if(mat.depthWrite!==false)depth[k]=z;}}}}
+;
+ // Opaque fragments establish depth first. Physical translucent surfaces then
+ // blend far-to-near in camera space. The hardware X-ray pass keeps its
+ // deliberate back/front layer priorities.
+ const translucent=[],context=[],focused=[];
+ function enqueue(bucket,o){
+  const g=o.geometry;if(!g.boundingSphere)g.computeBoundingSphere();
+  const z=vec.copy(g.boundingSphere.center).applyMatrix4(o.matrixWorld).applyMatrix4(camera.matrixWorldInverse).z;
+  bucket.push({o,z});
+ }
+ scene.traverseVisible(o=>{
+  const m=o.material;if(!m||!o.geometry)return;
+  if(m.userData?.domainGhost){enqueue(context,o);return;}
+  if(m.userData?.domainFront){enqueue(focused,o);return;}
+  if(m.transparent||m.depthWrite===false)enqueue(translucent,o);else draw(o);
+ });
+ for(const bucket of [translucent,context,focused]){
+  bucket.sort((a,b)=>a.o.renderOrder-b.o.renderOrder||a.z-b.z||a.o.id-b.o.id);
+  for(const {o} of bucket)draw(o);
+ }
+
 for(const [x0,y0,z0,x1,y1,z1,c,opacity] of lines){let dx=x1-x0,dy=y1-y0,steps=Math.min(4000,Math.max(1,Math.ceil(Math.max(Math.abs(dx),Math.abs(dy)))));for(let j=0;j<=steps;j++){let f=j/steps,x=Math.round(x0+dx*f),y=Math.round(y0+dy*f);if(x<0||x>=width||y<0||y>=height)continue;let i=y*width+x,kk=i*4;if(z0+(z1-z0)*f>depth[i]+.00007)continue;let op=opacity??1,af=img[kk+3]?op:1;img[kk]=img[kk]*(1-af)+(c>>16)*af;img[kk+1]=img[kk+1]*(1-af)+(c>>8&255)*af;img[kk+2]=img[kk+2]*(1-af)+(c&255)*af;img[kk+3]=Math.max(img[kk+3],op*255);}}
 raster.putImageData(frame,0,0);ctx.clearRect(0,0,canvas.width,canvas.height);ctx.drawImage(aa,0,0,canvas.width,canvas.height);},dispose(){depth=null;frame=null;}};}

@@ -50,7 +50,7 @@ export function installPropulsion(p,d,g,ledger){
  const racks=[[-w*.225,0,z(0)],[w*.225,0,z(0)]],gyros=[-1,1].flatMap(a=>[-1,1].map(b=>[a*(cmgDims[0]/2+.015),b*(cmgDims[1]/2+.015),l*.5-wall-gyZ*.5-.025]));
  p.stations={'01.01':racks,'01.02':racks,compute:[0,0,z(0)],host:[0,0,z(0)],switch:[-.313*w,h*.05,z(-.401)],storage:[.10*w,-h*.025,z(-.407)],'02.02':[0,1,2,3].map(i=>[(i-1.5)*.20*w,-h*.06,z(.408)]),terminals:[0,h*.50,0],'05.01':[[-w*.49,h*.26,l*.30],[w*.49,h*.26,l*.30]],'05.02':[w*.16,h*.52,-l*.35],'05.03':[-w*.20,h*.52,l*.35],coolant:[0,0,z(0)],'04.01':gyros,cmg:[0,0,gyros[0][2]],'06.02':[0,0,aft],hinges:[0,0,0]};
  p.installDims={'04.01':cmgDims,'01.03':[.55*w,.66*h,.137*free],'08.01':[.20*w,.37*h,.13*free]};
- const nozzleR=.146*Math.sqrt(d.thrustN/850),length=.38*Math.sqrt(d.thrustN/850),spacing=Math.max(nozzleR*1.35,.20*w),throatZ=-l*.5-.035;
+ const nozzleR=.146*Math.sqrt(d.thrustN/850),length=.38*Math.sqrt(d.thrustN/850),spacing=Math.max(nozzleR*1.35,Math.min(.20*w,.44)),throatZ=-l*.5-.035;
  p.engines=[-1,1].map(sign=>({x:sign*spacing,y:0,z:throatZ-length,exitRadiusM:nozzleR,throatZ}));
  const h0={...g,input:d,propulsion:p,massLedger:ledger,propellantKg:d.propellantKg};
  // Align the installed liquid pair to the nonconsumable transverse mass center.

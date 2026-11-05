@@ -48,7 +48,7 @@ export function equipmentResources(r,h,s){
  if(/^06\.0[678]$/.test(id)){const ti=Number(id.slice(3))-6;envelope(tankDims(p.tanks[ti]),ti===2?'Helium bottle at loading':'Shared vessel envelope','Contained fluid occupies its vessel. Do not add this envelope to its shell volume.',prop);}
  if(id==='07.04')electric(60,1000*n(s?.jointKW),'Deployment / rotary tracking','60 W is the single deployment-motor reference. The live power column follows release, unfolding, and on-orbit wing and radiator drive loads.');
  if(id==='08.01'){electric(h.cdh?.operatingW??45,cdhW,'Flight avionics active','Flight computer, command interfaces and spacecraft recorder draw from allocated auxiliary power.');envelope(h.cdh?.suiteDimsM??smallBox,'Flight avionics suite','Bounding installation allocation, including interfaces and mounts. The Moog unit has its own comparison dimensions.');}
- if(id==='09.01'){const a=h.fairing?.stack?.[0];if(a)envelope([a.widthM,a.heightM,a.lengthM],'Separation adapter','Launcher adapter bounding dimensions at the base of the stack.',model('fairings.js','Fairing interface model'));}
+ if(id==='09.01'){const a=h.fairing?.stack?.[0];if(a)envelope([a.widthM,a.heightM,h.payloadInterface.upperFaceStationM],'Active adapter and stand-off','Bounding diameter of launcher transition and stack height up to the spacecraft mounting face.',model('fairings.js','Fairing interface model'));}
  const supportKW=['auxKW','terminalKW','pumpKW','storageKW','cmgKW','coilKW','jointKW'].reduce((sum,key)=>sum+n(s?.[key]),0);
  const servedFraction=supportKW>0?Math.max(0,Math.min(1,(n(s?.servedLoadKW)-n(s?.itKW))/supportKW)):0;
  if(!['01.01','01.02','01.04'].includes(id))now*=servedFraction;

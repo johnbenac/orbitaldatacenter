@@ -11,3 +11,18 @@ body[data-bay=true] #primary{grid-template-columns:minmax(0,2.1fr) minmax(255px,
 .bay-playback{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin:12px 0 4px}.bay-playback label{display:inline-flex;align-items:center;gap:6px;color:#c1ced3;font-size:12px}
 
 .bay-station-menu,.gesture .touch-hint{display:none}@media(max-width:720px){.bay-station-menu{display:inline-flex}}@media(pointer:coarse){.gesture .mouse-hint{display:none}.gesture .touch-hint{display:inline}}
+
+.loading-player{padding:12px 14px;border-top:1px solid #3a4a51;background:#1b272e;color:#dbe8e7}
+.loading-player header,.loading-seek{display:flex;align-items:center;gap:10px;justify-content:space-between}
+.loading-player header small{color:#9fc9bc;font-size:11px}.loading-player h3{font-size:17px;margin:1px 0 2px;font-weight:570}
+.loading-player header .btn{border-color:#b49361;background:#423724;color:#ffe1ac}
+.loading-stages{display:flex;flex-wrap:wrap;gap:4px;margin-top:9px}
+.loading-stages button{display:flex;gap:4px;align-items:center;font:500 11px/1.4 system-ui;color:#c7d4d5;background:#202d34;border:1px solid #43565c;border-radius:5px;padding:3px 6px}
+.loading-stages button i{font:normal 10px/1.3 monospace;color:#89aaa9}
+.loading-stages button[aria-current=step]{background:#433722;border-color:#b38a50;color:#ffe1ab}
+.loading-stages button:disabled{opacity:.48;cursor:default}.loading-player p{margin:8px 0;color:#d0dbda;font-size:12px;line-height:1.45}
+.loading-seek{font-size:11px;color:#abc1c1;justify-content:flex-start}.loading-seek span,.loading-seek output{white-space:nowrap}.loading-seek input{width:auto;flex:1;min-width:40px;accent-color:#ebb16d}
+.facility-record{padding:15px 19px;margin:10px 0}.facility-record summary{color:#cee2dc;cursor:pointer;font-size:14px}.facility-record p{font-size:13px;line-height:1.55;color:#c0ced1;margin:8px 0}.facility-record h3{font-size:14px;color:#dfebe8;margin:14px 0 4px}.facility-record a{color:#b5d9cd}
+@media(max-width:720px){.loading-player{padding:10px}.loading-stages button{min-height:32px}.loading-seek input{height:32px}}
+
+.bay-guide .bay-study-note{font-size:11px;line-height:1.5;color:#b4c4c5}.starship-evidence{max-width:840px}.starship-evidence svg{display:block;max-width:600px;margin:14px 0}

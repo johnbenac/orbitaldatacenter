@@ -13,7 +13,7 @@ for(const purpose of ['text','pretrain']){
  const launch=makeLaunch(sizeDesign(missionStarter(purpose))),{bay,parts}=launch;
  const step=(phase,t,domain)=>launch.update({flightPhase:phase,t,altitudeKm:0},phase,{phase:'D',domain});
  for(const domain of domains){
-  const state=step('integration',-2500,domain);
+  const state=step('integration',-3599,domain);
   assert.equal(state.environment,'hangar');assert.equal(parts.tower.visible,false,domain+' pad leak');
   assert.equal(parts.facility.visible,true);assert.equal(bay.station.userData.stationId,bayStationFor(domain));
   assert.equal(bay.station.children.filter(x=>x.visible).length,1,domain+' shows another station');

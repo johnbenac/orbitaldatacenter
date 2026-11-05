@@ -1,3 +1,4 @@
+import {adapterEnvelopeM,spacecraftInterface} from './payload-interface.js';
 import {deploymentLayout,terminalLayout} from './deployment.js';
 // Coordinates are metres from the payload adapter interface plane, positive forward.
 const terran = {
@@ -74,9 +75,9 @@ export function packedSections(g){
  function add(part,widthM,heightM,lengthM,radiusM=Math.hypot(widthM,heightM)/2){
   sections.push({part,widthM,heightM,lengthM,radiusM,z0M:z,z1M:z+lengthM});z+=lengthM;
  }
- const adapterWidth=g.launcher==='glenn'?3.30:1.52;
+ const adapterWidth=adapterEnvelopeM(g.launcher||'terran');
  add('Separation adapter',adapterWidth,adapterWidth,.36,adapterWidth/2);
- add('Launch service stand-off',w*.8,h*.8,Math.max(.30,...(g.propulsion?.engines||[]).map(e=>-e.z-l*.5+.14)));
+ add('Launch service stand-off',spacecraftInterface.outerM,spacecraftInterface.outerM,Math.max(.30,...(g.propulsion?.engines||[]).map(e=>-e.z-l*.5+.14)),Math.max(spacecraftInterface.outerM/2,adapterWidth/2));
  const nozzles=g.propulsion?.engines||[];
  const bellEdge=Math.max(0,...nozzles.map(e=>Math.hypot(e.x,e.y)+e.exitRadiusM));
  const a=g.opticalApertureM??0,term=terminalLayout(w,h,kaDishM,a);

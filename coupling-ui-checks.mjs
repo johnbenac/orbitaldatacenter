@@ -161,3 +161,15 @@ await imp('app.js?reload-data');const afterReload=await snapshot();
 assert.equal(afterReload.view.domain,'data');assert.equal(afterReload.view.t,6);
 assert.equal(afterReload.view.chapter,'ascent');assert.equal(afterReload.design.launcher,'falconHeavy');
 console.log('Immediate reload at Falcon Heavy liftoff preserves the selected domain, rocket and clock.');
+
+// Inspect the launch adapter, follow the stowed spacecraft, and stop the handling
+// rehearsal at its final mate on the same mission clock used by the flight view.
+await fire({phase:'A'});await fire({domain:'launcher'});await fire({useLauncher:'starship'});await accept();
+await fire({phase:'B'});assert.match(el('fleet-host').innerHTML,/ODC-LI-01/);
+await fire({watchLoading:''});await fire({bayLens:'payload'});await fire({loadingAt:'-960'});
+let loadState=await snapshot();assert.equal(loadState.view.t,-960);assert.equal(loadState.view.bayLens,'payload');assert.equal(loadState.view.chapter,'integration');
+assert.match(el('loading-player').innerHTML,/Complete ship/);
+await fire({loadingAt:'-660'});assert.match(el('loading-player').innerHTML,/Replay payload loading/);
+await fire({loadingPlay:''});loadState=await snapshot();
+assert.equal(loadState.view.t,-3000);assert.equal(loadState.view.speed,120);assert.equal(loadState.design.launcher,'starship');
+console.log('Adapter-to-integration handoff, reversible payload milestones, follow camera and replay stay on one mission clock.');

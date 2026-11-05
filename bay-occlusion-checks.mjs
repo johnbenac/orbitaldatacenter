@@ -45,25 +45,34 @@ for(const id of Object.keys(launchFleet)){
   paint.apply(domain);for(const [o,m] of room)assert.equal(o.material,m);
  }
  paint.clear();thermal.apply([]);for(const [o,m] of room)assert.equal(o.material,m);thermal.destroy();paint.destroy();
- for(const t of [-3599,-2150,-601]){
-  lv.update({t,flightPhase:'integration',altitudeKm:0},'integration',{phase:'D',domain:'launch'});
+ for(const t of [-3599,-2400,-1920,-1500,-960,-660]){
+  lv.update({t,flightPhase:'integration',altitudeKm:0},'integration',{phase:'D',domain:'launcher'});
   lv.root.updateMatrixWorld(true);
-  const top=bounds(parts.facility.getObjectByName('Adapter bearing plate')).max.y;
-  const adapter=parts.payload.children.find(o=>o.isMesh&&o.userData.part==='adapter');
-  near(bounds(adapter).min.y,top);
-  const standFloor=bounds(parts.facility.children.find(o=>o.geometry?.type==='PlaneGeometry')).min.y;
-  const support=parts.facility.getObjectByName('Adapter bearing plate'),cells=named(parts.facility,'Pedestal load cell');
+  const top=bounds(parts.facility.getObjectByName('Adapter bearing plate')).max.y,ring=parts.fitting.getObjectByName('Carrier attachment ring');
+  const passed=hw.payloadInterface.passes,closed=passed&&hw.fairing.fit,layout=lv.bay.layout;
+  if(t<=-1920||!closed)near(bounds(ring).min.y,top);
+  const support=parts.facility.getObjectByName('Checkout bearing plate'),cells=named(parts.facility,'Pedestal load cell');
   assert.equal(cells.length,4);for(const cell of cells)near(bounds(cell).max.y,bounds(support).min.y);
-  const rim=hw.fairing.outerDiameterM*.5*hw.fairing.profile[0][1]/Math.max(...hw.fairing.profile.map(r=>r[1]));
-  const star=id==='starship',name=star?'Cargo mock-up rim shoe':'Fairing rim shoe';
-  const shoes=named(parts.facility,name);
-  assert.equal(shoes.length,star?4:6,id);
-  const shellParts=star?[parts.shell]:parts.shell.children.filter(o=>o.userData.halfSide);
-  for(const shoe of shoes){
-   const p=shoe.getWorldPosition(V()),shell=shellParts.find(o=>star||o.userData.halfSide===Math.sign(shoe.position.x));
-   assert.ok(shell);const pt=shell.worldToLocal(V(p.x,bounds(shoe).max.y,p.z));
-   near(pt.y);near(Math.hypot(pt.x,pt.z),rim);
-   assert.ok(bounds(shoe).min.y>standFloor);
+  if(t===-3599)near(parts.payload.position.x);else if(t>=-2400&&closed)near(parts.payload.position.distanceTo(parts.fitting.position));
+  if(t===-660&&closed){
+   near(parts.shell.position.distanceTo(parts.fitting.position));
+   const carrier=lv.geometry.stages===1?parts.lower:parts.upper;
+   near(parts.fitting.position.distanceTo(carrier.position));near(parts.fitting.rotation.z,carrier.rotation.z);
+  }
+  if(id==='starship'){
+   assert(parts.upper.visible&&!parts.lower.visible);
+   assert.equal(named(parts.upper,'Raptor 3').length,3);assert.equal(named(parts.upper,'Raptor Vacuum').length,3);
+   const shoe=named(parts.facility,'Forward module storage shoe')[0];if(t===-3599)near(bounds(shoe).max.y,parts.shell.position.y);
+   assert.equal(parts.shell.getObjectByName('Retained cargo door').rotation.y,0);
+   if(t===-1500&&closed){near(parts.shell.position.x,layout.ringX);assert(parts.shell.position.y>parts.upper.position.y);}
+   if(t===-960&&closed){near(parts.shell.position.x,parts.upper.position.x);assert(parts.shell.position.y>parts.upper.position.y);}
+  }else if(!layout.wholeCap){
+   const shoes=named(parts.facility,'Fairing rim shoe');assert.equal(shoes.length,6);
+   if(t<=-1920||!closed){
+    const rim=hw.fairing.outerDiameterM*.5*hw.fairing.profile[0][1]/Math.max(...hw.fairing.profile.map(r=>r[1]));
+    for(const shoe of shoes){const q=shoe.getWorldPosition(V()),half=parts.shell.children.find(o=>o.userData.halfSide===Math.sign(shoe.position.x));
+     const pt=half.worldToLocal(V(q.x,bounds(shoe).max.y,q.z));near(pt.y);near(Math.hypot(pt.x,pt.z),rim);}
+   }
   }
  }
 }
@@ -87,4 +96,4 @@ for(const az of [.46,.86,-.5]){
 }
 isolation.destroy();
 console.log('Full bay at 300×210, shell pixels over opaque room geometry at three azimuths: '+results.join(' / ')+'.');
-console.log('Ghosted shell blends over room depth at three viewing angles. Foreground wall and floor fully occlude it. Native facility materials, adapter, load cells and fairing shoes verified for ten launch configurations at three integration instants.');
+console.log('Ghosted shell blends over room depth at three viewing angles. Foreground wall and floor fully occlude it. Carrier seating, supported fairings, six Starship engines and full forward-module mating checked against the integration clock.');

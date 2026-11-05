@@ -88,13 +88,13 @@ export function buildEquipmentList(h,s=null) {
  add('06.06','fuel',d.engine==='aero'?'Aerozine-50 fuel at loading':'MMH fuel at loading',1,'charge','Loaded liquid mass divided by one plus the oxidizer-to-fuel ratio. Includes reserved and residual stock.',charge);
  add('06.07','oxidizer',d.engine==='aero'?'NTO oxidizer at loading':'MON-3 oxidizer at loading',1,'charge','Loaded liquid mass less the fuel charge.',charge);
  add('06.08','pressurant','Helium charge at loading',1,'charge','Initial regulated-system gas inventory from propulsion sizing. Vessel shell counted separately.',src.helium);
- add('07.01','structure','Primary frame and tray mounts',1,'frame','Enclosure frame allowance from gross structural area and installed tray count.',src.skin);
+ add('07.01','structure','Primary frame and tray mounts',1,'frame','Enclosure frame allowance from gross structural area and installed tray count. Includes the ODC-LI-01 thrust-deck flange and retained upper fitting.',src.skin);
  add('07.02','skin','Sandwich enclosure walls',1,'set','Six unequal faces. Sum of individual structural wall masses after occupied cutouts.',src.skin);
  add('07.03','shield','Internal radiation shielding',1,'set','Net covered wall area × shielding areal mass.',src.shield);
  add('07.04','hinges','Wing and radiator deployment and tracking drives',1,'set','Four wing rotary heads, two fluid-carrying radiator root drives and their deployment hardware share the existing mechanism mass allocation. Radiator outer hinges latch. Installed mass scales with total appendage area.',src.drive);
  add('07.05','cables','Power and data harness',1,'set','Study harness mass varies with enclosure surface and electronics power.',src.harness);
  add('08.01','switch','Command and data handling avionics',1,'suite','12 kg of the 20 kg fixed avionics/electronics allowance. Customer compute is in the payload group.',src.iau,[src.avionics]);
- add('09.01','adapter','Launch adapter and separation interface',1,'assembly','Active launch adapter allocation. Counted in the launch stack.',src.adapter);
+ add('09.01','adapter','Launch adapter and separation interface',1,'assembly','Active lower clamp, stand-off and launcher transition. Counted once in the launch stack. The passive upper fitting stays with the spacecraft under WBS 07.01.',src.adapter);
 
  const sum=(items)=>items.reduce((v,r)=>v+r.extendedMassKg,0);
  const hardwareKg=sum(rows.filter(r=>r.classification==='Hardware')),dryKg=hardwareKg+ledger.margin.kg,

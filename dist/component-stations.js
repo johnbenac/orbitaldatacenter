@@ -45,7 +45,7 @@ function partsAt(h,deploy,attitude){
  const points={
   '02.01':leaves.pv,'03.01':leaves.rad,'07.04':leaves.mechanisms,'06.01':engines,
   '06.03':[radii[0]],'06.04':[radii[1]],'06.05':[radii[2]],'06.06':[radii[0]],'06.07':[radii[1]],'06.08':radii,
-  '09.01':[[0,0,adapter&&bus?(adapter.z0M+adapter.z1M-bus.z0M-bus.z1M)/2:-l*.5-.24]]
+  '09.01':[[0,0,adapter&&bus?(adapter.z0M+h.payloadInterface.upperFaceStationM-bus.z0M-bus.z1M)/2:-l*.5-.24]]
  };
  for(const row of rows){
   // Integration model may explicitly locate individual units (e.g. CMGs).

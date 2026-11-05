@@ -74,20 +74,28 @@ export function buildStarship({lower,upper,shell,baseY,stage1,stage2}){
  const windAngle=-.48,thermalSpan=Math.PI*.91,first=windAngle-thermalSpan/2,last=first+thermalSpan;
  const barrel=[[r,-stage2],[r,0]];
  skin(upper,barrel,first,thermalSpan,tile,stage2);skin(upper,barrel,last,TAU-thermalSpan,steel,stage2);
+ // The upper tank's closed dome sits below the forward-section mating ring.
+ const forwardDome=add(upper,new T.SphereGeometry(r-.08,48,16,0,TAU,0,Math.PI/2),edge,0,-1.81,0);
+ forwardDome.name='Forward propellant tank dome';forwardDome.scale.y=.4;
+ skin(upper,[[r-.09,-.22],[r-.09,0],[r,0]],0,TAU,nickel,stage2);
  // A retained, side-opening large-cargo door is an ODC integration assumption.
  // The flown V3 satellite dispenser has a different opening. A fixed shell
  // preserves the windward heat shield and no flight phase jettisons the nose.
  const a0=last,a1=2.86,breakAt=6,doorProfile=shipNose.slice(0,breakAt+1);
  shell.userData.sideOutline={role:'shell',xyz:shipNose.map(([r,y])=>[-r,y,0])};
  const noseOutline=node(shell,'Leeward nose outline');noseOutline.userData.sideOutline={role:'shell',xyz:shipNose.slice(breakAt).map(([r,y])=>[r,y,0])};
- skin(shell,shipNose,first,thermalSpan,tile,stage2);
- skin(shell,shipNose,a1,first+TAU-a1,steel,stage2);
+ // Lower panels can be ghosted independently while crown, hinges and flaps
+ // preserve the full integrated ship's silhouette in the facility cutaway.
+ for(const [angle,span,finish] of [[first,thermalSpan,tile],[a1,first+TAU-a1,steel]]){
+  skin(shell,doorProfile,angle,span,finish,stage2).userData.cargoWall=true;
+  skin(shell,shipNose.slice(breakAt),angle,span,finish,stage2);
+ }
  skin(shell,shipNose.slice(breakAt),a0,a1-a0,steel,stage2);
  const door=node(shell,'Retained cargo door'),px=Math.sin(a1)*r,pz=Math.cos(a1)*r;door.position.set(px,0,pz);
  const leaf=node(door,'Cargo door skin');leaf.position.set(-px,0,-pz);
  leaf.userData.sideOutline={role:'shell',xyz:doorProfile.map(([r,y])=>[r,y,0])};
- skin(leaf,doorProfile,a0,a1-a0,steel,stage2);
- skin(leaf,doorProfile.map(([r,y])=>[r-.05,y]).reverse(),a0,a1-a0,edge,stage2);
+ skin(leaf,doorProfile,a0,a1-a0,steel,stage2).userData.cargoWall=true;
+ skin(leaf,doorProfile.map(([r,y])=>[r-.05,y]).reverse(),a0,a1-a0,edge,stage2).userData.cargoWall=true;
  for(const y of [1.4,3.4,5.6]){const p=node(shell,'Cargo hinge');p.position.set(px,y,pz);rod(p,V(0,-.31,0),V(0,.31,0),.09,dark);}
  // Forward flaps sit aft of the nose tip and aft flaps hinge at the ship skirt.
  // Windward coatings occupy the forward-facing side of each opposed flap.

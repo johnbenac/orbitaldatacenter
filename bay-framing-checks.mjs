@@ -22,8 +22,9 @@ for(const id of Object.keys(launchFleet)){
     sample.push(V(x,y,z).applyMatrix4(mesh.matrixWorld));
   }
   parts.shell.traverseVisible(corners);bay.station.traverseVisible(corners);
+  const receiver=parts.upper.visible?parts.upper:parts.lower;receiver.traverseVisible(corners);
   for(const item of parts.facility.children)if(item.name==='Fairing half carrier'||item.name==='Adapter bearing plate')item.traverseVisible(corners);
-  sample.push(V(0,h.stowedLengthM,0),bay.equipmentAnchor.getWorldPosition(V()),bay.portAnchor.getWorldPosition(V()));
+  sample.push(parts.payload.localToWorld(V(0,h.stowedLengthM,0)),bay.equipmentAnchor.getWorldPosition(V()),bay.portAnchor.getWorldPosition(V()));
   for(const aspect of [.62,1.47,2.4])for(const [az,el] of [[.4,.29],[-1.15,.72],[2.7,.12],[.4,-1.1],[-1.15,-.72],[2.7,-.22]]){
    const camera=new T.PerspectiveCamera(34,aspect,.07,2100),dir=V(Math.sin(az)*Math.cos(el),Math.sin(el),Math.cos(az)*Math.cos(el));
    const look=V(),half=fitBayWorkArea(points,dir,aspect,look,bay.floorY+.35);

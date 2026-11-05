@@ -19,15 +19,24 @@ const cameraView=s=>/launch|fairing/i.test(s)?'launch':/earth|orbit/i.test(s)?'o
 const pickAliases={enclosure:"structure",pv:'solar',array:'solar',arrays:'solar',radiators:'radiator',cmgs:'cmg',antennas:'communications',tanks:'propellant',coolant:'radiator',batteries:'battery',shielding:'structure',engine:'propulsion',prop:'propellant',attitude:'cmg',battery:'battery',trays:'compute'};
 const defaultPose={spacecraft:[.61,.49],core:[2.60,.47],orbit:[.54,.33],launch:[.46,.27],bay:[.40,.29]};
 export function bayWorkAreaPoints(launch,h){
- const {shell}=launch.parts,{station,floorY}=launch.bay,r=h.stowedDiameterM/2;
- const boxes=[new T.Box3(V(-r,floorY,-r),V(r,h.stowedLengthM,r))];
- // The two carriers move independently. Starship's cargo shell and attached
- // door instead form one enclosure, which reaches above its usable envelope.
+ const {shell,payload,upper,lower}=launch.parts,{station,floorY,layout}=launch.bay,r=h.stowedDiameterM/2;
+ const boxes=[];
+ const article=new T.Box3(V(-r,0,-r),V(r,h.stowedLengthM,r)).applyMatrix4(payload.matrixWorld);
+ boxes.push(article,new T.Box3(V(-r,floorY,-r),V(r,0,r)));
  const halves=shell.children.filter(o=>o.userData.halfSide);
  for(const part of halves.length?halves:[shell]){
   const bounds=new T.Box3().setFromObject(part);
-  bounds.min.y=Math.min(bounds.min.y,floorY);bounds.expandByScalar(.15);boxes.push(bounds);
+  bounds.expandByScalar(.15);boxes.push(bounds);
  }
+ // Exclude stage exhaust effects from the camera bounds. The cold receiver
+ // includes its visible propellant barrel, flaps, engine bells and support.
+ const receiver=upper.visible?upper:lower;
+ if(receiver.visible){
+  const extent=layout.star?8.2:Math.max(layout.radius,launch.geometry.diameterM/2)+.15;
+  boxes.push(new T.Box3(V(-extent,-layout.stage2-2.8,-extent),V(extent,0,extent)).applyMatrix4(receiver.matrixWorld));
+  boxes.push(new T.Box3(V(layout.receiverX-extent,floorY,-extent),V(layout.receiverX+extent,floorY+.1,extent)));
+ }
+ boxes.push(new T.Box3(V(layout.ringX-layout.radius,floorY,-layout.radius),V(layout.ringX+layout.radius,0,layout.radius)));
  for(const item of station.children)if(item.visible)boxes.push(new T.Box3().setFromObject(item));
  return boxes.flatMap(({min,max})=>[min.x,max.x].flatMap(x=>[min.y,max.y].flatMap(y=>[min.z,max.z].map(z=>V(x,y,z)))));
 }
@@ -136,7 +145,8 @@ export function createScene(container,{onPick=()=>{},onHover=()=>{},onThermalSca
  }
  const inBay=()=>view==='launch'&&phase==='D'&&s.flightPhase==='integration'&&launchFrame?.environment==='hangar'&&launch?.bay;
  const poseKey=()=>inBay()?'bay':view;
- function setCamera(){if(!w||!ht)return;let [az,elevation,zoom]=pose[poseKey()];if(view==='launch'&&h.input?.launcher==='starship'&&launchFrame&&!launchFrame.directCraft&&s.t>=-600)az+=launchLens==='ship'?.94:2.46;if(chapter==='commissioning'&&view==='spacecraft')az+=1.68;if(view==='orbit'&&onPhaseF()&&disposalPlan?.feasible){
+ function setCamera(){if(!w||!ht)return;let [az,elevation,zoom]=pose[poseKey()];if(view==='launch'&&h.input?.launcher==='starship'&&launchFrame&&!launchFrame.directCraft&&s.t>=-600)az+=launchLens==='ship'?.94:2.46;if(inBay()&&launch.bay.layout.star&&['overview','payload'].includes(bayLens))az+=2.44;
+ if(chapter==='commissioning'&&view==='spacecraft')az+=1.68;if(view==='orbit'&&onPhaseF()&&disposalPlan?.feasible){
   const pt=disposalPlan.method==='reentry'?(disposalPlan.impact||disposalPlan.target):disposalPlan.groundTrack?.at(-1);
   if(pt){const d=disposalPlan.method==='graveyard'&&graveFocus?graveFocus:surface(pt,1).applyAxisAngle(Y,s.earthRotationRad||0);az+=Math.atan2(d.x,d.z)-defaultPose.orbit[0];elevation=clamp(elevation+Math.asin(d.y)-defaultPose.orbit[1],-1.48,1.48);}
  }
@@ -199,11 +209,14 @@ export function createScene(container,{onPick=()=>{},onHover=()=>{},onThermalSca
  if(inBay()){
   const bay=launch.bay,cart=bay.equipmentAnchor.getWorldPosition(V()),port=bay.portAnchor.getWorldPosition(V());
   const r=h.fairing.outerDiameterM/2,lowest=bay.floorY,top=h.stowedLengthM;
-  if(bayLens==='equipment'){look.copy(cart);half=Math.max(1.22,1.38/aspect);}
+  if(bayLens==='payload'){
+   look.copy(launch.parts.payload.localToWorld(V(0,h.stowedLengthM*.48,0)));
+   half=Math.max(h.stowedLengthM*.74,(Math.max(h.stowedDiameterM,r*1.65)*.66+.65)/aspect);
+  }else if(bayLens==='equipment'){look.copy(cart);half=Math.max(1.22,1.38/aspect);}
   else if(bayLens==='interface'){look.copy(port);half=Math.max(.82,1.05/aspect);}
-  else if(['launch','launcher','conops'].includes(focus)){
-   if(bayFit?.launch!==launch||bayFit.opening!==launchFrame.opening||bayFit.station!==bay.station.userData.stationId){
-    bayFit={launch,opening:launchFrame.opening,station:bay.station.userData.stationId,points:bayWorkAreaPoints(launch,h)};
+  else if(bay.layout.star||['launch','launcher','conops'].includes(focus)||launchFrame.bayTime>-3000){
+   if(bayFit?.launch!==launch||bayFit.bayTime!==launchFrame.bayTime||bayFit.station!==bay.station.userData.stationId){
+    bayFit={launch,bayTime:launchFrame.bayTime,station:bay.station.userData.stationId,points:bayWorkAreaPoints(launch,h)};
    }
    half=fitBayWorkArea(bayFit.points,dir,aspect,look,bay.floorY+.35-pan.bay.y,zoom);
   }else{
@@ -233,13 +246,16 @@ export function createScene(container,{onPick=()=>{},onHover=()=>{},onThermalSca
  function bayCaptions(){
   if(!bayLabels)return;
   const bay=launch.bay,equipment=bay.equipmentAnchor,tool=bay.station.name||'Ground equipment';
-  const points=bayLens==='overview'?[[bay.vehicleAnchor,'Stowed spacecraft','overview'],[equipment,tool,'equipment']]:bayLens==='equipment'?[[equipment,tool,'equipment']]:[[bay.portAnchor,bay.interfaceLabel||'Test point','interface']];
+  const points=bayLens==='overview'?[[bay.vehicleAnchor,'Stowed spacecraft','payload'],[equipment,tool,'equipment']]:bayLens==='payload'?[[bay.vehicleAnchor,'Stowed spacecraft','payload']]:bayLens==='equipment'?[[equipment,tool,'equipment']]:[[bay.portAnchor,bay.interfaceLabel||'Test point','interface']];
+  if(bayLens==='overview'&&['launcher','launch','conops'].includes(focus)){
+   points.push([bay.receiverAnchor,bay.layout.star?'Starship tanks and Raptors':bay.layout.horizontal?'Upper stage on cradle':bay.layout.record.family==='cz5'?'Single-stage core':'Receiving stage',null]);
+  }
   for(const [anchor,name,lens] of points){
    const q=anchor.getWorldPosition(V()).project(camera);
    if(q.z< -1||q.z>1||Math.abs(q.x)>.97||Math.abs(q.y)>.94)continue;
    const x=(q.x+1)*w/2,y=(1-q.y)*ht/2,right=x<.64*w;
-   const pin=document.createElement('button');pin.type='button';pin.className='bay-pin'+(right?'':' bay-pin-left');
-   pin.dataset.bayLens=lens;pin.textContent=name;pin.setAttribute('aria-label','Inspect '+name.toLowerCase());pin.style.left=x+'px';pin.style.top=y+'px';
+   const pin=document.createElement(lens?'button':'span');if(lens)pin.type='button';pin.className='bay-pin'+(right?'':' bay-pin-left');
+   if(lens){pin.dataset.bayLens=lens;pin.setAttribute('aria-label','Inspect '+name.toLowerCase())}else pin.style.pointerEvents='none';pin.textContent=name;pin.style.left=x+'px';pin.style.top=y+'px';
    const available=Math.max(45,(right?w-x:x)-26);pin.style.maxWidth=Math.min(184,available)+'px';tags.append(pin);
   }
  }
@@ -424,12 +440,13 @@ export function createScene(container,{onPick=()=>{},onHover=()=>{},onThermalSca
   legendMode=view==='orbit'?'Choose Spacecraft or Compute Core to inspect hardware temperatures.':reference?'Stowed design reference. Switch to Spacecraft for the flight temperatures.':s.thermalQualification?.some(r=>r.status!=='unassessed'&&Number.isFinite(r.temperatureK))?'':'Temperature data unavailable for this instant.';
   const active=enabled&&!legendMode,showFocus=!!focus&&(launchFrame?.environment!=='hangar'||bayIsolate);
   if(active&&craftGroup.visible){craftFocus?.clear();craftSkin??=thermalSkin(craft.root);craftSkin.apply(s.thermalQualification,gpu?renderer.getPixelRatio():1,thermalScale);}
-  else{craftSkin?.clear();if(showFocus){craftFocus??=focusHardware(craft.root);craftFocus.apply(focus,selected);}else craftFocus?.clear();}
+  else{craftSkin?.clear();if(showFocus&&!(inBay()&&focus==='launcher')){craftFocus??=focusHardware(craft.root);craftFocus.apply(focus,selected);}else craftFocus?.clear();}
   if(active&&packed&&launchFrame.environment==='hangar'&&bayIsolate){
    // The mounted, live spacecraft owns the thermal nodes. Keep its carrier in context.
    launchSkin?.clear();launchFocus??=focusHardware(launch.parts.stage);launchFocus.apply('thermal');
   }else if(active&&packed){launchFocus?.clear();launchSkin??=thermalSkin(launch.parts.stage);launchSkin.apply(s.thermalQualification,gpu?renderer.getPixelRatio():1,thermalScale);}
-  else{launchSkin?.clear();if(showFocus&&launch?.root.visible&&!(phase==='D'&&['launcher','launch'].includes(focus)&&['pad','ascent'].includes(s.flightPhase))){launchFocus??=focusHardware(launch.parts.stage);launchFocus.apply(focus,selected);}else launchFocus?.clear();}
+  else{launchSkin?.clear();if(showFocus&&launch?.root.visible&&!(phase==='D'&&['launcher','launch'].includes(focus)&&['pad','ascent'].includes(s.flightPhase))){launchFocus??=focusHardware(launch.parts.stage);const exposeCargo=inBay()&&launch.bay.layout.star&&h.fairing.fit&&s.t>=-2400;
+    launchFocus.apply(exposeCargo&&focus==='conops'?'launcher':focus,selected,exposeCargo);}else launchFocus?.clear();}
   if((focus==='data'||focus==='purpose')&&craftGroup.visible&&view!=='orbit'&&!s.referenceBody){if(!custody){custody=dataRoutes(craft,h);craft.root.add(custody.root);}custody.update(s,true,focus);}else if(custody)custody.update(s,false);
   refreshLegend();
  }
@@ -499,7 +516,7 @@ export function createScene(container,{onPick=()=>{},onHover=()=>{},onThermalSca
  setBg();resize();return {update,setView,
   setDeploymentLens(value){if(deploymentLens===value)return;deploymentLens=value;if(craft)request();},
   setBayView(id,labels){
-   const next=['equipment','interface'].includes(id)?id:'overview';
+   const next=['equipment','interface','payload'].includes(id)?id:'overview';
    if(next===bayLens&&bayLabels===labels)return;
    if(next!==bayLens){pose.bay[2]=1;pan.bay.set(0,0,0);}
    bayLens=next;bayLabels=labels!==false;request();

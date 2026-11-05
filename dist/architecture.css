@@ -10,3 +10,19 @@
 .coordinate-triad{position:absolute;top:31px;right:8px;width:78px;z-index:2;background:#111a23df;border:1px solid #3e5260;border-radius:7px;pointer-events:none}.coordinate-triad svg{display:block;width:100%;height:auto}.coordinate-triad svg text{font:600 12px var(--mono);stroke:#192128;stroke-width:2.8px;paint-order:stroke}.coordinate-triad .frame-name{fill:#b7cdd4;font:9px var(--mono);letter-spacing:.07em;stroke:none}@media(max-width:550px){.coordinate-triad{width:65px;top:23px;right:5px}}
 
 #discipline-host:not([hidden]){margin:14px 0;min-width:0}
+
+.iface-panel .arch-pad {padding:15px 18px 18px}
+.iface-panel .iface-diagram {display:block;width:100%;max-height:245px;margin:15px 0 12px;background:#14232a;border:1px solid #344950;border-radius:8px}
+.iface-columns {display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,245px),1fr));gap:15px}
+.iface-columns h4 {font-size:16px;margin:6px 0}
+.iface-panel .iface-facts {display:grid;grid-template-columns:1fr 1fr;gap:7px 15px;margin:9px 0}
+.iface-panel dt,.iface-columns small {font-size:11px;color:#b2c5c7}
+.iface-panel dd {margin:0;color:#e0ebe6;font-size:14px}
+.iface-panel p,.iface-panel summary {font-size:13px;line-height:1.5}
+.iface-panel summary {cursor:pointer;color:#c0ddd8}
+.iface-fit {border-left:2px solid #80afa3;padding:5px 11px}
+.iface-negative {border-color:#e8aa74}
+
+.iface-watch {margin-top:12px}
+
+.iface-native {display:block;width:min(100%,280px);margin:8px 0}

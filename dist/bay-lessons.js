@@ -209,5 +209,13 @@ function readings(domain,h) {
 }
 export function bayLesson(domain,hardware){
  const key=Object.hasOwn(stations,domain)?domain:'conops',station=bayStationFor(key);
- return {domain:key,station,stationName:stationNames[station],...guides[key],...readings(key,hardware)};
+ const lesson={domain:key,station,stationName:stationNames[station],...guides[key],...readings(key,hardware)};
+ if(key==='launch'&&hardware.input.launcher==='starship'){
+  lesson.question='How much room does the data center have inside Starship?';
+  lesson.explanation='The stowed spacecraft must fit inside the tapering cargo volume. A clearance check compares the installed vehicle at each height with the adopted envelope of the proposed large-cargo nose.';
+  lesson.procedure='Survey the closest feature before closing the forward assembly. The retained door also needs a clear deployment path once the ship reaches orbit.';
+  lesson.stationName='Cargo-envelope clearance gauge';
+  lesson.sources=[{title:'SpaceX · Starship Users Guide, Figure 4',url:'https://www.spacex.com/media/starship_users_guide_v1.pdf#page=3'},resources.gevs];
+ }
+ return lesson;
 }

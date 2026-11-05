@@ -1,23 +1,40 @@
 import {icon} from './icons.js';
 import {domains} from './domain-analysis.js';
 import {bayLesson} from './bay-lessons.js';
+import {integrationProfile} from './integration-profiles.js';
+import {starshipEvidence} from './starship-evidence.js';
 
 const esc=value=>String(value??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
 const numeric=(value,p)=>typeof value==='number'?value.toLocaleString('en-US',{maximumFractionDigits:p??1}):String(value??'—');
-const lensNames={overview:'Work area',equipment:'Ground equipment',interface:'Test point'};
-const lensTips={overview:'See the stowed spacecraft, its support stand and the selected ground station together.',equipment:'Move in for a closer look at the tools used by this team.',interface:'Follow the service connection or look at the point this instrument measures.'};
+const lensNames={overview:'Work area',payload:'Follow payload',equipment:'Ground equipment',interface:'Test point'};
+const lensTips={overview:'See the stowed spacecraft, its support stand and the selected ground station together.',payload:'Keep the camera on the folded data center throughout pickup, encapsulation, and final mating.',equipment:'Move in for a closer look at the tools used by this team.',interface:'Follow the service connection or look at the point this instrument measures.'};
 export function bayCameraControls(view,cameraButtons,cameraName){
  const chosen=view.camera==='launch';
- const lensButton=(key,label)=>`<button type="button" class="bay-camera" data-bay-lens="${key}" aria-pressed="${chosen&&key===view.bayLens}" data-tip="${lensTips[key]}">${icon(({overview:'box',equipment:'wrench',interface:'crosshair'})[key],14)}${label}</button>`;
+ const lensButton=(key,label)=>`<button type="button" class="bay-camera" data-bay-lens="${key}" aria-pressed="${chosen&&key===view.bayLens}" data-tip="${lensTips[key]}">${icon(({overview:'box',payload:'focus',equipment:'wrench',interface:'crosshair'})[key],14)}${label}</button>`;
  return `<div class="bay-lenses" data-choice-group="bay-views" role="group" aria-label="Integration bay viewpoints">${Object.entries(lensNames).map(([key,name])=>lensButton(key,name)).join('')}<button type="button" class="bay-recenter" data-bay-reset aria-label="Recenter the bay camera" data-tip="Restore the framing for this viewpoint after rotating, panning or zooming.">${icon('rotate-ccw',14)} Recenter</button></div>
  <details class="bay-alt-cameras"><summary>${chosen?'Other cameras':esc(cameraName)}</summary><div>${cameraButtons}</div></details>`;
 }
 export function bayGuide(h,s,v){
- const l=bayLesson(v.domain,h,s);
- return `<aside class="bay-guide"><header><span class="bay-emblem">${icon(domains[v.domain].icon,20)}</span><div><small>Inside the integration bay</small><b>${esc(domains[v.domain].label)}</b></div></header>
- <h2>${esc(l.question)}</h2><p class="bay-explainer">${esc(l.explanation)}</p>
- <div class="bay-crew"><span>${icon('wrench',14)} At this station</span><h3>${esc(l.stationName)}</h3><p>${esc(l.procedure)}</p></div>
+ const l=bayLesson(v.domain,h,s),p=integrationProfile(h.input.launcher,h.input.launchSite);
+ const carrier=v.domain==='launcher',ship=p.kind==='ship-bay';
+ const question=carrier?(ship?'How does a large spacecraft get inside Starship?':'How does the spacecraft meet its rocket?'):l.question;
+ const explanation=carrier?p.handling:l.explanation;
+ const procedure=carrier?p.mating:l.procedure;
+ return `<aside class="bay-guide"><header><span class="bay-emblem">${icon(domains[v.domain].icon,20)}</span><div><small>${esc(p.location)}</small><b>${esc(domains[v.domain].label)}</b></div></header>
+ <h2>${esc(question)}</h2><p class="bay-explainer">${esc(explanation)}</p>
+ <div class="bay-crew"><span>${icon('wrench',14)} ${esc(p.facility)}</span><h3>${carrier?'Loading and mating':esc(l.stationName)}</h3><p>${esc(procedure)}</p></div>
+ ${carrier?`<p class="bay-study-note"><strong>Study tooling · ${esc(l.stationName)}</strong><br>${ship?'The workbench pairs a V3 tank and engine section with a proposed large-cargo nose. The cargo-deck drilling shown here is our design assumption.':'Two work areas are shown together. The receiving end of the rocket and its supports are at inspection height. Tooling and travel distances are illustrative.'}</p>`:''}
+ ${!['launch','launcher'].includes(v.domain)&&s?.t> -3000?'<button class="textbutton" data-loading-at="-3600">Return to ground checkout</button>':''}
  <button class="bay-to-pad" data-chapter="pad">${['launcher','launch'].includes(v.domain)?'See '+esc(h.launcherLabel)+' on the pad':'Follow the spacecraft to the pad'} ${icon('arrow-right',15)}</button></aside>`;
+}
+export function facilityNotes(h){
+ const p=integrationProfile(h.input.launcher,h.input.launchSite);
+ return `<details class="facility-record panel"><summary>Facility, handling sequence and sources</summary><h3>${esc(p.facility)}</h3><p>${esc(p.location)}. ${esc(p.handling)}</p><p>${esc(p.mating)}</p><p>${esc(p.provenance)}</p>
+ <p>The work areas share one view. The mission clock compresses the handling sequence for inspection. Its timestamps are illustrative.</p>
+ ${p.kind==='ship-bay'?starshipEvidence():p.evidence.map(e=>`<h3>${esc(e.label)}</h3><p>${esc(e.text)} <a href="${esc(e.source.url)}" target="_blank" rel="noopener noreferrer">${esc(e.source.title)} ↗</a></p>`).join('')}
+ <h3>Launcher attachment</h3><p>${esc(p.interface.basis)} <a href="${esc(p.interface.source.url)}" target="_blank" rel="noopener noreferrer">${esc(p.interface.source.title)} ↗</a></p>
+ ${p.kind==='ship-bay'?p.evidence.filter(e=>e.label==='Site-specific basis').map(e=>`<p>${esc(e.text)} <a href="${esc(e.source.url)}" target="_blank" rel="noopener noreferrer">${esc(e.source.title)} ↗</a></p>`).join(''):''}
+ </details>`;
 }
 export function bayEvidence(h,s,v){
  const l=bayLesson(v.domain,h,s),facts=l.facts||[],ids=Object.keys(domains),idx=ids.indexOf(v.domain),next=ids[(idx+1)%ids.length];

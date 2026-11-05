@@ -31,10 +31,12 @@ export function focusHardware(root){
  root.traverse(o=>{if((o.isLine||o.isMesh)&&o.material&&!Array.isArray(o.material))items.push({o,original:o.material,part:hardwarePart(o)});});
  let last='';
  function clear(){if(!last)return;for(const {o,original}of items){o.material=original;}last='';}
- return {apply(domain,selected=''){
-  if(!domain||['conops','orbit'].includes(domain)||!domainSceneSpecs[domain]){clear();return;}const isolated=domain==='mass'?selected:'',signature=domain+'/'+isolated;if(signature===last)return;
+ return {apply(domain,selected='',exposeCargo=false){
+  if(!domain||['conops','orbit'].includes(domain)||!domainSceneSpecs[domain]){clear();return;}const isolated=domain==='mass'?selected:'',signature=domain+'/'+isolated+'/'+exposeCargo;if(signature===last)return;
   if(last)clear();last=signature;
-  for(const {o,part,original}of items){const color=isolated&&part!==isolated?null:focusColor(part,domain,o);
+  for(const {o,part,original}of items){
+   if(exposeCargo&&o.userData.cargoWall){o.material=ghost;continue}
+   const color=exposeCargo&&domain==='launcher'&&part==='adapter'?'native':isolated&&part!==isolated?null:focusColor(part,domain,o);
    if(!color){o.material=o.isLine?ghostLine:['launcher','booster','fairing'].includes(part)?carrier:ghost;}
    else if(color!=='native'){
     const base=original.color,lum=base?clamp(Math.sqrt(.2126*base.r+.7152*base.g+.0722*base.b)):1;

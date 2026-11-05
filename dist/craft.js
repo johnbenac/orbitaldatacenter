@@ -1,3 +1,5 @@
+import {spacecraftInterface} from './payload-interface.js';
+import {flightInterfaceGeometry} from './payload-interface-mesh.js';
 import * as T from './vendor/three.module.js';
 import {deploymentLayout,mechanismPose,terminalLayout} from './deployment.js';
 import {thermalMesh} from './thermal-view.js';
@@ -75,6 +77,8 @@ for(const side of [-1,1]){
  wall(cover,'y',side,w,wallT,l-2*wallT,0,side*(hgt-wallT)/2,0);
  wall(cover,'z',side,w,hgt,wallT,0,0,side*(l-wallT)/2);
 }
+const flightFlange=obj(root,flightInterfaceGeometry(T),silver,0,0,h.payloadInterface.deckZ,'structure');
+flightFlange.name='ODC-LI-01 aft mounting ring';
 // The structural ring at each bay stays in the section. Six insulated exterior surfaces close the envelope.
 for(let side of [-1,1])for(let y of [-1,1])box(root,side*w*.488,y*y0,0,beam*.6,beam*.65,l*1.008,silver,'structure');
 for(let side of [-1,1]){
@@ -88,8 +92,12 @@ for(let side of [-1,1]){
  }
  // End bulkhead insulation cartridges surround service feedthroughs and a latched equipment access door.
  if(side<0){
-  // Keep injector penetrations and nozzle bases exposed through the blanket.
-  for(const sy of [-1,1])thermalMesh(box(cover,0,sy*hgt*.38,z,w*.9,hgt*.18,beam*.18,ivory,'structure'),'enclosure');
+  // Keep the machined seating annulus and injector penetrations clear of the blankets.
+  const free=spacecraftInterface.outerM/2+.012,outerY=hgt*.47,outerX=w*.46;
+  for(const s of [-1,1]){
+   if(outerY>free)thermalMesh(box(cover,0,s*(outerY+free)/2,z,2*outerX,outerY-free,beam*.18,ivory,'structure'),'enclosure');
+   if(outerX>free)thermalMesh(box(cover,s*(outerX+free)/2,0,z,outerX-free,2*Math.min(free,outerY),beam*.18,ivory,'structure'),'enclosure');
+  }
  }else{
   for(let edge of [-1,1])thermalMesh(box(cover,edge*w*.29,0,z,w*.39,hgt*.86,beam*.18,ivory,'structure'),'enclosure');
 

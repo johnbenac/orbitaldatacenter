@@ -1,4 +1,5 @@
 import {buildBayEquipment} from './bay-equipment.js';
+import {buildIntegrationRig} from './integration-rig.js';
 import * as T from './vendor/three.module.js';
 const v=(x,y,z)=>new T.Vector3(x,y,z);
 function painted(w,h,draw){
@@ -18,20 +19,20 @@ function plateTexture(){return painted(1536,1024,(g,w,h)=>{
  for(let k=0;k<8;k++){const x=w*(.20+.08*k);fill('#233239',x,h*.724,41,6);for(let j=0;j<8;j++)fill('#68737a',x+j*5,h*.725,1.5,4);}
  g.save();g.translate(w*.49,h*.699);g.fillStyle='rgba(218,211,182,.58)';g.font='600 14px monospace';g.fillText('PAYLOAD HANDLING    /    01',0,0);g.restore();
 });}
-function wallTexture(){return painted(1400,550,(g,w,h)=>{
+function wallTexture(name){return painted(1400,550,(g,w,h)=>{
  const rand=rng(),grad=g.createLinearGradient(0,0,0,h);grad.addColorStop(0,'#12212a');grad.addColorStop(.38,'#364650');grad.addColorStop(1,'#1d2d33');g.fillStyle=grad;g.fillRect(0,0,w,h);
  for(let k=0;k<w;k+=9){g.fillStyle='rgba(169,181,178,.13)';g.fillRect(k,0,1,h);g.fillStyle='rgba(4,11,17,.30)';g.fillRect(k+4,0,2,h);}
  for(let k=0;k<10;k++){let x=k*146;g.fillStyle='#111b23';g.fillRect(x,0,6,h);g.fillStyle='#5c6d73';g.fillRect(x+6,0,2,h);}
  for(let k=0;k<20;k++){let x=k*75;const tint=180+rand()*40;g.fillStyle='#15242a';g.fillRect(x+5,28,62,60);g.fillStyle='rgb(116,143,'+Math.round(tint)+')';g.fillRect(x+8,31,56,53);g.fillStyle='rgba(39,60,73,.7)';g.fillRect(x+33,29,3,55);g.fillRect(x+6,55,59,3);}
  g.fillStyle='#18262e';g.fillRect(442,192,522,358);for(let i=0;i<38;i++){g.fillStyle=i%3===0?'#3c4c52':'#324249';g.fillRect(451,198+i*9,504,7);}
- g.fillStyle='#acbabb';g.font='600 24px monospace';g.fillText('HIGH BAY    01',226,137);g.fillStyle='#c08b4d';g.fillRect(226,151,43,3);
+ g.fillStyle='#acbabb';g.font='600 24px monospace';g.fillText(name.toUpperCase(),105,137,1110);g.fillStyle='#c08b4d';g.fillRect(226,151,43,3);
  for(const x of [152,381,1102,1227]){g.fillStyle='#24363d';g.fillRect(x,392,48,158);g.fillStyle='#82908b';g.fillRect(x+3,398,42,143);g.fillStyle='#33474c';g.fillRect(x+9,412,30,36);g.fillStyle='#cfa666';g.fillRect(x-6,383,58,5);}
 });}
 export function fitOutBay(ctx){
  const {facility,tower,halves,unit:u,R,baseR,baseY,maxH,h,profile,box,tube,mesh,cylinder,mat,steel,rib,dark,gold,black}=ctx;
- const floor=-Math.max(.82,Math.min(1.45,R*.38)),gy=u*1.22,wx=u*2.20,wz=u*1.52,wallH=u*1.66,fixtures=[],iron=mat('#4c6067',.45),mark=mat('#cc9760'),graphite=mat('#29383f'),glow=new T.MeshBasicMaterial({color:0xe9dfc5}),cool=new T.MeshBasicMaterial({color:0xc3dce7});
+ const layout=ctx.layout,floor=layout.floor,wx=layout.roomHalfX,wz=layout.roomHalfZ,wallH=layout.craneY+2.2-floor,fixtures=[],iron=mat('#4c6067',.45),mark=mat('#cc9760'),graphite=mat('#29383f'),glow=new T.MeshBasicMaterial({color:0xe9dfc5}),cool=new T.MeshBasicMaterial({color:0xc3dce7});
  function plane(p,x,y,z,w,b,material,rotation=0){const m=mesh(p,new T.PlaneGeometry(w,b,rotation&&w>u*2?Math.min(128,Math.max(24,Math.ceil(w/u))):1,rotation&&b>u*2?Math.min(128,Math.max(20,Math.ceil(b/u))):1),material,x,y,z,'pad');m.rotation.x=rotation;return m;}
- const deck=plateTexture(),wall=wallTexture(),walls=[];
+ const deck=plateTexture(),wall=wallTexture(layout.record.facility),walls=[];
  const slab=plane(facility,0,floor,0,2*wx,2*wz,deck,-Math.PI/2);slab.name='High-bay floor';slab.userData.floorY=floor;
  function buildWall(x,z,width,yaw,name){
   const panel=new T.Group();panel.name=name;panel.position.set(x,0,z);panel.rotation.y=yaw;facility.add(panel);
@@ -58,23 +59,7 @@ export function fitOutBay(ctx){
   const z=j*wz*.40;box(roof,0,floor+wallH-u*.039,z,wx*2,u*.072,u*.038,graphite);
   for(const x of [-wx*.58,wx*.58])box(roof,x,floor+wallH-u*.082,z,u*.36,u*.019,u*.07,glow);
  }
- // Load-bearing trolley and runway. Two rails carry the bridge; a paired cable falls to the rigging yoke.
- const span=u*1.18,zBridge=-R*.26;
- for(const side of [-1,1]){
-  const x=side*span;
-  for(const z of [-u*.98,u*.81]){box(facility,x,(gy+floor)/2,z,u*.044,gy-floor,u*.068,graphite);box(facility,x,floor+.025,z,u*.069,.05,u*.09,iron);}
-  box(facility,x,gy,-u*.09,u*.062,u*.077,u*2.15,iron);box(facility,x,gy+.041*u,-u*.09,u*.022,u*.016,u*2.15,rib);
- }
- for(const zz of [-1,1]){const z=zBridge+zz*u*.060;box(facility,0,gy+u*.070,z,span*2,u*.075,u*.038,mark);box(facility,0,gy+u*.114,z,span*2,u*.012,u*.047,gold);box(facility,0,gy+.03*u,z,span*2,u*.013,u*.05,graphite);}
- const trolleyX=-.72*span,yoke=gy-.26*u;
- box(facility,trolleyX,gy+u*.12,zBridge,u*.14,u*.09,u*.195,graphite);
- for(const j of [-1,1]){
-  const drive=cylinder(facility,trolleyX+j*u*.052,gy+u*.11,zBridge,u*.034,u*.034,u*.16,iron,'pad',24);drive.rotation.x=Math.PI/2;
-  const x=trolleyX+j*u*.024;tube(facility,v(x,gy+.07*u,zBridge),v(x,yoke,zBridge),u*.0027,black);
- }
- box(facility,trolleyX,yoke,zBridge,u*.075,u*.046,u*.04,mark);
- const hook=new T.Mesh(new T.TorusGeometry(u*.029,u*.006,8,20,Math.PI*1.55),steel);
- hook.position.set(trolleyX,yoke-u*.04,zBridge);hook.rotation.z=.45;facility.add(hook);
+ const rig=buildIntegrationRig(ctx);
  // The lower adapter face defines y=0. Every support uses the same floor
  // datum as the surrounding hall, regardless of vehicle height.
  const pedestalWidth=Math.max(R*.45,h.fairing.stack[0].radiusM*1.12),plateH=.10,footH=.035,cellH=.075;
@@ -97,11 +82,15 @@ export function fitOutBay(ctx){
   }
   return plate;
  }
- stand(facility,0,pedestalWidth,pedestalWidth*.74,0,true).name='Adapter bearing plate';
+ stand(facility,0,pedestalWidth,pedestalWidth*.74,0,true).name='Checkout bearing plate';
+ stand(facility,layout.ringX,pedestalWidth,pedestalWidth*.74,0,false).name='Adapter bearing plate';
+ // Removable checkout standoffs bypass the engine bells.
+ const H=h.payloadInterface?.upperFaceStationM??h.fairing.stack.find(q=>q.part==='Insulated bus').z0M;
+ for(const a of [.25,1.82,3.39,4.96]){const rr=.66;cylinder(facility,rr*Math.cos(a),H*.5,rr*Math.sin(a),.038,.055,H,steel).name='Checkout hardpoint support';}
  const front=.74*pedestalWidth;
  box(facility,0,floor*.45,front-.045,1.82*pedestalWidth,.115,.09,iron).name='Service crossbar';
  const rim=R*profile[0][1]/Math.max(...profile.map(station=>station[1]));
- if(halves.length){
+ if(halves.length&&!layout.wholeCap){
   // Each half translates with its own three-point carrier until encapsulation.
   // The shoes touch the lower circumferential ring and clear the central pedestal.
   for(const side of [-1,1]){
@@ -111,14 +100,6 @@ export function fitOutBay(ctx){
     const shoe=box(f,side*Math.sin(a)*rim,-.06,Math.cos(a)*rim,.19,.12,.19,dark);
     shoe.name='Fairing rim shoe';
    }
-  }
- }else{
-  // Fixed cradle contacts the integral cargo enclosure outside its door opening.
-  for(const a of [-1.18,-.28,.75,3.08]){
-   const x=R*Math.sin(a),z=R*Math.cos(a),y=floor+footH;
-   cylinder(facility,x,floor+footH/2,z,.19,.22,footH,steel);
-   box(facility,x,(y-.12)/2,z,.19,-.12-y,.19,iron);
-   box(facility,x,-.06,z,.26,.12,.26,dark).name='Cargo mock-up rim shoe';
   }
  }
  // Off-axis service cabinets and a grated platform at the hall wall give the floor physical scale.
@@ -132,9 +113,10 @@ export function fitOutBay(ctx){
   for(const w of walls){local.copy(eye).sub(w.position).applyAxisAngle(v(0,1,0),-w.rotation.y);w.visible=local.z>.08;}
   roof.visible=eye.y<floor+wallH-.08;
  }
- return {...kit,floorY:floor,get interfaceLabel(){return kit.portAnchor.name},setViewFrom,update(opening,domain,active){
-  fixtures.forEach(({f,side})=>{f.position.x=side*opening*R*2.25;});
-  kit.select(domain,active);
+ return {...kit,...rig,layout,floorY:floor,get interfaceLabel(){return kit.portAnchor.name},setViewFrom,update(opening,domain,active,seq,pose){
+  fixtures.forEach(({f,side})=>{f.rotation.y=active?Math.PI/2:0;f.position.set(active?layout.ringX:side*opening*R*2.25,0,active?-side*opening*R*2.25:0);});
+  kit.select(domain,active); if(seq&&pose){kit.track(pose,seq);rig.update(seq,pose);}
+
  }};
 }
 export function payloadFinishes(){

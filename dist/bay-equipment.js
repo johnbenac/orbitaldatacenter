@@ -176,7 +176,7 @@ export function buildBayEquipment(ctx){
   const latch=frontDisc(item,x,portY,portZ+.077,.056,.075,color);
   latch.name='Spacecraft umbilical coupling';latch.userData.bayRole='interface';
  }
- let chosen;
+ let chosen,portAtRest,vehicleAtRest;
  function select(domain,on=true){
   const key=bayStationFor(domain);
   station.visible=on;
@@ -190,7 +190,7 @@ export function buildBayEquipment(ctx){
   const aim=optics?vehicleAnchor.position:groundPort;
   if(!item){
    const [title,color,label]=tools[key],accent=metallic(color,.27),w=['attitude','thermal','adapter'].includes(key)?1.55:1.26;
-   item=new T.Group();item.name=title;item.userData.stationId=key;const p=anchor(item,pos.x,pos.y,pos.z);p.rotation.y=-.16;
+   item=new T.Group();item.name=key==='fit'&&h.input.launcher==='starship'?'Cargo-envelope clearance gauge':title;item.userData.stationId=key;const p=anchor(item,pos.x,pos.y,pos.z);p.rotation.y=-.16;
    trolley(p,w,.86);instrument(p,key,accent);namePlate(p,0,.315,.445,w*.76,label,color);
    if(optics){
     const port=vehicleAnchor.position,axis=p.getObjectByProperty('name',key==='rf'?'Radio horn pointing axis':key==='fit'?'Survey head pointing axis':'Telescope pointing axis');
@@ -228,8 +228,27 @@ export function buildBayEquipment(ctx){
   if(room){const probe=item.getObjectByName('Particle sampling inlet');facility.worldToLocal(probe.getWorldPosition(portAnchor.position));}
   if(!room&&!optics&&!['adapter','mass'].includes(key))portAnchor.position.set(portX,portY,portZ+.115);
   portAnchor.name=labels[key]||'Spacecraft checkout receptacle';
+  portAtRest=portAnchor.position.clone();vehicleAtRest=vehicleAnchor.position.clone();
   fittings.visible=!optics&&!room&&key!=='adapter';
  }
  select('conops');
- return {station,portAnchor,vehicleAnchor,equipmentAnchor,select};
+ function track(pose,state){
+  if(!portAtRest)return;
+  const a=V(0,0,1),onBus=p=>p.applyAxisAngle(a,pose.angle).add(pose.article);
+  onBus(vehicleAnchor.position.copy(vehicleAtRest));
+  portAnchor.position.copy(portAtRest);
+  if(chosen==='adapter')portAnchor.position.applyAxisAngle(a,pose.angle).add(pose.assembly);
+  else if(chosen!=='environment'&&chosen!=='mass')onBus(portAnchor.position);
+  const active=cache.get(chosen);if(!active)return;
+  if(!active.userData.pickup){
+   const jumpers=[],lugs=[];
+   active.traverse(o=>{
+    if(['Spacecraft umbilical coupling','Vehicle service bulkhead','Optical survey target'].includes(o.name))lugs.push([o,o.position.clone(),o.quaternion.clone()]);
+    if(['Stand-to-spacecraft jumper','Jumper strain relief','Pedestal manifold outlet'].includes(o.name))jumpers.push(o);
+   }); active.userData.pickup={jumpers,lugs};
+  }
+  for(const lead of active.userData.pickup.jumpers)lead.visible=state.seat===0;
+  for(const [o,p,q] of active.userData.pickup.lugs){o.position.copy(p);onBus(o.position);o.quaternion.setFromAxisAngle(a,pose.angle).multiply(q);}
+ }
+ return {station,portAnchor,vehicleAnchor,equipmentAnchor,select,track};
 }

@@ -15,7 +15,7 @@ import {geometry,groundSites,R,DEG,MU} from './orbit.js';
 const V=(x=0,y=0,z=0)=>new T.Vector3(x,y,z),Y=V(0,1,0),TAU=Math.PI*2,clamp=(x,a,b)=>Math.max(a,Math.min(b,x)),eci=(a,k=1)=>V(a[0]*k,a[2]*k,-a[1]*k);
 const cameraView=s=>/launch|fairing/i.test(s)?'launch':/earth|orbit/i.test(s)?'orbit':/core/i.test(s)?'core':'spacecraft';
 const pickAliases={enclosure:"structure",pv:'solar',array:'solar',arrays:'solar',radiators:'radiator',cmgs:'cmg',antennas:'communications',tanks:'propellant',coolant:'radiator',batteries:'battery',shielding:'structure',engine:'propulsion',prop:'propellant',attitude:'cmg',battery:'battery',trays:'compute'};
-const defaultPose={spacecraft:[.61,.49],core:[.62,.47],orbit:[.54,.33],launch:[.46,.27]};
+const defaultPose={spacecraft:[.61,.49],core:[2.60,.47],orbit:[.54,.33],launch:[.46,.27]};
 function line(p,pts,color,opacity=1,dash=0){let g=new T.BufferGeometry().setFromPoints(pts);let m=dash?new T.LineDashedMaterial({color,dashSize:dash,gapSize:dash*.66,transparent:true,opacity}):new T.LineBasicMaterial({color,transparent:true,opacity});let l=new T.Line(g,m);if(dash)l.computeLineDistances();p.add(l);return l;}
 function arrow(p,start,dir,extent,color,dash=0){const q=dir.clone().normalize(),end=start.clone().addScaledVector(q,extent);line(p,[start,end],color,.88,dash);const head=new T.Mesh(new T.ConeGeometry(extent*.02,extent*.08,8),new T.MeshBasicMaterial({color}));head.position.copy(end).addScaledVector(q,-extent*.04);head.quaternion.setFromUnitVectors(Y,q);p.add(head);}
 function disposeGroup(group){
@@ -87,9 +87,10 @@ export function createScene(container,{onPick=()=>{},onHover=()=>{},onThermalSca
   const aim=eci(s.positionECI).normalize().addScaledVector(eci(s.normal).normalize(),.55).normalize();
   az+=Math.atan2(aim.x,aim.z)-defaultPose.orbit[0];elevation=clamp(elevation+Math.asin(aim.y)-defaultPose.orbit[1],-1.48,1.48);
  }
- const offset=focus&&['core','spacecraft'].includes(view)?({data:[3.71,.37],comm:[.15,.21],attitude:[.23,.22],prop:[.87,-.34],compute:[.42,-.05],power:[-.18,.06]})[focus]:null;
+ const offset=focus&&['core','spacecraft'].includes(view)?({data:[-.27,.31],comm:[.15,.21],attitude:[.23,.22],prop:[.18,-.38],compute:[.42,-.05],power:[-.18,.06]})[focus]:null;
  if(offset){az+=offset[0];elevation=clamp(elevation+offset[1],-1.48,1.48);}
  const el=elevation-(view==='launch'&&launchFrame?.environment==='ground'?.31:0);const bodyOrbit=view==='core'||view==='spacecraft',viewUp=bodyOrbit?V(0,0,1):Y;const dir=bodyOrbit?V(Math.sin(az)*Math.cos(el),-Math.cos(az)*Math.cos(el),Math.sin(el)):V(Math.sin(az)*Math.cos(el),Math.sin(el),Math.cos(az)*Math.cos(el));const aspect=w/ht;const launchConfig=view==='launch'&&launchFrame&&!launchFrame.directCraft,look=launchConfig?launchFrame.center.clone():V();let half;if(launchConfig)half=Math.max(launchFrame.half,launchFrame.half*.85/aspect);else if(view==='orbit')half=Math.max(1.32,1.37/aspect);else if(view==='core'||view==='spacecraft'&&domainSceneSpecs[focus]?.close)half=Math.max(h.bodyHeightM*.82+h.bodyLengthM*.20,(h.bodyLengthM*.64+h.bodyWidthM*.7)/aspect);else if(size){half=Math.max(size.fitHeight*.5,size.fitWidth*.5/aspect);}else half=10;
+ if(focus==='prop'&&view==='core'){look.copy(craft.root.localToWorld(V(0,0,-h.bodyLengthM*.07)));half*=1.04;}
  if(focus==='data'&&view!=='launch'&&view!=='orbit'){look.copy(craft.root.localToWorld(V(0,0,-h.bodyLengthM*.16)));half*=.88;}
  if(launchConfig&&phase==='D'&&focus==='launch'&&!launchFrame.reference&&['pad','ascent','insertion'].includes(s.flightPhase)){
   const ends=launch.parts.stage.localToWorld(V(0,s.flightPhase==='insertion'?-h.bodyLengthM*.45:-(launch.geometry.upperLengthM||h.stowedLengthM)*.30,0));
@@ -148,7 +149,7 @@ export function createScene(container,{onPick=()=>{},onHover=()=>{},onThermalSca
   for(const side of ['left','right']){
    const ordered=slots[side].sort((a,b)=>a.py-b.py),x=side==='left'?pad:w-pad-width,edge=side==='left'?x+width:x;
    ordered.forEach((el,i)=>{
-    const hasBadge=view==='launch'&&phase==='D'&&launchFrame&&!launchFrame.directCraft&&!['launcher','conops','orbit'].includes(focus),lo=(side==='left'&&hasBadge?138:43)+i*sep,hi=Math.max(lo,ht-58-(ordered.length-i-1)*sep),y=clamp(el.py,Math.max(lo,i?ordered[i-1].y+sep:lo),hi);el.y=y;
+    const hasBadge=view==='launch'&&phase==='D'&&launchFrame&&!launchFrame.directCraft&&!['launcher','conops','orbit'].includes(focus),lo=(side==='left'&&hasBadge?138:side==='right'?(w<470?110:132):43)+i*sep,hi=Math.max(lo,ht-58-(ordered.length-i-1)*sep),y=clamp(el.py,Math.max(lo,i?ordered[i-1].y+sep:lo),hi);el.y=y;
     const dx=el.px-edge,dy=el.py-y,leader=document.createElement('i');leader.style.cssText='position:absolute;left:'+edge+'px;top:'+y+'px;width:'+Math.hypot(dx,dy)+'px;height:1px;background:'+el.color+';opacity:.64;transform-origin:left center;transform:rotate('+Math.atan2(dy,dx)+'rad)';tags.append(leader);
     const dot=document.createElement('i');dot.style.cssText='position:absolute;left:'+(el.px-2)+'px;top:'+(el.py-2)+'px;width:5px;height:5px;box-shadow:0 0 0 2px #0a1418aa;background:'+el.color+';border-radius:50%';tags.append(dot);
     const card=document.createElement('span'),title=document.createElement('span'),value=document.createElement('span');

@@ -7,6 +7,6 @@
 .arch-verdict{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px 16px;margin-top:12px;padding:9px 12px;border-left:2px solid #88b29c;background:#192923;color:#b1ddc2}.arch-verdict span{color:#bdc9cd;font-size:12px}.arch-verdict.inspect{border-color:#d9ad69;background:#2b2720;color:#edc58f}
 .baseline-link{margin:12px 0;display:flex;align-items:center;flex-wrap:wrap;gap:9px}.arch-hold{color:#edbd8d}
 
-.coordinate-triad{position:absolute;bottom:38px;right:8px;width:78px;z-index:2;background:#111a23df;border:1px solid #3e5260;border-radius:7px;pointer-events:none}.coordinate-triad svg{display:block;width:100%;height:auto}.coordinate-triad svg text{font:600 12px var(--mono);stroke:#192128;stroke-width:2.8px;paint-order:stroke}.coordinate-triad .frame-name{fill:#b7cdd4;font:9px var(--mono);letter-spacing:.07em;stroke:none}@media(max-width:550px){.coordinate-triad{width:65px;bottom:27px;right:5px}}
+.coordinate-triad{position:absolute;top:31px;right:8px;width:78px;z-index:2;background:#111a23df;border:1px solid #3e5260;border-radius:7px;pointer-events:none}.coordinate-triad svg{display:block;width:100%;height:auto}.coordinate-triad svg text{font:600 12px var(--mono);stroke:#192128;stroke-width:2.8px;paint-order:stroke}.coordinate-triad .frame-name{fill:#b7cdd4;font:9px var(--mono);letter-spacing:.07em;stroke:none}@media(max-width:550px){.coordinate-triad{width:65px;top:23px;right:5px}}
 
 #discipline-host:not([hidden]){margin:14px 0;min-width:0}

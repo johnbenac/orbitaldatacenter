@@ -4,6 +4,11 @@ const V=(x=0,y=0,z=0)=>new T.Vector3(x,y,z);
 const clamp=x=>Math.max(0,Math.min(1,x));
 export function hardwarePart(o){while(o&&!o.userData.part)o=o.parent;return o?.userData.part||'structure';}
 function focusColor(part,domain,o){
+ // Keep the occupied equipment deck legible behind the exposed tank installation.
+ if(domain==='prop'&&['compute','battery','storage','avionics','cmg'].includes(part)){
+  if(o.isLine)return 'native';
+  return ({compute:o.userData.installedTrayRow?'#516e78':'#354b57',battery:'#556662',storage:'#615970',avionics:'#4b5e6c',cmg:'#74634d'})[part];
+ }
  if(domain==='data'&&part==='compute'&&o.userData.dataSource)return '#578990';
  if(domain==='thermal')return o.userData.thermalNode?'native':null;
  if(part==='pad'&&o.geometry?.type==='PlaneGeometry'&&o.material.map)return 'native';

@@ -32,32 +32,43 @@ export function deploymentLayout(h){
  for(const end of [-1,1])for(const j of [0,1])g.descriptors.push({type:'rad',end,j,width:rw,depth:r-.14,thickness:.07,normalOffset:0});
  cache.set(h,g);return g;
 }
-function wingPose(g,side,end,s,t){
- const span=s.pv*g.wl,rolledLength=g.wl-span,pitch=t*D*s.tracking;
+function wingPose(g,side,end,s,t,attitude){
+ const span=s.pv*g.wl,rolledLength=g.wl-span,pitch=(attitude?.wingPitchDeg??t*s.tracking)*D;
  const rollRadius=Math.sqrt(g.coreRadiusM**2+g.blanketGaugeM*rolledLength/Math.PI);
  const rollAngle=-side*2*Math.PI*(g.packedRollM-rollRadius)/g.blanketGaugeM;
  const root=[side*g.rootX,0,g.center+end*g.mountZ],tip=[root[0]+side*span,0,root[2]];
  return {root,tip,span,rolledLength,rollRadius,rollAngle,pitch,side,end};
 }
-export function bankPose(g,end,s){
+export function bankPose(g,end,s,attitude){
  const sign=-end,R=end<0?s.upperRoot:s.lowerRoot,T=end<0?s.upperTip:s.lowerTip;
- const a=-sign*Math.PI/4*R,b=a-sign*Math.PI*(1-T),root=[0,sign*g.rootY,g.radRoot];
+ const operatingPitch=end<0?attitude?.upperRadiatorPitchDeg:attitude?.lowerRadiatorPitchDeg;
+ const a=Number.isFinite(operatingPitch)?operatingPitch*D:-sign*Math.PI/4*R,b=a-sign*Math.PI*(1-T),root=[0,sign*g.rootY,g.radRoot];
  const next=(p,t)=>[p[0],p[1]-g.r*Math.sin(t),p[2]+g.r*Math.cos(t)];
  const elbow=next(root,a),tip=next(elbow,b);
  return {end,root,elbow,tip,rootPitch:a,outerPitch:b};
 }
-export function mechanismPose(g,progress,tiltDeg=0){
+export function mechanismPose(g,progress,tiltDeg=0,attitude){
  const s=deploymentSchedule(progress);
- return {wings:g.descriptors.filter(d=>d.type==='pv').map(d=>wingPose(g,d.side,d.end,s,tiltDeg)),banks:[bankPose(g,-1,s),bankPose(g,1,s)]};
+ return {wings:g.descriptors.filter(d=>d.type==='pv').map(d=>wingPose(g,d.side,d.end,s,tiltDeg,attitude)),banks:[bankPose(g,-1,s,attitude),bankPose(g,1,s,attitude)]};
 }
-export function leafPose(g,d,progress,tiltDeg=0){
+export function leafPose(g,d,progress,tiltDeg=0,attitude){
  const s=deploymentSchedule(progress);
  if(d.type==='pv'){
-  const m=wingPose(g,d.side,d.end,s,tiltDeg);
+  const m=wingPose(g,d.side,d.end,s,tiltDeg,attitude);
   return {x:(m.root[0]+m.tip[0])/2,y:0,z:m.root[2],pitch:m.pitch,width:m.span};
  }
- const m=bankPose(g,d.end,s),a=d.j?m.outerPitch:m.rootPitch,start=d.j?m.elbow:m.root,offset=d.end*g.hingeStand;
+ const m=bankPose(g,d.end,s,attitude),a=d.j?m.outerPitch:m.rootPitch,start=d.j?m.elbow:m.root,offset=d.end*g.hingeStand;
  return {x:0,y:start[1]-g.r*.5*Math.sin(a)+offset*Math.cos(a),z:start[2]+g.r*.5*Math.cos(a)+offset*Math.sin(a),pitch:a};
 }
 export function leafAxes(p){const c=Math.cos(p.pitch),s=Math.sin(p.pitch);return [[1,0,0],[0,c,s],[0,-s,c]];}
 export function leafCorners(p,d){const [a,,b]=leafAxes(p),width=p.width??d.width,out=[];for(const i of [-.5,.5])for(const j of [-.5,.5])out.push([p.x+i*width*a[0]+j*d.depth*b[0],p.y+i*width*a[1]+j*d.depth*b[1],p.z+i*width*a[2]+j*d.depth*b[2]]);return out;}
+
+// Radius of the swept head below its elevation pin bounds deck clearance at
+// every commanded azimuth. Includes the finite reflector rim / optical barrel.
+export function terminalLayout(w,b,diameter,aperture){
+ const beam=Math.min(w,b)*.052,D=diameter,A=aperture;
+ const kaPin=.37*D,kaHeadRadius=Math.hypot(.52*D,kaPin-.15*D);
+ const opticalPin=.46*A,opticalHeadRadius=Math.hypot(.80*A,opticalPin+.05*A);
+ return {kaPin,kaHeight:Math.max(3*beam+kaPin,kaHeadRadius+beam*.75+.02),kaFork:.555*D,
+  opticalPin,opticalHeight:Math.max(1.8*beam+opticalPin,opticalHeadRadius+beam*.75+.02),opticalFork:.85*A};
+}

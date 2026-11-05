@@ -155,8 +155,8 @@ group('elements transfer',missionBasis,[
  ['meanAnomalyDeg','Place the spacecraft along its orbit at epoch using mean anomaly. The solver computes true anomaly through Kepler’s equation.']
 ]);
 group('gnc actuator drag',assume,[
- ['rollDeg','Choose roll with the active attitude law. Compare wing incidence, radiator exposure, projected drag and torque in the same state.'],
- ['pitchDeg','In manual attitude, use pitch to turn the commanded body reference away from the local radial direction toward the orbit normal. Review heat, power and ram area together.'],
+ ['rollDeg','Roll around body +Z relative to the nominal reference. Compare wing incidence, radiator exposure, projected drag and torque in the same state.'],
+ ['pitchDeg','In manual attitude, pitch around local body X after yaw and before roll. At zero angles +Y faces Earth and +Z follows the orbital track. Compare sunlight, Earth exposure and ram area at the same instant.'],
  ['yawDeg','In manual attitude, vary yaw in the local orbit frame. Inspect the resulting body-normal vectors and the footprint projected into the relative flow.'],
  ['solarTiltDeg','Enter the commanded solar-wing tracking offset. Greater obliquity reduces generation and changes the projected silhouette.','For an unshadowed ideal single face, 60° off normal receives half the normal direct flux.'],
  ['cd','Use a drag coefficient consistent with the atmospheric regime, attitude and the model’s projected reference area. Vary it with density when examining uncertainty.'],
@@ -331,10 +331,10 @@ options('solarDriver',[
  ['observed','Replay the archived 2009–2019 monthly flux sequence. The workbench forms daily and smoothed proxies from the monthly data. Real daily/81-day indices require finer observations.','fluxarchive radioflux','Observed monthly radio flux with modeled interpolation and periodic replay.']
 ]);
 options('attitude',[
- ['tracking','Use a Sun-referenced nominal body orientation and compare generation against radiator incidence and projected drag during the orbit.','gnc power',codeInput],
- ['nadir','Use the radial orbit reference for the nominal body orientation. Examine sunlight incidence and Earth IR exposure through a complete orbit.','gnc thermal',codeInput],
- ['inertial','Hold the modeled base axis on the inertial X direction. Sun and ram angles then evolve with season and orbital position.','gnc elements',codeInput],
- ['lowdrag','Use the orbit-normal reference to examine reduced ram cross-section. Compare generated power and net cooling with the Sun-referenced case.','drag gnc',codeInput],
+ ['tracking','Start with +Z along track and +Y near nadir. A Sun-dependent roll improves collection within the wing drives’ one-axis travel. Inspect exposure and drag across an orbit.','gnc power',codeInput],
+ ['nadir','Point the +Y terminal deck at Earth and +Z along track. Examine sunlight incidence and Earth IR exposure through a complete orbit.','gnc thermal',codeInput],
+ ['inertial','Hold the body fixed relative to the inertial reference axes. Sun and ram angles then evolve with season and orbital position.','gnc elements',codeInput],
+ ['lowdrag','Point the wing-span axis along the atmosphere-relative velocity. Compare the projected silhouette, generation and cooling against the tracking mode.','drag gnc',codeInput],
  ['manual','Set roll, pitch, yaw and wing offset explicitly in the model’s local orbit frame. Inspect body axes and compare all subsystem responses at matched times.','gnc elements',codeInput]
 ]);
 options('link',[

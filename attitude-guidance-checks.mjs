@@ -1,0 +1,52 @@
+import assert from 'node:assert/strict';
+import {defaults,sizeDesign} from './dist/design.js';
+import {geometry,dot,unit,cross,DEG} from './dist/orbit.js';
+import {attitudeGuidance,attitudeLimits,interpolateAttitudeState} from './dist/attitude-guidance.js';
+const h=sizeDesign(defaults),close=(x,y,tol=1e-8)=>assert.ok(Math.abs(x-y)<tol,`${x} vs ${y}`),length=v=>Math.hypot(...v);
+const angle=(a,b)=>Math.acos(Math.max(-1,Math.min(1,dot(a,b))))/DEG;
+const qAngle=(a,b)=>2*Math.acos(Math.min(1,Math.abs(a.reduce((sum,v,i)=>sum+v*b[i],0))))/DEG;
+const step=(t,prev,o={})=>attitudeGuidance(h,geometry(h.input,t),{deployment:1,previous:prev?.attitudeState,...o});
+function certify(s,g){
+ const [x,y,z]=[s.bodyXECI,s.bodyUpECI,s.bodyZECI];close(dot(cross(x,y),z),1);for(const axis of [x,y,z])close(length(axis),1);
+ for(const [n,a] of [[s.pvNormalECI,s.wingPitchDeg],[s.upperRadiatorNormalECI,s.upperRadiatorPitchDeg],[s.lowerRadiatorNormalECI,s.lowerRadiatorPitchDeg]]){
+  close(dot(n,x),0);close(dot(n,y),Math.cos(a*DEG));close(dot(n,z),Math.sin(a*DEG));
+ }
+ assert.ok(s.upperRadiatorPitchDeg>=-65&&s.upperRadiatorPitchDeg<=-30);
+ assert.ok(s.lowerRadiatorPitchDeg>=30&&s.lowerRadiatorPitchDeg<=65);
+ for(const v of [s.dishBoresightBody,s.opticalBoresightBody]){close(length(v),1);assert.ok(v[1]>=Math.cos(75*DEG)-1e-9);}
+}
+let prev=null,wingRange=[],hits=new Set();
+for(let t=86400;t<=86400+6200;t+=5){
+ const g=geometry(h.input,t),a=step(t,prev);certify(a,g);hits.add(a.attitudeMode);wingRange.push(a.wingPitchDeg);
+ if(prev){assert.ok(qAngle(a.attitudeState.q,prev.attitudeState.q)<=.8*5+1e-7);assert.ok(Math.abs(a.wingRateDegS)<=2+1e-8);assert.ok(a.bodySlewMomentumNms<=attitudeLimits(h).maneuverMomentumNms+1e-7);}
+ prev=a;
+}
+assert.ok(hits.has('tracking')&&hits.has('eclipse'));assert.ok(Math.max(...wingRange)-Math.min(...wingRange)>340);
+const current=step(prev.attitudeState.t,prev);for(const key of ['bodyRateDegS','wingPitchDeg','wingRateDegS','upperRadiatorRateDegS','lowerRadiatorRateDegS'])close(prev[key],current[key]);
+const time=96000,g=geometry(defaults,time),free={...g,eclipse:false,station:null,stationECI:null};
+for(const law of ['tracking','manual','nadir','inertial','lowdrag']){
+ const hw=sizeDesign({...defaults,attitude:law,...(law==='manual'?{rollDeg:75,pitchDeg:20,yawDeg:11}:{})});
+ const s=attitudeGuidance(hw,free,{deployment:1});certify(s,free);assert.equal(s.attitudeMode,law);
+ if(law==='nadir')close(dot(s.bodyUpECI,g.radial),-1);
+ if(law==='inertial')assert.deepEqual(s.bodyXECI,[1,0,0]);
+ if(law==='lowdrag'){const p=g.positionECI,v=g.velocityECI;close(dot(s.bodyXECI,unit([v[0]+.00007292115*p[1],v[1]-.00007292115*p[0],v[2]])),1);}
+}
+for(const sign of [-1,1]){
+ const burn=attitudeGuidance(h,free,{burnDirection:sign,burnKind:'disposal',deployment:1});close(dot(burn.bodyZECI,unit(g.velocityECI)),sign);
+ const pulse=attitudeGuidance(h,{...free,t:g.t+1},{deployment:1,burnDirection:-sign,burnKind:'disposal',previous:burn.attitudeState});assert.ok(pulse.attitudeSlewErrorDeg>179);
+ const pre=attitudeGuidance(h,free,{deployment:1,plannedBurnDirection:sign,plannedBurnLeadS:50});assert.equal(pre.attitudeMode,'prepoint');close(dot(pre.bodyZECI,unit(g.velocityECI)),sign);
+}
+const nadir=h.input.attitude==='nadir'?h:sizeDesign({...defaults,attitude:'nadir'});
+const target=unit(g.radial.map((v,i)=>-v+.70*g.along[i])),site=n=>({...free,station:'test',rangeKm:600,stationECI:g.positionECI.map((v,i)=>v+600*n[i])});
+let state=attitudeGuidance(nadir,free,{deployment:1});
+for(let k=0;k<=25;k++){
+ const visible={...site(target),t:g.t+k};state=attitudeGuidance(nadir,visible,{deployment:1,terminal:'Ka',contactAge:k,previous:state.attitudeState});
+ if(k===0){assert.ok(state.terminalErrorDeg>30);assert.equal(state.terminalState,'acquiring');}
+}
+assert.equal(state.terminalState,'tracking');close(state.terminalErrorDeg,0,1e-5);close(dot(state.terminalBoresightECI,target),1);
+const masked=attitudeGuidance(nadir,site(g.radial),{deployment:1,contactAge:80,terminal:'Optical'});assert.equal(masked.terminalState,'travel limit');assert.equal(masked.terminalReachable,false);assert.ok(masked.terminalErrorDeg>=104);
+const frozen=attitudeGuidance(h,{...geometry(defaults,time+600),flightPhase:'entry'},{previous:state.attitudeState,deployment:1});assert.equal(frozen.attitudeMode,'passive');assert.deepEqual(frozen.attitudeState.q,state.attitudeState.q);close(frozen.wingPitchDeg,state.wingPitchDeg);assert.equal(frozen.terminalErrorDeg,null);
+const a=prev.attitudeState,b={...a,q:a.q.map(v=>-v),wing:a.wing+1,upper:a.upper-.4,dish:[.5,Math.sqrt(.75),0],momentum:a.momentum+5};
+const mid=interpolateAttitudeState(a,b,.5);close(qAngle(mid.q,a.q),0,1e-5);close(mid.wing,a.wing+.5);close(mid.momentum,a.momentum+2.5);close(Math.hypot(...mid.dish),1);
+assert.equal(interpolateAttitudeState(a,b,0),a);assert.equal(interpolateAttitudeState(a,b,1),b);
+console.log('Attitude guidance verified across a sunlit/eclipsed orbit, body policies, bounded CMG slews, both burn directions, aperture acquisition, signed radiator drives and retirement.');

@@ -11,10 +11,10 @@ const defs={
  orbit:{label:'Orbit & eclipse',camera:'orbit',parts:[]},
  compute:{label:'Compute & storage',camera:'core',parts:['compute','storage'],close:true},
  data:{label:'Data & delivery',camera:'core',parts:['storage','avionics','communications'],close:true},
- comm:{label:'Communications',camera:'core',parts:['communications'],close:true},
+ comm:{label:'Communications',camera:'spacecraft',parts:['communications'],close:true},
  power:{label:'Electrical Power',camera:'spacecraft',parts:['solar','battery']},
  thermal:{label:'Thermal',camera:'core',parts:[],close:true},
- attitude:{label:'Attitude control',camera:'core',parts:['cmg','torquer'],close:true},
+ attitude:{label:'Attitude control',camera:'spacecraft',parts:['cmg','torquer','solar','radiator','communications']},
  prop:{label:'Propulsion',camera:'core',parts:['propellant','propulsion'],close:true},
  mass:{label:'Mass budget',camera:'spacecraft',parts:['solar','radiator','structure','compute','storage','avionics','battery','cmg','torquer','propellant','propulsion','communications']},
  launch:{label:'Launch & insertion',camera:'launch',parts:['fairing','adapter','payload','solar','radiator','structure']},
@@ -50,6 +50,7 @@ export function domainInstruments(key,h,s,{view='spacecraft',reference=false}={}
    item('orbitCraft','communications',inLaunch?'Insertion altitude':'Spacecraft',met(s.altitudeKm,'km')+' · '+(s.eclipse?'shadow':'sunlit'),'right'),
    item('orbitGround','solar','Orbit plane','β '+met(s.betaDeg,'°')+' · '+met(s.periodSec/60,'min'),'left')
   ];
+  if(key==='attitude')return [item('orbitCraft','cmg','Body axes · directions',s.attitudeModeLabel||'Guided attitude','right'),item('orbitGround','solar','Nadir footprint',met(s.altitudeKm,'km above ground',0),'left')];
   if(key==='data'||key==='comm')return [item('orbitCraft','communications','Spacecraft link',link,'right'),...(s.station?[item('station','avionics',s.station,bit(s.goodputMbps)+' delivered','left')]:[])];
   return [];
  }
@@ -66,7 +67,7 @@ export function domainInstruments(key,h,s,{view='spacecraft',reference=false}={}
  case 'power':return [item('solar','solar',(s.pvDeployment??s.deployment)===0?'Stowed solar array':s.eclipse?'Array · eclipse':'Array generation',met(s.solarKW,'kW',2),'left'),item('battery','battery','Battery pack',met(s.socPct,'%')+' · '+(s.chargeKW>.001?met(s.chargeKW,'kW in'):s.dischargeKW>.001?met(s.dischargeKW,'kW out'):'standby'),'right')];
  case 'thermal':return [item('compute','compute','Junction',met(s.junctionK,'K'),'left'),item('coolant','radiator','Coolant loop',met(s.coolantK,'K'),'right'),item(view==='core'?'battery':'radiator',view==='core'?'battery':'radiator',view==='core'?'Battery':'Radiator',met(view==='core'?s.batteryK:s.radiatorK,'K'),'right')];
  case 'comm':return [item('dish','communications','Steerable Ka reflector',s.groundLink==='Ka'&&s.station?link:met(h.input.kaDishM,'m aperture',2),'left'),item('optic','communications','Optical terminal',s.groundLink==='Optical'&&s.station?link:met(h.input.opticalApertureM,'m aperture',2),'right'),item('patch','avionics','S-band command',met(s.commandGoodputKbps,'kbit/s up',2),'left')];
- case 'attitude':return [item('cmg','cmg','CMG cluster',met(s.momentumNms,'N·m·s')+' · '+met(s.cmgKW,'kW',2),'left'),item('torquer','torquer','Magnetic torquer',s.desat?'Unloading · '+met(s.unloadTorqueNm,'N·m',4):'Standby · '+met(s.unloadAuthorityNm,'N·m available',4),'right')];
+ case 'attitude':if(view==='spacecraft'&&s.attitudeModeLabel)return [item('body','cmg','Body pointing',s.attitudeModeLabel,'left'),item('solar','solar','Array rotary joint',met(s.wingPitchDeg,'°',1),'right'),item('radiator','radiator','Radiator root drives',met(s.upperRadiatorPitchDeg,'°',0)+' / '+met(s.lowerRadiatorPitchDeg,'°',0),'right')];return [item('cmg','cmg','CMG cluster',met(s.momentumNms,'N·m·s')+' · '+met(s.cmgKW,'kW',2),'left'),item('torquer','torquer','Magnetic torquer',s.desat?'Unloading · '+met(s.unloadTorqueNm,'N·m',4):'Standby · '+met(s.unloadAuthorityNm,'N·m available',4),'right')];
  case 'prop':return [item('fuel','propellant','Internal fuel vessel',met(s.fuelKg,'kg',1),'left'),item('helium','propellant','Helium bottle',met(h.propulsion.heliumL,'L',1)+' · regulated feed','left'),item('oxidizer','propellant','Internal oxidizer vessel',met(s.oxidizerKg,'kg',1),'right'),item('engine','propulsion','−Z thrust deck',s.burn?'Firing · '+met(h.input.thrustN,'N'):'Idle · '+met(s.remainingDv,'m/s available'),'right')];
  case 'environment':if(s.t<540)return [item('body','structure','Payload exposure','Encapsulated · '+stage,'right'),item('solar','solar','Array deployment',met((s.pvDeployment??0)*100,'% deployed',0),'left')];return [item('solar','solar','Direct illumination',s.eclipse?'Eclipse · 0 W/m²':met(s.solarIrradiance??1361,'W/m²',0),'left'),item('radiator','radiator','Absorbed environmental heat',met(s.absorbedKW,'kW',2),'right'),item('body','structure','Ram-facing area',met(s.ramAreaM2,'m²',2),'left')];
  case 'mass':{const m=id=>h.massLedger.find(r=>r.id===id)?.kg;return [item('solar','solar','Array allocation',fmtI(m('array'),'kg'),'left'),item('radiator','radiator','Radiator allocation',fmtI(m('radiator'),'kg'),'right'),item('body','structure','Flight inventory',fmtI(s.wetKg,'kg wet'),'right')];}

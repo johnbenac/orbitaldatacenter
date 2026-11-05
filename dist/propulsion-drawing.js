@@ -53,7 +53,7 @@ export function propulsionSectionDrawing(h,snapshot={}){
   s+=`<path d="M${f(cx-er*.35)} ${f(base)}V${f(te)}L${f(cx-er)} ${f(exit)}H${f(cx+er)}L${f(cx+er*.35)} ${f(te)}V${f(base)}Z" fill="#6c7981" stroke="#cbd2d0"/>`;
   s+=line(cx,exit+2,cx,exit+9,'#7abce0','stroke-dasharray="2 2"');
  }
- const cm=propulsionReview(h,snapshot.propellantKg??h.propellantKg).cm,centerX=xx(cm[0]),cy2=yy(cm[2]);const thrustX=xx((p.engines[0].x+p.engines[1].x)/2);s+=line(thrustX,base+9,thrustX,y,'#adc9a5','stroke-dasharray="3 3"')+`<circle cx="${f(centerX)}" cy="${f(cy2)}" r="3" fill="#18252a" stroke="white"/>`+line(centerX-5,cy2,centerX+5,cy2,white)+line(centerX,cy2-5,centerX,cy2+5,white);
+ const cm=propulsionReview(h,snapshot.propellantKg??h.propellantKg,snapshot).cm,centerX=xx(cm[0]),cy2=yy(cm[2]);const thrustX=xx((p.engines[0].x+p.engines[1].x)/2);s+=line(thrustX,base+9,thrustX,y,'#adc9a5','stroke-dasharray="3 3"')+`<circle cx="${f(centerX)}" cy="${f(cy2)}" r="3" fill="#18252a" stroke="white"/>`+line(centerX-5,cy2,centerX+5,cy2,white)+line(centerX,cy2-5,centerX,cy2+5,white);
  const support=h.fairing.stack.find(t=>t.part==='Launch service stand-off'),ring=h.fairing.stack.find(t=>t.part==='Separation adapter');
  if(support&&ring){
   const endY=yy(-l/2-support.lengthM),edge=w*.4;
@@ -67,6 +67,6 @@ export function propulsionSectionDrawing(h,snapshot={}){
  };
  s+=guide(true,mid+len*.408,'Battery packs')+guide(false,mid,'Compute racks')+guide(true,mid-len*.407,'Avionics / storage')+guide(false,p.tanks[1].z,'Liquid tanks');
  s+=label(14,210,'● Fuel',fuel)+label(78,210,'● Oxidizer',ox)+label(160,210,'◌ Helium',gas)+label(376,210,'⊕ Deployed center of mass',white,'end');
- s+=label(14,227,'+Z launch-up · −Z nadir / exhaust','#adc0cd')+label(376,227,f(l)+' m bus','#adc0cd','end');
+ s+=label(14,227,'+Z launch-up · −Z adapter / exhaust','#adc0cd')+label(376,227,f(l)+' m bus','#adc0cd','end');
  return `<figure style="margin:0"><div style="display:grid;gap:.65rem;grid-template-columns:repeat(auto-fit,minmax(min(100%,315px),1fr))">${deployedPlan(h)}${panel('Launch-axis section','View across Y · helium projected from the interstice',s)}</div></figure>`;
 }

@@ -22,7 +22,7 @@ function pose(h,s,key){
 }
 function stateFor(h,s,mode){
  const [remaining,progress,adapter]=pose(h,s,mode);
- const props=componentMassProperties(h,remaining,progress,adapter);
+ const props=componentMassProperties(h,remaining,progress,adapter,true,mode==='current'?s:null);
  return {...props,remainingKg:remaining,deployment:progress,adapterAttached:adapter};
 }
 function center(rows){

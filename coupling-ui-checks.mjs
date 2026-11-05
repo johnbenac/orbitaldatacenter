@@ -85,3 +85,15 @@ await fire({deployAt:'1'});const locked=await snapshot();assert.equal(locked.vie
 assert.match(el('guidepanel').innerHTML,/Replay/);
 await fire({action:'flightplay'});assert.equal((await snapshot()).view.t,DEPLOY_START_S);
 console.log('Deployment handoff, one-clock milestones, physical hinge inspection and locked-state replay passed.');
+
+// A phase-C comparison can run and scrub the same flight director without changing the design.
+await fire({phase:'C'});await fire({domain:'attitude'});
+assert.match(el('guidepanel').innerHTML,/Play analysis/);
+await fire({attitudeTime:'9642'});const held=await snapshot();
+assert.match(el('attitude-strip').innerHTML,/Canberra/);assert.match(el('attitude-history').innerHTML,/data-attitude-time/);
+await fire({camera:'orbit'});const switched=await snapshot();assert.equal(switched.view.t,held.view.t);assert.deepEqual(switched.design,held.design);
+assert.match(el('attitude-strip').innerHTML,/Earth-centered view/);
+await fire({action:'flightplay'});assert.match(el('guidepanel').innerHTML,/Pause/);await fire({action:'flightplay'});
+await fire({phase:'B'});assert.match(el('system-choice').innerHTML,/Flight pointing modes and actuator design/);
+assert.equal(el('attitude-strip').hidden,true);assert.equal(el('attitude-history').hidden,true);
+console.log('Pointing mode design, orbital scrub, camera continuity, coupled telemetry and analysis playback passed.');

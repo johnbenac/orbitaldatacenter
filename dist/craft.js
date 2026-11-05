@@ -1,5 +1,5 @@
 import * as T from './vendor/three.module.js';
-import {deploymentLayout,mechanismPose,deploymentSchedule} from './deployment.js';
+import {deploymentLayout,mechanismPose,terminalLayout} from './deployment.js';
 import {thermalMesh} from './thermal-view.js';
 const v=(x,y,z)=>new T.Vector3(x,y,z);
 const solid=(c,m=.24,r=.49)=>new T.MeshStandardMaterial({color:c,metalness:m,roughness:r});
@@ -158,7 +158,7 @@ for(const end of [-1,1]){
   pin(knuckle,j*ap,0,0,.060,.16,bronze,'x',id);
  }
  const motor=pin(mount,ap+.12,0,0,.106,.13,navy,'x',id);
- motor.name='Radiator deployment actuator';
+ motor.name='Radiator root deployment and trim actuator';
  const owner=[],rootPin=marker(mount,0,0,0),rootSocket=marker(bank,0,0,0),elbowPin=marker(bank,0,0,kin.r),elbowSocket=marker(knuckle,0,0,0);
  for(const [j,frame] of [bank,knuckle].entries()){
   const d=kin.descriptors.find(q=>q.type==='rad'&&q.end===end&&q.j===j),off=end*kin.hingeStand;
@@ -223,11 +223,35 @@ for(const [idx,t] of liquids.entries()){
  for(const e of propulsion.engines){const x=e.x+side*.014;tubeRun([man,v(x,man.y,man.z),v(x,e.y,man.z),v(x,e.y,e.throatZ+.01)],feedR*.72,color);}
 }
 // Reflector is a shallow paraboloid with crossed support rods and a feed horn.
-const dishD=Math.max(.3,h.input.kaDishM),base=join(root,w*.16,y0+beam,-l*.35,'communications');cyl(base,0,beam*.6,0,dishD*.18,dishD*.24,beam*1.3,steel,'communications');const dish=join(base,0,beam*2,0,'communications');// The continuous finite-thickness shell runs from inner rim to axis and back along the outer skin.
+const dishD=h.input.kaDishM,ap=h.input.opticalApertureM,terminal=terminalLayout(w,hgt,dishD,ap);
+function pedestal(x,z,span,pinHeight,scale){
+ const mount=join(root,x,y0,z,'communications'),turntable=join(mount,0,beam*.32,0,'communications'),head=join(turntable,0,pinHeight-beam*.32,0,'communications');
+ cyl(mount,0,beam*.21,0,scale*.17,scale*.20,beam*.45,steel,'communications');
+ pin(turntable,0,0,0,scale*.19,beam*.22,bronze,'y','communications');
+ for(const side of [-1,1]){
+  const out=side*span;
+  pipe(turntable,v(side*scale*.105,beam*.10,0),v(out,beam*.38,0),scale*.026,steel,'communications');
+  pipe(turntable,v(out,beam*.38,0),v(out,pinHeight-beam*.32,0),scale*.026,steel,'communications');
+  pin(head,out-side*scale*.035,0,0,scale*.047,scale*.095,bronze,'x','communications');
+ }
+ return {head,turntable};
+}
+const kaGimbal=pedestal(w*.16,-l*.35,terminal.kaFork,terminal.kaHeight,dishD),dish=kaGimbal.head;
+const reflectorHead=join(dish,0,-terminal.kaPin,0,'communications');
+for(const side of [-1,1])pipe(dish,v(side*(terminal.kaFork-.027*dishD),0,0),v(side*dishD*.455,-terminal.kaPin+dishD*.13,0),dishD*.022,steel,'communications');
+// The continuous finite-thickness shell runs from inner rim to axis and back along the outer skin.
 const parab=[],dishT=Math.max(.007,dishD*.014),profile=(i,dy)=>{const r=dishD*.5*i/16;return new T.Vector2(r,(r/dishD)**2*dishD*.65+dy);};
 for(let i=0;i<=16;i++)parab.push(profile(i,-dishT));for(let i=16;i>=0;i--)parab.push(profile(i,0));
-const reflector=obj(dish,trimPoleTriangles(new T.LatheGeometry(parab,64)),solid('#dcdacb',.55,.38),0,0,0,'communications');reflector.name='Closed reflector shell';const rim=new T.Mesh(new T.TorusGeometry(dishD*.499,Math.max(.014,dishD*.014),12,64),bronze);rim.rotation.x=Math.PI/2;rim.position.y=dishD*.162;dish.add(rim);for(let j=0;j<3;j++){let a=j*2*Math.PI/3;pipe(dish,v(dishD*.44*Math.cos(a),dishD*.12,dishD*.44*Math.sin(a)),v(0,dishD*.37,0),dishD*.013,steel,'communications');}cyl(dish,0,dishD*.37,0,dishD*.035,dishD*.063,dishD*.10,gold,'communications');
-const optic=join(root,-w*.2,y0+beam*1.8,l*.35,'communications');let ap=Math.max(.15,h.input.opticalApertureM);cyl(optic,0,ap*.45,0,ap*.68,ap*.8,ap,ivory,'communications');cyl(optic,0,ap*.98,0,ap*.63,ap*.63,beam*.2,black,'communications');cyl(optic,0,ap*1.01,0,ap*.46,ap*.46,beam*.12,blue,'communications');const patches=[-1,1].map(side=>box(root,side*w*.49,y0*.52,l*.3,beam*.35,hgt*.14,w*.21,bronze,'communications'));
+const reflector=obj(reflectorHead,trimPoleTriangles(new T.LatheGeometry(parab,64)),solid('#dcdacb',.55,.38),0,0,0,'communications');reflector.name='Closed reflector shell';const rim=new T.Mesh(new T.TorusGeometry(dishD*.499,Math.max(.014,dishD*.014),12,64),bronze);rim.rotation.x=Math.PI/2;rim.position.y=dishD*.162;reflectorHead.add(rim);for(let j=0;j<3;j++){let a=j*2*Math.PI/3;pipe(reflectorHead,v(dishD*.44*Math.cos(a),dishD*.12,dishD*.44*Math.sin(a)),v(0,dishD*.37,0),dishD*.013,steel,'communications');}cyl(reflectorHead,0,dishD*.37,0,dishD*.035,dishD*.063,dishD*.10,gold,'communications');
+const opticalGimbal=pedestal(-w*.2,l*.35,terminal.opticalFork,terminal.opticalHeight,ap),optic=opticalGimbal.head,barrel=join(optic,0,-terminal.opticalPin,0,'communications');
+ cyl(barrel,0,ap*.45,0,ap*.68,ap*.8,ap,ivory,'communications');cyl(barrel,0,ap*.98,0,ap*.63,ap*.63,ap*.08,black,'communications');cyl(barrel,0,ap*1.01,0,ap*.46,ap*.46,ap*.05,blue,'communications');
+ function pointTerminals(ka,opt){
+  for(const [g,a] of [[kaGimbal,ka],[opticalGimbal,opt]]){
+   if(a.x*a.x+a.z*a.z>1e-12)g.turntable.rotation.y=Math.atan2(a.x,a.z);
+   g.head.rotation.x=Math.atan2(Math.hypot(a.x,a.z),a.y);
+  }
+ }
+ const patches=[-1,1].map(side=>box(root,side*w*.49,y0*.52,l*.3,beam*.35,hgt*.14,w*.21,bronze,'communications'));
 // Liquid-cooled tray section with cold plates, rack manifolds, supply/return branches and end-wall penetrations.
 for(let side of [-1,1]){
  const rack=join(internal,side*w*.225,0,0,'compute'),rx=side*w*.175;
@@ -303,12 +327,15 @@ function updateHose(h){
  let last=p;
  for(let i=1;i<=n;i++){const t=i/n,next=p.clone().addScaledVector(delta,t);next.x+=h.side*(hi+lo)*.5*Math.sin(Math.PI*t);beamTo(h.seg[i-1],last,next);last=next;}
 }
-let installedAt=null;
-function positionPanels(progress){
- if(progress===installedAt)return;installedAt=progress;
- const k=mechanismPose(kin,progress,h.input.solarTiltDeg),s=deploymentSchedule(progress);
+let installedAt=null,wingPitch,upperPitch,lowerPitch;
+function positionPanels(progress,attitude){
+ const wp=attitude?.wingPitchDeg,up=attitude?.upperRadiatorPitchDeg,lp=attitude?.lowerRadiatorPitchDeg;
+ const deploymentChanged=progress!==installedAt,radiatorsChanged=deploymentChanged||up!==upperPitch||lp!==lowerPitch;
+ if(!deploymentChanged&&wp===wingPitch&&!radiatorsChanged)return;
+ installedAt=progress;wingPitch=wp;upperPitch=up;lowerPitch=lp;
+ const k=mechanismPose(kin,progress,h.input.solarTiltDeg,attitude);
  wings.forEach((w,i)=>{
-  const m=k.wings[i],side=w.side;w.table.rotation.x=m.pitch;w.tip.position.x=side*m.span;
+  const m=k.wings[i],side=w.side;w.table.rotation.x=m.pitch;if(!deploymentChanged)return;w.tip.position.x=side*m.span;
   w.reel.position.y=m.rollRadius;w.reel.rotation.z=m.rollAngle;
   w.roll.scale.set(m.rollRadius,panelW+.04,m.rollRadius);w.stripe.position.y=m.rollRadius;
   w.discs.forEach(o=>o.scale.set(m.rollRadius+.009,.035,m.rollRadius+.009));
@@ -325,10 +352,11 @@ function positionPanels(progress){
    w.saddles[j].rotation.x=(j?1:-1)*Math.PI*.45*Math.min(1,Math.max(0,(progress-.015)/.025));
   }
  });
+ if(!radiatorsChanged)return;
  rads.forEach((r,i)=>{const m=k.banks[i];r.bank.rotation.x=m.rootPitch;r.knuckle.rotation.x=m.outerPitch-m.rootPitch;
   for(const clip of r.clips)clip.rotation.x=-r.end*1.2*Math.min(1,Math.max(0,(progress-(r.end<0?.42:.665))/.025));
  });
  appendages.updateWorldMatrix(true,true);hoses.forEach(updateHose);
 }
 positionPanels(1);
-return{root,internal,skin,enclosure,service,shelf,tankMap,engines,regulator:regulatorParts[0],walls,wings,panels,mechanismAudit,appendages,recorder,avionics,torquers,driveCount,shownDrives,trayRows,positionPanels,rads,cmgs,cells,leds,dish,optic,patches,plumes,gyroPack,bw,bh,bl,wingspan:2*(panelL+kin.rootX),spanZ:kin.radRoot+2*kin.r*Math.SQRT1_2+Math.max(bl/2,-kin.center+kin.mountZ+panelW/2)};}
+return{root,internal,skin,enclosure,service,shelf,tankMap,engines,regulator:regulatorParts[0],walls,wings,panels,mechanismAudit,appendages,recorder,avionics,torquers,driveCount,shownDrives,trayRows,positionPanels,rads,cmgs,cells,leds,dish,optic,pointTerminals,patches,plumes,gyroPack,bw,bh,bl,wingspan:2*(panelL+kin.rootX),spanZ:kin.radRoot+2*kin.r*Math.SQRT1_2+Math.max(bl/2,-kin.center+kin.mountZ+panelW/2)};}

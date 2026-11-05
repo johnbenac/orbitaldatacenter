@@ -65,7 +65,7 @@ export const aiDeploymentAudit={
       "maxLengthErrorM": 0,
       "maxHoseLengthErrorM": 0.000001039,
       "deployClear": true,
-      "meshFitMarginM": 0.43833801,
+      "meshFitMarginM": 0.39498401,
       "fit": true,
       "radialClearanceM": 0.382643614,
       "axialClearanceM": 3.844443665
@@ -164,9 +164,9 @@ export const aiDeploymentAudit={
       "maxLengthErrorM": 0,
       "maxHoseLengthErrorM": 0.000001039,
       "deployClear": true,
-      "meshFitMarginM": 0.497326026,
+      "meshFitMarginM": 0.39498401,
       "fit": true,
-      "radialClearanceM": 0.483100711,
+      "radialClearanceM": 0.391099638,
       "axialClearanceM": 5.220056998
     },
     {

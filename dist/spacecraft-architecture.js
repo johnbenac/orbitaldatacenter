@@ -71,14 +71,14 @@ export function installPropulsion(p,d,g,ledger){
 }
 
 const reviewCache=new WeakMap();
-function surfaceReview(h){
+function surfaceReview(h,attitude){
  const g=deploymentLayout(h),p=h.propulsion,angle=(coneDeg+installationDeg)*rad;
  let radiatorMarginM=Infinity,wingMarginM=Infinity;
  // Conservative separation from an infinite conical frustum. The AABB encloses
  // the exact oriented rigid leaf incl thickness. Upstream distance or the closest
  // footprint relative to the widest cone slice furnishes a separation lower bound.
  for(const d of g.descriptors){
-  const pos=leafPose(g,d,1,h.input.solarTiltDeg),axes=leafAxes(pos),extent=[d.width,d.thickness,d.depth];
+  const pos=leafPose(g,d,1,h.input.solarTiltDeg,attitude),axes=leafAxes(pos),extent=[d.width,d.thickness,d.depth];
   const b=[0,1,2].map(k=>axes.reduce((sum,a,i)=>sum+Math.abs(a[k])*extent[i]/2,0));
   const c=[pos.x,pos.y,pos.z].map((v,k)=>v+d.normalOffset*axes[1][k]);
   for(const e of p.engines){
@@ -90,12 +90,12 @@ function surfaceReview(h){
   }
  }
  const values={radiatorMarginM,wingMarginM,plumeMarginM:Math.min(radiatorMarginM,wingMarginM),solarSaddleCenterM:g.center};
- reviewCache.set(h,values);return values;
+ if(!attitude)reviewCache.set(h,values);return values;
 }
 
-export function propulsionReview(h,remainingKg=h.propellantKg){
- const p=h.propulsion,surfaces=reviewCache.get(h)||surfaceReview(h),kg=Math.max(0,Math.min(h.propellantKg,remainingKg)),gas=heliumDistribution(p,kg);
- const cm=componentCentroid(h,kg,1);
+export function propulsionReview(h,remainingKg=h.propellantKg,attitude=null){
+ const p=h.propulsion,surfaces=attitude?surfaceReview(h,attitude):(reviewCache.get(h)||surfaceReview(h)),kg=Math.max(0,Math.min(h.propellantKg,remainingKg)),gas=heliumDistribution(p,kg);
+ const cm=componentCentroid(h,kg,1,false,attitude);
  const e=[(p.engines[0].x+p.engines[1].x)/2,(p.engines[0].y+p.engines[1].y)/2,p.engines[0].throatZ];
  const missM=Math.hypot(cm[0]-e[0],cm[1]-e[1]),lever=Math.max(.001,cm[2]-e[2]),alignmentDeg=Math.atan2(missM,lever)/rad;
  const stowedCM=componentCentroid(h,kg,0);

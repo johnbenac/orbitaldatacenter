@@ -1,4 +1,4 @@
-import {deploymentLayout} from './deployment.js';
+import {deploymentLayout,terminalLayout} from './deployment.js';
 // Coordinates are metres from the payload adapter interface plane, positive forward.
 const terran = {
  outerDiameterM:5.4,basis:'Planning estimate',source:'Relativity Space · Terran R architecture',
@@ -79,7 +79,11 @@ export function packedSections(g){
  add('Launch service stand-off',w*.8,h*.8,Math.max(.30,...(g.propulsion?.engines||[]).map(e=>-e.z-l*.5+.14)));
  const nozzles=g.propulsion?.engines||[];
  const bellEdge=Math.max(0,...nozzles.map(e=>Math.hypot(e.x,e.y)+e.exitRadiusM));
- const dishEdge=Math.hypot(w*.16+kaDishM*.5,h*.5+Math.min(w,h)*.052*3+kaDishM*.42);
+ const a=g.opticalApertureM??0,term=terminalLayout(w,h,kaDishM,a);
+ const dishEdge=Math.max(Math.hypot(w*.16+kaDishM*.52,h*.5+term.kaHeight-term.kaPin+.18*kaDishM),
+  Math.hypot(w*.16+term.kaFork+.017*kaDishM,h*.5+term.kaHeight+.048*kaDishM),
+  Math.hypot(w*.16+kaDishM*.063,h*.5+term.kaHeight-term.kaPin+kaDishM*.42),
+  Math.hypot(w*.20+a*.89,h*.5+term.opticalHeight+Math.max(.05*a,1.04*a-term.opticalPin)));
  const k=deploymentLayout(g),spoolRadius=k.packedRollM+.018;
  const drumEnvelope=Math.hypot(k.rootX,k.packedRollM)+spoolRadius;
  const radHalfWidth=Math.max(k.rw/2,k.rw*.32+.32)+.012,radHalfHeight=k.rootY+k.hingeStand+.05;

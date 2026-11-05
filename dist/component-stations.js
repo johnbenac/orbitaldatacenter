@@ -22,23 +22,23 @@ export function equipmentAllocations(h){
  ];
  return specs.map(([wbs,id,kg])=>({wbs,id,kg:kg??by[id].kg,group:by[id].group}));
 }
-function leafGroups(h,deploy){
- const g=deploymentLayout(h),pose=mechanismPose(g,deploy,h.input.solarTiltDeg);
+function leafGroups(h,deploy,attitude){
+ const g=deploymentLayout(h),pose=mechanismPose(g,deploy,h.input.solarTiltDeg,attitude);
  // A uniform blanket/boom assembly has flat material along the deployed span
  // and the remaining material coiled on its translating tip drum.
  const pv=pose.wings.map(w=>{
   const exposed=w.span/(w.span+w.rolledLength);
   return w.tip.map((v,i)=>v+(w.root[i]-v)*exposed/2);
  });
- const rad=pose.banks.map(b=>mean(g.descriptors.filter(d=>d.type==='rad'&&d.end===b.end).map(d=>xyz(leafPose(g,d,deploy,h.input.solarTiltDeg)))));
+ const rad=pose.banks.map(b=>mean(g.descriptors.filter(d=>d.type==='rad'&&d.end===b.end).map(d=>xyz(leafPose(g,d,deploy,h.input.solarTiltDeg,attitude)))));
  const mechanisms=[...pose.wings.map(q=>q.root),...pose.banks.flatMap(q=>[q.root,q.elbow])];
  return {pv,rad,mechanisms};
 
 }
-function partsAt(h,deploy){
+function partsAt(h,deploy,attitude){
  const p=h.propulsion,d=h.input,w=h.bodyWidthM,b=h.bodyHeightM,l=h.bodyLengthM;
  const supplied=p.stations||{},rows=equipmentAllocations(h);
- const leaves=leafGroups(h,deploy),engines=p.engines.map(e=>e.throatZ!=null?[e.x,e.y,.5*(e.throatZ+e.z)]:[e.x,.5*(e.throatY+e.y),e.z]);
+ const leaves=leafGroups(h,deploy,attitude),engines=p.engines.map(e=>e.throatZ!=null?[e.x,e.y,.5*(e.throatZ+e.z)]:[e.x,.5*(e.throatY+e.y),e.z]);
  const stack=h.fairing?.stack||[],bus=stack.find(v=>/insulated bus/i.test(v.part)),adapter=stack[0];
  const suppliedPoint=(wbs,id)=>supplied[wbs]||supplied[id]||[0,0,0];
  const radii=p.tanks.map(xyz);
@@ -60,11 +60,11 @@ function partsAt(h,deploy){
 // Cache immutable hardware by pose. A sizing iteration can bypass the cache until
 // the engine installation is final. A live burn changes liquid/gas mass only.
 const memo=new WeakMap();
-export function componentMassProperties(h,remainingKg=h.propellantKg,deployedFraction=1,adapterAttached=false,cache=true){
+export function componentMassProperties(h,remainingKg=h.propellantKg,deployedFraction=1,adapterAttached=false,cache=true,attitude=null){
  const p=h.propulsion,loaded=p.fuelKg+p.oxidizerKg,liquid=Math.min(loaded,Math.max(0,remainingKg??loaded));
  const frac=Math.max(0,Math.min(1,deployedFraction)),poses=memo.get(h)??{};
- let base=cache&&poses[frac];
- if(!base){base=partsAt(h,frac);if(cache&&(frac===0||frac===1)){poses[frac]=base;memo.set(h,poses)}}
+ let base=cache&&!attitude&&poses[frac];
+ if(!base){base=partsAt(h,frac,attitude);if(cache&&!attitude&&(frac===0||frac===1)){poses[frac]=base;memo.set(h,poses)}}
  const gas=heliumDistribution(p,liquid),dryGrowth=h.input.structureMargin??0;
  let massKg=0,equipmentKg=0,allocatedGrowthKg=0;const moment=[0,0,0];
  const rows=base.map(row=>{
@@ -82,10 +82,10 @@ export function componentMassProperties(h,remainingKg=h.propellantKg,deployedFra
 }
 
 const momentCache=new WeakMap();
-export function componentCentroid(h,remainingKg,deploy=1,adapterAttached=false){
+export function componentCentroid(h,remainingKg,deploy=1,adapterAttached=false,attitude=null){
  // Fixed-mixture liquids and regulated ullage masses vary linearly with remaining
  // stock. Interpolate first moments, then divide by the instantaneous total mass.
- if(deploy!==0&&deploy!==1)return componentMassProperties(h,remainingKg,deploy,adapterAttached).cm;
+ if(attitude||deploy!==0&&deploy!==1)return componentMassProperties(h,remainingKg,deploy,adapterAttached,false,attitude).cm;
  let poses=momentCache.get(h);if(!poses){poses={};momentCache.set(h,poses)}
  const key=deploy+'/'+adapterAttached;
  const ends=poses[key]??=( [componentMassProperties(h,0,deploy,adapterAttached),componentMassProperties(h,h.propellantKg,deploy,adapterAttached)] );

@@ -16,7 +16,7 @@ for(const u of [0,.025,.17,.42,.61,.68,.72,.901,.97,1]){
  close(f.solarDeployedM2,h.solarM2*parts.wings[0].span/g.wl);close(f.radiatorCoupledM2,h.radiatorM2*(motion.upperFlow+motion.lowerFlow)/2);
  const radNormals=[f.upperRadiatorNormalECI,f.lowerRadiatorNormalECI];
  for(const [i,bank] of parts.banks.entries()){
-  const n=leafAxes(leafPose(g,g.descriptors.find(p=>p.type==='rad'&&p.end===bank.end),u,30))[1];
+  const n=leafAxes(leafPose(g,g.descriptors.find(p=>p.type==='rad'&&p.end===bank.end),u,30,f))[1];
   for(const [axis,v] of [f.bodyXECI,f.bodyUpECI,f.bodyZECI].entries())close(dot(radNormals[i],v),n[axis]);
  }
  close(f.solarKW,1.361*f.solarDeployedM2*d.pvEfficiency*d.solarDelivery*Math.max(0,dot(f.pvNormalECI,orbit.sunECI))*d.pvRetention**orbit.windowAgeYears);

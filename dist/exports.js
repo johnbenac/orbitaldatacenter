@@ -56,7 +56,7 @@ export async function makePacket({scenario,hardware,sim,result,snap,day,events,o
  z.file('verification/built-in-deployment-sweep.json',json(deploymentAudit));z.file('verification/suggested-ai-build-deployment-sweep.json',json(aiDeploymentAudit));z.file('design/commissioning-schedule.csv',csv(commissioning));
  const aging=[0,Math.max(0,view.t)/YEAR,sim.duration/YEAR].map(t=>({age_years:t,...ageProperties(d,t)}));
  const equipment=buildEquipmentList(hardware,snap),archReadings=architectureReadings(hardware,snap.propellantKg);
- const massCases=[['loaded',hardware.propellantKg],['selected',snap.propellantKg],['residual',hardware.propellantKg*d.residualFraction]].map(([massCase,kg])=>({case:massCase,remaining_kg:kg,...propulsionReview(hardware,kg)}));
+ const massCases=[['loaded',hardware.propellantKg],['selected',snap.propellantKg],['residual',hardware.propellantKg*d.residualFraction]].map(([massCase,kg])=>({case:massCase,remaining_kg:kg,pose:massCase==='selected'?'selected live attitude':'nominal deployed',...propulsionReview(hardware,kg,massCase==='selected'?snap:null)}));
  z.file('design/master-equipment-list.csv',equipmentMassCsv(equipment.rows));
  const references=equipment.rows.flatMap(r=>[r,...r.otherSources].map(ref=>({wbs:r.wbs,item:r.item,manufacturer:ref.manufacturer,reference_model:ref.referenceModel,published_mass_kg:ref.referenceUnitMassKg??null,source:ref.sourceUrl,installed_mass_basis:r.massBasis,power_basis:r.powerBasis,power_source:r.powerSourceUrl,dimension_basis:r.dimensionBasis,dimension_source:r.dimensionSourceUrl})));
  z.file('reference/equipment-sources.csv',csv(references));
@@ -78,6 +78,15 @@ export async function makePacket({scenario,hardware,sim,result,snap,day,events,o
  z.file('mechanical/launch-mass-properties.json',json(mechAt('D',sim.at(-1))));
  z.file('mechanical/terminal-disposition.json',json(mechAt('F',end,terminalCtx)));
  z.file('attitude/gyro-benchmark.json',json(gyroComparison(hardware,snap)));
+ z.file('attitude/mission-mode-duration-s.json',json(audit.attitudeModeSeconds??{}));
+ z.file('attitude/pointing-power-heat.csv',csv(tele.map(s=>({
+  MET_s:s.t,mode:s.attitudeModeLabel,station:s.station,body_x_ECI:s.bodyXECI,body_y_ECI:s.bodyUpECI,body_z_ECI:s.bodyZECI,
+  body_rate_deg_s:s.bodyRateDegS,wing_pitch_deg:s.wingPitchDeg,upper_bank_pitch_deg:s.upperRadiatorPitchDeg,lower_bank_pitch_deg:s.lowerRadiatorPitchDeg,
+  solar_cosine:s.solarIncidenceCos,eclipse:s.eclipse,solar_kW:s.solarKW,battery_kWh:s.batteryKWh,tracking_drive_kW:s.trackingDriveKW,
+  Earth_view_upper_both_faces:s.upperEarthView,Earth_view_lower_both_faces:s.lowerEarthView,direct_absorbed_kW:s.radiatorDirectSolarKW,
+  albedo_absorbed_kW:s.radiatorAlbedoKW,IR_absorbed_kW:s.radiatorEarthIRKW,net_rejection_kW:s.netRejectionKW,sink_K:s.radiatorK,
+  terminal_error_deg:s.antennaResidualDeg,direct_terminal_acquired:s.acquired,delivered_Mbps:s.goodputMbps
+ }))));
  const environment=environmentFlows({hardware,state:snap}),route=disposal;
  z.file('design/mission-preset.json',JSON.stringify(missionPreset({id:'user-pdr-reference',name:designName({...view,modified:false},hardware),design:scenario.design,solver:view.solve||'installed',thermalTargets:view.thermalTargets,thermalPadding:view.thermalPadding,thermalScope:view.thermalScope}),null,2));
  z.file('environment/selected-instant.csv',csv(environment));

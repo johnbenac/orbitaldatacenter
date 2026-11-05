@@ -91,7 +91,7 @@ export function buildEquipmentList(h,s=null) {
  add('07.01','structure','Primary frame and tray mounts',1,'frame','Enclosure frame allowance from gross structural area and installed tray count.',src.skin);
  add('07.02','skin','Sandwich enclosure walls',1,'set','Six unequal faces. Sum of individual structural wall masses after occupied cutouts.',src.skin);
  add('07.03','shield','Internal radiation shielding',1,'set','Net covered wall area × shielding areal mass.',src.shield);
- add('07.04','hinges','Array and radiator deployment mechanisms',1,'set','Four roll-out saddles and two radiator root/knuckle drive pairs share the deployment allowance. Mass scales with total appendage area.',src.drive);
+ add('07.04','hinges','Wing and radiator deployment and tracking drives',1,'set','Four wing rotary heads, two fluid-carrying radiator root drives and their deployment hardware share the existing mechanism mass allocation. Radiator outer hinges latch. Installed mass scales with total appendage area.',src.drive);
  add('07.05','cables','Power and data harness',1,'set','Study harness mass varies with enclosure surface and electronics power.',src.harness);
  add('08.01','switch','Command and data handling avionics',1,'suite','12 kg of the 20 kg fixed avionics/electronics allowance. Customer compute is in the payload group.',src.iau,[src.avionics]);
  add('09.01','adapter','Launch adapter and separation interface',1,'assembly','Active launch adapter allocation. Counted in the launch stack.',src.adapter);

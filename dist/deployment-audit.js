@@ -33,7 +33,7 @@ export const deploymentAudit={
       "deployClear": true,
       "meshFitMarginM": 0.497326026,
       "fit": true,
-      "radialClearanceM": 0.663041449,
+      "radialClearanceM": 0.544206996,
       "axialClearanceM": 5.492199953
     },
     {

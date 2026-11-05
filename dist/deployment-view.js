@@ -35,7 +35,7 @@ function jointReading(h,s,k){
  if(s.deployment<.46){const w=m.wings[0];return 'Tip drum Ø '+format(2*w.rollRadius,2)+' m · '+format(w.rolledLength)+' m still wound';}
  if(s.deployment<.92){const bank=m.banks[s.deployment<.69?0:1],root=Math.abs(bank.rootPitch)*180/Math.PI,outer=180-Math.abs(bank.outerPitch-bank.rootPitch)*180/Math.PI;
   return (s.deployment<.69?'Upper':'Lower')+' bank · root '+format(root,0)+'° · outer hinge '+format(outer,0)+'° · '+format(s.radiatorCoupledM2,1)+' m² on coolant';}
- return 'Wing tilt '+format(h.input.solarTiltDeg*k.tracking,1)+'° · '+format(s.radiatorCoupledM2,1)+' m² on coolant';
+ return 'Wing tilt '+format(s.wingPitchDeg,1)+'° · '+format(s.radiatorCoupledM2,1)+' m² on coolant';
 }
 export function commissioningTimeline(h,s){
  const m=DEPLOYMENT_STAGES.filter(o=>Object.hasOwn(major,o.id));

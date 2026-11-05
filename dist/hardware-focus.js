@@ -93,7 +93,7 @@ export function hardwareAnchor(id,c,h,s){
  case 'activeTerminal':return centre(s.groundLink==='Optical'?c.optic:s.groundLink==='S-band'?c.patches[0]:c.dish);
  case 'cmg':return centre(c.cmgs[0].g);case 'torquer':return centre(c.torquers[0]);
  case 'fuel':case 'oxidizer':case 'helium':return centre(c.tankMap[id]);case 'engine':return centre(c.engines[0]);
- case 'solar':case 'radiator':{const p=c.panels[id==='solar'?4:13];return p.surface.localToWorld(V(p.cx,0,p.cz));}
+ case 'solar':case 'radiator':{const p=c.panels.find(v=>v.descriptor.type===(id==='solar'?'pv':'rad'));return p?.surface.getWorldPosition(V())||null;}
  default:{const pts={body:P(0,0,0),compute:P(.22,.20,-.17),battery:P(.2,.15,.435),coolant:P(.41,.18,.28)};
   return pts[id]?(id==='body'?c.root:c.internal).localToWorld(pts[id]):null;}
  }

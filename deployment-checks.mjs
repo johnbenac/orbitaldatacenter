@@ -161,9 +161,9 @@ function rigidWitness(mesh){
 function closer(record,p,q,u){
  const g=gap(p,q,record.value);if(g<record.value){record.value=g;record.names=[p.name,q.name];record.u=u;record.centers=[p.center,q.center].map(v=>v.toArray().map(x=>+x.toFixed(3)));}
 }
-function plateBoxes(g,u,tilt){
+function plateBoxes(g,u,tilt,attitude=null){
  return g.descriptors.map((d,i)=>{
-  const p=leafPose(g,d,u,tilt),basis=leafAxes(p).map(a=>V(...a));
+  const p=leafPose(g,d,u,tilt,attitude),basis=leafAxes(p).map(a=>V(...a));
   const c=V(p.x,p.y,p.z).addScaledVector(basis[1],d.normalOffset);
   const name=d.type==='pv'?`wing ${d.side}/${d.end}`:`radiator ${d.end}/${d.j}`;
   const b=orientedBox(c,basis,[(p.width??d.width)/2,d.thickness/2,d.depth/2],name);
@@ -259,6 +259,36 @@ export function auditDeployment(h,steps=2400){
   deployClear:nearest.value>=0&&maxHinge<tolerance&&maxHose<tolerance&&maxLength<tolerance&&maxHoseLengthError<3e-6,
   meshFitMarginM:round(fitMargin),fit:h.fairing.fit,radialClearanceM:round(h.fairing.radialClearanceM),axialClearanceM:round(h.fairing.axialClearanceM)};
  return answer;
+}
+// At operational length the four blankets use one common drive command. The
+// radiator banks always diverge in opposite Y half-spaces. Check their closest
+// legal configuration analytically and sample every wing / bank joint pairing.
+export function auditOperatingAngles(h,wingStep=10,bankStep=5){
+ const g=deploymentLayout(h),craft=makeCraft(h);craft.root.updateMatrixWorld(true);
+ const fixed=fixedBoxes(craft),other=mechanismSolids(craft);
+ const closest=newMinimum(),flow=craft.mechanismAudit.banks;let count=0;
+ for(let wing=-180;wing<180;wing+=wingStep){
+  for(let bank=30;bank<=65;bank+=bankStep){
+   const angles={wingPitchDeg:wing,upperRadiatorPitchDeg:-bank,lowerRadiatorPitchDeg:bank};
+   craft.positionPanels(1,angles);craft.root.updateMatrixWorld(true);
+   const plates=plateBoxes(g,1,0,angles),solids=other.filter(({o})=>o.visible).map(({o,owner,rollHardware,fixedPipe})=>({...meshBox(o),name:(owner??'fixed')+' '+(o.name||o.geometry.type),owner,rollHardware,fixedPipe}));
+   for(const [i,a] of plates.entries()){
+    verifyPlateBounds(craft.panels[a.index],a);
+    for(const b of plates.slice(i+1))closer(closest,a,b,angles);
+    for(const b of fixed)closer(closest,a,b,angles);
+    for(const b of solids)if(b.owner!==a.owner||b.fixedPipe)closer(closest,a,b,angles);
+    if(a.type==='rad')assert(Math.abs(a.center.y)-a.extent[1]>0,'Opposing banks cross their separating plane');
+   }
+   for(const a of solids)if(a.rollHardware){
+    for(const b of fixed)closer(closest,a,b,angles);
+    for(const b of solids)if(b.owner!==a.owner)closer(closest,a,b,angles);
+   }
+   const {hinge,hose,developed}=connections(flow);
+   assert(hinge<2e-6&&hose<2e-6&&developed<3e-6,'Tracking joint or fluid interface opened');
+   count++;
+  }
+ }
+ return {count,minGapM:closest.value,pair:closest.names,angles:closest.u};
 }
 if(process.argv[1]?.endsWith('deployment-checks.mjs')){
  testSeparation();

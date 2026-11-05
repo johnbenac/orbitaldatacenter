@@ -10,9 +10,15 @@ python3 -m http.server 8000 --directory dist
 
 To deploy, upload the contents of `dist/` to an HTTP(S) static host, preserving the relative paths. Scenario links restore a configuration from the URL fragment on that host.
 
+## Follow flight pointing
+
+Open `?phase=E&domain=attitude&chapter=contact&met=9390&play=0` for the live-text starter just before its sunlit pass over Canberra. Play from there or select a contact in the orbit-response plot. The Spacecraft camera follows the local orbital frame. Compute Core follows the bus, and Earth Orbit shows the station, ground track and spacecraft. Switching cameras preserves the instant.
+
+The same realized vehicle axes, four wing-drive angles (a common command), two fluid-carrying radiator roots and terminal boresight drive the geometry, projected sunlight, Earth exposure, drag, joint power, link acquisition and thermal balance. The operational radiators rotate at the root after their outer hinges lock. Phase B explains the mode priorities and actuator limits. Phase C compares editable pointing laws at matched instants. In Phase E, playback and event selection operate the clock.
+
 ## Navigate the mission
 
-The phase tabs select the kind of work. The domain navigation selects the subsystem or question. The same fourteen domains are available in all six phases.
+The phase tabs select the kind of work. The domain navigation selects the subsystem or question. The same sixteen domains are available in all six phases.
 
 | Phase | Work in this phase |
 | --- | --- |
@@ -31,7 +37,7 @@ The thermal view maps six modeled nodes to fixed Kelvin color scales. Select a n
 
 ## Spacecraft baseline
 
-The persistent **Spacecraft architecture** and **Master equipment list** views are available from every phase. The ODC-01 Rev D bus keeps the same enclosure, four solar wings, two radiator banks, two internal liquid tanks, separate helium bottle and two engines across customer missions. A sized variant can exceed an envelope, including an engine's published range or a launch vehicle’s available fairing.
+The persistent **Spacecraft architecture** and **Master equipment list** views are available from every phase. The ODC-01 Rev E bus keeps the same enclosure, four solar wings, two radiator banks, two internal liquid tanks, separate helium bottle and two engines across customer missions. A sized variant can exceed an envelope, including an engine's published range or a launch vehicle’s available fairing.
 
 The equipment list gives separate power, dimensions and mass bases and sources. Mechanical Design filters equipment stations by WBS, part number or subsystem and calculates the selected group’s center of mass. Command & Data Handling records spacecraft commands and housekeeping alongside the AI payload. The equipment list separates supplier reference masses from the vehicle allocations and rolls them up through dry, wet and launch mass. CSV and JSON retain the work breakdown structure, source information and sizing basis. The quantitative PDR includes the installed equipment register, vessel volumes, engine stations, mass properties at depletion states and geometric clearance screens.
 

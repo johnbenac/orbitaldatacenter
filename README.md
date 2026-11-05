@@ -10,6 +10,46 @@ python3 -m http.server 8000 --directory dist
 
 To deploy, upload the contents of `dist/` to an HTTP(S) static host, preserving the relative paths. Scenario links restore a configuration from the URL fragment on that host.
 
+## Production hosting and repository
+
+The public workbench is https://orbitaldatacenter.design. Source is maintained in
+the private GitLab repository https://gitlab.benac.dev/johnb/orbitaldatacenter on
+branch `main`, using the HTTPS remote
+`https://gitlab.benac.dev/johnb/orbitaldatacenter.git`.
+
+The Centroid checkout is `/root/orbitaldatacenter/site`. Its first 24 commits
+were restored from the Git history bundle supplied with the v21 ZIP. The imported
+`dist/` files match that release. The ZIP and original extracted directory are
+retained separately in `/root/orbitaldatacenter`.
+
+The current host is the Cloudflare Pages project `orbitaldatacenter` in account
+`3c20efc51551c69eba728cdb54093b6b`; its assigned hostname is
+`orbitaldatacenter-2o2.pages.dev`. The inherited `.openai/hosting.json` records the
+original export's hosting identity and is not used by this deployment script.
+
+From this checkout, publish the current `dist/` with:
+
+```sh
+python3 deploy.py
+```
+
+Deployment reads the root-only token at
+`/root/.config/orbitaldatacenter/cloudflare-api-token`. If it needs replacing, run
+`sudo python3 save-cloudflare-token.py` and enter it at the hidden prompt.
+Cloudflare credentials stay outside Git. `deployment-records/production.json`
+records the latest deployment, and `release.json` records the imported archive's
+checksum and verification. This release fits entirely on Pages; R2 is reserved
+for future large assets.
+
+GitLab HTTPS authentication uses `GITLAB_TOKEN` from the existing login-shell
+configuration. The Centroid checkout has a repository-local credential helper
+that reads this environment variable; no token is stored in the remote URL or
+Git configuration. On another machine, use its normal HTTPS credential manager.
+
+Git pushes preserve source on GitLab. Deployments are manual: pushing `main`
+does not publish the website. New commits follow the Conventional Commits and
+required-body rules documented in `/srv/praxes/tools/git-commit-standards.md`.
+
 ## Fly the launch vehicle
 
 In Phase A, choose Launch Vehicle and a compatible facility. The change preview shows the launch-site assignment and the insertion angles for departure from that site at the design epoch. Phase D opens the full stack, pad works and vehicle detail cameras. The first-minute controls use real mission seconds. In Earth Orbit the site marker and the ascent trace share the same Earth rotation as the spacecraft.

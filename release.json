@@ -1,0 +1,15 @@
+{
+  "release": "v21",
+  "source_host": "boiler",
+  "source_path": "/home/johnb/Downloads/orbital-data-center-v21.zip",
+  "archive_sha256": "91a8c1d897ad4735b9cb1613ca82598074f2f621e9103baa4716d51728ebfd94",
+  "static_directory": "dist",
+  "checks_passed": [
+    "127 asset manifest entries",
+    "102 JavaScript syntax checks",
+    "design-test.mjs",
+    "engine-checks.mjs",
+    "scene-interaction-checks.mjs",
+    "ai-core-checks.mjs"
+  ]
+}

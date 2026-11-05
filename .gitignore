@@ -1,0 +1,16 @@
+# Provider tooling, dependencies and local credentials
+.deploy-state/
+.wrangler/
+node_modules/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+__pycache__/
+*.pyc
+
+# Local archives and screenshots
+history.bundle
+orbital-data-center-v*.zip
+v21-*.png

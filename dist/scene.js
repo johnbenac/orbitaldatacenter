@@ -31,21 +31,38 @@ export function bayWorkAreaPoints(launch,h){
  for(const item of station.children)if(item.visible)boxes.push(new T.Box3().setFromObject(item));
  return boxes.flatMap(({min,max})=>[min.x,max.x].flatMap(x=>[min.y,max.y].flatMap(y=>[min.z,max.z].map(z=>V(x,y,z)))));
 }
-export function fitBayWorkArea(points,dir,aspect,look){
- const right=Y.clone().cross(dir).normalize(),up=dir.clone().cross(right),slope=Math.tan(17*DEG);
+export function fitBayWorkArea(points,dir,aspect,look,minEyeY,zoom=1){
+ const right=Y.clone().cross(dir).normalize(),up=V(),slope=Math.tan(17*DEG);
  const tx=slope*aspect*.89,ty=slope*.83;
- let left=Infinity,bottom=Infinity,back=Infinity,rightmost=-Infinity,top=-Infinity,front=-Infinity;
- // Account for each corner's depth. A nearby shell rim appears larger than
- // an equal-sized rim at the target plane, especially on a narrow screen.
- for(const p of points){
-  const x=p.dot(right),y=p.dot(up),z=p.dot(dir);
-  left=Math.min(left,x-tx*z);rightmost=Math.max(rightmost,x+tx*z);
-  bottom=Math.min(bottom,y-ty*z);top=Math.max(top,y+ty*z);
-  back=Math.min(back,z);front=Math.max(front,z);
+ function fit(){
+  up.copy(dir).cross(right);
+  let left=Infinity,bottom=Infinity,back=Infinity,rightmost=-Infinity,top=-Infinity,front=-Infinity;
+  // A nearby shell rim appears larger than an equal rim at the target plane.
+  for(const p of points){
+   const x=p.dot(right),y=p.dot(up),z=p.dot(dir);
+   left=Math.min(left,x-tx*z);rightmost=Math.max(rightmost,x+tx*z);
+   bottom=Math.min(bottom,y-ty*z);top=Math.max(top,y+ty*z);
+   back=Math.min(back,z);front=Math.max(front,z);
+  }
+  const centerZ=(back+front)/2;
+  look.copy(right).multiplyScalar((left+rightmost)/2).addScaledVector(up,(bottom+top)/2).addScaledVector(dir,centerZ);
+  return (Math.max((rightmost-left)/(2*tx),(top-bottom)/(2*ty))-centerZ)*slope;
  }
- const centerZ=(back+front)/2;
- look.copy(right).multiplyScalar((left+rightmost)/2).addScaledVector(up,(bottom+top)/2).addScaledVector(dir,centerZ);
- return (Math.max((rightmost-left)/(2*tx),(top-bottom)/(2*ty))-centerZ)*slope;
+ let half=fit();
+ if(dir.y<0&&look.y+dir.y*half/(slope*zoom)<minEyeY){
+  // Settle the camera at floor height while preserving orbit azimuth, viewing
+  // distance and fit. Lifting only the eye after fitting would clip the nose.
+  let low=Math.asin(dir.y),high=0;
+  const horizontal=V(dir.x,0,dir.z).normalize();
+  function pitch(angle){dir.copy(horizontal).multiplyScalar(Math.cos(angle));dir.y=Math.sin(angle);return fit();}
+  for(let i=0;i<10;i++){
+   const mid=(low+high)/2;
+   half=pitch(mid);
+   if(look.y+dir.y*half/(slope*zoom)<minEyeY)low=mid;else high=mid;
+  }
+  half=pitch(high);
+ }
+ return half;
 }
 function line(p,pts,color,opacity=1,dash=0){let g=new T.BufferGeometry().setFromPoints(pts);let m=dash?new T.LineDashedMaterial({color,dashSize:dash,gapSize:dash*.66,transparent:true,opacity}):new T.LineBasicMaterial({color,transparent:true,opacity});let l=new T.Line(g,m);if(dash)l.computeLineDistances();p.add(l);return l;}
 function arrow(p,start,dir,extent,color,dash=0){const q=dir.clone().normalize(),end=start.clone().addScaledVector(q,extent);line(p,[start,end],color,.88,dash);const head=new T.Mesh(new T.ConeGeometry(extent*.02,extent*.08,8),new T.MeshBasicMaterial({color}));head.position.copy(end).addScaledVector(q,-extent*.04);head.quaternion.setFromUnitVectors(Y,q);p.add(head);}
@@ -188,7 +205,7 @@ export function createScene(container,{onPick=()=>{},onHover=()=>{},onThermalSca
    if(bayFit?.launch!==launch||bayFit.opening!==launchFrame.opening||bayFit.station!==bay.station.userData.stationId){
     bayFit={launch,opening:launchFrame.opening,station:bay.station.userData.stationId,points:bayWorkAreaPoints(launch,h)};
    }
-   half=fitBayWorkArea(bayFit.points,dir,aspect,look);
+   half=fitBayWorkArea(bayFit.points,dir,aspect,look,bay.floorY+.35-pan.bay.y,zoom);
   }else{
    look.set(.12*cart.x,lowest+.42*(top-lowest),cart.z*.26);
    half=Math.max((top-lowest)*.63,(2.25*r+1.2)/aspect,2.7);

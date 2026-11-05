@@ -25,9 +25,11 @@ for(const id of Object.keys(launchFleet)){
   const receiver=parts.upper.visible?parts.upper:parts.lower;receiver.traverseVisible(corners);
   for(const item of parts.facility.children)if(item.name==='Fairing half carrier'||item.name==='Adapter bearing plate')item.traverseVisible(corners);
   sample.push(parts.payload.localToWorld(V(0,h.stowedLengthM,0)),bay.equipmentAnchor.getWorldPosition(V()),bay.portAnchor.getWorldPosition(V()));
-  for(const aspect of [.62,1.47,2.4])for(const [az,el] of [[.4,.29],[-1.15,.72],[2.7,.12],[.4,-1.1],[-1.15,-.72],[2.7,-.22]]){
+  // Frame at the actual Work area preset. Afterward, rotating is free to crop the scene.
+  const az=.4+(bay.layout.star?2.44:0),el=.29;
+  for(const aspect of [.62,1.47,2.4]){
    const camera=new T.PerspectiveCamera(34,aspect,.07,2100),dir=V(Math.sin(az)*Math.cos(el),Math.sin(el),Math.cos(az)*Math.cos(el));
-   const look=V(),half=fitBayWorkArea(points,dir,aspect,look,bay.floorY+.35);
+   const look=V(),half=fitBayWorkArea(points,dir,aspect,look);
    camera.position.copy(look).addScaledVector(dir,half/slope);
    assert.ok(camera.position.y>=bay.floorY+.35-1e-6,'Work area eye must be above the actual floor stop');
    camera.lookAt(look);camera.updateMatrixWorld();
@@ -43,4 +45,4 @@ for(const id of Object.keys(launchFleet)){
   }
  }
 }
-console.log(`Full enclosure, stowed payload, stand and cart stay framed in ${cases} launcher/station/angle/aspect combinations.`);
+console.log(`Full enclosure, stowed payload, stand and cart stay framed in ${cases} launcher/station/aspect combinations at the preset angle.`);

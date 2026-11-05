@@ -41,38 +41,20 @@ export function bayWorkAreaPoints(launch,h){
  for(const item of station.children)if(item.visible)boxes.push(new T.Box3().setFromObject(item));
  return boxes.flatMap(({min,max})=>[min.x,max.x].flatMap(x=>[min.y,max.y].flatMap(y=>[min.z,max.z].map(z=>V(x,y,z)))));
 }
-export function fitBayWorkArea(points,dir,aspect,look,minEyeY,zoom=1){
- const right=Y.clone().cross(dir).normalize(),up=V(),slope=Math.tan(17*DEG);
+// Fit the initial work-area composition using the preset sightline.
+export function fitBayWorkArea(points,dir,aspect,look){
+ const right=Y.clone().cross(dir).normalize(),up=dir.clone().cross(right),slope=Math.tan(17*DEG);
  const tx=slope*aspect*.89,ty=slope*.83;
- function fit(){
-  up.copy(dir).cross(right);
-  let left=Infinity,bottom=Infinity,back=Infinity,rightmost=-Infinity,top=-Infinity,front=-Infinity;
-  // A nearby shell rim appears larger than an equal rim at the target plane.
-  for(const p of points){
-   const x=p.dot(right),y=p.dot(up),z=p.dot(dir);
-   left=Math.min(left,x-tx*z);rightmost=Math.max(rightmost,x+tx*z);
-   bottom=Math.min(bottom,y-ty*z);top=Math.max(top,y+ty*z);
-   back=Math.min(back,z);front=Math.max(front,z);
-  }
-  const centerZ=(back+front)/2;
-  look.copy(right).multiplyScalar((left+rightmost)/2).addScaledVector(up,(bottom+top)/2).addScaledVector(dir,centerZ);
-  return (Math.max((rightmost-left)/(2*tx),(top-bottom)/(2*ty))-centerZ)*slope;
+ let left=Infinity,bottom=Infinity,back=Infinity,rightmost=-Infinity,top=-Infinity,front=-Infinity;
+ for(const p of points){
+  const x=p.dot(right),y=p.dot(up),z=p.dot(dir);
+  left=Math.min(left,x-tx*z);rightmost=Math.max(rightmost,x+tx*z);
+  bottom=Math.min(bottom,y-ty*z);top=Math.max(top,y+ty*z);
+  back=Math.min(back,z);front=Math.max(front,z);
  }
- let half=fit();
- if(dir.y<0&&look.y+dir.y*half/(slope*zoom)<minEyeY){
-  // Settle the camera at floor height while preserving orbit azimuth, viewing
-  // distance and fit. Lifting only the eye after fitting would clip the nose.
-  let low=Math.asin(dir.y),high=0;
-  const horizontal=V(dir.x,0,dir.z).normalize();
-  function pitch(angle){dir.copy(horizontal).multiplyScalar(Math.cos(angle));dir.y=Math.sin(angle);return fit();}
-  for(let i=0;i<10;i++){
-   const mid=(low+high)/2;
-   half=pitch(mid);
-   if(look.y+dir.y*half/(slope*zoom)<minEyeY)low=mid;else high=mid;
-  }
-  half=pitch(high);
- }
- return half;
+ const centerZ=(back+front)/2;
+ look.copy(right).multiplyScalar((left+rightmost)/2).addScaledVector(up,(bottom+top)/2).addScaledVector(dir,centerZ);
+ return (Math.max((rightmost-left)/(2*tx),(top-bottom)/(2*ty))-centerZ)*slope;
 }
 function line(p,pts,color,opacity=1,dash=0){let g=new T.BufferGeometry().setFromPoints(pts);let m=dash?new T.LineDashedMaterial({color,dashSize:dash,gapSize:dash*.66,transparent:true,opacity}):new T.LineBasicMaterial({color,transparent:true,opacity});let l=new T.Line(g,m);if(dash)l.computeLineDistances();p.add(l);return l;}
 function arrow(p,start,dir,extent,color,dash=0){const q=dir.clone().normalize(),end=start.clone().addScaledVector(q,extent);line(p,[start,end],color,.88,dash);const head=new T.Mesh(new T.ConeGeometry(extent*.02,extent*.08,8),new T.MeshBasicMaterial({color}));head.position.copy(end).addScaledVector(q,-extent*.04);head.quaternion.setFromUnitVectors(Y,q);p.add(head);}
@@ -189,7 +171,11 @@ export function createScene(container,{onPick=()=>{},onHover=()=>{},onThermalSca
  }
  const inBay=()=>view==='launch'&&phase==='D'&&s.flightPhase==='integration'&&launchFrame?.environment==='hangar'&&launch?.bay;
  const poseKey=()=>inBay()?'bay':view;
- function setCamera(){if(!w||!ht)return;let [az,elevation,zoom]=pose[poseKey()];if(view==='launch'&&h.input?.launcher==='starship'&&launchFrame&&!launchFrame.directCraft&&s.t>=-600)az+=launchLens==='ship'?.94:2.46;if(inBay()&&launch.bay.layout.star&&['overview','payload'].includes(bayLens))az+=2.44;
+ function setCamera(){
+ if(!w||!ht)return;
+ const key=poseKey(),[homeAz,homeEl]=defaultPose[key],[userAz,userEl,zoom]=pose[key];
+ let az=homeAz,elevation=homeEl;
+ if(view==='launch'&&h.input?.launcher==='starship'&&launchFrame&&!launchFrame.directCraft&&s.t>=-600)az+=launchLens==='ship'?.94:2.46;if(inBay()&&launch.bay.layout.star&&['overview','payload'].includes(bayLens))az+=2.44;
  if(chapter==='commissioning'&&view==='spacecraft')az+=1.68;if(view==='orbit'&&onPhaseF()&&disposalPlan?.feasible){
   const pt=disposalPlan.method==='reentry'?(disposalPlan.impact||disposalPlan.target):disposalPlan.groundTrack?.at(-1);
   if(pt){const d=disposalPlan.method==='graveyard'&&graveFocus?graveFocus:surface(pt,1).applyAxisAngle(Y,s.earthRotationRad||0);az+=Math.atan2(d.x,d.z)-defaultPose.orbit[0];elevation=clamp(elevation+Math.asin(d.y)-defaultPose.orbit[1],-1.48,1.48);}
@@ -200,7 +186,17 @@ export function createScene(container,{onPick=()=>{},onHover=()=>{},onThermalSca
  }
  const offset=focus&&['core','spacecraft'].includes(view)?({data:[-.27,.31],comm:[.15,.21],attitude:[.23,.22],prop:[.18,-.38],compute:[.42,-.05],power:[-.18,.06]})[focus]:null;
  if(offset){az+=offset[0];elevation=clamp(elevation+offset[1],-1.48,1.48);}
- const el=elevation-(view==='launch'&&launchFrame?.environment==='ground'?.10:0);const bodyOrbit=view==='core'||view==='spacecraft',viewUp=bodyOrbit?V(0,0,1):Y;const dir=bodyOrbit?V(Math.sin(az)*Math.cos(el),-Math.cos(az)*Math.cos(el),Math.sin(el)):V(Math.sin(az)*Math.cos(el),Math.sin(el),Math.cos(az)*Math.cos(el));if(bodyOrbit&&skyVisible()&&!bodyCamera()){dir.applyQuaternion(flightFrame.orbitalToBody);viewUp.applyQuaternion(flightFrame.orbitalToBody);}
+ // Framing uses the preset orientation. Only the camera eye uses the user's rotation.
+ const el=elevation-(view==='launch'&&launchFrame?.environment==='ground'?.10:0);
+ const bodyOrbit=view==='core'||view==='spacecraft',viewUp=bodyOrbit?V(0,0,1):Y;
+ const direction=(a,e)=>bodyOrbit?V(Math.sin(a)*Math.cos(e),-Math.cos(a)*Math.cos(e),Math.sin(e)):V(Math.sin(a)*Math.cos(e),Math.sin(e),Math.cos(a)*Math.cos(e));
+ const orbitAz=az+userAz-homeAz,orbitEl=clamp(el+userEl-homeEl,-1.52,1.52);
+ const presetDir=direction(az,el),dir=direction(orbitAz,orbitEl);
+ if(bodyOrbit&&skyVisible()&&!bodyCamera()){
+  presetDir.applyQuaternion(flightFrame.orbitalToBody);
+  dir.applyQuaternion(flightFrame.orbitalToBody);
+  viewUp.applyQuaternion(flightFrame.orbitalToBody);
+ }
  const aspect=w/ht;const launchConfig=view==='launch'&&launchFrame&&!launchFrame.directCraft,look=launchConfig?launchFrame.center.clone():V();let half;if(launchConfig)half=Math.max(launchFrame.half,launchFrame.half*.85/aspect);else if(view==='orbit')half=Math.max(1.32,1.37/aspect);else if(view==='core'||view==='spacecraft'&&domainSceneSpecs[focus]?.close)half=Math.max(h.bodyHeightM*.82+h.bodyLengthM*.20,(h.bodyLengthM*.64+h.bodyWidthM*.7)/aspect);else if(size){half=Math.max(size.fitHeight*.5,size.fitWidth*.5/aspect);}else half=10;
  if(focus==='prop'&&view==='core'){look.copy(craft.root.localToWorld(V(0,0,-h.bodyLengthM*.07)));half*=1.04;}
  if(focus==='data'&&view!=='launch'&&view!=='orbit'){look.copy(craft.root.localToWorld(V(0,0,-h.bodyLengthM*.16)));half*=.88;}
@@ -231,7 +227,7 @@ export function createScene(container,{onPick=()=>{},onHover=()=>{},onThermalSca
    for(const x of [-1,1])for(const y of [-1,1])for(const z of [-1,1])bodyPoints.push(V(x*h.bodyWidthM*.6,y*h.bodyHeightM*.6,z*h.bodyLengthM*.65));
    framedDesign=h;
   }
-  const right=viewUp.clone().cross(dir).normalize(),up=dir.clone().cross(right);
+  const right=viewUp.clone().cross(presetDir).normalize(),up=presetDir.clone().cross(right);
   const current=s.deployment>=.995?deploymentLayout(h).descriptors.flatMap(d=>leafCorners(leafPose(deploymentLayout(h),d,s.deployment,h.input.solarTiltDeg,s),d).map(p=>V(...p))):[];
 
   let xmin=Infinity,xmax=-Infinity,ymin=Infinity,ymax=-Infinity;
@@ -239,7 +235,7 @@ export function createScene(container,{onPick=()=>{},onHover=()=>{},onThermalSca
    xmin=Math.min(xmin,x);xmax=Math.max(xmax,x);ymin=Math.min(ymin,y);ymax=Math.max(ymax,y);}
   look.copy(right).multiplyScalar((xmin+xmax)/2).addScaledVector(up,(ymin+ymax)/2);half=Math.max((xmax-xmin)/aspect,ymax-ymin)*.57;
  }
- if(stagingBounds&&chapter!=='commissioning'&&view!=='core'&&view!=='orbit'&&!launchConfig){const ext=stagingBounds.getSize(V()),right=viewUp.clone().cross(dir).normalize(),up=dir.clone().cross(right),extent=u=>Math.abs(u.x)*ext.x+Math.abs(u.y)*ext.y+Math.abs(u.z)*ext.z;look.copy(stagingBounds.getCenter(V()));half=Math.max(half,extent(right)*.53/aspect,extent(up)*.53);}
+ if(stagingBounds&&chapter!=='commissioning'&&view!=='core'&&view!=='orbit'&&!launchConfig){const ext=stagingBounds.getSize(V()),right=viewUp.clone().cross(presetDir).normalize(),up=presetDir.clone().cross(right),extent=u=>Math.abs(u.x)*ext.x+Math.abs(u.y)*ext.y+Math.abs(u.z)*ext.z;look.copy(stagingBounds.getCenter(V()));half=Math.max(half,extent(right)*.53/aspect,extent(up)*.53);}
  if(chapter==='commissioning'&&view==='spacecraft'&&deploymentLens!=='vehicle'){
   const g=deploymentLayout(h),m=mechanismPose(g,s.deployment,h.input.solarTiltDeg,s);
   if(deploymentLens==='wing'){
@@ -262,13 +258,27 @@ export function createScene(container,{onPick=()=>{},onHover=()=>{},onThermalSca
    if(bayFit?.launch!==launch||bayFit.bayTime!==launchFrame.bayTime||bayFit.station!==bay.station.userData.stationId){
     bayFit={launch,bayTime:launchFrame.bayTime,station:bay.station.userData.stationId,points:bayWorkAreaPoints(launch,h)};
    }
-   half=fitBayWorkArea(bayFit.points,dir,aspect,look,bay.floorY+.35-pan.bay.y,zoom);
+   half=fitBayWorkArea(bayFit.points,presetDir,aspect,look);
   }else{
    look.set(.12*cart.x,lowest+.42*(top-lowest),cart.z*.26);
    half=Math.max((top-lowest)*.63,(2.25*r+1.2)/aspect,2.7);
   }
  }
- half/=zoom;halfAtFocus=half;look.add(pan[poseKey()]);const perspective=view==='launch';camera=perspective?launchCamera:orthCamera;const dist=perspective?half/Math.tan(17*DEG):view==='orbit'?5:Math.max(40,(size?.span??20)*4);camera.position.copy(dir).multiplyScalar(dist).add(look);if(inBay()){camera.position.y=Math.max(camera.position.y,launch.bay.floorY+.35);look.y=Math.max(look.y,launch.bay.floorY+.1);}camera.up.copy(viewUp);camera.lookAt(look);camera.left=-half*aspect;camera.right=half*aspect;camera.top=half;camera.bottom=-half;camera.near=perspective?.07:.001;camera.far=dist*(launchConfig?55:4);if(perspective)camera.aspect=aspect;camera.updateProjectionMatrix();camera.updateMatrixWorld();ring.quaternion.copy(camera.quaternion);}
+ half/=zoom;halfAtFocus=half;look.add(pan[key]);
+ const perspective=view==='launch';camera=perspective?launchCamera:orthCamera;
+ const dist=perspective?half/Math.tan(17*DEG):view==='orbit'?5:Math.max(40,(size?.span??20)*4);
+ if(inBay()){
+  const floor=launch.bay.floorY;
+  look.y=Math.max(look.y,floor+.1);
+  // Stop pitching at the floor while keeping the eye on its orbit sphere.
+  const minY=clamp((floor+.35-look.y)/dist,-1,1);
+  if(dir.y<minY){
+   const horizontal=Math.sqrt(1-minY*minY);
+   dir.set(Math.sin(orbitAz)*horizontal,minY,Math.cos(orbitAz)*horizontal);
+  }
+ }
+ camera.position.copy(look).addScaledVector(dir,dist);
+ camera.up.copy(viewUp);camera.lookAt(look);camera.left=-half*aspect;camera.right=half*aspect;camera.top=half;camera.bottom=-half;camera.near=perspective?.07:.001;camera.far=dist*(launchConfig?55:4);if(perspective)camera.aspect=aspect;camera.updateProjectionMatrix();camera.updateMatrixWorld();ring.quaternion.copy(camera.quaternion);}
  function anchorFor(id){
   if(view==='orbit'){
    if(id==='orbitCraft')return mark.getWorldPosition(V());

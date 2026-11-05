@@ -1,5 +1,6 @@
 // Exercise the production scene, camera controls and CPU lighting passes without a GPU.
 import assert from 'node:assert/strict';
+import {Object3D} from './dist/vendor/three.module.js';
 import {canvas as rasterCanvas} from './render-test-canvas.mjs';
 import {sizeDesign} from './dist/design.js';
 import {createSimulation} from './dist/model.js';
@@ -95,6 +96,37 @@ ctx.drawImage=(...args)=>{copy(...args);passes.push(canvas.frame.data.slice());}
 function paintFrame(){
  passes=[];assert.ok(pendingFrame,'Viewer should request a paint');const paint=pendingFrame;pendingFrame=null;paint();
  return passes;
+}
+// Read the camera actually used by the renderer. The saved zoom multiplier can
+// remain constant even when automatic fitting changes the projected scale.
+function cameraFrame(){
+ const lookAt=Object3D.prototype.lookAt;let camera,pivot;
+ Object3D.prototype.lookAt=function(target,...args){
+  if(!camera&&this.isCamera){camera=this;pivot=target.clone()}
+  return lookAt.call(this,target,...args);
+ };
+ try{paintFrame()}finally{Object3D.prototype.lookAt=lookAt}
+ assert.ok(camera,'Expected the scene camera to aim at a pivot');
+ const eye=camera.position.clone(),radius=eye.distanceTo(pivot);
+ const height=2*(camera.isPerspectiveCamera?radius:1)/camera.projectionMatrix.elements[5];
+ return {eye,pivot,radius,height};
+}
+scene.setBayView('overview',false);
+for(const [view,chapter,t,phase] of [['spacecraft','operations',6402,'E'],['spacecraft','commissioning',1700,'E'],['spacecraft','operations',1700,'C'],['launch','integration',-1500,'D']]){
+ scene.setDomain('conops',phase);scene.setChapter(chapter);scene.setView(view);scene.update(h,sim.at(t));scene.resetCamera();
+ const fit=cameraFrame();
+ canvas.events.wheel({deltaY:-140,preventDefault(){}});const zoomed=cameraFrame();
+ assert.ok(zoomed.height<fit.height,`${chapter}: wheel zoom must reduce the rendered span`);
+ // Keep an off-centre target so that rotating around a freshly fitted origin also fails.
+ fire('pointerdown',40,50,1,1);fire('pointermove',54,61,1,1);fire('pointerup',54,61,1,1);
+ const panned=cameraFrame();assert.ok(panned.pivot.distanceTo(zoomed.pivot)>1e-3);
+ const y=chapter==='integration'?-125:97;
+ fire('pointerdown',40,50);fire('pointermove',139,y);fire('pointerup',139,y);
+ const rotated=cameraFrame();
+ assert.ok(rotated.eye.distanceTo(panned.eye)>1,`${chapter}: the drag must rotate the camera`);
+ assert.ok(Math.abs(rotated.height/panned.height-1)<1e-8,`${chapter}: drag changed the visible span from ${panned.height} to ${rotated.height}`);
+ assert.ok(Math.abs(rotated.radius/panned.radius-1)<1e-8,`${chapter}: drag changed the orbit radius`);
+ assert.ok(rotated.pivot.distanceTo(panned.pivot)<1e-8,`${chapter}: drag moved the pan target`);
 }
 const shadow=sim.at(6402),original=structuredClone(shadow);
 assert.ok(shadow.eclipse);assert.equal(shadow.solarKW,0);

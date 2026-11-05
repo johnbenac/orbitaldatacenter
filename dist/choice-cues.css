@@ -1,0 +1,98 @@
+/* Sequence steps and viewpoints stay recognizable after their brief invitation. */
+.pathlabel .guideflag {
+  color: #a9b8c2;
+  font-size: 10px;
+}
+.flightpath .pathlabel {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  column-gap: 12px;
+}
+.choice-hint {
+  color: #a5b1ba;
+  font: 11px/1.4 system-ui, sans-serif;
+}
+.flightpath .pathsteps {
+  gap: 5px;
+  padding: 2px 1px;
+}
+.flightpath .pathstep {
+  border: 1px solid #43505a;
+  color: #c4cfd6;
+  background: #1c252c;
+  min-height: 32px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+.flightpath .pathstep + .pathstep::before { content: none; }
+.flightpath .pathstep[aria-current="step"] {
+  color: #ffd59e;
+  border-color: #b89057;
+  background: #352d23;
+}
+#cameras > .camera {
+  border: 1px solid #46545e;
+  border-radius: 5px;
+  color: #c6d1d7;
+}
+#cameras > .camera[aria-pressed="true"] {
+  color: #ffe2b3;
+  border-color: #a67f50;
+  background: #362e24;
+}
+@media (min-width: 920px) {
+  #cameras:has(> .camera)::before {
+    content: 'Camera views';
+    color: #abb9c1;
+    font: 11px/1.4 system-ui, sans-serif;
+    margin-right: 5px;
+  }
+}
+:is([data-choice-group], #cameras) > button:is([aria-pressed], [aria-current]) {
+  position: relative;
+  cursor: pointer;
+}
+:is([data-choice-group], #cameras) > button:is([aria-pressed], [aria-current]):hover {
+  border-color: #b4c9ce;
+  color: #f2f6f5;
+}
+:is([data-choice-group], #cameras) > button:focus-visible {
+  outline: 2px solid #def3ff;
+  outline-offset: -3px;
+}
+.lp-sequence .choice-hint, .dep-timeline .choice-hint { margin: 5px 0 8px; }
+@media (max-width: 720px) {
+  .flightpath .pathsteps { flex-wrap: wrap; min-width: 0; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .cue-option, .cue-selected { --cue-rgb: 150, 211, 203; }
+  [data-choice-group="chapters"] > button,
+  [data-choice-group="launch-stops"] > button { --cue-rgb: 251, 190, 104; }
+  .cue-option::after, .cue-selected::after {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: 0;
+    border: 1px solid rgb(var(--cue-rgb));
+    background: rgba(var(--cue-rgb), .19);
+    box-shadow: inset 0 0 8px rgba(var(--cue-rgb), .28), 0 0 6px rgba(var(--cue-rgb), .22);
+  }
+  .cue-option::after {
+    --peak: .64;
+    animation: suggest-choice 870ms ease-out 80ms;
+  }
+  .cue-option:nth-of-type(3)::after { --peak: .51; animation-delay: 140ms; }
+  .cue-option:nth-of-type(n+4)::after { --peak: .42; animation-delay: 200ms; }
+  .cue-selected::after { animation: settle-choice 1550ms ease-in-out 80ms; }
+  @keyframes suggest-choice {
+    0%, 100% { opacity: 0; }
+    36% { opacity: var(--peak); }
+  }
+  @keyframes settle-choice {
+    0%, 18%, 100% { opacity: 0; }
+    61% { opacity: .95; }
+  }
+}

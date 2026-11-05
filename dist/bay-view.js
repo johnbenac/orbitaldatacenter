@@ -9,7 +9,7 @@ const lensTips={overview:'See the stowed spacecraft, its support stand and the s
 export function bayCameraControls(view,cameraButtons,cameraName){
  const chosen=view.camera==='launch';
  const lensButton=(key,label)=>`<button type="button" class="bay-camera" data-bay-lens="${key}" aria-pressed="${chosen&&key===view.bayLens}" data-tip="${lensTips[key]}">${icon(({overview:'box',equipment:'wrench',interface:'crosshair'})[key],14)}${label}</button>`;
- return `<div class="bay-lenses" aria-label="Integration bay viewpoints">${Object.entries(lensNames).map(([key,name])=>lensButton(key,name)).join('')}<button type="button" class="bay-recenter" data-bay-reset aria-label="Recenter the bay camera" data-tip="Restore the framing for this viewpoint after rotating, panning or zooming.">${icon('rotate-ccw',14)} Recenter</button></div>
+ return `<div class="bay-lenses" data-choice-group="bay-views" role="group" aria-label="Integration bay viewpoints">${Object.entries(lensNames).map(([key,name])=>lensButton(key,name)).join('')}<button type="button" class="bay-recenter" data-bay-reset aria-label="Recenter the bay camera" data-tip="Restore the framing for this viewpoint after rotating, panning or zooming.">${icon('rotate-ccw',14)} Recenter</button></div>
  <details class="bay-alt-cameras"><summary>${chosen?'Other cameras':esc(cameraName)}</summary><div>${cameraButtons}</div></details>`;
 }
 export function bayGuide(h,s,v){
@@ -17,7 +17,7 @@ export function bayGuide(h,s,v){
  return `<aside class="bay-guide"><header><span class="bay-emblem">${icon(domains[v.domain].icon,20)}</span><div><small>Inside the integration bay</small><b>${esc(domains[v.domain].label)}</b></div></header>
  <h2>${esc(l.question)}</h2><p class="bay-explainer">${esc(l.explanation)}</p>
  <div class="bay-crew"><span>${icon('wrench',14)} At this station</span><h3>${esc(l.stationName)}</h3><p>${esc(l.procedure)}</p></div>
- <button class="bay-to-pad" data-chapter="pad">Follow the spacecraft to the pad ${icon('arrow-right',15)}</button></aside>`;
+ <button class="bay-to-pad" data-chapter="pad">${['launcher','launch'].includes(v.domain)?'See '+esc(h.launcherLabel)+' on the pad':'Follow the spacecraft to the pad'} ${icon('arrow-right',15)}</button></aside>`;
 }
 export function bayEvidence(h,s,v){
  const l=bayLesson(v.domain,h,s),facts=l.facts||[],ids=Object.keys(domains),idx=ids.indexOf(v.domain),next=ids[(idx+1)%ids.length];

@@ -50,6 +50,11 @@ function backend(input){
   w.on('error',reject);w.on('message',data=>{if(data.progress)progress.push(data.progress);else{w.terminate();resolve({...data,progress})}});w.postMessage(input);
  });
 }
+const firstDay=await backend({design:sim.hardware.input,start:0,span:DAY,firstDay:true});
+assert.deepEqual(firstDay.result,real,'Background landing-page service must match the same numerical evaluator');
+const midnight=sim.at(DAY);
+sim.daySummary(DAY);
+assert.deepEqual(sim.at(DAY),midnight,'Reading a midnight seed must agree with integrating the following day');
 const older=createSimulation(fixture('batch',{missionYears:1,serviceOffersPerHour:2})),start=61.25*DAY,seed61=older.serviceSeed(start),span=1.5*DAY;
 const later=await backend({design:older.hardware.input,start,span,initialSeed:seed61,seedProvenance:'test supplied inventory'});
 assert.ok(later.result,later.error);assert.equal(later.progress.length,2);assert.ok(later.result.notes.some(s=>s.includes('test supplied inventory')));

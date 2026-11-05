@@ -1,9 +1,22 @@
 import {deploymentLayout,mechanismPose,leafPose,leafCorners} from './deployment.js';
 // Two independent drawing scales. All lengths passed to the projections are in metres.
 const fmt = x => Number(x).toFixed(2);
-const line = (x1, y1, x2, y2, cls='detail') => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="${cls}"/>`;
-const rect = (x,y,w,h,cls) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" class="${cls}"/>`;
-const text = (x,y,str,cls='note',anchor='start') => `<text x="${x}" y="${y}" class="${cls}" text-anchor="${anchor}">${str}</text>`;
+// Presentation attributes also travel with the standalone drawing in the review package.
+const colors={paper:'#f3f5f4',ink:'#25383d',hint:'#50636a',sub:'#889ca0',rule:'#bdd0cf',teal:'#147c79',pv:'#385c6c',grid:'#8cafb5',rad:'#e0ac70',bus:'#b8c4c1',base:'#778b8d'};
+const color=key=>`var(--drawing-${key},${colors[key]})`;
+const stroke=(key,width=1)=>`stroke="${color(key)}" stroke-width="${width}"`;
+const fill=key=>`fill="${color(key)}"`;
+const type=(key,size,weight=400)=>`${fill(key)} font-size="${size}" font-weight="${weight}"`;
+const ink={
+ paper:fill('paper'),title:type('ink',18,600),eyebrow:type('teal',11,600)+' letter-spacing="1.3"',measure:type('ink',13,600),note:type('hint',13),
+ rule:stroke('rule'),dim:stroke('teal',1.1),guide:stroke('sub',.7),envelope:`fill="none" ${stroke('teal',1.5)} stroke-dasharray="5 3"`,
+ bound:`fill="none" ${stroke('sub')} stroke-dasharray="2 2"`,axis:`${stroke('sub',.75)} stroke-dasharray="7 3 2 3"`,
+ adapter:fill('base')+' '+stroke('hint',.7),bus:fill('bus')+' '+stroke('hint',.9),panel:fill('pv')+' '+stroke('paper',.7),cell:stroke('grid',.45),
+ thermal:fill('rad')+' '+stroke('hint',.7),fin:stroke('hint',.6),detail:stroke('hint',.6),mount:stroke('base',2.5)
+};
+const line = (x1, y1, x2, y2, cls='detail') => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" ${ink[cls]}/>`;
+const rect = (x,y,w,h,cls) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" ${ink[cls]}/>`;
+const text = (x,y,str,cls='note',anchor='start') => `<text x="${x}" y="${y}" ${ink[cls]} text-anchor="${anchor}">${str}</text>`;
 function dim(x1,y,x2,label,above=true){
   return line(x1,y,x2,y,'dim') + [x1,x2].map(x=>line(x-2.5,y+4,x+2.5,y-4,'dim')).join('') + text((x1+x2)/2,y+(above?-7:16),label,'measure','middle');
 }
@@ -12,7 +25,7 @@ function stowed(h){
   const k=Math.min(294/span,115/dia),x=48,y=152;
   const perimeter=[...f.profile.map(([z,r])=>[x+z*k,y-r*k]),...f.profile.slice().reverse().map(([z,r])=>[x+z*k,y+r*k])];
   let a=text(22,26,'01    STOWED','eyebrow')+text(22,48,'Payload keep-in profile','title');
-  a+='<polygon points="'+perimeter.map(p=>p.join(',')).join(' ')+'" class="envelope"/>'+line(x-6,y,x+span*k+6,y,'axis');
+  a+='<polygon points="'+perimeter.map(p=>p.join(',')).join(' ')+'" '+ink.envelope+'/>'+line(x-6,y,x+span*k+6,y,'axis');
   a+=dim(x,76,x+f.heightM*k,`Profile height ${fmt(f.heightM)} m`);
   for(const [i,part] of f.stack.entries()){
     const sx=x+part.z0M*k,sw=part.lengthM*k,diam=part.radiusM*2*k;
@@ -45,7 +58,7 @@ function deployed(h){
   const maxX=Math.max(bw/2,...points.map(p=>Math.abs(p[0]*cs-p[1]*sn)));
   const k=Math.min(160/maxX,139/long),cx=584,cy=155;
   const project=([x,y,z])=>[cx+(x*cs-y*sn)*k,cy-(z-(zMin+zMax)/2)*k];
-  const poly=(points,cls)=>`<polygon points="${points.map(p=>project(p).join(',')).join(' ')}" class="${cls}"/>`;
+  const poly=(points,cls)=>`<polygon points="${points.map(p=>project(p).join(',')).join(' ')}" ${ink[cls]}/>`;
   const edge=(p,q,cls='detail')=>line(...project(p),...project(q),cls);
   let a=text(402,26,'02    DEPLOYED','eyebrow')+text(402,48,'Operating geometry','title');
   const pvY=0;
@@ -67,10 +80,6 @@ function deployed(h){
   a+=text(402,295,`4 solar wings   ·   ${fmt(wl)} × ${fmt(ww)} m each`,'note')+text(402,317,`2 radiator banks   ·   ${fmt(rl)} × ${fmt(rw)} m each`,'note');
   return a;
 }
-const drawingRules = `.odc-vehicle-drawing .paper{fill:var(--paper)}.odc-vehicle-drawing .title{fill:var(--ink);font:600 18px system-ui,sans-serif}.odc-vehicle-drawing .eyebrow{fill:var(--teal);font:600 11px sans-serif;letter-spacing:1.3px}.odc-vehicle-drawing .measure{fill:var(--ink);font:600 13px system-ui,sans-serif}.odc-vehicle-drawing .note{fill:var(--hint);font:13px system-ui,sans-serif}
-  .odc-vehicle-drawing .rule{stroke:var(--rule)}.odc-vehicle-drawing .dim{stroke:var(--teal);stroke-width:1.1}.odc-vehicle-drawing .guide{stroke:var(--sub);stroke-width:.7}.odc-vehicle-drawing .envelope{fill:none;stroke:var(--teal);stroke-width:1.5;stroke-dasharray:5 3}.odc-vehicle-drawing .bound{fill:none;stroke:var(--sub);stroke-dasharray:2 2}.odc-vehicle-drawing .axis{stroke:var(--sub);stroke-width:.75;stroke-dasharray:7 3 2 3}.odc-vehicle-drawing .adapter{fill:var(--base);stroke:var(--hint);stroke-width:.7}.odc-vehicle-drawing .bus{fill:var(--bus);stroke:var(--hint);stroke-width:.9}.odc-vehicle-drawing .panel{fill:var(--pv);stroke:var(--paper);stroke-width:.7}.odc-vehicle-drawing .cell{stroke:var(--grid);stroke-width:.45}.odc-vehicle-drawing .thermal{fill:var(--rad);stroke:var(--hint);stroke-width:.7}.odc-vehicle-drawing .fin,.odc-vehicle-drawing .detail{stroke:var(--hint);stroke-width:.6}.odc-vehicle-drawing .mount{stroke:var(--base);stroke-width:2.5}`;
-const palette = (rules, colors) => rules.replace(/var\(--(\w+)\)/g, (_, key) => colors[key]);
-const drawingCSS = palette(drawingRules,{'paper': '#f3f5f4', 'ink': '#25383d', 'hint': '#50636a', 'sub': '#889ca0', 'rule': '#bdd0cf', 'teal': '#147c79', 'pv': '#385c6c', 'grid': '#8cafb5', 'rad': '#e0ac70', 'bus': '#b8c4c1', 'base': '#778b8d'}) + '@media screen and (prefers-color-scheme:dark){' + palette(drawingRules,{'paper': '#19212a', 'ink': '#e9f1ef', 'hint': '#b4c4c7', 'sub': '#6e8993', 'rule': '#364952', 'teal': '#86d4cf', 'pv': '#395d73', 'grid': '#8caebe', 'rad': '#bb9869', 'bus': '#93a5a6', 'base': '#74888f'}) + '}';
 export function vehicleDrawings(hardware){
-  return `<svg class="odc-vehicle-drawing" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Dimensioned stowed launch envelope and deployed spacecraft orthographic drawings" viewBox="0 0 780 338" width="100%" style="display:block;height:auto;max-width:100%"><title>ODC-01 · Installed vehicle dimensions</title><desc>Independent scales. Stowed dimensions compare the circumscribed spacecraft stack to the interpolated tapered keep-in profile measured from the adapter interface. The deployed orthographic view is thirty degrees from solar broadside.</desc><style>${drawingCSS}</style>${rect(0,0,780,338,'paper')}${line(380,16,380,321,'rule')}${line(22,252,356,252,'rule')}${line(402,252,756,252,'rule')}${stowed(hardware)}${deployed(hardware)}</svg>`;
+  return `<svg class="odc-vehicle-drawing" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Dimensioned stowed launch envelope and deployed spacecraft orthographic drawings" viewBox="0 0 780 338" width="100%" font-family="system-ui,sans-serif"><title>ODC-01 · Installed vehicle dimensions</title><desc>Independent scales. Stowed dimensions compare the circumscribed spacecraft stack to the interpolated tapered keep-in profile measured from the adapter interface. The deployed orthographic view is thirty degrees from solar broadside.</desc>${rect(0,0,780,338,'paper')}${line(380,16,380,321,'rule')}${line(22,252,356,252,'rule')}${line(402,252,756,252,'rule')}${stowed(hardware)}${deployed(hardware)}</svg>`;
 }

@@ -7,3 +7,12 @@
 .loadrow{display:grid;grid-template-columns:95px 1fr 80px;gap:9px;align-items:center;margin:7px 0;font-size:11px;color:var(--soft)}.loadrow div{background:#10151b;height:5px;border-radius:3px;overflow:hidden}.loadrow b{height:5px;display:block}.loadrow strong{font:10px var(--mono);text-align:right}.heatflow{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-around;gap:9px;padding:17px}.heatflow span{font-size:11px;color:var(--soft)}.heatflow b{display:block;font:14px var(--mono);color:var(--amber)}.heatflow i{color:var(--muted)}.scenarioslink{font:11px var(--mono);color:#aeb9c8;text-align:left;padding:12px 22px;display:flex;gap:8px;align-items:center;border-top:1px solid var(--line)}.scenarioslink:hover{color:var(--amber);background:#20242a}#scene{position:absolute}.tracks svg line{pointer-events:none}.fallbackfull{position:fixed!important;inset:0;z-index:12}.cameras .camera{white-space:nowrap}@media(min-width:721px) and (max-width:970px){.scenarioslink{font-size:0;padding:14px 22px}}
 .eventribbon{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px;border-top:1px solid var(--line);background:#111b22;padding:5px 12px;font:8px var(--mono);color:var(--muted)}.eventribbon b{font-size:9px;color:#a7d6df;font-weight:500}.eventribbon .textbutton{font:10px var(--mono);color:var(--cyan)}
 .quicksolver{display:flex;align-items:center;gap:7px;margin:11px 0 1px}.quicksolver label{font:8px var(--mono);text-transform:uppercase;color:var(--muted);letter-spacing:.6px;white-space:nowrap}.quicksolver select{font-size:10px;color:#dbe2e9;width:0;flex:1;padding:3px 5px;border-color:#35404a;background:#161b22}.quicksolver+.qrow{margin-top:9px}@media(max-width:720px){.quicksolver{grid-column:1/-1}}
+
+/* This screen is in the initial HTML so it can paint before the simulation runs. */
+body[data-starting] > :not(#startup){display:none!important}
+#startup{box-sizing:border-box;min-height:100vh;max-width:38rem;padding:clamp(70px,21vh,200px) 24px 42px;margin:0 auto;color:var(--text)}
+#startup img{display:block;margin-bottom:18px}
+#startup h1{font-size:clamp(24px,4vw,34px);font-weight:550;line-height:1.18;letter-spacing:-.03em;margin:6px 0 10px}
+#startup p{color:var(--soft)}
+#startup-actions{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-top:18px}
+#scene-loading{position:absolute;inset:0;z-index:2;display:grid;place-content:center;justify-items:center;gap:10px;padding:24px;text-align:center;background:var(--panel);color:var(--soft)}

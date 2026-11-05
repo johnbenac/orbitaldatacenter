@@ -12,7 +12,7 @@ const backing=new Map();globalThis.window={localStorage:{getItem:k=>backing.get(
 
 const realTimeout=globalThis.setTimeout;globalThis.setTimeout=(f,t,...a)=>{const r=realTimeout(f,t,...a);if(t>=2500)r.unref?.();return r};
 const rawError=console.error;console.error=(e)=>{if(e?.stack?.includes('scene.js')||e?.stack?.includes('three.module.js'))return;rawError(e)};
-class AuditWorker{async postMessage(input){const {chronologicalAudit}=await imp('mission-worker.js');try {this.onmessage({data:chronologicalAudit(input,p=>this.onmessage({data:{progress:p}}))})} catch(e){this.onerror(e)}}terminate(){}}
+class AuditWorker{async postMessage(input){if(input.firstDay){this.onmessage({data:{result:{purpose:input.design.aiPurpose,metrics:[],status:'partial'}}});return}const {chronologicalAudit}=await imp('mission-worker.js');try {this.onmessage({data:chronologicalAudit(input,p=>this.onmessage({data:{progress:p}}))})} catch(e){this.onerror(e)}}terminate(){}}
 globalThis.Worker=AuditWorker;
 await imp('app.js');
 const el=id=>document.getElementById(id), fire=async(data)=>{const e=new Element();e.dataset=data;await listeners.get('click')({target:e})},change=async(id,value,data={})=>{const q=new Element(id);Object.assign(q,{value,valueAsNumber:Number(value),dataset:data,tagName:'SELECT'});return listeners.get('change')({target:q})};
@@ -149,3 +149,15 @@ const bayRestored=await snapshot();checkBaySelection(bayRestored.view);assert.eq
 await fire({chapter:'pad'});const pad=await snapshot();assert.equal(pad.view.phase,'D');assert.equal(pad.view.chapter,'pad');assert.equal(pad.view.t,-8);
 assert.deepEqual(pad.design,bayRestored.design);assert.equal(el('bay-display').hidden,true);assert.doesNotMatch(el('guidepanel').innerHTML,/Inside the integration bay/);
 console.log('All integration teams, clock and design continuity, three lenses, display controls, reopened share, pad and analysis handoffs passed.');
+
+// Same-tab reload immediately after choosing Data & delivery keeps the rocket and clock.
+window.history={state:null,replaceState(state){this.state=structuredClone(state)}};
+await fire({phase:'A'});await fire({domain:'launcher'});await fire({useLauncher:'falconHeavy'});await accept();
+await fire({phase:'D'});assert.match(el('guidepanel').innerHTML,/See Falcon Heavy on the pad/);
+await fire({chapter:'pad'});await fire({launchTime:'6'});await fire({domain:'data'});
+await fire({phase:'D'});const beforeReload=await snapshot();
+assert.equal(beforeReload.view.t,6);assert.equal(beforeReload.view.chapter,'ascent');
+await imp('app.js?reload-data');const afterReload=await snapshot();
+assert.equal(afterReload.view.domain,'data');assert.equal(afterReload.view.t,6);
+assert.equal(afterReload.view.chapter,'ascent');assert.equal(afterReload.design.launcher,'falconHeavy');
+console.log('Immediate reload at Falcon Heavy liftoff preserves the selected domain, rocket and clock.');

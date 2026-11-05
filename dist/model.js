@@ -369,14 +369,23 @@ export function createSimulation(design){
   out.pendingImpulse=Math.max(0,rep.end.pendingImpulse+Math.max(0,requests-(seed.prop-out.prop)*exhaust));out.burnEnd=0;out.station=null;out.contactSince=out.t;return out;
  }
  function block(i){if(blocks.has(i))return blocks.get(i);const seed=i===0?earlySeed(earlyDays):project(block(i-1).seed,block(i-1).rep,sampleBlock),rep=makeDay(seed,{step:180,record:false}),b={seed,rep};blocks.set(i,b);return b;}
- function day(n,canonical=false){n=Math.max(0,Math.floor(n));if(!canonical&&focused.has(n))return focused.get(n);if(mainDays.has(n))return mainDays.get(n);let seed;if(audited?.seeds[n])seed=audited.seeds[n];else if(n>terminalDay||n===terminalDay&&n>=earlyDays)seed=day(n-1,true).end;else if(n<earlyDays)seed=earlySeed(n);else{const age=n-earlyDays,i=Math.floor(age/sampleBlock),b=block(i);seed=project(b.seed,b.rep,age%sampleBlock);}
-  const r=makeDay(seed);if(mainDays.size>=7){const k=[...mainDays.keys()].find(x=>x>=3);if(k!==undefined)mainDays.delete(k);}mainDays.set(n,r);return r;
+ function seedForDay(n){
+  if(audited?.seeds[n])return audited.seeds[n];
+  if(n>terminalDay||n===terminalDay&&n>=earlyDays)return day(n-1,true).end;
+  if(n<earlyDays)return earlySeed(n);
+  const age=n-earlyDays,b=block(Math.floor(age/sampleBlock));return project(b.seed,b.rep,age%sampleBlock);
+ }
+ function day(n,canonical=false){n=Math.max(0,Math.floor(n));if(!canonical&&focused.has(n))return focused.get(n);if(mainDays.has(n))return mainDays.get(n);
+  const r=makeDay(seedForDay(n));if(mainDays.size>=7){const k=[...mainDays.keys()].find(x=>x>=3);if(k!==undefined)mainDays.delete(k);}mainDays.set(n,r);return r;
  }
  function focusWindow(start){const n=Math.max(0,Math.floor(start/DAY));if(audited||n===focusDay)return;focusDay=n;focused.clear();eventCache.clear();if(n<earlyDays-1||n>=terminalDay-1)return;
   // Resolve a continuous trajectory across both dates in the selected 86,400-second window. A full preceding day spins up the fast thermal and power states.
   const prev=day(n-1,true),current=makeDay(prev.end);focused.set(n,current);focused.set(n+1,makeDay(current.end));
  }
- function stateAt(t){t=Number(t)||0;if(t<0)return {...first,t:Math.max(-3600,t)};t=Math.min(duration,t);const r=day(Math.floor(t/DAY));let l=0,u=r.states.length-1;while(l<u){const m=Math.ceil((l+u)/2);if(r.states[m].t<=t)l=m;else u=m-1;}const a=r.states[l],b=r.states[l+1];
+ function stateAt(t){t=Number(t)||0;if(t<0)return {...first,t:Math.max(-3600,t)};t=Math.min(duration,t);const n=Math.floor(t/DAY);
+  // The final point of a 24-hour chart needs the next midnight, not the following day of flight.
+  if(t===n*DAY&&!focused.has(n)&&!mainDays.has(n)){const seed={...seedForDay(n)};boundary(seed);return seed;}
+  const r=day(n);let l=0,u=r.states.length-1;while(l<u){const m=Math.ceil((l+u)/2);if(r.states[m].t<=t)l=m;else u=m-1;}const a=r.states[l],b=r.states[l+1];
   if(t<=a.t||!b)return advance(a,t);
   const state=advance(a,t);state.attitudeState=interpolateAttitudeState(a.attitudeState,b.attitudeState,(t-a.t)/(b.t-a.t));state.attitudeAnchor=a.attitudeState;return state;}
  const at=t=>read(stateAt(t));

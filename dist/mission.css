@@ -25,3 +25,9 @@
 .design-more button{display:block;width:100%;text-align:left;padding:8px 9px;color:#d4dfe0;font:12px/1.4 system-ui,sans-serif;border-radius:4px}.design-more button:hover,.design-more button:focus-visible{background:#2c4049}
 @media(max-width:600px){.current-design-strip{padding:8px 9px}.current-design-id{flex-basis:100%}.design-file-actions{gap:4px}.design-file-actions .chip,.design-more>summary{min-height:36px;padding:6px 8px}.design-more button{min-height:40px}}
 @media(max-width:365px){.design-file-actions .chip svg{display:none}}
+
+/* Phase F disposal plots */
+.odc-disposal{background:#18202a;border:1px solid #354350;border-radius:8px;color:#e4eaec;padding:15px}.odc-disposal h3{font-size:17px;margin:0 0 2px}.odc-disposal p{font-size:12px;color:#bfcad3;margin:4px 0 9px}.odc-disposal svg{display:block;width:100%;max-height:300px;margin:5px 0;background:#111b24;border:1px solid #30414c;border-radius:5px}.odc-disposal .phasef-method{font:600 10px ui-monospace,monospace;letter-spacing:.09em;color:#96d6cc}.odc-disposal summary{cursor:pointer;font-size:12px;color:#bbd5d7;margin:8px 0}.odc-disposal button{margin:3px 4px 1px 0;font-size:11px;padding:5px 8px}.phasef-legend{display:flex;gap:10px;flex-wrap:wrap;font-size:11px}.phasef-legend b{font-weight:600}.phasef-metrics{display:flex;gap:14px;flex-wrap:wrap;margin:7px 0;font:11px ui-monospace,monospace}.odc-disposal .map-note{font-size:11px}
+
+.odc-vehicle-drawing{display:block;height:auto;max-width:100%}
+@media screen and (prefers-color-scheme:dark){.odc-vehicle-drawing{--drawing-paper:#19212a;--drawing-ink:#e9f1ef;--drawing-hint:#b4c4c7;--drawing-sub:#6e8993;--drawing-rule:#364952;--drawing-teal:#86d4cf;--drawing-pv:#395d73;--drawing-grid:#8caebe;--drawing-rad:#bb9869;--drawing-bus:#93a5a6;--drawing-base:#74888f}}

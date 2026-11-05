@@ -26,7 +26,7 @@ export function commissioningGuide(h,s,v,playing){
  return `<aside class="dep-guide"><div class="dep-kicker">COMMISSIONING &nbsp;/&nbsp; MECHANISMS</div><h2 id="dep-title">${k.title}</h2><p id="dep-copy">${guides[k.step]||''}</p><dl class="dep-gauges">
  <div><dt>Solar blanket paid out</dt><dd id="dep-length">${format(k.pv*h.wingLengthM)} / ${format(h.wingLengthM)} m</dd></div><div><dt>Solar generation</dt><dd id="dep-power">${format(s.solarKW)} kW${s.eclipse?' · eclipse':''}</dd></div><div><dt>Radiator heat rejection</dt><dd id="dep-heat">${format(s.netRejectionKW)} kW</dd></div><div><dt>Stored battery energy</dt><dd id="dep-energy">${format(s.batteryKWh)} kWh</dd></div></dl>
  <div id="dep-joint" class="dep-joint">${jointReading(h,s,k)}</div>
- <div class="dep-lenses" aria-label="Deployment camera detail">${[['vehicle','Whole vehicle'],['wing','Tip drum'],['hinge','Radiator joint']].map(([id,label])=>`<button class="chip" data-deployment-lens="${id}" aria-pressed="${v.deploymentLens===id&&v.camera==='spacecraft'}">${label}</button>`).join('')}</div>
+ <div class="dep-lenses" data-choice-group="deployment-lenses" role="group" aria-label="Deployment camera detail">${[['vehicle','Whole vehicle'],['wing','Tip drum'],['hinge','Radiator joint']].map(([id,label])=>`<button class="chip" data-deployment-lens="${id}" aria-pressed="${v.deploymentLens===id&&v.camera==='spacecraft'}">${label}</button>`).join('')}</div>
  <div class="dep-transport"><button class="btn export" data-action="flightplay" id="dep-play">${icon(playing?'pause':'play',14)} ${playing?'Pause':s.deployment>=1?'Replay':'Play deployment'}</button><select aria-label="Deployment playback speed" id="flight-rate">${[1,10,30,120,600].map(n=>`<option value="${n}" ${v.speed===n?'selected':''}>${n}×</option>`).join('')}</select></div>
  ${!h.launchScreenFeasible?'<p class="dep-warning">Mechanism study. This build exceeds its selected launch mass or fairing envelope.</p>':''}<small>One mission clock · ${clock(DEPLOY_DURATION_S)} modeled duration</small></aside>`;
 }
@@ -41,7 +41,8 @@ export function commissioningTimeline(h,s){
  const m=DEPLOYMENT_STAGES.filter(o=>Object.hasOwn(major,o.id));
  return `<section class="dep-timeline panel" aria-label="Deployment sequence"><header><div><span class="dep-kicker">FLIGHT SEQUENCE</span><h3>Appendage deployment</h3></div><output id="dep-clock">${formatHours(s.t)} / ${clock(DEPLOY_DURATION_S)}</output></header>
  <input type="range" id="deploy-cursor" min="0" max="${DEPLOY_DURATION_S}" step=".1" value="${s.deployment*DEPLOY_DURATION_S}" style="--pct:${100*s.deployment}%" aria-label="Scrub deployment time" />
- <div class="dep-keys">${m.map((o,j)=>`<button data-deploy-at="${o.at}" data-tip="Seek to ${o.title.toLowerCase()}."><small>${clock(Math.round(o.at*DEPLOY_DURATION_S))}</small><b>${major[o.id]}</b></button>`).join('')}</div>
+ <p class="choice-hint">Choose a milestone to inspect the hardware at that instant.</p>
+ <div class="dep-keys" data-choice-group="deployment-stops" role="group" aria-label="Deployment milestones">${m.map((o,j)=>`<button data-deploy-at="${o.at}" data-tip="Seek to ${o.title.toLowerCase()}."><small>${clock(Math.round(o.at*DEPLOY_DURATION_S))}</small><b>${major[o.id]}</b></button>`).join('')}</div>
  <div class="dep-foot"><div><button class="chip" data-deploy-step="-1" aria-label="Previous deployment step">← Previous step</button> <button class="chip" data-deploy-step="1" aria-label="Next deployment step">Next step →</button></div><button class="textbutton" data-chapter="operations">Continue to operations →</button></div></section>${deploymentReferences(h)}`;
 }
 export function refreshCommissioning(host,h,s){

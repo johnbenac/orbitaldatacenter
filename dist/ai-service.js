@@ -301,7 +301,7 @@ export function evaluateService(sim,start=0,span=DAY){
  if(m.size>=6)m.delete(m.keys().next().value);m.set(key,r);return r;
 }
 export const evaluateServiceWindow=evaluateService;
-export function evaluateServiceAsync(design,start=0,span=DAY,{signal,onProgress=()=>{},initialSeed,seedProvenance}={}){
+export function evaluateServiceAsync(design,start=0,span=DAY,{signal,onProgress=()=>{},initialSeed,seedProvenance,firstDay=false}={}){
  return new Promise((resolve,reject)=>{
   if(signal?.aborted){reject(new DOMException('Service study cancelled','AbortError'));return}
   const worker=new Worker(new URL('./ai-service-worker.js',import.meta.url),{type:'module'});
@@ -310,6 +310,6 @@ export function evaluateServiceAsync(design,start=0,span=DAY,{signal,onProgress=
   signal?.addEventListener('abort',cancel,{once:true});
   worker.onmessage=({data})=>{if(data.progress){onProgress(data.progress);return}close();if(data.error)reject(new Error(data.error));else resolve(data.result)};
   worker.onerror=e=>{close();reject(new Error(e.message||'Service worker failed'))};
-  worker.postMessage({design:design.input||design,start,span,initialSeed,seedProvenance});
+  worker.postMessage({design:design.input||design,start,span,initialSeed,seedProvenance,firstDay});
  });
 }

@@ -1,8 +1,8 @@
 // Quaternions [x,y,z,w] actively rotate body vectors into Earth-centred inertial axes.
 // Guided rigid-body kinematics. Drives and body pointing are advanced from the previous
 // inventory checkpoint so scrubbing, replay and integration follow the same trajectory.
-import {DEG,R,clip,cross,dot,unit} from './orbit.js';
-import {deploymentSchedule} from './deployment.js';
+import {DEG,clip,cross,dot,unit} from './orbit.js';
+import {deploymentSchedule,bankNormal,terminalLayout} from './deployment.js';
 
 export const guidanceReferences=[
  ['ISS solar tracking rotary joints','https://www.nasa.gov/wp-content/uploads/2022/06/508318main_iss_ref_guide_nov2010.pdf'],
@@ -13,7 +13,7 @@ export const guidanceReferences=[
 const X=[1,0,0],Y=[0,1,0],Z=[0,0,1],neg=a=>[-a[0],-a[1],-a[2]];
 const IDENTITY=[0,0,0,1],safeAcos=x=>Math.acos(clip(x,-1,1)),wrap=a=>a-360*Math.floor((a+180)/360);
 const rad2deg=1/DEG;
-const motionCaps={wingRateDegS:2,radiatorRateDegS:.4,dishRateDegS:4,opticalRateDegS:3,terminalConeDeg:75,pointingToleranceDeg:.75};
+const motionCaps={wingRateDegS:2,radiatorRateDegS:.4,radiatorTrimRateDegS:.75,radiatorTrimStopDeg:105,dishRateDegS:4,opticalRateDegS:3,terminalConeDeg:75,pointingToleranceDeg:.75};
 const limitCache=new WeakMap();
 export function attitudeLimits(h){
  if(limitCache.has(h))return limitCache.get(h);
@@ -26,7 +26,23 @@ export function attitudeLimits(h){
  const inertia=[bus*(b*b+l*l)/12+mp*wingZ2+mr*(rY2+rZ2),bus*(w*w+l*l)/12+mp*(wingX2+wingZ2)+mr*(rX2+rZ2),bus*(b*b+w*w)/12+mp*wingX2+mr*(rX2+rY2)];
  const maxI=Math.max(1,...inertia),H=.8*d.cmgMomentumNms,T=.8*d.cmgTorqueNm;
  const bodyRateDegS=Math.min(.8,H/maxI/DEG),bodyAccelDegS2=T/maxI/DEG;
- const limits={...motionCaps,inertiaKgM2:inertia,maneuverMomentumNms:H,maneuverTorqueNm:T,bodyRateDegS,bodyAccelDegS2,prepointS:Math.ceil(180/bodyRateDegS+2*bodyRateDegS/bodyAccelDegS2+90)};
+ // Keep each swept panel entirely within its own side of the bank pair. Include
+ // the hinge offset, sheet edge and clearance for fittings. Wider banks need more cant.
+ const bankHalfWidthM=h.radiatorWidthM/2+.18,bankClearanceY=ry-.26;
+ const bankCantDeg=clip(safeAcos(bankClearanceY/bankHalfWidthM)/DEG+1,45,85);
+ // The upper bank shares the +Y deck with two moving terminals. Bound each
+ // swept head by a sphere, then test it against the bank's full rotary cylinder.
+ const fixture=terminalLayout(w,b,d.kaDishM,d.opticalApertureM);
+ const targets=[[.16*w,fixture.kaHeight-.16,-.85*l-.43,.61*d.kaDishM+.065],
+  [-.2*w,fixture.opticalHeight-.16,-.15*l-.43,1.05*d.opticalApertureM+.065]];
+ function clearsTerminals(cant){
+  const c=Math.cos(cant*DEG),s=Math.sin(cant*DEG);
+  return targets.every(([x,y,z,r])=>y*s+z*c+r<0||Math.hypot(x,y*c-z*s)>bankHalfWidthM+r);
+ }
+ let upperBankCantDeg=bankCantDeg;
+ while(upperBankCantDeg>45&&!clearsTerminals(upperBankCantDeg))upperBankCantDeg=Math.max(45,upperBankCantDeg-.25);
+ const upperTrimEnabled=clearsTerminals(upperBankCantDeg);
+ const limits={...motionCaps,bankHalfWidthM,bankClearanceY,bankCantDeg,upperBankCantDeg,upperTrimEnabled,inertiaKgM2:inertia,maneuverMomentumNms:H,maneuverTorqueNm:T,bodyRateDegS,bodyAccelDegS2,prepointS:Math.ceil(180/bodyRateDegS+2*bodyRateDegS/bodyAccelDegS2+90)};
  limitCache.set(h,limits);return limits;
 }
 function multiply(a,b){
@@ -70,22 +86,23 @@ const modes={
  passive:['Passivated','Active pointing and joint drives have ended. The displayed orientation is the last controlled pose.']
 };
 export const attitudeModes=modes;
-function selectMode(d,g,o,l){
- if(o.passivated||g.flightPhase==='entry')return 'passive';
- if(g.t<540)return 'launch';
- if(g.t<900)return 'insertion';
- if(o.burnDirection)return ['trim','reboost'].includes(o.burnKind)?o.burnKind:'disposal';
- if(o.deployment<1)return 'deployment';
- if(o.plannedBurnDirection&&o.plannedBurnLeadS>=0&&o.plannedBurnLeadS<=l.prepointS)return 'prepoint';
- if(g.flightPhase==='deorbit')return 'coast';
- if(g.station&&o.terminal)return 'contact';
- if(o.unloading)return 'desat';
- if(g.eclipse)return 'eclipse';
- return modes[d.attitude]?d.attitude:'tracking';
-}
+// First matching guard wins. The flight console presents this same ordered table.
+export const modeRules=[
+ {id:'passive',label:'Retire actuators',guard:'Passivation commanded or entry interface reached.',test:(d,g,o)=>o.passivated||g.flightPhase==='entry'},
+ {id:'launch',label:'Carrier control',guard:'Before insertion at 540 s mission elapsed time.',test:(d,g)=>g.t<540},
+ {id:'insertion',label:'Separation hold',guard:'Insertion complete, before spacecraft handover at 900 s.',test:(d,g)=>g.t<900},
+ {id:'burn',label:'Active maneuver',guard:'A signed chemical burn is in progress.',test:(d,g,o)=>o.burnDirection,mode:(d,o)=>['trim','reboost'].includes(o.burnKind)?o.burnKind:'disposal'},
+ {id:'deployment',label:'Commissioning hold',guard:'The deployment sequence is incomplete.',test:(d,g,o)=>o.deployment<1},
+ {id:'prepoint',label:'Prepare for ignition',guard:'A maneuver falls inside the calculated lead time for this vehicle.',test:(d,g,o,l)=>o.plannedBurnDirection&&o.plannedBurnLeadS>=0&&o.plannedBurnLeadS<=(o.plannedBurnWindowS??l.prepointS)},
+ {id:'coast',label:'Disposal coast',guard:'The vehicle is on its retirement trajectory between burns.',test:(d,g)=>g.flightPhase==='deorbit'},
+ {id:'contact',label:'Point to the station',guard:'A visible ground station and a selected terminal are available.',test:(d,g,o)=>g.station&&o.terminal},
+ {id:'desat',label:'Unload momentum',guard:'The magnetic unloading scheduler has released the actuator.',test:(d,g,o)=>o.unloading},
+ {id:'eclipse',label:'Shadow hold',guard:'Earth blocks direct sunlight.',test:(d,g)=>g.eclipse},
+ {id:'nominal',label:'Nominal body policy',guard:'The configured reference governs routine flight.',test:()=>true,mode:d=>modes[d.attitude]?d.attitude:'tracking'}
+];
 function reference(d,g,mode,o){
  if(['trim','reboost','disposal','prepoint','deployment','insertion'].includes(mode)){
-  const sign=mode==='prepoint'?o.plannedBurnDirection:o.burnDirection;return thrustFrame(g,sign||1);
+  const sign=mode==='prepoint'?o.plannedBurnDirection:o.burnDirection;return thrustFrame(mode==='prepoint'&&o.prepointGeometry?o.prepointGeometry:g,sign||1);
  }
  const x=neg(g.normal),y=neg(g.radial),z=g.along;
  let q=basisQuat(x,y,z);
@@ -118,6 +135,7 @@ function followBody(target,old,dt,limits,hold){
  if(hold)return {q:old.q,rate:0,error:angle,axis:X,momentum:0};
  if(dt<=0)return {q:old.q,rate:old.rate||0,error:angle,axis:old.axis||X,momentum:old.momentum||0};
  if(sn<1e-12)return {q:target,rate:0,error:0,axis:X,momentum:0};
+ if(!(limits.maneuverTorqueNm>0&&limits.maneuverMomentumNms>0))return {q:old.q,rate:0,error:angle,axis:old.axis||X,momentum:0};
  const axis=[rel[0]/sn,rel[1]/sn,rel[2]/sn],I=Math.hypot(...axis.map((v,i)=>v*limits.inertiaKgM2[i]));
  const accel=limits.maneuverTorqueNm/(I*DEG),maximum=Math.min(.8,limits.maneuverMomentumNms/(I*DEG));
  // Accelerate in the geodesic rotation direction. Angular rate along the
@@ -134,21 +152,43 @@ function moveAngle(goal,old,dt,rate,cyclic=false){
  const delta=cyclic?wrap(goal-old):goal-old,step=clip(delta,-dt*rate,dt*rate);
  return [old+step,dt?step/dt:0];
 }
-function radiatorTarget(sign,s,e,g,d,previous){
- const lo=sign<0?-65:30,hi=sign<0?-30:65;
- const age=g.windowAgeYears||0,alpha=clip(d.absorptivity+(d.alphaGrowth||0)*age,0,1),eps=d.emissivity*(d.emissivityRetention??1)**age;
- const sun=alpha*1361*(g.eclipse?0:1),earth=(eps*237+alpha*1361*.3*Math.max(0,g.sunRadial))*.78*(R/(R+g.altitudeKm))**2;
- function score(a){const c=Math.cos(a*DEG),v=Math.sin(a*DEG);return sun*Math.abs(c*s[1]+v*s[2])+earth*Math.abs(c*e[1]+v*e[2]);}
- // Positive sums of |sinusoids| are concave between zero crossings;
- // an absorbed-flux minimum lies at a travel stop or a grazing incidence.
- let best=lo,value=score(lo);
- for(const candidate of [hi,Math.atan2(-s[1],s[2])/DEG,Math.atan2(-e[1],e[2])/DEG]){
-  const p=lo+((candidate-lo)%180+180)%180;if(p>hi+1e-8)continue;
-  const v=score(p);if(v<value){best=p;value=v;}
+// A two-sided panel has two equivalent plane solutions 180 degrees apart.
+// Choose the nearest attainable solution; if neither is in travel, compare the
+// two stops by their *actual* projected flux. The bounded joint never wraps.
+function trimGoal(dir,pitch,limit,previous,face){
+ const yz=Math.cos(pitch*DEG)*dir[1]+Math.sin(pitch*DEG)*dir[2],x=dir[0];
+ if(Math.hypot(x,yz)<1e-8)return clip(previous,-limit,limit);
+ const base=wrap(Math.atan2(yz,x)/DEG+(face?90:0));
+ let best,travel=Infinity;
+ for(const goal of [base,base-180,base+180]){
+  const distance=Math.abs(goal-previous);
+  if(Math.abs(goal)<=limit&&distance<travel){best=goal;travel=distance;}
  }
- // 1 W/m² deadband avoids needless hunting under nearly flat illumination.
- if(previous>=lo&&previous<=hi&&score(previous)<=value+1)return previous;
- return best;
+ if(best!==undefined)return best;
+ const plus=Math.abs(-x*Math.sin(limit*DEG)+yz*Math.cos(limit*DEG));
+ const minus=Math.abs(x*Math.sin(limit*DEG)+yz*Math.cos(limit*DEG));
+ if(Math.abs(plus-minus)<1e-9)return previous<0?-limit:limit;
+ return (face?plus>minus:plus<minus)?limit:-limit;
+}
+export function bankTrimTravel(cant,l,upper=false){
+ if(upper&&!l.upperTrimEnabled)return 0;
+ const clearance=l.bankClearanceY/(l.bankHalfWidthM*Math.cos(cant*DEG));
+ return clearance>=1?l.radiatorTrimStopDeg:Math.asin(clip(clearance,0,1))/DEG;
+}
+function bankDrive(sign,fraction,oldPitch,oldRoll,ctx){
+ const {u,dt,hold,park,cold,g,sun,earth,l}=ctx;
+ if(u<1){
+  const pitch=sign*45*fraction;
+  return {pitch,roll:0,pitchGoal:pitch,rollGoal:0,limit:0,pitchRate:dt&&oldPitch!=null?(pitch-oldPitch)/dt:0,rollRate:0};
+ }
+ const previous=oldRoll??0;
+ // Unwind before bringing a wide bank back toward the bus for a burn.
+ const pitchGoal=hold?(oldPitch??sign*45):park?(Math.abs(previous)>.01?(oldPitch??sign*45):sign*45):sign*(sign<0?l.upperBankCantDeg:l.bankCantDeg);
+ const [pitch,pitchRate]=moveAngle(pitchGoal,oldPitch,dt,l.radiatorRateDegS);
+ const limit=bankTrimTravel(pitch,l,sign<0);
+ const rollGoal=hold?previous:park?0:trimGoal(g.eclipse?earth:sun,pitch,limit,previous,g.eclipse&&cold);
+ const [roll,rollRate]=moveAngle(rollGoal,oldRoll,dt,l.radiatorTrimRateDegS);
+ return {pitch,roll,pitchGoal,rollGoal,limit,pitchRate,rollRate};
 }
 function coneTarget(dir){
  const angle=safeAcos(dir[1]),stop=motionCaps.terminalConeDeg*DEG;
@@ -166,22 +206,24 @@ function moveVector(old,to,dt,rate){
 const deployed=deploymentSchedule(1),stowed=deploymentSchedule(0);
 export function attitudeGuidance(h,g,options={}){
  const o=options,d=h.input,l=attitudeLimits(h),u=o.deployment??1,m=u>=1?deployed:u<=0?stowed:deploymentSchedule(u);
- const mode=selectMode(d,g,o,l),hold=mode==='passive',old=o.previous,dt=Math.max(0,o.elapsedS??(old?g.t-old.t:0));
+ const rule=modeRules.find(r=>r.test(d,g,o,l)),mode=rule.mode?rule.mode(d,o):rule.id,hold=mode==='passive',old=o.previous,dt=Math.max(0,o.elapsedS??(old?g.t-old.t:0));
  const goal=hold&&old?old.q:reference(d,g,mode,o);
- const body=followBody(goal,mode==='launch'?null:old,dt,l,hold),[x,y,z]=axes(body.q);
+ const body=followBody(goal,mode==='launch'?null:old,dt,o.controlLimits?{...l,...o.controlLimits}:l,hold),[x,y,z]=axes(body.q);
  const toBody=v=>[dot(x,v),dot(y,v),dot(z,v)],sun=toBody(g.sunECI),earth=toBody(g.radial);
  const wingGoal=Math.hypot(sun[1],sun[2])>1e-8?wrap(Math.atan2(sun[2],sun[1])/DEG+(d.solarTiltDeg||0)):(old?.wing??0);
  const commissioningWing=wrap(wingGoal)*m.tracking;
  const [wing,wingRate]=moveAngle(hold?old?.wing??0:u<1?commissioningWing:wingGoal,old?.wing,dt,l.wingRateDegS,true);
- const angleFor=(sign,fraction,prev)=>{
-  // Root and elbow follow the latched deployment trajectory until verification.
-  // The operational rotary head then uses a separate, bounded travel envelope.
-  if(u<1)return [sign*45*fraction,old&&dt?(sign*45*fraction-prev)/dt:0];
-  const alignThrust=['trim','reboost','disposal','prepoint'].includes(mode);
-  const target=alignThrust?sign*45:radiatorTarget(sign,sun,earth,g,d,prev);
-  return moveAngle(hold?prev??sign*45:target,prev,dt,l.radiatorRateDegS);
- };
- const [upper,upperRate]=angleFor(-1,m.upperRoot,old?.upper),[lower,lowerRate]=angleFor(1,m.lowerRoot,old?.lower);
+ const park=['trim','reboost','disposal','prepoint'].includes(mode);
+ // Hysteresis uses the prior integrated loop temperature. The margins above
+ // the editable operating minima are study assumptions, not ammonia flight setpoints.
+ const coldThresholdK=Math.max(d.radiatorOpMinK??203,d.coolantOpMinK??233)+8;
+ const loopTemperatureK=o.loopTemperatureK??d.initialCoreK??293;
+ const cold=loopTemperatureK<=coldThresholdK||(old?.cold===true&&loopTemperatureK<coldThresholdK+5);
+ const ctx={u,dt,hold,park,cold,g,sun,earth,l};
+ const up=bankDrive(-1,m.upperRoot,old?.upper,old?.upperRoll,ctx),lo=bankDrive(1,m.lowerRoot,old?.lower,old?.lowerRoll,ctx);
+ const upper=up.pitch,lower=lo.pitch;
+ const upperN=bankNormal(upper*DEG,up.roll*DEG),lowerN=bankNormal(lower*DEG,lo.roll*DEG);
+ const radiatorControlLaw=hold?'Hold last encoder position':u<1?'Deployment interlock':park?'Park for thrust':!g.eclipse?'Turn emitting faces edge-on to sunlight':cold?'Cold loop · turn faces toward Earth':'Warm loop · minimize Earth infrared';
  const sight=g.stationECI&&g.station?toBody(unit(g.stationECI.map((v,i)=>v-g.positionECI[i]))):null;
  const terminal=mode==='contact'?o.terminal:null,aim=terminal&&sight?coneTarget(sight):Y;
  // A receiver near zenith follows a curved path even between adjacent replay
@@ -195,12 +237,19 @@ export function attitudeGuidance(h,g,options={}){
  const acq=terminal==='Optical'?35:terminal==='Ka'?20:5;
  const beamHalfDeg=terminal==='Optical'?1.22*1.55e-6/(d.opticalApertureM||.1)/DEG:35*299792458/(26e9*(d.kaDishM||.6));
  const state=hold?'passivated':u<1?'stowed':!terminal?'parked':!directional?'fixed patch':!reachable?'travel limit':residual>beamHalfDeg||(o.contactAge??0)<acq?'acquiring':'tracking';
- const rates=dt===0&&old?.rates&&!hold?old.rates:[wingRate,upperRate,lowerRate,Math.max(dishRate,opticRate)];
- const attitudeState={t:g.t,q:body.q,rate:body.rate,axis:body.axis,momentum:body.momentum,wing,upper,lower,dish,optic,rates};
- return {attitudeState,attitudeMode:mode,attitudeModeLabel:modes[mode][0],attitudeObjective:modes[mode][1],
-  bodyXECI:x,bodyUpECI:y,bodyZECI:z,attitudeSlewErrorDeg:body.error,bodyRateDegS:body.rate,bodySlewMomentumNms:body.momentum,
-  wingPitchDeg:wrap(wing),wingTargetDeg:wingGoal,wingRateDegS:rates[0],upperRadiatorPitchDeg:upper,lowerRadiatorPitchDeg:lower,upperRadiatorRateDegS:rates[1],lowerRadiatorRateDegS:rates[2],
-  pvNormalECI:normalFor(wing,y,z),upperRadiatorNormalECI:normalFor(upper,y,z),lowerRadiatorNormalECI:normalFor(lower,y,z),
+ const rates=dt===0&&old?.rates&&!hold?old.rates:[wingRate,up.pitchRate,lo.pitchRate,Math.max(dishRate,opticRate),up.rollRate,lo.rollRate];
+ const attitudeState={t:g.t,q:body.q,rate:body.rate,axis:body.axis,momentum:body.momentum,wing,upper,lower,upperRoll:up.roll,lowerRoll:lo.roll,cold,dish,optic,rates};
+ return {attitudeState,modeRuleId:rule.id,prepointLeadWindowS:o.plannedBurnWindowS??l.prepointS,attitudeMode:mode,attitudeModeLabel:modes[mode][0],attitudeObjective:modes[mode][1],
+  bodyReferenceQ:goal,bodyAttitudeQ:body.q,bodyXECI:x,bodyUpECI:y,bodyZECI:z,attitudeSlewErrorDeg:body.error,bodyRateDegS:body.rate,bodySlewMomentumNms:body.momentum,
+  wingPitchDeg:wrap(wing),wingTargetDeg:hold?wrap(wing):u<1?commissioningWing:wingGoal,wingRateDegS:rates[0],upperRadiatorPitchDeg:upper,lowerRadiatorPitchDeg:lower,upperRadiatorRateDegS:rates[1],lowerRadiatorRateDegS:rates[2],
+  upperRadiatorRollDeg:up.roll,lowerRadiatorRollDeg:lo.roll,upperRadiatorRollRateDegS:rates[4]||0,lowerRadiatorRollRateDegS:rates[5]||0,
+  upperRadiatorTrimLimitDeg:up.limit,lowerRadiatorTrimLimitDeg:lo.limit,
+  upperRadiatorTargetDeg:up.pitchGoal,lowerRadiatorTargetDeg:lo.pitchGoal,upperRadiatorTargetRollDeg:up.rollGoal,lowerRadiatorTargetRollDeg:lo.rollGoal,
+  radiatorControlLaw,radiatorControlTemperatureK:loopTemperatureK,radiatorColdThresholdK:coldThresholdK,radiatorColdProtection:cold&&g.eclipse&&!park&&!hold&&u===1,
+  pvNormalECI:normalFor(wing,y,z),upperRadiatorNormalECI:fromBody(upperN,x,y,z),lowerRadiatorNormalECI:fromBody(lowerN,x,y,z),
+  upperRadiatorSunCos:Math.abs(dot(upperN,sun)),lowerRadiatorSunCos:Math.abs(dot(lowerN,sun)),
+  dishTargetBody:hold?dish:terminal==='Ka'?aim:Y,opticalTargetBody:hold?optic:terminal==='Optical'?aim:Y,
+  terminalBeamHalfDeg:directional?beamHalfDeg:null,terminalConeMarginDeg:directional&&sight?l.terminalConeDeg-safeAcos(sight[1])/DEG:null,
   terminalState:state,terminalErrorDeg:residual,terminalReachable:reachable,terminalAngularRateDegS:rates[3],
   dishBoresightBody:dish,opticalBoresightBody:optic,terminalBoresightECI:directional?fromBody(encoder,x,y,z):null,stationDirectionBody:sight};
 }
@@ -223,6 +272,6 @@ export function interpolateAttitudeState(a,b,fraction){
  const angular=a.axis.map((v,i)=>mix(v*a.rate,b.axis[i]*b.rate)),rate=Math.hypot(...angular);
  const dir=(v,w)=>moveVector(v,w,f,safeAcos(dot(v,w))/DEG)[0];
  return {t:mix(a.t,b.t),q,rate,axis:rate>1e-12?angular.map(v=>v/rate):a.axis,momentum:mix(a.momentum,b.momentum),
-  wing:a.wing+f*wrap(b.wing-a.wing),upper:mix(a.upper,b.upper),lower:mix(a.lower,b.lower),
+  wing:a.wing+f*wrap(b.wing-a.wing),upper:mix(a.upper,b.upper),lower:mix(a.lower,b.lower),upperRoll:mix(a.upperRoll??0,b.upperRoll??0),lowerRoll:mix(a.lowerRoll??0,b.lowerRoll??0),cold:a.cold,
   dish:dir(a.dish,b.dish),optic:dir(a.optic,b.optic),rates:a.rates.map((v,i)=>mix(v,b.rates[i]))};
 }

@@ -37,4 +37,4 @@ assert.equal(bayLesson('compute',unfit).status,'exceeds');
 assert.equal(bayLesson('data',sizeDesign({...basic,storageTB:.1,inputSpoolGB:8000})).status,'exceeds');
 const noBase=sizeDesign({...missionStarter('finetune'),artifactKind:'adapter',baseCompatible:'no'});
 assert.equal(bayLesson('purpose',noBase).status,'exceeds');
-console.log('Six customer purposes, all sixteen facility disciplines, signed fit/mass/memory/storage evidence and incompatible receiver checks passed.');
+console.log('Six customer purposes, all seventeen facility disciplines, signed fit/mass/memory/storage evidence and incompatible receiver checks passed.');

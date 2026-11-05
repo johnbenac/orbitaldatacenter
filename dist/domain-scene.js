@@ -4,6 +4,7 @@ import {purposeInfo,purposeId} from './purpose-display.js';
 import {launchFleet} from './launch-fleet.js';
 const defs={
  mechanical:{label:'Mechanical Design',camera:'spacecraft',parts:['structure','propulsion','propellant','compute','solar','radiator','cmg'],vectors:['dimensions']},
+ software:{label:'Flight Software',camera:'spacecraft',parts:['avionics','solar','radiator','communications','cmg','propulsion']},
  avionics:{label:'Command & Data Handling',camera:'core',close:true,parts:['avionics','communications']},
  conops:{label:'Mission operations',camera:'spacecraft',parts:[]},
  purpose:{label:'AI Data Center Purpose',camera:'core',parts:['compute','storage','avionics','communications'],close:true},
@@ -50,13 +51,14 @@ export function domainInstruments(key,h,s,{view='spacecraft',reference=false}={}
    item('orbitCraft','communications',inLaunch?'Insertion altitude':'Spacecraft',met(s.altitudeKm,'km')+' · '+(s.eclipse?'shadow':'sunlit'),'right'),
    item('orbitGround','solar','Orbit plane','β '+met(s.betaDeg,'°')+' · '+met(s.periodSec/60,'min'),'left')
   ];
-  if(key==='attitude')return [item('orbitCraft','cmg','Body axes · directions',s.attitudeModeLabel||'Guided attitude','right'),item('orbitGround','solar','Nadir footprint',met(s.altitudeKm,'km above ground',0),'left')];
+  if(key==='attitude'||key==='software')return [item('orbitCraft','cmg','Body axes · directions',s.attitudeModeLabel||'Guided attitude','right'),item('orbitGround','solar','Nadir footprint',met(s.altitudeKm,'km above ground',0),'left')];
   if(key==='data'||key==='comm')return [item('orbitCraft','communications','Spacecraft link',link,'right'),...(s.station?[item('station','avionics',s.station,bit(s.goodputMbps)+' delivered','left')]:[])];
   return [];
  }
  if(view==='launch'&&key!=='launch'&&key!=='launcher'&&key!=='conops'&&reference)return [];
  switch(key){
  case 'mechanical':return [item('structure','structure','Spacecraft body',met(h.bodyLengthM,'m')+' long','left'),item('propellant','propellant','Liquid inventory',met(s.propellantKg,'kg'),'right')];
+ case 'software':return [item('avionics','avionics','Flight computer',s.attitudeModeLabel||'Launch hold','left'),item('body','cmg','Body tracking error',met(s.attitudeSlewErrorDeg,'°',2),'right')];
  case 'avionics':return [item('avionics','avionics','Spacecraft flight computer',met(s.cdhKW*1000,'W'),'left'),item('activeTerminal','communications','Ground commands',met(s.commandGoodputKbps,'kbit/s'),'right')];
  case 'data':if(h.ai&&purposeId(h)!=='text')return [item('avionics','avionics','Customer input staged',bytes(s.aiInputBufferGB),'left'),item('storage','storage',purposeInfo(h).output,bytes(s.aiProductQueueGB)+' queued','left'),item('activeTerminal','communications','Returned to Earth',bytes(s.aiProductDeliveredGB),'right')];return [
   {...item('avionics','avionics','Flight data switch',bit(rd.offered)+' offered','left'),detail:'Text '+bit(rd.text)+' · bulk '+bit(rd.bulk)},

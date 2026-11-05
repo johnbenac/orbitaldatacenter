@@ -158,7 +158,8 @@ function flexible(fromPort,toPort,side,mat,owner){
 for(const end of [-1,1]){
  const start=appendages.children.length;
  const sign=-end,id='radiator',ry=sign*kin.rootY,rz=kin.radRoot;
- const mount=join(appendages,0,ry,rz,id),bank=join(mount,0,0,0,id),knuckle=join(bank,0,0,kin.r,id);
+ const mount=join(appendages,0,ry,rz,id),pitchFrame=join(mount,0,0,0,id);
+ const bank=join(pitchFrame,0,0,0,id),knuckle=join(bank,0,0,kin.r,id);
  const ap=kin.rw*.32;
  for(const j of [-1,1]){
   pipe(appendages,v(j*w*.34,sign*hgt*.29,l*.48),v(j*ap,ry,rz),frameRadius,steel,'structure');
@@ -166,8 +167,11 @@ for(const end of [-1,1]){
   pin(knuckle,j*ap,0,0,.060,.16,bronze,'x',id);
  }
  const motor=pin(mount,ap+.12,0,0,.106,.13,navy,'x',id);
- motor.name='Radiator root deployment and trim actuator';
- const owner=[],rootPin=marker(mount,0,0,0),rootSocket=marker(bank,0,0,0),elbowPin=marker(bank,0,0,kin.r),elbowSocket=marker(knuckle,0,0,0);
+ motor.name='Radiator root pitch actuator';
+ const union=pin(pitchFrame,0,0,0,.093,.14,steel,'z',id);
+ union.name='Pitch cradle and rotary coolant union';
+ pin(bank,0,0,.067,.076,.082,bronze,'z',id).name='Bank span-axis trim rotor';
+ const owner=[],rootPin=marker(mount,0,0,0),rootSocket=marker(pitchFrame,0,0,0),elbowPin=marker(bank,0,0,kin.r),elbowSocket=marker(knuckle,0,0,0);
  for(const [j,frame] of [bank,knuckle].entries()){
   const d=kin.descriptors.find(q=>q.type==='rad'&&q.end===end&&q.j===j),off=end*kin.hingeStand;
   const p=join(frame,0,off,kin.r/2,id);box(p,0,0,0,d.width,d.thickness-.008,d.depth,steel,id);
@@ -177,21 +181,31 @@ for(const end of [-1,1]){
    pipe(frame,v(xa,0,.012),v(xa,off,.085),.031,steel,id);
    pipe(frame,v(xa,off,.085),v(xa,off,kin.r-.085),.018,mat,id);
    pipe(frame,v(xa,off,kin.r-.085),v(xa,0,kin.r-.012),.031,steel,id);
-   const src=marker(j?bank:mount,xa,off,j?kin.r-.16:-.16),dst=marker(frame,xa,off,.16);
+   // Root flex lines bridge pitch only. Supply and return cross the roll
+   // bearing through a coaxial union so the lines do not wind around the bank.
+   const src=marker(j?bank:mount,xa,off,j?kin.r-.16:-.16),dst=marker(j?frame:pitchFrame,xa,off,.16);
+   if(!j){
+    const port=k*.035;
+    pipe(pitchFrame,v(xa,off,.16),v(port,0,.025),.018,mat,id);
+    pipe(bank,v(port,0,.07),v(xa,off,.085),.018,mat,id);
+   }
    flexible(src,dst,k,mat,owner);
    if(!j)pipe(appendages,v(k*w*.22,sign*hgt*.20,l*.51),v(xa,ry+off,rz-.16),.021,mat,id);
   }
   panels.push({surface:p,descriptor:d});
  }
- // Tip-end hold-downs on a stationary spine support launch loads. Release
- // fingers retract before either radiator hinge starts moving.
+ // The fixed launch rails occupy the center corridor between both banks.
+ // Long keeper arms fold down alongside the rails before the bank can move.
  const clips=[];
  for(const j of [-1,1]){
-  const xx=j*ap;pipe(appendages,v(xx,ry-sign*.19,rz),v(xx,ry-sign*.19,rz+kin.r-.18),frameRadius*.69,silver,'structure');
-  const latch=join(appendages,xx,ry-sign*.19,rz+kin.r-.18,id);box(latch,0,sign*.055,0,.068,.17,.085,gold,id);clips.push(latch);
+  const xx=j*Math.min(ap*.54,w*.31),railY=sign*.066,tipZ=rz+kin.r-.18;
+  pipe(appendages,v(xx,railY,l*.49),v(xx,railY,tipZ),frameRadius*.69,silver,'structure');
+  const latch=join(appendages,xx,railY,tipZ,id),reach=kin.rootY-.066-.133;
+  const arm=pipe(latch,v(0,0,0),v(0,sign*reach,0),.024,steel,id);arm.name='Folding launch keeper';
+  box(latch,0,sign*reach,0,.074,.08,.083,gold,id);clips.push(latch);
  }
  for(const o of appendages.children.slice(start))o.userData.assembly='bank '+end;
- rads.push({end,bank,knuckle,clips});
+ rads.push({end,pitchFrame,bank,knuckle,clips});
  mechanismAudit.banks.push({end,rootPin,rootSocket,elbowPin,elbowSocket,tip:marker(knuckle,0,0,kin.r),hoses:owner});
 }
 // The two liquid vessels and high-pressure helium bottle sit within the dry bus.
@@ -335,12 +349,13 @@ function updateHose(h){
  let last=p;
  for(let i=1;i<=n;i++){const t=i/n,next=p.clone().addScaledVector(delta,t);next.x+=h.side*(hi+lo)*.5*Math.sin(Math.PI*t);beamTo(h.seg[i-1],last,next);last=next;}
 }
-let installedAt=null,wingPitch,upperPitch,lowerPitch;
+let installedAt=null,wingPitch,upperPitch,lowerPitch,upperRoll,lowerRoll;
 function positionPanels(progress,attitude){
  const wp=attitude?.wingPitchDeg,up=attitude?.upperRadiatorPitchDeg,lp=attitude?.lowerRadiatorPitchDeg;
- const deploymentChanged=progress!==installedAt,radiatorsChanged=deploymentChanged||up!==upperPitch||lp!==lowerPitch;
+ const ur=attitude?.upperRadiatorRollDeg,lr=attitude?.lowerRadiatorRollDeg;
+ const deploymentChanged=progress!==installedAt,radiatorsChanged=deploymentChanged||up!==upperPitch||lp!==lowerPitch||ur!==upperRoll||lr!==lowerRoll;
  if(!deploymentChanged&&wp===wingPitch&&!radiatorsChanged)return;
- installedAt=progress;wingPitch=wp;upperPitch=up;lowerPitch=lp;
+ installedAt=progress;wingPitch=wp;upperPitch=up;lowerPitch=lp;upperRoll=ur;lowerRoll=lr;
  const k=mechanismPose(kin,progress,h.input.solarTiltDeg,attitude);
  wings.forEach((w,i)=>{
   const m=k.wings[i],side=w.side;w.table.rotation.x=m.pitch;if(!deploymentChanged)return;w.tip.position.x=side*m.span;
@@ -361,8 +376,8 @@ function positionPanels(progress,attitude){
   }
  });
  if(!radiatorsChanged)return;
- rads.forEach((r,i)=>{const m=k.banks[i];r.bank.rotation.x=m.rootPitch;r.knuckle.rotation.x=m.outerPitch-m.rootPitch;
-  for(const clip of r.clips)clip.rotation.x=-r.end*1.2*Math.min(1,Math.max(0,(progress-(r.end<0?.42:.665))/.025));
+ rads.forEach((r,i)=>{const m=k.banks[i];r.pitchFrame.rotation.x=m.rootPitch;r.bank.rotation.z=m.roll;r.knuckle.rotation.x=m.outerPitch-m.rootPitch;
+  for(const clip of r.clips)clip.rotation.x=r.end*Math.PI/2*Math.min(1,Math.max(0,(progress-(r.end<0?.42:.665))/.025));
  });
  appendages.updateWorldMatrix(true,true);hoses.forEach(updateHose);
 }

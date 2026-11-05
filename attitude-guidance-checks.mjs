@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {defaults,sizeDesign} from './dist/design.js';
 import {geometry,dot,unit,cross,DEG} from './dist/orbit.js';
+import {bankNormal,deploymentLayout,leafPose,leafAxes} from './dist/deployment.js';
 import {attitudeGuidance,attitudeLimits,interpolateAttitudeState} from './dist/attitude-guidance.js';
 const h=sizeDesign(defaults),close=(x,y,tol=1e-8)=>assert.ok(Math.abs(x-y)<tol,`${x} vs ${y}`),length=v=>Math.hypot(...v);
 const angle=(a,b)=>Math.acos(Math.max(-1,Math.min(1,dot(a,b))))/DEG;
@@ -8,11 +9,18 @@ const qAngle=(a,b)=>2*Math.acos(Math.min(1,Math.abs(a.reduce((sum,v,i)=>sum+v*b[
 const step=(t,prev,o={})=>attitudeGuidance(h,geometry(h.input,t),{deployment:1,previous:prev?.attitudeState,...o});
 function certify(s,g){
  const [x,y,z]=[s.bodyXECI,s.bodyUpECI,s.bodyZECI];close(dot(cross(x,y),z),1);for(const axis of [x,y,z])close(length(axis),1);
- for(const [n,a] of [[s.pvNormalECI,s.wingPitchDeg],[s.upperRadiatorNormalECI,s.upperRadiatorPitchDeg],[s.lowerRadiatorNormalECI,s.lowerRadiatorPitchDeg]]){
-  close(dot(n,x),0);close(dot(n,y),Math.cos(a*DEG));close(dot(n,z),Math.sin(a*DEG));
+ const wing=s.wingPitchDeg*DEG;
+ close(dot(s.pvNormalECI,x),0);close(dot(s.pvNormalECI,y),Math.cos(wing));close(dot(s.pvNormalECI,z),Math.sin(wing));
+ for(const [bank,sign] of [['upper',-1],['lower',1]]){
+  const p=s[bank+'RadiatorPitchDeg'],r=s[bank+'RadiatorRollDeg'],n=s[bank+'RadiatorNormalECI'];
+  assert.ok(sign*p>=45-1e-9&&sign*p<=85);assert.ok(Math.abs(r)<=105);
+  const local=bankNormal(p*DEG,r*DEG),layout=deploymentLayout(h);
+  for(const desc of layout.descriptors.filter(q=>q.type==='rad'&&q.end===sign)){
+   const mesh=leafAxes(leafPose(layout,desc,1,0,s))[1];
+   for(const [i,axis] of [x,y,z].entries()){close(dot(n,axis),local[i]);close(mesh[i],local[i]);}
+  }
+  close(s[bank+'RadiatorSunCos'],Math.abs(dot(n,g.sunECI)));
  }
- assert.ok(s.upperRadiatorPitchDeg>=-65&&s.upperRadiatorPitchDeg<=-30);
- assert.ok(s.lowerRadiatorPitchDeg>=30&&s.lowerRadiatorPitchDeg<=65);
  for(const v of [s.dishBoresightBody,s.opticalBoresightBody]){close(length(v),1);assert.ok(v[1]>=Math.cos(75*DEG)-1e-9);}
 }
 let prev=null,wingRange=[],hits=new Set();
@@ -23,6 +31,19 @@ for(let t=86400;t<=86400+6200;t+=5){
 }
 assert.ok(hits.has('tracking')&&hits.has('eclipse'));assert.ok(Math.max(...wingRange)-Math.min(...wingRange)>340);
 const current=step(prev.attitudeState.t,prev);for(const key of ['bodyRateDegS','wingPitchDeg','wingRateDegS','upperRadiatorRateDegS','lowerRadiatorRateDegS'])close(prev[key],current[key]);
+// The former single-pitch architecture put one bank near broadside here.
+let warm=null,maxIncidence=0,covered=0;
+for(let t=86400;t<92600;t+=10){
+ const g=geometry(h.input,t);warm=attitudeGuidance(h,g,{deployment:1,previous:warm?.attitudeState,loopTemperatureK:295});
+ if(!g.eclipse){covered++;maxIncidence=Math.max(maxIncidence,warm.upperRadiatorSunCos,warm.lowerRadiatorSunCos);}
+}
+assert.ok(covered>250&&maxIncidence<.15,'Hot-case banks should stay near edge-on over the sunlit arc: '+maxIncidence);
+const testEclipse={...geometry(h.input,88590),eclipse:true,station:null};
+const cold=attitudeGuidance(h,testEclipse,{deployment:1,loopTemperatureK:230});
+const hot=attitudeGuidance(h,testEclipse,{deployment:1,loopTemperatureK:300});
+for(const key of ['upperRadiatorNormalECI','lowerRadiatorNormalECI'])assert.ok(Math.abs(dot(cold[key],testEclipse.radial))>Math.abs(dot(hot[key],testEclipse.radial))+.12);
+const hysteresis=attitudeGuidance(h,testEclipse,{deployment:1,loopTemperatureK:cold.radiatorColdThresholdK+2,previous:cold.attitudeState});
+assert.equal(hysteresis.radiatorColdProtection,true);assert.equal(hot.radiatorColdProtection,false);
 const time=96000,g=geometry(defaults,time),free={...g,eclipse:false,station:null,stationECI:null};
 for(const law of ['tracking','manual','nadir','inertial','lowdrag']){
  const hw=sizeDesign({...defaults,attitude:law,...(law==='manual'?{rollDeg:75,pitchDeg:20,yawDeg:11}:{})});

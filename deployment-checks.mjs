@@ -234,7 +234,7 @@ export function auditDeployment(h,steps=2400){
    }
   }
   const leaves=plateBoxes(g,u,h.input.solarTiltDeg);
-  const supports=other.filter(({o})=>o.visible).map(({o,owner,rollHardware,fixedPipe})=>({...meshBox(o),name:(owner??'fixed')+' '+(o.name||o.geometry.type),owner,rollHardware,fixedPipe}));
+  const supports=other.filter(({o})=>o.visible).map(({o,owner,rollHardware,fixedPipe})=>({...meshBox(o),name:(owner??'fixed')+' '+(o.name||o.geometry.type)+(fixedPipe?' at '+o.position.toArray().map(v=>v.toFixed(2)).join(','):''),owner,rollHardware,fixedPipe}));
   // The renderer and audit use different transform paths. Sample every vertex at
   // stops and during motion to ensure the simpler sweep boxes really enclose it.
   if(k===0||k===steps||k%Math.max(1,Math.floor(steps/20))===0)
@@ -263,15 +263,15 @@ export function auditDeployment(h,steps=2400){
 // At operational length the four blankets use one common drive command. The
 // radiator banks always diverge in opposite Y half-spaces. Check their closest
 // legal configuration analytically and sample every wing / bank joint pairing.
-export function auditOperatingAngles(h,wingStep=10,bankStep=5){
+export function auditOperatingAngles(h,wingStep=10,bankStep=5,trimPoses=[]){
  const g=deploymentLayout(h),craft=makeCraft(h);craft.root.updateMatrixWorld(true);
  const fixed=fixedBoxes(craft),other=mechanismSolids(craft);
  const closest=newMinimum(),flow=craft.mechanismAudit.banks;let count=0;
- for(let wing=-180;wing<180;wing+=wingStep){
-  for(let bank=30;bank<=65;bank+=bankStep){
-   const angles={wingPitchDeg:wing,upperRadiatorPitchDeg:-bank,lowerRadiatorPitchDeg:bank};
+ const poses=[...trimPoses];
+ for(let wing=-180;wing<180;wing+=wingStep)for(let bank=30;bank<=65;bank+=bankStep)poses.push({wingPitchDeg:wing,upperRadiatorPitchDeg:-bank,lowerRadiatorPitchDeg:bank});
+ for(const angles of poses){
    craft.positionPanels(1,angles);craft.root.updateMatrixWorld(true);
-   const plates=plateBoxes(g,1,0,angles),solids=other.filter(({o})=>o.visible).map(({o,owner,rollHardware,fixedPipe})=>({...meshBox(o),name:(owner??'fixed')+' '+(o.name||o.geometry.type),owner,rollHardware,fixedPipe}));
+   const plates=plateBoxes(g,1,0,angles),solids=other.filter(({o})=>o.visible).map(({o,owner,rollHardware,fixedPipe})=>({...meshBox(o),name:(owner??'fixed')+' '+(o.name||o.geometry.type)+(fixedPipe?' at '+o.position.toArray().map(v=>v.toFixed(2)).join(','):''),owner,rollHardware,fixedPipe}));
    for(const [i,a] of plates.entries()){
     verifyPlateBounds(craft.panels[a.index],a);
     for(const b of plates.slice(i+1))closer(closest,a,b,angles);
@@ -286,7 +286,6 @@ export function auditOperatingAngles(h,wingStep=10,bankStep=5){
    const {hinge,hose,developed}=connections(flow);
    assert(hinge<2e-6&&hose<2e-6&&developed<3e-6,'Tracking joint or fluid interface opened');
    count++;
-  }
  }
  return {count,minGapM:closest.value,pair:closest.names,angles:closest.u};
 }

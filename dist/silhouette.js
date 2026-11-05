@@ -15,16 +15,18 @@ function project(polygons,dir){const ref=Math.abs(dir[2])>.95?[0,1,0]:[0,0,1],x0
  const edges=polys.flat();for(let i=0;i<edges.length;i++)for(let j=0;j<i;j++){const a=edges[i],b=edges[j],denom=a[4]-b[4];if(Math.abs(denom)<1e-9)continue;const xx=(b[3]-a[3]-b[4]*b[2]+a[4]*a[2])/denom;if(xx>Math.max(a[0],b[0])+1e-8&&xx<Math.min(a[1],b[1])-1e-8)cuts.push(xx);}
  cuts.sort((a,b)=>a-b);let area=0;for(let i=1;i<cuts.length;i++){const width=cuts[i]-cuts[i-1];if(width<1e-8)continue;const xx=(cuts[i]+cuts[i-1])*.5,intervals=[];for(const es of polys){let low=Infinity,high=-Infinity;for(const e of es)if(xx>=e[0]&&xx<=e[1]){const yy=e[3]+e[4]*(xx-e[2]);low=Math.min(low,yy);high=Math.max(high,yy);}if(high>low)intervals.push([low,high]);}intervals.sort((a,b)=>a[0]-b[0]);let top=-Infinity;for(const [lo,hi] of intervals){if(hi>top){area+=width*(hi-Math.max(lo,top));top=hi;}}}return area;
 }
-// Operational directions and three hinge angles form a five-dimensional table.
+// Operational directions, deployment cant and both span trims index the pose table.
 // Populate only flown cells. Its entries are projected polygon unions, so a
 // panel hidden behind the bus contributes only its exposed silhouette.
 function trackingSilhouette(h,dir,att){
  const hemisphere=dir[2]<0?-1:1,azi=(Math.round(Math.atan2(hemisphere*dir[1],hemisphere*dir[0])/step)+72)%72,lat=Math.round(Math.asin(Math.min(1,Math.abs(dir[2])))/step);
  const w=Math.round(att.wingPitchDeg/5),u=Math.round(att.upperRadiatorPitchDeg/5),l=Math.round(att.lowerRadiatorPitchDeg/5);
- const key=((((lat*72+(lat===18?0:azi))*73+w+36)*37+u+18)*37+l+18);
+ const ur=Math.round((att.upperRadiatorRollDeg||0)/5),lr=Math.round((att.lowerRadiatorRollDeg||0)/5);
+ const base=((((lat*72+(lat===18?0:azi))*73+w+36)*37+u+18)*37+l+18);
+ const key=(base*73+ur+36)*73+lr+36;
  let data=trackingCache.get(h);if(!data){data=new Map();trackingCache.set(h,data);}
  let answer=data.get(key);if(answer!==undefined)return answer;
- const az=azi*step,el=lat*step,binned={wingPitchDeg:5*w,upperRadiatorPitchDeg:5*u,lowerRadiatorPitchDeg:5*l};
+ const az=azi*step,el=lat*step,binned={wingPitchDeg:5*w,upperRadiatorPitchDeg:5*u,lowerRadiatorPitchDeg:5*l,upperRadiatorRollDeg:5*ur,lowerRadiatorRollDeg:5*lr};
  answer=project(layout(h,1,binned),[Math.cos(az)*Math.cos(el),Math.sin(az)*Math.cos(el),Math.sin(el)]);
  if(data.size>=50000)data.clear();data.set(key,answer);return answer;
 }

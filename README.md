@@ -24,7 +24,7 @@ The same realized vehicle axes, four wing-drive angles (a common command), two f
 
 ## Navigate the mission
 
-The phase tabs select the kind of work. The domain navigation selects the subsystem or question. The same sixteen domains are available in all six phases.
+The phase tabs select the kind of work. The domain navigation selects the subsystem or question. The same seventeen domains are available in all six phases.
 
 | Phase | Work in this phase |
 | --- | --- |
@@ -60,6 +60,8 @@ In Phase A, hover or focus an input for selection advice. Its **?** button opens
 The service analysis records customer outcomes against the modeled direct contacts or an explicitly assumed relay allocation. The selected-day study and the optional multi-day order study have independent horizons. Training requires calibration evidence to claim target quality. The model transfer budget gives ideal active transfer times after the selected artifact is released. PDR exports include the installed compute estimate and selected-window customer metrics.
 
 **Launch Vehicle** compares carrier configurations and their reference payload, fairing and recovery assumptions. **Launch & Insertion** follows the selected spacecraft on that carrier through integration and release. In design phases a change review shows replaced inputs, retained interfaces to check, updated coupled quantities and any exceeded sizing limits. Cancel or apply the proposal before switching hardware. A carrier change keeps the active sizing mode and the mission-specific allowance.
+
+**Flight Software** follows the same mode executive and encoder feedback that drive the vehicle. Inspect priority, body and engine permissions, terminal lock, or the two-sided radiator exposure. Pointing guides show the achieved geometry. The acute angle to a radiator face normal is 90° at grazing incidence.
 
 **Share** restores the scenario, phase, domain, camera, clock and selected event. **Export & import** provides scenario JSON, telemetry CSV, a static-site bundle and the quantitative PDR ZIP. Scenario JSON and PDR packages can be imported from a design phase.
 

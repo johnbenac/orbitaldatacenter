@@ -151,7 +151,7 @@ export const domains={
   ['Changing mass distribution','Follow the center of mass as appendages move, liquid is consumed and the adapter separates.','deploymentPct wetKg fuelKg oxidizerKg'],
   ['Mechanical disposition','Inspect retained hardware for a raised orbit or screen individual items for survival during targeted reentry.','disposalMode disposalStatus disposalUsedKg finalPerigee finalApogee']
  ],'launch insertion deployment trim reboost maneuver disposal entry impact graveyard'),
- avionics:spec('Command & Data Handling','panels-top-left','Spacecraft flight computer, command reception, health telemetry, recording and flight software.',
+ avionics:spec('Command & Data Handling','panels-top-left','Spacecraft flight computer, command reception, health telemetry and recording.',
   'commandKbps hkPeriodS hkRecorderMB uplinkBufferMB','hkPeriodS hkRecorderMB commandKbps','hkStoredMB cdhKW',[
   ['Spacecraft command and telemetry requirements','Set the ground command traffic and cadence of spacecraft health measurements.','commandKbps hkPeriodS hkRateKbps hkRecorderMB'],
   ['Flight computer and housekeeping recorder','Inspect the flight computer, command path, onboard health data and recorder capacity.','cdhKW commandDemandKbps hkRateKbps hkRecorderMB'],
@@ -159,7 +159,16 @@ export const domains={
   ['Flight computer checkout','Follow command availability and health telemetry through launch and separation.','phase cdhKW hkRateKbps hkStoredMB'],
   ['Spacecraft housekeeping','Watch command backlog, ground contact and the housekeeping recorder at the mission instant.','cdhKW commandGoodputKbps uplinkQueueMB hkStoredMB hkOverwrittenMB'],
   ['Last commands and telemetry','Inspect command delivery and the spacecraft recorder at retirement or entry interface.','disposalStatus cdhKW commandUploadedGB hkStoredMB']
- ],'launch insertion deployment contact disposal entry impact graveyard')
+ ],'launch insertion deployment contact disposal entry impact graveyard'),
+ software:spec('Flight Software','workflow','Follow the onboard decisions that point the chassis, steer appendages, establish a link and permit a burn.',
+  'attitude solarTiltDeg cmgTorqueNm cmgMomentumNms dipoleAm2','attitude solarTiltDeg cmgTorqueNm dipoleAm2','attitudeSlewErrorDeg radiatorDirectSolarKW',[
+  ['Define the pointing policy','Choose a nominal pointing law and the actuator authority the onboard controller can use. Scheduled events take precedence over the nominal law.','attitudeLaw cmgRating cmgCapacity dipole'],
+  ['Design the closed loop','Trace a motion request from the mode executive to an actuator, then follow the achieved pointing and the permit for the next action.','attitudeModeLabel bodyRateDegS trackingDriveKW terminalState'],
+  ['Test competing pointing requests','At the same instant, compare the remaining body error and direct solar heat as the spacecraft follows a changed attitude law.','attitudeModeLabel attitudeSlewErrorDeg bodyRateDegS radiatorDirectSolarKW'],
+  ['Release and enable drives','Follow the handover from the carrier through separation, sequential release and enablement of the flight drives.','phase deploymentPct attitudeModeLabel burnPermitState terminalState'],
+  ['Observe the onboard controller','Compare the command with achieved motion. Watch a pass, eclipse or slew change which controller has authority.','attitudeModeLabel burnPermitState terminalState trackingDriveKW radiatorDirectSolarKW'],
+  ['Retire the control system','Follow pointing authorization through the retirement maneuver and coast to the end of spacecraft control.','disposalStatus attitudeModeLabel burnPermitState terminalState disposalUsedKg']
+ ],'launch insertion deployment contact eclipse maneuver trim reboost desat disposal coast entry impact graveyard passivation')
 };
 
 const serviceFields={
@@ -186,6 +195,7 @@ function fields(source,defs,note=''){
  for(const [id,label,unit='',key=id] of defs)registry[id]={label,unit,note,read:c=>c[source]?.[key],source};
 }
 fields('d',[['commandKbps','Ground command traffic','kbit/s'],['hkPeriodS','Housekeeping sample period','s'],['hkRecorderMB','Housekeeping recorder capacity','MB']]);
+fields('s',[['burnPermitState','Engine authorization']]);
 fields('s',[['attitudeModeLabel','Active pointing mode'],['bodyRateDegS','Achieved body rate','°/s'],['attitudeSlewErrorDeg','Remaining body slew','°'],['wingPitchDeg','Wing drive angle','°'],['upperRadiatorPitchDeg','Upper radiator drive','°'],['lowerRadiatorPitchDeg','Lower radiator drive','°'],['spaceViewFactor','Radiator view to space',''],['trackingDriveKW','Tracking drive power','kW'],['terminalState','Terminal steering'],['radiatorDirectSolarKW','Absorbed direct Sun','kW'],['radiatorAlbedoKW','Absorbed Earth albedo','kW'],['radiatorEarthIRKW','Absorbed Earth infrared','kW'],['cdhKW','Spacecraft avionics demand','kW'],['hkRateKbps','Housekeeping production','kbit/s'],['hkStoredMB','Retained housekeeping','MB'],['hkOverwrittenMB','Housekeeping overwritten','MB'],['commandUploadedGB','Ground commands received','GB'],['commandDemandKbps','Ground command demand','kbit/s'],
  ['phase','Flight state','','flightPhase'],['disposalStatus','Retirement state'],['entryDynamicPressurePa','Reference-body dynamic pressure','Pa'],['entryReferenceDragMS2','Reference-body drag deceleration','m/s²'],['tokensGenerated','Onboard decode tokens','tok'],['tokensDelivered','Ground-received decode tokens','tok'],['tokensPerSec','Instantaneous aggregate decode','tok/s'],['prefillPerSec','Aggregate prefill','tok/s'],['perUserTps','Decode per active stream','tok/s'],['generatedGB','Payload generated since launch','GB'],['deliveredGB','Payload delivered since launch','GB'],['droppedGB','Payload dropped since launch','GB'],['queueGB','Current payload backlog','GB'],['textQueueGB','Queued output text','GB'],['bulkQueueGB','Queued bulk data','GB'],['textDeliveredGB','Text delivered since launch','GB'],['bulkDeliveredGB','Bulk delivered since launch','GB'],['uploadedGB','Command uplink since launch','GB'],['uplinkQueueMB','Queued ground commands','MB'],['occupiedTB','Occupied persistent storage','TB'],['freeTB','Free persistent storage','TB'],
  ['itKW','IT power','kW'],['solarKW','Generated bus power','kW'],['loadKW','Requested load','kW'],['servedLoadKW','Served electrical demand','kW'],['unmetKW','Unserved demand','kW'],['unmetKWh','Cumulative unserved energy','kWh'],['curtailedKW','Curtailed power','kW'],['chargeKW','Pack charging at bus','kW'],['dischargeKW','Pack discharging at bus','kW'],['socPct','Current pack SOC','%'],['batteryKWh','Stored battery energy','kWh'],['terminalKW','Terminal power','kW'],['jointKW','Joint power demand','kW'],['coilKW','Coil power','kW'],['cmgKW','CMG power','kW'],['pumpKW','Pump demand','kW'],['heatInputKW','Heat entering main node','kW'],['packLossKW','Battery conversion heat','kW'],['packToLoopKW','Pack-to-loop exchange','kW'],['netRejectionKW','Net radiator heat rejection','kW'],['grossEmissionKW','Gross radiator emission','kW'],['absorbedKW','Radiator environmental absorption','kW'],['enclosureLeakKW','Outward enclosure heat','kW'],
@@ -361,6 +371,7 @@ function linkedFlows(id,c){
  if(id==='environment')return environmentFlows(c);
  const all={
  mechanical:[F('Pressure vessels','Spacecraft mass properties','Remaining liquid mass',s.propellantKg,'kg'),F('Integrated structure','Launcher','Launched stack',h.launchKg,'kg')],
+ software:[F('Body reference','Gyro cluster','Achieved body rate',s.bodyRateDegS,'°/s'),F('Mechanism drives','Electrical bus','Tracking demand',s.trackingDriveKW,'kW'),F('Realized panel normals','Thermal loop','Absorbed direct sunlight',s.radiatorDirectSolarKW,'kW')],
  avionics:[F('Electrical bus','Flight computer','Avionics draw',s.cdhKW,'kW'),F('Spacecraft sensors','Housekeeping recorder','Source rate',s.hkRateKbps,'kbit/s'),F('S-band receiver','Flight computer','Ground command delivery',s.commandGoodputKbps,'kbit/s')],
  conops:[F('Customer input','Onboard processing','Customer input consumed',s.aiInputConsumedGB,'GB'),F('Payload recorder',purposeInfo(h).customer,'Products received on Earth',s.aiProductDeliveredGB,'GB')],
  purpose:[F(purposeInfo(h).customer,'Staged input','Input held onboard',s.aiInputBufferGB,'GB'),F('Installed workload',purposeInfo(h).output,'Cumulative work',s.aiUnitsComputed,h.ai?.unit||'work units'),F('Recorder',purposeInfo(h).customer,'Returned product',s.aiProductDeliveredGB,'GB')],
@@ -397,6 +408,7 @@ function auditRows(id,a){
  const end=a.finalState??{},E=a.energyKWh??{};
  const map={
  mechanical:[['Liquid mass expended',end.propellantUsedKg,'kg'],['Final vehicle mass',end.wetKg,'kg']],
+ software:[['Integrated joint energy',E.joints,'kWh'],['Final stored momentum',end.momentumNms,'N·m·s']],
  avionics:[['Command data received',end.commandUploadedGB,'GB'],['Housekeeping overwritten',end.hkOverwrittenMB,'MB']],
  purpose:[['Returned customer product',end.aiProductDeliveredGB,'GB'],['Campaign input consumed',end.aiInputConsumedGB,'GB'],['Customer product remaining',end.aiProductQueueGB,'GB']],
  conops:[['Thermally evaluated interval',a.thermal?.coveredSeconds,'s'],['Returned customer product',end.aiProductDeliveredGB,'GB'],['First in-flight limit',a.firstCrossing?.time,'s']],
@@ -453,6 +465,7 @@ function series(code,ctx){
 // A shared bin width gives both integrations a common horizontal time scale even if life differs.
 const missionTrend={
  mechanical:['Spacecraft wet mass','kg','stock',r=>r.propellantUsedKg],
+ software:['Mean joint power','kW','power',r=>r.energyKWh?.joints],
  avionics:['Ground commands received','GB','sum',r=>r.commandUploadedGB??r.uploadedGB],
  conops:['Returned customer product','Mbit/s','rate',r=>r.aiProductDeliveredGB*8000],
  purpose:['Returned customer product','Mbit/s','rate',r=>r.aiProductDeliveredGB*8000],

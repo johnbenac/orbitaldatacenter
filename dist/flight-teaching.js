@@ -164,6 +164,13 @@ const thermalSource={title:'NASA · thermal control and environmental heating',u
 const attitudeSource={title:'NASA · spacecraft pointing and momentum control',url:'https://www.nasa.gov/smallsat-institute/sst-soa/guidance-navigation-and-control/'};
 const demiseSource={title:'NASA · how component survival is assessed',url:'https://orbitaldebris.jsc.nasa.gov/reentry/orsat.html'};
 export function flightTeaching(phase,id,h,s,view,disposalPlan){
+ if(id==='software'){
+  const ended=s.referenceBody||s.spacecraftModelEndedAt!=null&&s.t>=s.spacecraftModelEndedAt;
+  return card(phase==='D'?'Who owns pointing during launch?':phase==='F'?'When does onboard control end?':'What is the controller trying to do right now?',
+   ended?'The vehicle control record ends here. The atmospheric trajectory continues as a reference body.':
+   s.attitudeObjective||'The launcher carries the restrained vehicle until the modeled handover.',
+   [fact('Controller',ended?'Control ended':s.attitudeModeLabel||'Carrier control'),fact('Engine authorization',ended?'Closed':s.burnPermitState||'Idle')],link('Inspect the actuators','attitude'));
+ }
  if(phase==='F'){
   const lesson=closeout(id,h,s,disposalPlan);
   if((id==='mechanical'||id==='environment')&&h.input.disposalMethod==='reentry'&&s.disposalStatus!=='infeasible'&&disposalPlan?.feasible!==false)lesson.source=demiseSource;

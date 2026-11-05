@@ -45,7 +45,8 @@ export function bankPose(g,end,s,attitude){
  const a=Number.isFinite(operatingPitch)?operatingPitch*D:-sign*Math.PI/4*R,b=a-sign*Math.PI*(1-T),root=[0,sign*g.rootY,g.radRoot];
  const next=(p,t)=>[p[0],p[1]-g.r*Math.sin(t),p[2]+g.r*Math.cos(t)];
  const elbow=next(root,a),tip=next(elbow,b);
- return {end,root,elbow,tip,rootPitch:a,outerPitch:b};
+ const roll=(s.allLocked?(end<0?attitude?.upperRadiatorRollDeg:attitude?.lowerRadiatorRollDeg):0)||0;
+ return {end,root,elbow,tip,rootPitch:a,outerPitch:b,roll:roll*D};
 }
 export function mechanismPose(g,progress,tiltDeg=0,attitude){
  const s=deploymentSchedule(progress);
@@ -58,9 +59,17 @@ export function leafPose(g,d,progress,tiltDeg=0,attitude){
   return {x:(m.root[0]+m.tip[0])/2,y:0,z:m.root[2],pitch:m.pitch,width:m.span};
  }
  const m=bankPose(g,d.end,s,attitude),a=d.j?m.outerPitch:m.rootPitch,start=d.j?m.elbow:m.root,offset=d.end*g.hingeStand;
- return {x:0,y:start[1]-g.r*.5*Math.sin(a)+offset*Math.cos(a),z:start[2]+g.r*.5*Math.cos(a)+offset*Math.sin(a),pitch:a};
+ const n=bankNormal(a,m.roll);
+ return {x:offset*n[0],y:start[1]-g.r*.5*Math.sin(a)+offset*n[1],z:start[2]+g.r*.5*Math.cos(a)+offset*n[2],pitch:a,roll:m.roll};
 }
-export function leafAxes(p){const c=Math.cos(p.pitch),s=Math.sin(p.pitch);return [[1,0,0],[0,c,s],[0,-s,c]];}
+// Body pose of a transverse axis, face normal and bank span under Rx(pitch) Rz(trim).
+export function bankNormal(pitch,roll){
+ const c=Math.cos(roll);return [-Math.sin(roll),Math.cos(pitch)*c,Math.sin(pitch)*c];
+}
+export function leafAxes(p){
+ const c=Math.cos(p.pitch),s=Math.sin(p.pitch),t=p.roll||0,v=Math.sin(t);
+ return [[Math.cos(t),c*v,s*v],bankNormal(p.pitch,t),[0,-s,c]];
+}
 export function leafCorners(p,d){const [a,,b]=leafAxes(p),width=p.width??d.width,out=[];for(const i of [-.5,.5])for(const j of [-.5,.5])out.push([p.x+i*width*a[0]+j*d.depth*b[0],p.y+i*width*a[1]+j*d.depth*b[1],p.z+i*width*a[2]+j*d.depth*b[2]]);return out;}
 
 // Radius of the swept head below its elevation pin bounds deck clearance at

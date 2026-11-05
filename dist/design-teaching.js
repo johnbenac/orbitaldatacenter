@@ -175,6 +175,11 @@ export function designTeaching(phase,id,h,s){
   return lesson('How far could the mass center shift as the tanks empty?','Hold the spacecraft folded and the adapter attached in both cases, then remove the liquid propellant. Comparing their mass-weighted centers isolates the effect of propellant inventory on balance.',
    [reading('Shift between these two cases',1000*Math.hypot(...wet.map((n,i)=>n-empty[i])),'mm'),reading('Liquid removed',h.propellantKg,'kg')],page('Trace the tank inventory','prop','B'),'mech');
  }
+ case 'software':
+  return A?lesson('Who gets to point the spacecraft?','The nominal law governs quiet flight. Before a burn, the body must align its thrust axis. During a ground pass the terminal tries to follow the station within its travel limits.',
+   [reading('Nominal law',d.attitude),reading('Installed gyro torque',d.cmgTorqueNm,'N·m')],edit('Compare nominal pointing laws','attitude'),'flightio'):
+   lesson('How does software know that a command worked?','Follow the feedback arrow. A moving joint can lag its target, so power, heat and communications use the achieved orientation.',
+   [reading('Body slew remaining',s.attitudeSlewErrorDeg??0,'°'),reading('Tracking drive draw',s.trackingDriveKW??0,'kW')],page('Watch the software in flight','software','E'),'flightio');
  case 'avionics':{
   const interval=d.hkPeriodS,packet=h.cdh.packetBytes,rate=8*packet/(1000*interval),count=Math.floor(d.hkRecorderMB*1e6/packet);
   if(A)return lesson('How often must a short event be sampled to leave a record?','A brief change between samples can go unseen. Shortening the sampling interval captures finer timing and fills the spacecraft health recorder faster.',

@@ -4,7 +4,7 @@ import {DEPLOY_END_S} from './commissioning-clock.js';
 import {R,MU,TAU} from './orbit.js';
 const escape=x=>String(x??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;');
 const num=(n,unit='',p=1)=>Number.isFinite(n)?n.toFixed(p)+unit:'—';
-const historyDomains=new Set(['conops','orbit','attitude','comm','thermal','power','environment']);
+const historyDomains=new Set(['conops','orbit','attitude','software','comm','thermal','power','environment']);
 export function activePointing(v,s){
  return ['C','D','E','F'].includes(v.phase)&&s.t>=540&&!s.orbitLost&&!s.referenceBody&&!(s.spacecraftModelEndedAt!=null&&s.t>=s.spacecraftModelEndedAt);
 }
@@ -20,11 +20,11 @@ export function attitudeStrip(v,s){
  const residual=Number.isFinite(s.terminalErrorDeg)?num(s.terminalErrorDeg,'°',2)+' off target':window;
  const drive=[s.groundLink,s.terminalState].filter(Boolean).join(' · ')||'Parked',station=s.station?' · '+s.station:'';
  const boresight=s.groundLink==='Optical'?s.opticalBoresightBody:s.dishBoresightBody;
- const wingAngle=num(s.wingPitchDeg,'°'),radiatorAngle=num(s.upperRadiatorPitchDeg,'°')+' / '+num(s.lowerRadiatorPitchDeg,'°');
+ const wingAngle=num(s.wingPitchDeg,'°'),radiatorAngle=num(s.upperRadiatorRollDeg,'°')+' / '+num(s.lowerRadiatorRollDeg,'°');
  return `<div class="ad-title"><div><span class="ad-pip"></span><small>ATTITUDE MODE</small><strong>${escape(mode)}</strong></div><span class="ad-frame">${escape(frameName(v))} · ${shadow}</span></div>
  <p class="ad-objective">${escape(s.attitudeObjective)}</p><div class="ad-gauges">
  ${gauge('solar','Solar wings',wingAngle,num(s.solarKW,' kW')+' generated',s.wingPitchDeg,'Realized wing-root angle and electrical generation. Array incidence and shadow determine the sunlight reaching the blankets.')}
- ${gauge('radiator','Radiator banks',radiatorAngle,num(s.netRejectionKW,' kW')+' net rejection',s.upperRadiatorPitchDeg,'Upper and lower root angles. Net rejection subtracts absorbed sunlight, albedo and Earth infrared from thermal emission.')}
+ ${gauge('radiator','Radiator banks',radiatorAngle,num(s.netRejectionKW,' kW')+' net rejection',s.upperRadiatorRollDeg,'Upper and lower trim encoders. Each bank rotates about its long axis. Net rejection subtracts absorbed sunlight, albedo and Earth infrared from thermal emission.')}
  ${gauge('link','Earth terminal',drive+station,residual,Number.isFinite(s.terminalErrorDeg)?Math.atan2(boresight?.[2]||0,boresight?.[1]||0)*180/Math.PI:0,'Terminal state and angular distance from the line to the visible station. Useful traffic requires an acquired link.')}
  </div>`;
 }
@@ -75,7 +75,7 @@ export function pointingApproach(h,open=false){
  ${card('02 · Routine and eclipse',escape(nominal[1])+' In shadow the wing drives follow the predicted solar direction for sunlight return.')}
  ${card('03 · Ground pass','The CMGs turn the +Y deck toward Earth. The selected Ka or optical terminal aims along the spacecraft-to-station line. The terminal must acquire the link before customer data can leave.')}
  ${card('04 · Burn and unload','Before a planned chemical burn the CMGs align +Z and the radiator roots seek symmetric −45° and +45° parking angles to center their mass. Ignition checks the achieved alignment and torque. Between burns, magnetic rods can unload the CMGs against the local magnetic field while the spacecraft maintains its reference.')}
- </div><p>For this build the conservative worst-axis slew planning rate is ${num(l.bodyRateDegS,'°/s',3)}, based on inertia and installed control authority. Wing roots follow the Sun at up to ${num(l.wingRateDegS,'°/s')}. The two fluid-carrying radiator roots choose a lower absorbed-heat orientation within their travel at up to ${num(l.radiatorRateDegS,'°/s')}. Terminal steering is limited to a ${num(l.terminalConeDeg,'°',0)} half-cone about its deck normal. Realized slew rate depends on the rotation axis. These are design-study limits. Flexibility, sensor noise and closed-loop attitude stability require further analysis.</p>
+ </div><p>For this build the conservative worst-axis slew planning rate is ${num(l.bodyRateDegS,'°/s',3)}, based on inertia and installed control authority. Wing roots follow the Sun at up to ${num(l.wingRateDegS,'°/s')}. The upper and lower radiator roots cant out to ${num(l.upperBankCantDeg,'°')} and ${num(l.bankCantDeg,'°')} for clearance on this build. The upper bank also clears the moving communications terminals. Each bank then twists about its span at up to ${num(l.radiatorTrimRateDegS,'°/s')}. In sunlight it presents its edge to the Sun. In shadow it turns toward the warm Earth if the loop approaches its cold limit, and reduces Earth exposure when the loop needs cooling. Terminal steering is limited to a ${num(l.terminalConeDeg,'°',0)} half-cone about its deck normal. Realized slew rate depends on the rotation axis. These are design-study limits. Flexibility, sensor noise and closed-loop attitude stability require further analysis.</p>
  <button class="btn ad-physics-link" data-attitude-flight>Inspect flight pointing →</button><p>ISS flight references for rotary interfaces and thermal pointing</p>${guidanceReferences.map(([name,url])=>`<a href="${escape(url)}" target="_blank" rel="noopener">${escape(name)} ↗</a>`).join(' &nbsp; ')}
  </details>`;
 }

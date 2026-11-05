@@ -1,4 +1,4 @@
-const icons={'panels-top-left':[
+const icons={'workflow':[['rect',{x:'2',y:'3',width:'8',height:'7',rx:'2'}],['path',{d:'M6 10v5a2 2 0 0 0 2 2h6'}],['rect',{x:'14',y:'13',width:'8',height:'8',rx:'2'}]],'panels-top-left':[
   ["rect", { width: "18", height: "18", x: "3", y: "3", rx: "2" }],
   ["path", { d: "M3 9h18" }],
   ["path", { d: "M9 21V9" }]

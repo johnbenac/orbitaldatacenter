@@ -3,7 +3,7 @@ const stations = {
  conops:'checkout', purpose:'compute', environment:'environment', orbit:'orbit',
  compute:'compute', data:'data', comm:'rf', power:'power', thermal:'thermal',
  attitude:'attitude', prop:'propulsion', mass:'mass', launch:'fit', launcher:'adapter',
- mechanical:'alignment', avionics:'avionics'
+ mechanical:'alignment', avionics:'avionics', software:'avionics'
 };
 export const bayStationFor=domain=>stations[domain]??stations.conops;
 
@@ -80,6 +80,9 @@ const guides={
  mechanical:wording('Establish a common line of sight','What tells two teams where “straight ahead” is?',
   'An alignment telescope sights a fixed reference mark on the spacecraft. That mark lets technicians relate instruments and mounting surfaces to the same set of body axes.',
   'Sight the vehicle reference, then compare component reference marks with their positions in the installation drawing. Record the instrument setup so another team can repeat the survey.',['alignment','gevs']),
+ software:wording('Rehearse the release sequence','How can engineers test flight logic on the floor?',
+  'The flight computer can receive synthetic orbit and sensor inputs from a checkout console. Engineers exercise transitions while hardware remains restrained.',
+  'Replay a separation indication with deployment inhibited. Verify the expected command history, then repeat with a simulated latch release.',['orbit','rehearsal']),
  avionics:wording('Ask the spacecraft to answer back','Which computer listens when Earth sends a command?',
   'The spacecraft flight computer can run while the customer’s AI processors are idle. A ground console sends a command and checks the returned spacecraft status to confirm the right equipment acted.',
   'Send a harmless test command with a known expected response. Check the returned status, packet timing and command history through the flight computer.',['hardware','rehearsal']),
@@ -200,6 +203,11 @@ function readings(domain,h) {
    return result([mm('Lateral mass offset',Math.hypot(cm[0],cm[1]),'Distance of the stowed, fueled stack’s calculated mass center from the body Z axis. Includes the flight adapter.'),fact('Mass center along Z',cm[2],'m','Signed distance from the bus center along the launch axis, with adapter attached.',3),fact('Enclosed bus length',h.bodyLengthM,'m','Structural body dimension along the same axis.',2)],
     'The survey and the mass budget share a body reference. Surveyed mount positions can update the equipment coordinates used to predict the balance point.');
   }
+  case 'software':return result([
+   fact('Nominal gyro torque authority',d.cmgTorqueNm,'N·m','Installed torque capacity used by the simulated body controller.'),
+   fact('Stored angular momentum capacity',d.cmgMomentumNms,'N·m·s','Installed cluster allocation before maneuver reserve.'),
+   fact('Magnetic dipole authority',d.dipoleAm2,'A·m²','Upper dipole command in flight. The local magnetic field determines the torque.')
+  ],'A checkout can exercise interlocks without rotating the vehicle. The in-flight rate response depends on the real mass distribution and available actuator authority.');
   case 'avionics':{
    const seconds=Math.floor(d.hkRecorderMB*1e6/h.cdh.packetBytes)*d.hkPeriodS;
    return result([fact('Flight computer design load',h.cdh.operatingW,'W','Operating allocation for the installed command and data handling suite.',0),time('Health sample interval',d.hkPeriodS,'Time between successive spacecraft health packets.'),fact('Health log capacity',d.hkRecorderMB,'MB','Dedicated onboard housekeeping ring buffer, in decimal megabytes.',0)],

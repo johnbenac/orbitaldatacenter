@@ -380,7 +380,17 @@ function avionics({d,s},id){
  pick(parts[2],416,62,151,119,glyph('ssd',492,105,.81)+named(492,149,'Health recorder',val(s.hkStoredMB,'MB',2)));
  return info('Spacecraft avionics','Command execution and spacecraft health records',parts,art,[legend('cyan','Commands from Earth'),legend('green','Housekeeping telemetry')],s.flightPhase);
 }
-const builders={conops,purpose,environment,orbit,compute,data,comm,power,thermal,attitude,prop,mass,launch,launcher,mechanical,avionics};
+function software({s},id){
+ const parts=[
+  P('estimate','Navigation state','Guidance reads the propagated position, velocity, Sun direction and achieved body attitude. This study assumes ideal knowledge of the simulated state.',null,'avionics',[row('Flight phase',s.flightPhase),row('Body rate',val(s.bodyRateDegS,'°/s',3))]),
+  P('executive','Mode executive','Restraints, maneuvers, contact and eclipse can supersede the nominal body reference. Each mechanism receives a reachable command.','attitude','avionics',[row('Active mode',s.attitudeModeLabel),row('Objective',s.attitudeObjective)]),
+  P('actuate','Actuators and interlocks','Gyros turn the body. Joint drives move wings, radiator banks and terminals. The next step uses their achieved pose.',null,'cmg',[row('Body error',val(s.attitudeSlewErrorDeg,'°',3)),row('RF / optical steering',s.terminalState)])];
+ const art=flow(id,'M175 112H214','cyan')+flow(id,'M377 112H415','cyan')+flow(id,'M494 163V204H99V164','green')+
+  [[17,97,'earth','Navigation','Orbit and attitude'],[215,295,'chip','Guidance','Mode and reference'],[416,495,'wheel','Control','Achieved motion']].map(([x,c,g,a,b],i)=>pick(parts[i],x,50,157,113,glyph(g,c,91,.84)+named(c,130,a,b))).join('')+
+  T(297,225,'Achieved pose and joint angles feed the next update','sd-name');
+ return info('From command to motion','Select a stage to follow the feedback loop.',parts,art,[legend('cyan','State and commands'),legend('green','Feedback')],s.attitudeModeLabel||s.flightPhase);
+}
+const builders={conops,purpose,environment,orbit,compute,data,comm,power,thermal,attitude,prop,mass,launch,launcher,mechanical,avionics,software};
 export const schematicPages=Object.keys(builders);
 const indexes=Object.fromEntries(schematicPages.map((k,i)=>[k,String(i+1).padStart(2,'0')]));
 const norm=({hardware:h,state:s,day={},events=[],selected,instance,qualificationWindow,thermalScale})=>({h,d:h.input,s,day,events,selected,instance,qualificationWindow,thermalScale});

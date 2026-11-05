@@ -16,6 +16,7 @@ const terms={
  launch:[['Keep-in envelope','The region the payload may occupy inside the launcher, with room reserved for movement and tolerances.'],['Insertion','The point where the launch vehicle delivers the spacecraft into its initial orbit.']],
  launcher:[['Bolt circle','The circle through the centers of a set of equally spaced fasteners.'],['Separation plane','The joint that releases the spacecraft after launch. It can sit below a permanently bolted fitting.']],
  mechanical:[['Mass center','The weighted average of all mass positions. A heavy item far from the center can shift the balance of the whole vehicle.'],['Moment of inertia','Resistance to changing rotation about an axis. Both mass and its distance from that axis matter.']],
+ software:[['Surface normal','An arrow perpendicular to a panel. At 90° to the Sun direction, sunlight grazes the face and its projected area is zero.'],['Feedback','The controller compares its command with the realized orientation. A drive moving at finite speed can take several seconds to catch up.'],['Interlock','A condition that must be true before equipment can move, transmit or fire.']],
  avionics:[['Housekeeping','Status readings that tell operators how the spacecraft itself is doing.'],['Command buffer','Storage for spacecraft commands waiting to be sent or executed.']]
 };
 export const domainTerms=id=>terms[id]||[];

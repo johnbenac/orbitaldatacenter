@@ -161,7 +161,7 @@ group('gnc actuator drag',assume,[
  ['yawDeg','In manual attitude, vary yaw in the local orbit frame. Inspect the resulting body-normal vectors and the footprint projected into the relative flow.'],
  ['solarTiltDeg','Enter the commanded solar-wing tracking offset. Greater obliquity reduces generation and changes the projected silhouette.','For an unshadowed ideal single face, 60° off normal receives half the normal direct flux.'],
  ['cd','Use a drag coefficient consistent with the atmospheric regime, attitude and the model’s projected reference area. Vary it with density when examining uncertainty.'],
- ['cpOffsetM','Use a perpendicular effective lever arm between mass center and pressure center. The reduced-order aerodynamic torque is drag force × lever arm.','0.05 N of drag at 0.1 m effective offset produces 0.005 N·m.'],
+ ['cpOffsetM','Place the effective pressure center this far along the body +Y axis from the mass center. Drag along this axis produces zero torque. Cross-flow produces the full force times the offset.','0.05 N of drag perpendicular to a 0.1 m offset produces 0.005 N·m.'],
  ['cmgMomentumNms','Specify usable cluster momentum storage including geometry and steering reserve. Check integrated disturbance momentum between unloading opportunities.'],
  ['cmgTorqueNm','Specify the available clustered torque for the commanded axis and envelope. Assess slew transients with projected inertia growth and gimbal limitations.'],
  ['dipoleAm2','Use the combined commanded magnetic dipole and verify authority against the field component perpendicular to it.','1,000 A·m² perpendicular to 30 µT gives 0.030 N·m. Parallel alignment gives zero.']

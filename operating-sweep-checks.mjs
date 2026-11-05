@@ -4,11 +4,16 @@ import {missionStarter,sizeDesign} from './dist/design.js';
 import {presetList} from './dist/mission-presets.js';
 import {propulsionReview} from './dist/spacecraft-architecture.js';
 import {componentMassProperties} from './dist/component-stations.js';
+import {attitudeLimits,bankTrimTravel} from './dist/attitude-guidance.js';
 import {auditOperatingAngles} from './deployment-checks.mjs';
 const designs=[...presetList,...Object.keys(aiPurposes).map(id=>({id,h:sizeDesign(missionStarter(id))}))];
 for(const {id,h} of designs){
  if(process.env.ODC_AUDIT_ONLY&&id!==process.env.ODC_AUDIT_ONLY)continue;
- const audit=auditOperatingAngles(h);
+ const limits=attitudeLimits(h),{bankCantDeg:c,upperBankCantDeg:uc}=limits,poses=[];
+ const uStop=bankTrimTravel(uc,limits,true),lStop=bankTrimTravel(c,limits);
+ for(const w of [0,90,180])for(const u of [-105,-90,-45,0,45,90,105])for(const l of [-105,-90,0,90,105])
+  poses.push({wingPitchDeg:w,upperRadiatorPitchDeg:-uc,lowerRadiatorPitchDeg:c,upperRadiatorRollDeg:u*uStop/105,lowerRadiatorRollDeg:l*lStop/105});
+ const audit=auditOperatingAngles(h,10,5,poses);
  console.log(id,JSON.stringify(audit));
  assert.ok(audit.minGapM>0,id+' in-flight moving assembly interference');
  // Check the plume at all joint extrema. An unfavorable asymmetric radiator

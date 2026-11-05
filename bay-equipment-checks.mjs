@@ -8,7 +8,7 @@ const brush=new Proxy({},{get:(_,key)=>key.includes('Gradient')?()=>({addColorSt
 globalThis.document={createElement:()=>({getContext:()=>brush})};
 const near=(a,b,tol=1e-6)=>assert.ok(Math.abs(a-b)<tol,`${a} versus ${b}`);
 const V=(...v)=>new T.Vector3(...v),cartMeshes=group=>{const out=[];group.traverseVisible(o=>{if(o.isMesh)out.push(o)});return out;};
-const domains=['conops','purpose','environment','orbit','compute','data','comm','power','thermal','attitude','prop','mass','launch','launcher','mechanical','avionics'];
+const domains=['conops','purpose','environment','orbit','compute','data','comm','power','thermal','attitude','prop','mass','launch','launcher','mechanical','avionics','software'];
 for(const purpose of ['text','pretrain']){
  const launch=makeLaunch(sizeDesign(missionStarter(purpose))),{bay,parts}=launch;
  const step=(phase,t,domain)=>launch.update({flightPhase:phase,t,altitudeKm:0},phase,{phase:'D',domain});

@@ -12,7 +12,7 @@ export const aiDeploymentAudit={
       "minHardwareGapM": 0.032176299,
       "closestPair": [
         "wing -1/1",
-        "wing -1/1 CylinderGeometry"
+        "wing -1/1 CylinderGeometry at -1.44,0.18,3.08"
       ],
       "closestAt": 0.13875,
       "closestCentersM": [
@@ -45,7 +45,7 @@ export const aiDeploymentAudit={
       "minHardwareGapM": 0.031685577,
       "closestPair": [
         "wing -1/1",
-        "wing -1/1 CylinderGeometry"
+        "wing -1/1 CylinderGeometry at -1.31,0.18,2.86"
       ],
       "closestAt": 0.08666666666666667,
       "closestCentersM": [
@@ -78,7 +78,7 @@ export const aiDeploymentAudit={
       "minHardwareGapM": 0.032432737,
       "closestPair": [
         "radiator 1/0",
-        "bank 1 CylinderGeometry"
+        "bank 1 CylinderGeometry at -1.06,-0.74,1.79"
       ],
       "closestAt": 0.71875,
       "closestCentersM": [
@@ -111,7 +111,7 @@ export const aiDeploymentAudit={
       "minHardwareGapM": 0.027307471,
       "closestPair": [
         "radiator 1/0",
-        "bank 1 CylinderGeometry"
+        "bank 1 CylinderGeometry at -1.28,-0.74,2.08"
       ],
       "closestAt": 0.7204166666666667,
       "closestCentersM": [
@@ -144,7 +144,7 @@ export const aiDeploymentAudit={
       "minHardwareGapM": 0.03246177,
       "closestPair": [
         "wing -1/1",
-        "wing -1/1 CylinderGeometry"
+        "wing -1/1 CylinderGeometry at -1.18,0.18,2.28"
       ],
       "closestAt": 0.25083333333333335,
       "closestCentersM": [
@@ -177,7 +177,7 @@ export const aiDeploymentAudit={
       "minHardwareGapM": 0.005541522,
       "closestPair": [
         "radiator -1/1",
-        "bank -1 CylinderGeometry"
+        "bank -1 CylinderGeometry at -3.45,1.38,2.03"
       ],
       "closestAt": 0,
       "closestCentersM": [

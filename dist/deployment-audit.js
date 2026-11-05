@@ -7,22 +7,22 @@ export const deploymentAudit={
     {
       "id": "pathfinder",
       "minLeafGapM": 0.094,
-      "minSolarRadiatorGapM": 0.746250228,
-      "minHardwareGapM": 0.039992267,
+      "minSolarRadiatorGapM": 0.75,
+      "minHardwareGapM": 0.039989649,
       "closestPair": [
         "wing -1/1",
-        "wing -1/1 CylinderGeometry"
+        "wing -1/1 CylinderGeometry at -0.99,0.15,1.94"
       ],
       "closestAt": 0.2966666666666667,
       "closestCentersM": [
         [
           -4.016,
           0,
-          2.623
+          2.626
         ],
         [
           -0.991,
-          0.148,
+          0.149,
           1.942
         ]
       ],
@@ -33,8 +33,8 @@ export const deploymentAudit={
       "deployClear": true,
       "meshFitMarginM": 0.497326026,
       "fit": true,
-      "radialClearanceM": 0.544206996,
-      "axialClearanceM": 5.492199953
+      "radialClearanceM": 0.540811022,
+      "axialClearanceM": 5.49816693
     },
     {
       "id": "reference",
@@ -43,7 +43,7 @@ export const deploymentAudit={
       "minHardwareGapM": 0.032176299,
       "closestPair": [
         "wing -1/1",
-        "wing -1/1 CylinderGeometry"
+        "wing -1/1 CylinderGeometry at -1.44,0.18,3.08"
       ],
       "closestAt": 0.13875,
       "closestCentersM": [
@@ -75,7 +75,7 @@ export const deploymentAudit={
       "minHardwareGapM": 0.032180669,
       "closestPair": [
         "wing -1/1",
-        "wing -1/1 CylinderGeometry"
+        "wing -1/1 CylinderGeometry at -1.44,0.18,3.08"
       ],
       "closestAt": 0.13875,
       "closestCentersM": [
@@ -107,7 +107,7 @@ export const deploymentAudit={
       "minHardwareGapM": 0.022096593,
       "closestPair": [
         "radiator 1/0",
-        "bank 1 CylinderGeometry"
+        "bank 1 CylinderGeometry at -1.26,-0.86,1.90"
       ],
       "closestAt": 0.715,
       "closestCentersM": [
@@ -139,7 +139,7 @@ export const deploymentAudit={
       "minHardwareGapM": 0.005027313,
       "closestPair": [
         "radiator -1/1",
-        "bank -1 CylinderGeometry"
+        "bank -1 CylinderGeometry at -13.85,2.53,5.14"
       ],
       "closestAt": 0,
       "closestCentersM": [

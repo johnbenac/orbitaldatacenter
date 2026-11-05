@@ -16,6 +16,7 @@ export const pages={
  launcher:['Launch vehicle','rocket','Compare provider references, recovery modes, upper stages and mission-specific launch allowances.'],
  mechanical:['Mechanical Design','box','Trace each installed component to its body coordinates, mass properties and terminal disposition.'],
  avionics:['Command & Data Handling','panels-top-left','Operate the spacecraft flight computer, command receiver and housekeeping recorder.'],
+ software:['Flight Software','workflow','Inspect the active mode, its reference, actuator feedback and the interlock permitting the next operation.'],
  architecture:['Spacecraft architecture','box','One spacecraft layout for all six customer missions. Inspect its fixed interfaces and the dimensions of your current build.'],
  equipment:['Master equipment list','list-checks','Trace each mass allocation to the installed hardware, its sizing basis and its published reference.'],
  sources:['Model & sources','book-open','Inspect the equations, assumptions, and reference hardware behind this design.'],
@@ -23,6 +24,7 @@ export const pages={
 };
 export const colors=['#f1ae67','#72cbd0','#a69cde','#87c7a5','#8599c9','#dc9f9d'];
 export const cfg={
+ software:{metrics:['attitudeSlewErrorDeg|Body pointing residual|°','trackingDriveKW|Tracking drive demand|kW','radiatorDirectSolarKW|Direct solar heat absorbed|kW','cmgMarginNms|Gyro momentum headroom|N·m·s'],charts:['attitudeSlewErrorDeg|Body pointing residual|°','radiatorDirectSolarKW|Direct sunlight on radiators|kW','upperRadiatorRollDeg|Upper bank trim encoder|°','lowerRadiatorRollDeg|Lower bank trim encoder|°'],rows:['wingTargetDeg|Commanded wing pitch|°','wingPitchDeg|Achieved wing pitch|°','lockErrorDeg|Effective terminal pointing error|°','burnAxisErrorDeg|Thrust-axis residual|°']},
  mechanical:{metrics:['wetKg|Flight mass|kg','$dryKg|Dry mass|kg','propellantKg|Liquid inventory|kg','$launchKg|Launched stack|kg'],charts:['wetKg|Spacecraft mass|kg','propellantKg|Remaining liquids|kg'],rows:['$bodyWidthM|Bus width|m','$bodyHeightM|Bus height|m','$bodyLengthM|Bus length|m','$stowedLengthM|Stack height|m']},
  avionics:{metrics:['cdhKW|Flight avionics load|kW','hkRateKbps|Housekeeping source rate|kbit/s','hkStoredMB|Housekeeping recorder|MB','uplinkQueueMB|Ground command backlog|MB'],charts:['hkStoredMB|Housekeeping recorder|MB','commandGoodputKbps|Commands received|kbit/s','hkOverwrittenMB|Housekeeping overwritten|MB','cdhKW|Flight avionics load|kW'],rows:['@hkPeriodS|Housekeeping sample cadence|s','@hkRecorderMB|Housekeeping recorder capacity|MB','commandUploadedGB|Commands received|GB']},
 
@@ -43,7 +45,7 @@ export const cfg={
 };
 export const nowMetrics=['tokensPerSec|Compute throughput|tok/s','solarKW|Solar generation|kW','socPct|Battery charge|%','wetKg|Spacecraft mass|kg'];
 export const quickMap={purpose:['serviceRoute','trayCount','storageTB','duty'],launcher:['launcher','launchAllowanceKg','fairingM','fairingLengthM'],conops:['missionYears','requiredTps','duty','idleComputePolicy'],environment:['solarDriver','solarCyclePhase','ap','solarTiltDeg'],data:['bytesPerToken','bulkMbps','initialQueueGB','storageTB'],overview:['trayCount','altitudeKm','solarM2','batteryKWh'],orbit:['altitudeKm','ecc','inclinationDeg','raanDeg'],compute:['trayCount','batch','context','storageTB'],comm:['link','kaDishM','elevationDeg','bulkMbps'],power:['batteryKWh','solarM2','socMin','chargeC'],thermal:['radiatorM2','thermalMode','appliedHeatKw','radiatorDesignK'],attitude:['attitude','rollDeg','dipoleAm2','cmgMomentumNms'],prop:['propellantKg','isp','mixtureRatio','yearsSupply'],mass:['trayCount','solarM2','batteryKWh','propellantKg'],launch:['launcher','launchAllowanceKg','trimDv','adapterKg']};
-export const overlayNames={thermal:'Component temperatures',sun:'Direct sunlight',albedo:'Earth albedo',ir:'Earth infrared',radiator:'Radiator emission',ram:'Relative wind',pressure:'Pressure force',thrust:'Chemical thrust',dimensions:'Vehicle dimensions'};
+export const overlayNames={pointing:'Pointing guides',thermal:'Component temperatures',sun:'Direct sunlight',albedo:'Earth albedo',ir:'Earth infrared',radiator:'Radiator emission',ram:'Relative wind',pressure:'Pressure force',thrust:'Chemical thrust',dimensions:'Vehicle dimensions'};
 export const componentMap={compute:'compute',host:'compute',switch:'compute',storage:'storage',battery:'battery',array:'solar',hinges:'solar',radiator:'radiator',coolant:'radiator',terminals:'communications',cmg:'cmg',tanks:'propellant',fuel:'propellant',oxidizer:'propellant',pressurant:'propellant',engine:'propulsion',margin:'structure',adapter:'adapter',shield:'structure',cables:'structure',structure:'structure',skin:'enclosure',blanket:'enclosure',frame:'structure',insulation:'enclosure'};
 
 // Titles and units follow the work actually executed by this spacecraft.

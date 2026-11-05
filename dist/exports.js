@@ -92,6 +92,11 @@ export async function makePacket({scenario,hardware,sim,result,snap,day,events,o
  z.file('attitude/pointing-power-heat.csv',csv(tele.map(s=>({
   MET_s:s.t,mode:s.attitudeModeLabel,station:s.station,body_x_ECI:s.bodyXECI,body_y_ECI:s.bodyUpECI,body_z_ECI:s.bodyZECI,
   body_rate_deg_s:s.bodyRateDegS,wing_pitch_deg:s.wingPitchDeg,upper_bank_pitch_deg:s.upperRadiatorPitchDeg,lower_bank_pitch_deg:s.lowerRadiatorPitchDeg,
+  body_command_quaternion_xyzw:s.bodyReferenceQ,body_achieved_quaternion_xyzw:s.bodyAttitudeQ,body_error_deg:s.attitudeSlewErrorDeg,wing_command_deg:s.wingTargetDeg,
+  upper_bank_trim_command_deg:s.upperRadiatorTargetRollDeg,upper_bank_trim_encoder_deg:s.upperRadiatorRollDeg,lower_bank_trim_command_deg:s.lowerRadiatorTargetRollDeg,lower_bank_trim_encoder_deg:s.lowerRadiatorRollDeg,
+  upper_projected_solar_fraction:s.upperRadiatorSunCos,lower_projected_solar_fraction:s.lowerRadiatorSunCos,radiator_control:s.radiatorControlLaw,
+  magnetic_field_ECI_uT:s.magFieldEciUT,magnetic_torque_ECI_Nm:s.magTorqueEciNm,stored_momentum_ECI_Nms:s.storedMomentumEciNms,available_slew_momentum_Nms:s.availableSlewMomentumNms,
+  burn_permit:s.burnPermitState,thrust_direction_error_deg:s.burnAxisErrorDeg,terminal_travel_margin_deg:s.terminalConeMarginDeg,payload_lock:s.directPayloadLock,effective_lock_error_deg:s.lockErrorDeg,
   solar_cosine:s.solarIncidenceCos,eclipse:s.eclipse,solar_kW:s.solarKW,battery_kWh:s.batteryKWh,tracking_drive_kW:s.trackingDriveKW,
   Earth_view_upper_both_faces:s.upperEarthView,Earth_view_lower_both_faces:s.lowerEarthView,direct_absorbed_kW:s.radiatorDirectSolarKW,
   albedo_absorbed_kW:s.radiatorAlbedoKW,IR_absorbed_kW:s.radiatorEarthIRKW,net_rejection_kW:s.netRejectionKW,sink_K:s.radiatorK,

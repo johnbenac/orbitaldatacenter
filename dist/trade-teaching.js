@@ -123,6 +123,9 @@ function evidenceFor(id,c,key,fullDay){
   return pair('Where will the loaded assembly balance?',
    'The center of mass weights each equipment station by the mass installed there. These values include the fueled spacecraft with appendages stowed and its adapter attached.',
    [reading('Stowed center along body Z','m',v=>componentCentroid(v.hardware,v.hardware.propellantKg,0,true)[2]),stack]);
+ case 'software':
+  return pair('What else moves when the body turns?','Each drive tracks a target in the moving body frame. Compare the achieved body error and the heat absorbed by the radiators at the same mission instant.',
+   [reading('Body error','°',v=>v.state.attitudeSlewErrorDeg),reading('Absorbed direct Sun','kW',v=>v.state.radiatorDirectSolarKW)]);
  case 'avionics':{
   const commands=key==='commandKbps';
   const lookback=reading('Health history at full logging','h',v=>Math.floor(v.hardware.input.hkRecorderMB*1e6/v.hardware.cdh.packetBytes)*v.hardware.input.hkPeriodS/3600);

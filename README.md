@@ -17,6 +17,12 @@ the private GitLab repository https://gitlab.benac.dev/johnb/orbitaldatacenter o
 branch `main`, using the HTTPS remote
 `https://gitlab.benac.dev/johnb/orbitaldatacenter.git`.
 
+GitLab is private and is not a public source destination. A second HTTPS remote,
+`github`, is prepared for `https://github.com/johnbenac/orbitaldatacenter.git`.
+The intended GitHub repository will be public; initial publication is pending
+working GitHub CLI authentication. See [GitHub publication](docs/github-publication.md)
+for setup, verification, and commands to push changes to both remotes.
+
 The Centroid checkout is `/root/orbitaldatacenter/site`. Its first 24 commits
 were restored from the Git history bundle supplied with the v21 ZIP. The imported
 `dist/` files match that release. The ZIP and original extracted directory are

@@ -1,3 +1,4 @@
+import {orbitalLightingAvailable} from './orbit-lighting.js';
 import * as T from './vendor/three.module.js';
 import {flightFrames,createEarthBackdrop,eciScene as eci} from './flight-frame.js';
 import {createTriad} from './coordinate-triad.js';
@@ -85,17 +86,21 @@ export function createScene(container,{onPick=()=>{},onHover=()=>{},onThermalSca
  const triad=createTriad(container);
  let framedDesign=null,bodyPoints=[],deploymentLens='vehicle',bayFit=null;
  const scene=new T.Scene(),craftGroup=new T.Group(),orbit=new T.Group();scene.add(craftGroup,orbit);const orthCamera=new T.OrthographicCamera(-10,10,10,-10,.001,5000),launchCamera=new T.PerspectiveCamera(34,1,.04,2000);let camera=orthCamera;const hemi=new T.HemisphereLight(0xe5f4ff,0xb8a58f,1.52),key=new T.DirectionalLight(0xffedcf,3.2),rim=new T.DirectionalLight(0xabcfff,1.95);key.position.set(-4,8,5);rim.position.set(7,2,-6);scene.add(hemi,key,rim,key.target);if(gpu){renderer.shadowMap.type=T.PCFSoftShadowMap;key.shadow.mapSize.set(1024,1024);key.shadow.normalBias=.028;}
+ // Camera-relative floodlights are confined to the foreground render pass.
+ const softbox=new T.DirectionalLight(0xfff1db,2.65),bounce=new T.DirectionalLight(0xdcecff,1.6);
+ scene.add(softbox,bounce);
+ let lightingMode='realistic',exposureEV=0;
  let launchLens='wide',bayLens='overview',bayLabels=true;
  let domain='',phase='',focus='',craftFocus=null,launchFocus=null,custody=null,stagingBounds=null,chapter='',launch=null,launchKey='',launchFrame=null;let view='spacecraft',size,h={},s={},craft=null,pose={spacecraft:[...defaultPose.spacecraft,1],core:[...defaultPose.core,1],orbit:[...defaultPose.orbit,1],launch:[...defaultPose.launch,1],bay:[...defaultPose.bay,1]},w=0,ht=0,selected='',layers=[],annotation=new T.Group(),selection=new T.Group(),beamGroup=new T.Group(),arrowSig='',pickables=[],raf=0,alive=true,orbitSig='',stationSig='',texture=null, lastPaint=0,frameKey='',meshKey='',overlayStale=true;
  const pan=Object.fromEntries(Object.keys(defaultPose).map(k=>[k,V()]));let halfAtFocus=1;
  let bayIsolate=true;
  let thermalScale='working',craftSkin=null,launchSkin=null,showLegend=true,legendMode='',hoverHit=null,selectedHit=null;
  craftGroup.add(annotation,selection,beamGroup);const spin=new T.Group();orbit.add(spin);const earth=new T.Mesh(new T.SphereGeometry(1,96,56),new T.MeshStandardMaterial({color:0xffffff,roughness:1,metalness:0}));spin.add(earth);texture=new T.TextureLoader().load('./vendor/earth-atmos.jpg',()=>request());texture.colorSpace=T.SRGBColorSpace;earth.material.map=texture;earth.material.userData.globeTexture=true;
- const atmosphere=new T.Mesh(new T.SphereGeometry(1.017,64,40),new T.ShaderMaterial({uniforms:{tint:{value:new T.Color('#73b5e7')},solar:{value:V(1,0,0)}},vertexShader:'varying vec3 n;varying vec3 v;varying vec3 worldNormal;void main(){vec4 p=modelViewMatrix*vec4(position,1.);n=normalize(normalMatrix*normal);worldNormal=normalize(mat3(modelMatrix)*normal);v=normalize(-p.xyz);gl_Position=projectionMatrix*p;}',fragmentShader:'varying vec3 n;varying vec3 v;varying vec3 worldNormal;uniform vec3 tint;uniform vec3 solar;void main(){float f=pow(1.-abs(dot(normalize(n),normalize(v))),5.);float daylight=smoothstep(-.22,.18,dot(normalize(worldNormal),solar));gl_FragColor=vec4(tint,f*(.060+.65*daylight));}',transparent:true,side:T.FrontSide,depthWrite:false}));atmosphere.material.userData.airglow=true;atmosphere.renderOrder=1;orbit.add(atmosphere);
+ const atmosphere=new T.Mesh(new T.SphereGeometry(1.017,64,40),new T.ShaderMaterial({uniforms:{tint:{value:new T.Color('#73b5e7')},solar:{value:V(1,0,0)}},vertexShader:'varying vec3 n;varying vec3 v;varying vec3 worldNormal;void main(){vec4 p=modelViewMatrix*vec4(position,1.);n=normalize(normalMatrix*normal);worldNormal=normalize(mat3(modelMatrix)*normal);v=normalize(-p.xyz);gl_Position=projectionMatrix*p;}',fragmentShader:'varying vec3 n;varying vec3 v;varying vec3 worldNormal;uniform vec3 tint;uniform vec3 solar;void main(){float f=pow(1.-abs(dot(normalize(n),normalize(v))),5.);float daylight=smoothstep(-.22,.18,dot(normalize(worldNormal),solar));gl_FragColor=vec4(tint,f*(.060+.65*daylight));\n#include <tonemapping_fragment>\n#include <colorspace_fragment>\n}',transparent:true,side:T.FrontSide,depthWrite:false}));atmosphere.material.userData.airglow=true;atmosphere.renderOrder=1;orbit.add(atmosphere);
  const backdrop=createEarthBackdrop(earth,atmosphere);let flightFrame=null;
  function skyVisible(){return flightFrame&&view!=='orbit'&&s.altitudeKm>0&&!s.referenceBody&&(view==='launch'?launchFrame?.environment==='space':s.t>=540);}
  function bodyCamera(){return view==='core'||chapter==='commissioning'&&deploymentLens!=='vehicle';}
- const trace=new T.Group();orbit.add(trace);const originPin=new T.Mesh(new T.SphereGeometry(.0085,12,8),new T.MeshBasicMaterial({color:0x7ee0d9}));spin.add(originPin);originPin.visible=false;const mark=new T.Mesh(new T.SphereGeometry(.011,12,8),new T.MeshBasicMaterial({color:0xffb363}));orbit.add(mark);const ring=new T.Mesh(new T.RingGeometry(.021,.024,40),new T.MeshBasicMaterial({color:0xffb363,side:T.DoubleSide,depthWrite:false}));orbit.add(ring);const sites=new T.Group();spin.add(sites);const stationMat=new T.MeshBasicMaterial({color:0x92ddcd});stationMat.userData.shared=true;const trackBeam=line(orbit,[V(),V()],0x7dedd4,.9);
+ const trace=new T.Group();orbit.add(trace);const originPin=new T.Mesh(new T.SphereGeometry(.0085,12,8),new T.MeshBasicMaterial({color:0x7ee0d9}));spin.add(originPin);originPin.visible=false;const mark=new T.Mesh(new T.SphereGeometry(.011,12,8),new T.MeshBasicMaterial({color:0xffb363,toneMapped:false}));orbit.add(mark);const ring=new T.Mesh(new T.RingGeometry(.021,.024,40),new T.MeshBasicMaterial({color:0xffb363,side:T.DoubleSide,depthWrite:false,toneMapped:false}));orbit.add(ring);const sites=new T.Group();spin.add(sites);const stationMat=new T.MeshBasicMaterial({color:0x92ddcd});stationMat.userData.shared=true;const trackBeam=line(orbit,[V(),V()],0x7dedd4,.9);
  const groundTrail=new T.Group(),orbitAxes=new T.Group();let trailStamp='';
  spin.add(groundTrail);orbit.add(orbitAxes);
  for(const [dir,color] of [[V(1,0,0),0xf79d89],[V(0,1,0),0xa2db96],[V(0,0,1),0x8dc8ff]])arrow(orbitAxes,V(),dir,.10,color);
@@ -132,16 +137,55 @@ export function createScene(container,{onPick=()=>{},onHover=()=>{},onThermalSca
   if(next==='hangar')container.style.backgroundImage='radial-gradient(ellipse at 52% 10%, #526674, #2a3947 43%, #14222d 75%, #0c161f)';if(next==='ground')container.style.backgroundImage='url('+padSky()+')';if(next==='sky')container.style.backgroundImage='linear-gradient(170deg,#0a182b,#184466 54%,#84aec0 90%,#c9d4d5)';container.style.backgroundSize='cover';container.style.backgroundPosition='50% 50%';
  }
  function lightScene(){
-   const world=view==='orbit',displayLaunch=view==='launch'&&launchFrame&&!launchFrame.directCraft, shadow=!world&&!displayLaunch&&s.eclipse;
-   key.position.copy(displayLaunch?V(-5,7,3):world&&s.sunECI?eci(s.sunECI,8):frameDirection(s.sunECI).multiplyScalar(8));
-   key.intensity=shadow?0:world?3.6:3.2;
-   hemi.intensity=world?.35:shadow?.95:1.52;hemi.groundColor.setHex(shadow?0x627f99:0xb8a58f);
-   rim.intensity=world?.17:shadow?.82:1.75;
-   const illumination=key.position.clone().normalize();
-   if(displayLaunch){key.intensity=2.6;hemi.intensity=.97;rim.intensity=1.12;}
-   if(gpu){const shadows=displayLaunch&&['ground','hangar'].includes(launchFrame.environment);renderer.shadowMap.enabled=!!shadows;key.castShadow=!!shadows;key.target.position.set(0,0,0);
-    if(shadows){const r=launchFrame.half*1.65;key.target.position.copy(launchFrame.center);key.position.copy(key.target.position).addScaledVector(illumination,r*2.6);const c=key.shadow.camera;c.left=-r;c.right=r;c.top=r;c.bottom=-r;c.near=.1;c.far=r*6;c.updateProjectionMatrix();}}
-   scene.userData.lightState={sun:illumination,ambient:world?.21:displayLaunch?.33:shadow?.27:.45,direct:shadow?0:1.06,rim:world?.05:shadow?.20:.38};
+  const world=view==='orbit',displayLaunch=view==='launch'&&launchFrame&&!launchFrame.directCraft;
+  const available=orbitalLightingAvailable(view,s),orbitalVehicle=available&&!world;
+  const studio=available&&lightingMode==='studio',flood=studio&&orbitalVehicle;
+  const ev=available?exposureEV:null;
+  scene.userData.exposureEV=backdrop.scene.userData.exposureEV=ev;
+  if(gpu)renderer.toneMappingExposure=1.16*2**(ev??0);
+  const lighting={ambient:.45,direct:1.06,rim:.38};
+  key.target.position.set(0,0,0);
+  if(orbitalVehicle){
+   // In the insertion stack the foreground axes follow configureObserver's
+   // launch frame. The separated spacecraft and core use spacecraft body axes.
+   const direction=v=>displayLaunch&&flightFrame
+    ?eci(v).applyQuaternion(flightFrame.orbital.clone().invert()).applyAxisAngle(V(1,0,0),-Math.PI/2).normalize()
+    :frameDirection(v);
+   const reflected=clamp(s.sunRadial??0,0,1)*Math.pow(R/(R+s.altitudeKm),2);
+   key.position.copy(direction(s.sunECI));key.intensity=s.eclipse?0:3.2;
+   rim.position.copy(direction(s.radial)).negate();rim.color.setHex(0xaccfff);rim.intensity=.67*reflected;
+   hemi.intensity=.045+(flood?.95:0);hemi.groundColor.setHex(flood?0xb0bdca:0x71849a);
+   lighting.ambient=.015+(flood?.34:0);lighting.direct=s.eclipse?0:1.12;
+   lighting.rim=.27*reflected;lighting.rimDirection=rim.position;
+  }else{
+   const shadow=!world&&!displayLaunch&&s.eclipse;
+   key.position.copy(world&&s.sunECI?eci(s.sunECI,8):displayLaunch?V(-5,7,3):frameDirection(s.sunECI).multiplyScalar(8));
+   key.intensity=world?3.6:displayLaunch?2.6:shadow?0:3.2;
+   hemi.intensity=world?.35:displayLaunch?.97:shadow?.95:1.52;
+   hemi.groundColor.setHex(shadow?0x627f99:0xb8a58f);
+   rim.position.set(7,2,-6);rim.color.setHex(0xabcfff);
+   rim.intensity=world?.17:displayLaunch?1.12:shadow?.82:1.75;
+   lighting.ambient=world?.21:displayLaunch?.33:shadow?.27:.45;
+   lighting.direct=shadow?0:1.06;lighting.rim=world?.05:shadow?.20:.38;
+  }
+  lighting.sun=key.position.clone().normalize();
+  softbox.visible=bounce.visible=flood;
+  if(flood){
+   softbox.position.set(-.65,.78,1).normalize().applyQuaternion(camera.quaternion);
+   bounce.position.set(.82,.1,.55).normalize().applyQuaternion(camera.quaternion);
+   lighting.softbox=softbox.position;lighting.bounce=bounce.position;
+  }
+  if(world){
+   // At globe scale the spacecraft is represented by a locator. Change the dot
+   // only; the geographic terminator, event ring and trajectory remain physical.
+   mark.material.color.setHex(s.burn?(studio?0xffb08a:0xff7844):studio?0xfff5d6:available&&s.eclipse?0xa68b72:0xffb363);
+  }
+  if(gpu){
+   const shadows=displayLaunch&&['ground','hangar'].includes(launchFrame.environment);
+   renderer.shadowMap.enabled=!!shadows;key.castShadow=!!shadows;
+   if(shadows){const r=launchFrame.half*1.65;key.target.position.copy(launchFrame.center);key.position.copy(key.target.position).addScaledVector(lighting.sun,r*2.6);const c=key.shadow.camera;c.left=-r;c.right=r;c.top=r;c.bottom=-r;c.near=.1;c.far=r*6;c.updateProjectionMatrix();}
+  }
+  scene.userData.lightState=lighting;
  }
  const inBay=()=>view==='launch'&&phase==='D'&&s.flightPhase==='integration'&&launchFrame?.environment==='hangar'&&launch?.bay;
  const poseKey=()=>inBay()?'bay':view;
@@ -305,7 +349,7 @@ export function createScene(container,{onPick=()=>{},onHover=()=>{},onThermalSca
    });
   }
  }
- function render(){raf=0;if(!alive||!w||!ht||!craft||!container.getClientRects().length)return;setCamera();if(inBay())launch.bay.setViewFrom(camera);if(view==='launch')launch?.faceLaunchClouds?.(camera);tags.replaceChildren();if(view==='spacecraft'&&layers.includes('dimensions')){let p=V(0,0,Math.max(h.wingWidthM*1.15,h.bodyLengthM*.7)).applyMatrix4(craft.root.matrixWorld).project(camera);label((p.x+1)*w/2,(1-p.y)*ht/2,`PV span ${craft.wingspan.toFixed(1)} m`);}if(view==='orbit'&&orbitAxes.visible){
+ function render(){raf=0;if(!alive||!w||!ht||!craft||!container.getClientRects().length)return;setCamera();lightScene();if(inBay())launch.bay.setViewFrom(camera);if(view==='launch')launch?.faceLaunchClouds?.(camera);tags.replaceChildren();if(view==='spacecraft'&&layers.includes('dimensions')){let p=V(0,0,Math.max(h.wingWidthM*1.15,h.bodyLengthM*.7)).applyMatrix4(craft.root.matrixWorld).project(camera);label((p.x+1)*w/2,(1-p.y)*ht/2,`PV span ${craft.wingspan.toFixed(1)} m`);}if(view==='orbit'&&orbitAxes.visible){
    for(const [id,dir] of [['+X',V(.105,0,0)],['+Y',V(0,.105,0)],['+Z',V(0,0,.105)]]){
     const world=orbitAxes.localToWorld(dir);if(world.dot(camera.position)<1)continue;
     const p=world.project(camera);label((p.x+1)*w/2,(1-p.y)*ht/2,id);
@@ -350,7 +394,7 @@ export function createScene(container,{onPick=()=>{},onHover=()=>{},onThermalSca
   if(s.positionECI){mark.position.copy(eci(s.positionECI,1/R));ring.position.copy(mark.position);}
   spin.rotation.y=s.earthRotationRad||0;atmosphere.material.uniforms.solar.value.copy(eci(s.sunECI));trackBeam.visible=!!s.stationECI;
   if(s.stationECI){trackBeam.geometry.setFromPoints([mark.position,eci(s.stationECI,1/R)]);trackBeam.material.color.setHex(s.goodputMbps>0?0x79edd3:0x7e8e98);trackBeam.material.opacity=s.goodputMbps>0?.98:.50;}
-  mark.material.color.setHex(s.burn?0xff7844:0xffb363);ring.scale.setScalar(s.burn?1.7:1);
+  ring.scale.setScalar(s.burn?1.7:1);
   orbitAxes.visible=!!flightFrame&&s.t>=540&&focus==='attitude';
   if(orbitAxes.visible){orbitAxes.position.copy(mark.position);orbitAxes.quaternion.copy(flightFrame.body);}
   groundTrail.visible=!onPhaseF()&&s.t>=550&&s.periodSec>0;
@@ -423,8 +467,8 @@ export function createScene(container,{onPick=()=>{},onHover=()=>{},onThermalSca
   craftGroup.visible=view!=='orbit'&&(view!=='launch'||!launchFrame?.reference);
  }
  function update(hardware,snapshot){if(!hardware||!snapshot)return;h=hardware;s=snapshot;flightFrame=flightFrames(s);let k=[h.trays,h.storageTB,h.input.diskModuleTB,h.bodyLengthM,h.bodyWidthM,h.bodyHeightM,h.wingLengthM,h.wingWidthM,h.radiatorLengthM,h.radiatorWidthM,h.input.kaDishM,h.input.opticalApertureM,h.tankVolumeL,h.fuelKg,h.oxidizerKg,h.input.thrustN,h.input.engine,...h.propulsion.tanks.flatMap(o=>[o.x,o.y,o.z,o.volumeL]),...h.propulsion.engines.map(o=>o.x+','+o.z)].join('/');if(k!==meshKey){if(craft){craftSkin?.destroy();craftSkin=null;craftFocus?.destroy();craftFocus=null;custody?.destroy();custody=null;craftGroup.remove(craft.root);disposeGroup(craft.root);}meshKey=k;craft=makeCraft(h);craftGroup.add(craft.root);let span=Math.max(craft.wingspan,craft.spanZ);size={span,fitWidth:Math.max(craft.wingspan*1.05,craft.spanZ*.60),fitHeight:Math.max(craft.wingspan*.29+craft.spanZ*.36,span*.48)};pickables=[craft.root];overlayStale=true;}
- updateLaunch();actuate();stagingBounds=chapter!=='commissioning'&&s.deployment<.995&&s.deployment>.0001?new T.Box3().setFromObject(craft.root):null;if(overlayStale||layers.length||domainSceneSpecs[focus]?.vectors?.length||['attitude','prop'].includes(focus)){arrows();overlayStale=false;}if(selected)selectionBox();updateOrbit();positionVehicle();orbit.visible=view==='orbit';setBg();lightScene();updateThermal();request();}
- function setView(v){const next=cameraView(v);if(next===view&&craft)return;cancelGestures();if(hoverHit)leave({clientX:hoverHit.x,clientY:hoverHit.y});view=next;setBg();if(view!=='orbit'){key.position.set(-4,8,5);rim.position.set(7,2,-6);rim.intensity=1.95;hemi.intensity=1.52;}if(craft)update(h,s);else request();}
+ updateLaunch();actuate();stagingBounds=chapter!=='commissioning'&&s.deployment<.995&&s.deployment>.0001?new T.Box3().setFromObject(craft.root):null;if(overlayStale||layers.length||domainSceneSpecs[focus]?.vectors?.length||['attitude','prop'].includes(focus)){arrows();overlayStale=false;}if(selected)selectionBox();updateOrbit();positionVehicle();orbit.visible=view==='orbit';setBg();updateThermal();request();}
+ function setView(v){const next=cameraView(v);if(next===view&&craft)return;cancelGestures();if(hoverHit)leave({clientX:hoverHit.x,clientY:hoverHit.y});view=next;setBg();if(craft)update(h,s);else request();}
  function thermalRow(hit){return (!focus||focus==='thermal'||layers.includes('thermal'))&&hit?.node?(s.thermalQualification||[]).find(r=>r.id===hit.node)||null:null;}
  function refreshLegend(){
   const enabled=layers.includes('thermal')&&showLegend;
@@ -514,6 +558,8 @@ export function createScene(container,{onPick=()=>{},onHover=()=>{},onThermalSca
  cv.addEventListener('pointercancel',cancelGestures);cv.addEventListener('auxclick',e=>{if(e.button===1)e.preventDefault();});
  cv.addEventListener('wheel',e=>{e.preventDefault();zoom(Math.exp(clamp(-e.deltaY*.0015,-.5,.5)));},{passive:false});cv.addEventListener('keydown',keyMove);
  setBg();resize();return {update,setView,
+  setExposureEV(value){const next=Number.isFinite(value)?clamp(value,-2,2):0;if(next!==exposureEV){exposureEV=next;request();}},
+  setLightingMode(value){const next=value==='studio'?'studio':'realistic';if(next!==lightingMode){lightingMode=next;request();}},
   setDeploymentLens(value){if(deploymentLens===value)return;deploymentLens=value;if(craft)request();},
   setBayView(id,labels){
    const next=['equipment','interface','payload'].includes(id)?id:'overview';

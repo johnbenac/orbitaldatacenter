@@ -80,6 +80,7 @@
   "mission-worker.js",
   "mission.css",
   "model.js",
+  "orbit-lighting.js",
   "orbit.js",
   "payload-interface-mesh.js",
   "payload-interface.js",

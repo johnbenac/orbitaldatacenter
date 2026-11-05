@@ -173,3 +173,16 @@ await fire({loadingAt:'-660'});assert.match(el('loading-player').innerHTML,/Repl
 await fire({loadingPlay:''});loadState=await snapshot();
 assert.equal(loadState.view.t,-3000);assert.equal(loadState.view.speed,120);assert.equal(loadState.design.launcher,'starship');
 console.log('Adapter-to-integration handoff, reversible payload milestones, follow camera and replay stay on one mission clock.');
+
+await fire({phase:'C'});await fire({camera:'spacecraft'});await fire({attitudeTime:'6402'});
+const orbitBefore=await snapshot();assert.equal(orbitBefore.view.lighting,'realistic');
+assert.equal(el('orbit-lighting').hidden,false);
+await fire({lighting:'studio'});await change('camera-exposure',1);const studioView=await snapshot();
+assert.deepEqual(studioView.design,orbitBefore.design);assert.equal(studioView.view.t,orbitBefore.view.t);
+assert.equal(studioView.view.camera,orbitBefore.view.camera);assert.equal(studioView.view.lighting,'studio');
+await fire({camera:'core'});assert.equal(el('lighting-studio').getAttribute('aria-pressed'),'true');
+await fire({action:'share'});const studioLink=el('dialogbody').innerHTML.match(/#design=[A-Za-z0-9_-]+/)[0];await fire({action:'close'});
+globalThis.location=new URL(studioLink,'https://example.test');await imp('app.js?shared-orbital-lighting');
+const sharedLighting=await snapshot();assert.equal(sharedLighting.view.lighting,'studio');assert.equal(sharedLighting.view.exposureEV,1);await fire({phase:'D'});
+assert.equal(el('orbit-lighting').hidden,true);
+console.log('Lighting defaults, camera continuity, fixed mission time and design, shared studio view, and ground-view scope passed.');

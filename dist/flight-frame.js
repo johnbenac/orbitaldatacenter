@@ -30,7 +30,7 @@ export function createEarthBackdrop(planet,atmosphere){
   positions.push(4*r*Math.cos(a),4*y,4*r*Math.sin(a));
  }
  const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(positions,3));
- const stars=new T.Points(g,new T.PointsMaterial({color:0x94afc7,opacity:.47,transparent:true,size:1,sizeAttenuation:false,depthWrite:false,toneMapped:false}));stars.renderOrder=-1;scene.add(stars);
+ const stars=new T.Points(g,new T.PointsMaterial({color:0x94afc7,opacity:.47,transparent:true,size:1,sizeAttenuation:false,depthWrite:false}));stars.renderOrder=-1;scene.add(stars);
  const sun=new T.DirectionalLight(0xfff3e1,2.65),fill=new T.AmbientLight(0x91adc2,.19);scene.add(sun,fill);
  return {scene,camera:skyCam,dispose(){g.dispose();stars.material.dispose();},update(camera,frame,s,aspect,launchStack){
   configureObserver(skyCam,camera,frame,s,aspect,launchStack);

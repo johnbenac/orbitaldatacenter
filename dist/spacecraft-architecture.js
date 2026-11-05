@@ -89,7 +89,7 @@ function surfaceReview(h){
    else radiatorMarginM=Math.min(radiatorMarginM,margin);
   }
  }
- const values={radiatorMarginM,wingMarginM,plumeMarginM:Math.min(radiatorMarginM,wingMarginM),cassetteCenterM:g.center};
+ const values={radiatorMarginM,wingMarginM,plumeMarginM:Math.min(radiatorMarginM,wingMarginM),solarSaddleCenterM:g.center};
  reviewCache.set(h,values);return values;
 }
 

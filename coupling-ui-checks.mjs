@@ -76,3 +76,12 @@ await fire({provisionPurpose:'agents'});await accept();assert.equal((await snaps
 await fire({action:'managepresets'});assert.match(el('dialogbody').innerHTML,/My tuned spacecraft/);assert(el('dialogbody').innerHTML.includes('data-design="'+saved+'"'));await fire({design:saved});await fire({action:'cancelimpact'});assert.equal(el('dialogtitle').textContent,'Saved designs');await fire({design:saved});await accept();
 const reopened=await snapshot();assert.equal(reopened.view.presetName,'My tuned spacecraft');assert.deepEqual(reopened.design,first.design);
 console.log('Single combined mission selector, reusable starter, exact named-design restore and cancel passed.');
+
+const {DEPLOY_START_S,DEPLOY_END_S,deploymentMET}=await imp('commissioning-clock.js');
+await fire({phase:'D'});await fire({phase:'E'});assert.equal(el('title').textContent,'Spacecraft deployment');assert.equal((await snapshot()).view.t,DEPLOY_START_S);
+await fire({deployAt:'.59'});assert.equal((await snapshot()).view.t,deploymentMET(.59));assert.match(el('guidepanel').innerHTML,/outer hinge 90°/);
+await fire({deploymentLens:'hinge'});assert.equal((await snapshot()).view.deploymentLens,'hinge');
+await fire({deployAt:'1'});const locked=await snapshot();assert.equal(locked.view.chapter,'commissioning');assert.equal(locked.view.t,DEPLOY_END_S);
+assert.match(el('guidepanel').innerHTML,/Replay/);
+await fire({action:'flightplay'});assert.equal((await snapshot()).view.t,DEPLOY_START_S);
+console.log('Deployment handoff, one-clock milestones, physical hinge inspection and locked-state replay passed.');

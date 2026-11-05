@@ -2,6 +2,7 @@
 // and stowed sections come from the sizing solver; the support equipment is illustrative.
 import * as T from './vendor/three.module.js';
 import {launchFleet} from './launch-fleet.js';
+import {deploymentLayout,mechanismPose,leafPose} from './deployment.js';
 import {thermalMesh} from './thermal-view.js';
 import {fitOutBay,payloadFinishes} from './launch-art.js';
 const v=(x=0,y=0,z=0)=>new T.Vector3(x,y,z),clamp=x=>Math.max(0,Math.min(1,x));
@@ -64,16 +65,12 @@ export function makeLaunch(h){
   }
   halves.push({g,side});
  }
- const finish=payloadFinishes();const hw=h.bodyWidthM,hh=h.bodyHeightM,bl=h.bodyLengthM;
- const stack=f.stack||[{part:'adapter',z0M:0,z1M:.36,radiusM:h.stowedDiameterM*.46},{part:'bus',z0M:.36,z1M:.36+bl,widthM:hw,heightM:hh},{part:'folded cassette',z0M:.36+bl,z1M:h.stowedLengthM,widthM:hw,heightM:hh}];
- for(const section of stack){
-  const z0=section.z0M,z1=section.z1M,H=Math.max(.025,z1-z0),w=section.widthM||hw,dep=section.heightM||hh,y=(z0+z1)/2,name=String(section.part).toLowerCase();
-  if(/adapter|interface/.test(name)){cylinder(payload,0,y,0,section.radiusM*.81,section.radiusM,H,steel,'adapter');continue;}
-  if(name.includes('stand-off')){
-   const rad=stack[0].radiusM*.8;
-   for(const sx of [-1,1])for(const sz of [-1,1])tube(payload,v(sx*rad*.68,z0,sz*rad*.68),v(sx*.46*hw,z1,sz*.46*hh),.035,steel,'adapter');
-   continue;
-  }
+ const hw=h.bodyWidthM,hh=h.bodyHeightM,bl=h.bodyLengthM,stack=f.stack;
+ const adapter=stack[0],spacer=stack[1],rad=adapter.radiusM*.8;
+ cylinder(payload,0,(adapter.z0M+adapter.z1M)/2,0,adapter.radiusM*.81,adapter.radiusM,adapter.lengthM,steel,'adapter');
+ for(const sx of [-1,1])for(const sz of [-1,1])tube(payload,v(sx*rad*.68,spacer.z0M,sz*rad*.68),v(sx*.46*hw,spacer.z1M,sz*.46*hh),.035,steel,'adapter');
+ const finish=payloadFinishes();
+ {const bus=stack.find(s=>s.part==='Insulated bus'),z0=bus.z0M,H=bl,y=z0+H*.5,name='bus';
   if(/bus|body|core|chassis/.test(name)){
    // The stack allowance includes parked hardware. Draw the insulated mold
    // line at its physical dimensions and the two nozzle exits at their stations.
@@ -86,16 +83,27 @@ export function makeLaunch(h){
     const shell=shellBands([[exit.exitRadiusM,-height/2],[exit.exitRadiusM*.61,0],[exit.exitRadiusM*.25,height/2]],0,2*Math.PI);
     mesh(payload,shell,dark,exit.x,y+(exit.throatZ+exit.z)/2,-exit.y,'propulsion');
    }
-  }else if(/cassette|fold|wing|radiator|array|panel/.test(name)){
-   box(payload,0,y,0,w*.92,H*.98,dep*.96,black,'payload');
-   for(let i=0;i<18;i++){const iz=(i+.5)/18-.5;const leaf=box(payload,0,y,iz*dep,w*.997,H*.996,dep*.049,i<12?(i%2?blue:steel):fin,i<12?'solar':'radiator');if(i>=12)thermalMesh(leaf,'radiator');}
-   for(const u of [-1,1]){box(payload,u*w*.48,y,0,w*.022,H,dep,steel,'payload');for(let j=0;j<3;j++)box(payload,u*w*.498,z0+H*(j+.5)/3,0,w*.019,H*.038,dep*1.03,gold,'payload');}
-   for(const side of [-1,1]){const front=side*dep*.517;
-    const cover=mesh(payload,new T.PlaneGeometry(w*.93,H*.95),finish.radiators,0,y,side*dep*.505,'radiator');cover.rotation.y=side<0?Math.PI:0;if(side>0)thermalMesh(cover,'radiator');for(let j=0;j<5;j++)box(payload,(j-2)*w*.183,y,front,w*.012,H*.95,dep*.012,side>0?steel:rib,'payload');for(let k=0;k<7;k++)box(payload,0,z0+(k+.5)*H/7,front,w*.94,H*.009,dep*.011,steel,'payload');}
-   for(let x of [-1,1])for(let z of [-1,1])box(payload,x*w*.475,y,z*dep*.485,w*.034,H*.998,dep*.07,rib,'payload');
-  }else{box(payload,0,y,0,w,H,dep,/engine/.test(name)?dark:ivory,'payload');}
+  }
  }
- const liveMount=group(payload,'payload');liveMount.position.y=(stack.find(q=>/insulated bus/i.test(q.part))?.z0M??.84)+h.bodyLengthM/2;liveMount.rotation.x=-Math.PI/2;
+ const liveMount=group(payload,'payload');liveMount.position.y=stack.find(q=>q.part==='Insulated bus').z0M+bl/2;liveMount.rotation.x=-Math.PI/2;
+ // Low-detail parked hardware uses the flight model's physical hardpoints.
+ const kin=deploymentLayout(h),parked=group(liveMount,'payload'),mechanism=mechanismPose(kin,0);
+ for(const q of mechanism.wings){
+  const [x,y,z]=q.root,rad=q.rollRadius,roll=cylinder(parked,x,y+rad,z,rad,rad,kin.ww+.04,blue,'solar',32);
+  roll.rotation.x=Math.PI/2;
+  for(const side of [-1,1]){
+   const cheek=cylinder(parked,x,y+rad,z+side*(kin.ww/2+.055),rad+.009,rad+.009,.035,steel,'solar',32);cheek.rotation.x=Math.PI/2;
+   tube(parked,v(q.side*hw*.47,side*hh*.21,Math.min(bl*.42,Math.max(-bl*.42,z+side*.28*bl))),v(x-q.side*.08,0,z+side*.19),Math.min(.065,.022*hw),steel,'structure');
+  }
+ }
+ for(const d of kin.descriptors.filter(d=>d.type==='rad')){
+  const q=leafPose(kin,d,0),panel=thermalMesh(box(parked,q.x,q.y,q.z,d.width,d.thickness,d.depth,fin,'radiator'),'radiator');panel.rotation.x=q.pitch;
+  if(!d.j)for(const j of [-1,1]){
+   const ry=-d.end*kin.rootY,xx=j*kin.rw*.32;
+   tube(parked,v(j*hw*.34,-d.end*hh*.29,bl*.48),v(xx,ry,kin.radRoot),Math.min(.065,.022*hw),steel,'structure');
+   tube(parked,v(xx,ry+d.end*.19,kin.radRoot),v(xx,ry+d.end*.19,kin.radRoot+kin.r-.18),.03,steel,'structure');
+  }
+ }
  const referenceParts=payload.children.filter(o=>o!==liveMount&&o.userData.part!=='adapter');
  const fleet=launchFleet[d.launcher]||launchFleet.terran,glenn=/glenn/i.test(d.launcher);
  const parallel=d.launcher==='falconHeavy',single=fleet.stages===1;
@@ -152,7 +160,7 @@ export function makeLaunch(h){
   const directCraft=commission||['deorbit','entry','infeasible'].includes(phase);
   const t=s.t,up=asc?clamp(t/540):0,level=asc?Math.max(0,s.altitudeKm||0):0;
   envelope.visible=integration||context.phase==='D'&&context.domain&&context.domain!=='launcher'&&context.domain!=='conops'&&(pad||asc&&t<230);facility.visible=integration;tower.visible=pad||(asc&&t<26);lower.visible=pad||(asc&&(single||t<215))||(single&&insert);upper.visible=!single&&!integration&&!directCraft;payload.visible=!directCraft;shell.visible=integration||pad||(asc&&(star||t<276))||(star&&insert);
-  referenceParts.forEach(o=>o.visible=reference);const opening=reference&&!vehicleStudy?.80:integration?clamp((-600-t)/2400)*.90:asc&&!star?clamp((t-230)/46):star&&insert?clamp((t-540)/35):0;
+  parked.visible=reference;referenceParts.forEach(o=>o.visible=reference);const opening=reference&&!vehicleStudy?.80:integration?clamp((-600-t)/2400)*.90:asc&&!star?clamp((t-230)/46):star&&insert?clamp((t-540)/35):0;
   moveHandlingFixtures(opening);halves.forEach(({g,side})=>{g.position.set(side*opening*R*(asc?3.7:2.25),asc?-opening*R*2:0,0);g.rotation.z=-side*opening*(asc?.9:.2);if(star&&!integration&&side<0){g.position.set(0,0,0);g.rotation.z=0;}});
   const stageDrop=asc&&!single?clamp((t-170)/45):0;const sideDrop=asc?clamp((t-128)/40):0;
   for(const q of boosters){q.br.visible=pad||asc&&t<168;q.br.position.set(q.dx*(q.rad+sideDrop*baseR*3),baseY-sideDrop*stage1*.36,q.dz*(q.rad+sideDrop*baseR*3));q.br.rotation.z=q.dx*sideDrop*.16;}

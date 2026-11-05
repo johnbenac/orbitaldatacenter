@@ -1,6 +1,6 @@
 // Installed mass and body stations. Distances in m, masses in kg. Instance stations
 // for a group use equal unit masses unless its measured weight shares are supplied.
-import {deploymentLayout,leafPose} from './deployment.js';
+import {deploymentLayout,leafPose,mechanismPose} from './deployment.js';
 
 const xyz=o=>[o.x,o.y,o.z];
 const mean=(points,weights=null)=>points.reduce((out,p,i)=>out.map((v,k)=>v+p[k]*(weights?weights[i]:1/points.length)),[0,0,0]);
@@ -23,13 +23,17 @@ export function equipmentAllocations(h){
  return specs.map(([wbs,id,kg])=>({wbs,id,kg:kg??by[id].kg,group:by[id].group}));
 }
 function leafGroups(h,deploy){
- const g=deploymentLayout(h),groups={};
- for(const leaf of g.descriptors){
-  const {x,y,z}=leafPose(g,leaf,deploy,h.input.solarTiltDeg);
-  (groups[[leaf.type,leaf.side,leaf.end].join('/')]??=[]).push([x,y,z]);
- }
- const select=type=>Object.entries(groups).filter(([key])=>key.startsWith(type+'/')).map(([,points])=>mean(points));
- return {pv:select('pv'),rad:select('rad')};
+ const g=deploymentLayout(h),pose=mechanismPose(g,deploy,h.input.solarTiltDeg);
+ // A uniform blanket/boom assembly has flat material along the deployed span
+ // and the remaining material coiled on its translating tip drum.
+ const pv=pose.wings.map(w=>{
+  const exposed=w.span/(w.span+w.rolledLength);
+  return w.tip.map((v,i)=>v+(w.root[i]-v)*exposed/2);
+ });
+ const rad=pose.banks.map(b=>mean(g.descriptors.filter(d=>d.type==='rad'&&d.end===b.end).map(d=>xyz(leafPose(g,d,deploy,h.input.solarTiltDeg)))));
+ const mechanisms=[...pose.wings.map(q=>q.root),...pose.banks.flatMap(q=>[q.root,q.elbow])];
+ return {pv,rad,mechanisms};
+
 }
 function partsAt(h,deploy){
  const p=h.propulsion,d=h.input,w=h.bodyWidthM,b=h.bodyHeightM,l=h.bodyLengthM;
@@ -39,14 +43,14 @@ function partsAt(h,deploy){
  const suppliedPoint=(wbs,id)=>supplied[wbs]||supplied[id]||[0,0,0];
  const radii=p.tanks.map(xyz);
  const points={
-  '02.01':leaves.pv,'03.01':leaves.rad,'06.01':engines,
+  '02.01':leaves.pv,'03.01':leaves.rad,'07.04':leaves.mechanisms,'06.01':engines,
   '06.03':[radii[0]],'06.04':[radii[1]],'06.05':[radii[2]],'06.06':[radii[0]],'06.07':[radii[1]],'06.08':radii,
   '09.01':[[0,0,adapter&&bus?(adapter.z0M+adapter.z1M-bus.z0M-bus.z1M)/2:-l*.5-.24]]
  };
  for(const row of rows){
   // Integration model may explicitly locate individual units (e.g. CMGs).
   const direct=supplied[row.wbs],preferred=(Array.isArray(direct?.[0])?direct:null);
-  const centers=preferred||points[row.wbs]||[suppliedPoint(row.wbs,row.id)];
+  const centers=points[row.wbs]||preferred||[suppliedPoint(row.wbs,row.id)];
   const count=h.trays??Math.ceil(h.input.trayCount);
   const weights=['01.01','01.02'].includes(row.wbs)&&centers.length===2?[Math.ceil(count/2)/count,Math.floor(count/2)/count]:centers.map(()=>1/centers.length);
   row.stationShares=weights;row.stationsM=centers;row.centroidM=mean(centers,weights);

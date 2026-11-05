@@ -1,3 +1,4 @@
+import {DEPLOY_END_S} from './dist/commissioning-clock.js';
 import assert from 'node:assert/strict';
 import {defaults,normalizeDesign,sizeDesign} from './dist/design.js';
 import {createSimulation} from './dist/model.js';
@@ -13,7 +14,7 @@ const final=base.at(p.end);near(distanceKm(surfacePoint(defaults,p.end,final.pos
 const d={...defaults,missionYears:3.25*DAY/YEAR},g=createSimulation({...d,disposalMethod:'graveyard'}),q=g.disposal();assert.ok(q.feasible&&q.targetMet);assert.equal(q.burns.length,2);assert.equal(q.entry,null);assert.ok(!q.impact&&!q.footprint);near(q.finalPerigeeKm,d.graveyardAltitudeKm,5);near(q.finalApogeeKm,d.graveyardAltitudeKm,5);
 let mass=0;for(const burn of q.burns){const a=g.at(burn.start),b=g.at(burn.end);assert.ok(g.at((burn.start+burn.end)/2).burn);near(a.propellantKg-b.propellantKg,burn.usedKg,.0001);near(burn.dvMs,9.80665*d.isp*Math.log(a.wetKg/b.wetKg),.0001);near(burn.usedKg*9.80665*d.isp,(burn.end-burn.start)*d.thrustN,.001);mass+=burn.usedKg;}
 near(q.usedKg,mass,.0001);near(g.at(q.burns[0].end).propellantKg,g.at(q.burns[1].start).propellantKg);assert.equal(g.at(q.end).disposalStatus,'graveyard');assert.equal(g.events(q.start-.1,q.end-q.start+1).filter(e=>e.type==='disposal').length,2);
-const {result:verified}=chronologicalAudit(g.hardware.input);near(verified.terminal.usedKg,verified.finalState.disposalUsedKg,.0001);near(verified.terminal.finalPerigeeKm,q.finalPerigeeKm,.001);assert.equal(verified.disposalCount,2);near(verified.payloadServiceSeconds,q.start-180-1200,.1);
+const {result:verified}=chronologicalAudit(g.hardware.input);near(verified.terminal.usedKg,verified.finalState.disposalUsedKg,.0001);near(verified.terminal.finalPerigeeKm,q.finalPerigeeKm,.001);assert.equal(verified.disposalCount,2);near(verified.payloadServiceSeconds,q.start-180-DEPLOY_END_S,.1);
 const bad=createSimulation({...d,targetLatDeg:89,targetToleranceKm:10});assert.equal(bad.disposal().outcome,'infeasible');near(bad.at(bad.duration).disposalUsedKg,0);assert.equal(bad.disposal().entry,null);
 const fuel=createSimulation({...d,disposalMethod:'graveyard',propellantKg:1,trimDv:0});assert.equal(fuel.disposal().feasible,false);near(fuel.at(fuel.duration).disposalUsedKg,0);
 const tighter=createSimulation({...d,targetToleranceKm:1,entryVelocitySigmaMs:0,entryDensitySigmaPct:0,entryAzimuthSigmaDeg:0,entryBallisticSigmaPct:0}),miss=tighter.disposal();assert.equal(miss.outcome,'target-miss');near(miss.footprint.semiMajorKm,0);near(miss.footprint.semiMinorKm,0);assert.ok(miss.targetErrorKm>1);
@@ -28,7 +29,7 @@ if(process.argv.includes('--five-year')){
   assert.equal(p.targetMet,true);near(result.finalState.disposalUsedKg,p.usedKg);
   near(p.initialWet-result.finalState.wetKg,p.usedKg);
   near(p.initialWet*(-Math.expm1(-p.paidDv/(h.input.isp*9.80665))),p.usedKg,.001);
-  near(result.payloadServiceSeconds,p.start-1380,.01);
+  near(result.payloadServiceSeconds,p.start-180-DEPLOY_END_S,.01);
   near(result.thermal.coveredSeconds,p.entry??p.end,.01);
   if(method==='reentry'){
    near(p.targetErrorKm,28.05,2);near(p.usedKg,123.46,.5);near(p.impact.speedMs,49.28,.5);near(p.footprint.semiMajorKm,426.9,2);assert.equal(result.impactCount,1);

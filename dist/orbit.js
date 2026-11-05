@@ -28,10 +28,10 @@ export function geometry(d,t,offsetKm=0,track=null){
  const ct=Math.cos(earthRotationRad),stheta=Math.sin(earthRotationRad);
  for(const s of context.sites){
   const x=ct*s.x-stheta*s.y,y=stheta*s.x+ct*s.y,projection=pos[0]*x+pos[1]*y+pos[2]*s.z;
-  if(projection<R||t<1200)continue;
+  if(projection<R||t<540)continue;
   const dist=Math.sqrt(Math.max(1,rr*rr+R*R-2*R*projection)),sinEl=(projection-R)/dist;if(sinEl<Math.sin(el))continue;
   const elev=Math.asin(clip(sinEl,-1,1)),st=[x*R,y*R,s.z*R],sight=st.map((v,k)=>(v-pos[k])/dist);
-  if(elev>=el&&t>=1200){el=elev;best={station:s.name,stationLatDeg:s.lat,stationLonDeg:s.lon,stationECI:st,rangeKm:dist,elevationDeg:elev/DEG,dishAzDeg:Math.atan2(dot(sight,normal),dot(sight,along))/DEG,dishElDeg:Math.acos(clip(-dot(sight,radial),-1,1))/DEG};}
+  if(elev>=el&&t>=540){el=elev;best={station:s.name,stationLatDeg:s.lat,stationLonDeg:s.lon,stationECI:st,rangeKm:dist,elevationDeg:elev/DEG,dishAzDeg:Math.atan2(dot(sight,normal),dot(sight,along))/DEG,dishElDeg:Math.acos(clip(-dot(sight,radial),-1,1))/DEG};}
  }
  return {t,windowAgeYears:t/YEAR,positionECI:pos,velocityECI:vel,sunECI:sun,radial,along,normal,earthRotationRad,altitudeKm:rr-R,perigeeKm,apogeeKm,periodSec,orbitNumber:1+Math.floor(flight*nRef/TAU),orbitPhaseRad:u,eclipse,betaDeg:Math.asin(clip(dot(normal,sun),-1,1))/DEG,sunRadial:sDot,relativeSpeedMs:Math.hypot(vel[0]+.00007292115*pos[1],vel[1]-.00007292115*pos[0],vel[2])*1000,station:null,stationECI:null,rangeKm:0,elevationDeg:0,dishAzDeg:0,dishElDeg:0,...best};
 }

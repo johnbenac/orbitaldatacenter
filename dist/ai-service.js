@@ -1,3 +1,4 @@
+import {DEPLOY_END_S} from './commissioning-clock.js';
 // Customer work is admitted at Earth, then replayed against the selected vehicle's
 // acquisition-, power- and activity-limited service opportunities. Resources are
 // reserved in chronological FCFS order. One clock covers ingress, work and egress.
@@ -51,7 +52,7 @@ function rates(d,h,raw){
   const cuts=d.serviceRoute!=='direct'?[seg.start,...relayBoundaries(seg.start,seg.end,d),seg.end]:[seg.start,seg.end];
   for(let i=1;i<cuts.length;i++){
    const start=cuts[i-1],end=cuts[i],n=end-start,relay=d.serviceRoute!=='direct'&&relayGate((start+end)/2,d);
-   const commissioned=seg.commissioned??seg.serviceAvailable??(start>=1200);
+   const commissioned=seg.commissioned??seg.serviceAvailable??(start>=DEPLOY_END_S);
    const ref=seg.routePoweredFraction??seg.poweredSupport??1;
    const useRelay=relay&&commissioned&&ref>0&&(seg.relayOn??true),allowDirect=d.serviceRoute==='direct'||d.serviceRoute==='hybrid'&&!useRelay;
    let up=useRelay?d.relayUpMbps*ref:allowDirect?seg.upMbps||0:0;

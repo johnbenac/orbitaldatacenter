@@ -6,7 +6,7 @@ const sun=geometry(defaults,0).sunECI;
 const terminatorNode=(360+Math.atan2(sun[0],-sun[1])/DEG)%360;
 
 export const scenarios=[
- {id:'compute-burst',label:'Compute burst',note:'Sixteen trays draw 32 kW during a 22% duty cycle. Inspect the cold plate during the second burst, then advance into cooldown.',design:{...defaults,trayCount:16,solarM2:240,radiatorM2:82,duty:.22},instant:7570,camera:'core',eventType:'burst'},
+ {id:'compute-burst',label:'Compute burst',note:'Sixteen trays draw 32 kW during a 22% duty cycle. Inspect the cold plate during the second burst, then advance into cooldown.',design:{...defaults,trayCount:16,solarM2:240,radiatorM2:82,duty:.22},instant:8470,camera:'core',eventType:'burst'},
  {id:'bulk-optical',label:'Bulk optical pass',note:'An 18 TB initial backlog selects the optical terminal automatically. The 32 TB recorder supplies the Madrid transfer.',design:{...defaults,link:'auto',initialQueueGB:18000,storageTB:32,bulkMbps:160},instant:31065,camera:'spacecraft',eventType:'contact'},
  {id:'dawn-dusk',label:'Dawn–dusk orbit',note:'A 97.6° orbit has its plane normal aligned near the epoch Sun direction. The first 24 hours have continuous sunlight.',design:{...defaults,inclinationDeg:97.6,raanDeg:terminatorNode},instant:21600,camera:'orbit',eventType:null}
 ];

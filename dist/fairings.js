@@ -1,3 +1,4 @@
+import {deploymentLayout} from './deployment.js';
 // Coordinates are metres from the payload adapter interface plane, positive forward.
 const terran = {
  outerDiameterM:5.4,basis:'Planning estimate',source:'Relativity Space · Terran R architecture',
@@ -79,18 +80,25 @@ export function packedSections(g){
  const nozzles=g.propulsion?.engines||[];
  const bellEdge=Math.max(0,...nozzles.map(e=>Math.hypot(e.x,e.y)+e.exitRadiusM));
  const dishEdge=Math.hypot(w*.16+kaDishM*.5,h*.5+Math.min(w,h)*.052*3+kaDishM*.42);
- const radius=Math.max(Math.hypot(w+.12,h+.12)/2,bellEdge,dishEdge);
- add('Insulated bus',Math.max(w+.12,...nozzles.map(e=>2*(Math.abs(e.x)+e.exitRadiusM))),h+.12,l,radius);
- const solarShort=Math.min(wingLengthM/3,wingWidthM),solarLong=Math.max(wingLengthM/3,wingWidthM);
- const radiatorShort=Math.min(radiatorLengthM/3,radiatorWidthM),radiatorLong=Math.max(radiatorLengthM/3,radiatorWidthM);
- // Rails on both sides, plus allowances for hinges, latches and fluid loops.
- const cassetteHeight=12*.05+6*.08+.18;
- // The forward handling frame holds the cassette beyond the boom saddles and
- // folded coolant swivels. Its length is charged to launch fit.
- const standOff=.32;
- add('Forward guide truss',.46*w,.40*h,standOff);
- add('Folded wing and radiator cassette',Math.max(solarShort,radiatorShort)+.12,cassetteHeight,Math.max(solarLong,radiatorLong)+.12);
- add('Parked terminals',Math.max(kaDishM,.45)+.12,.52,.30);
+ const k=deploymentLayout(g),spoolRadius=k.packedRollM+.018;
+ const drumEnvelope=Math.hypot(k.rootX,k.packedRollM)+spoolRadius;
+ const radHalfWidth=Math.max(k.rw/2,k.rw*.32+.32)+.012,radHalfHeight=k.rootY+k.hingeStand+.05;
+ const radEnvelope=Math.hypot(radHalfWidth,radHalfHeight);
+ const busRadius=Math.max(Math.hypot(w+.12,h+.12)/2,bellEdge,dishEdge,drumEnvelope);
+ add('Insulated bus',Math.max(w+.12,2*(k.rootX+spoolRadius)),Math.max(h+.12,4*spoolRadius+.11),l,busRadius);
+ // Heights of the final stations above the forward bus bulkhead. Rolls and banks
+ // are beside one another on fixed hardpoints, not serial appendage compartments.
+ const rollsEnd=k.center+k.mountZ+k.ww/2+.17-l/2,radEnd=k.radRoot+k.r+.13-l/2;
+ const ends=[Math.min(rollsEnd,radEnd),Math.max(rollsEnd,radEnd)].filter(t=>t>0);
+ let from=0;
+ for(const t of ends){if(t-from<1e-6)continue;
+  const pv=rollsEnd>from+1e-7,rad=radEnd>from+1e-7;
+  const label=pv&&rad?'Side rolls and folded radiator banks':pv?'Solar roll end fittings':'Folded radiator tip restraints';
+  add(label,2*Math.max(pv?k.rootX+spoolRadius:0,rad?radHalfWidth:0),
+   2*Math.max(pv?2*spoolRadius+.055:0,rad?radHalfHeight:0),t-from,
+   Math.max(pv?drumEnvelope:0,rad?radEnvelope:0));
+  from=t;
+ }
  return sections;
 }
 

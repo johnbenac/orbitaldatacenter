@@ -1,6 +1,6 @@
 import {sizeGyros,avionics} from './flight-electronics.js';
 /** Orbital Data Center • design and reference model. Units use SI and decimal GB. */
-import {packStep,linkBudget,drag as flightDrag,burnMass} from './physics.js';
+import {surfaces,packStep,linkBudget,drag as flightDrag,burnMass} from './physics.js';
 import {aiPurposes,aiControls,purposeSizing} from './ai-purpose.js';
 import {serviceControls} from './ai-service-inputs.js';
 import {thermalControls,validateThermalLimits} from './thermal-limits.js';
@@ -16,6 +16,9 @@ const clamp=(x,lo,hi)=>Math.min(hi,Math.max(lo,x));
 const rad=x=>x*Math.PI/180;
 export const sources=[
  ...propulsionSources,
+ ['NASA · iROSA deployed in orbit','https://www.nasa.gov/blogs/spacestation/2021/06/20/spacewalkers-successfully-deploy-solar-arrays/','Approximately 18 m of roll-out solar array deployed in six minutes on June 20, 2021. The ODC model uses four smaller/equivalently scaled blanket wings and a selected timeline.'],
+ ['NASA · iROSA second deployment','https://www.nasa.gov/blogs/spacestation/2021/06/25/second-of-the-new-solar-arrays-successfully-deployed/','The second ISS installation rolled out in about ten minutes. Its deployment mechanism supplies the precedent for elastic boom drive.'],
+ ['NASA · ISS thermal control system, pp. 8–12','https://www.nasa.gov/wp-content/uploads/2021/02/473486main_iss_atcs_overview.pdf','Flight hardware reference for radiator tubes, flexible interpanel hoses and separate coolant flow control. The ODC fixed root and folding hinges use a different deployment mechanism.'],
  ['Hoffmann et al. · Training Compute-Optimal Large Language Models','https://arxiv.org/abs/2203.15556','Approximate dense-transformer training compute is 6 × active parameters × training tokens.'],
  ['Transformers · model memory anatomy','https://huggingface.co/docs/transformers/v4.37.0/en/model_memory_anatomy','Mixed-precision Adam training can require 18 bytes per parameter plus activations. State layout, checkpoint size and activation reserve are separate inputs.'],
  ['Hu et al. · LoRA','https://arxiv.org/abs/2106.09685','Low-rank adaptation freezes base weights and trains added parameters. The modeled adapter fraction and service rates are assumptions.'],
@@ -165,9 +168,20 @@ function moderateDensity(altitudeKm){
  const low=densities[index][1],high=densities[index+1][1];
  return low*(high/low)**(coordinate-index);
 }
+const designIllumination=new WeakMap();
+function deployedIncidence(h,period){
+ if(designIllumination.has(h))return designIllumination.get(h);
+ let count=0,pv=0,radHot=0;
+ for(let i=0;i<24;i++){
+  const g=geometry(h.input,540+period*(i+.5)/24);
+  if(g.eclipse)continue;
+  const f=surfaces(h,g,1,true);count++;pv+=f.solarIncidenceCos;radHot=Math.max(radHot,f.radiatorSunCos);
+ }
+ const summary={pv:count?pv/count:0,radHot};designIllumination.set(h,summary);return summary;
+}
 export function sizingEnvelope(h,years=h.input.missionYears){
  const d=h.input,R=6378.137,a=R+d.altitudeKm,period=2*Math.PI*Math.sqrt(a**3/398600.4418),sunFraction=1-Math.asin(R/a)/Math.PI,shadowHours=(1-sunFraction)*period/3600;
- const aging=ageProperties(d,years),incidence=Math.max(0,Math.cos(rad(d.rollDeg+d.solarTiltDeg))),actuatorKw=h.cmg.maneuverW/1000+.12+.012,terminalKw=.24,peakBus=h.itKw+h.hotelKw+actuatorKw+terminalKw;
+ const aging=ageProperties(d,years),angles=deployedIncidence(h,period),incidence=angles.pv,actuatorKw=h.cmg.maneuverW/1000+.12+.012,terminalKw=.24,peakBus=h.itKw+h.hotelKw+actuatorKw+terminalKw;
  const idleIt=d.idleComputePolicy==='off'?0:h.idleKw,meanHotel=h.hotelKw-(d.pumpStandbyPolicy==='follow'&&idleIt===0&&d.thermalMode!=='applied'?h.pumpKw*(1-d.duty):0);
  const meanBus=(h.itKw*d.duty+idleIt*(1-d.duty))+meanHotel+(h.cmg.idleW+(h.cmg.maneuverW-h.cmg.idleW)*d.contactFraction)/1000+.012+.12*.25+terminalKw*d.contactFraction,solarPerM=SOLAR*aging.pv*d.solarDelivery*incidence/1000;
  const solarNeeded=meanBus*(1+(1-sunFraction)*(1/(d.chargeEff*d.dischargeEff)-1))/(sunFraction*Math.max(1e-9,solarPerM));
@@ -175,7 +189,7 @@ export function sizingEnvelope(h,years=h.input.missionYears){
  // Sizing uses a uniform 200 W/m² shortwave and 100 W/m² IR exterior on the insulated box.
  const rejectedKw=d.thermalMode==='applied'?d.appliedHeatKw:peakBus,transportRiseK=d.thermalResistanceKPerKw*(d.thermalMode==='applied'?d.appliedHeatKw:h.itKw)/h.trays;
  const radiatorK=clamp(Math.min(d.radiatorDesignK,d.junctionLimitK-transportRiseK),3,1000);
- const radAbsorbedWm2=aging.emissivity*237*.5+aging.absorptivity*1361*.3*.5;
+ const radAbsorbedWm2=aging.emissivity*237*.5+aging.absorptivity*1361*(angles.radHot+.3*.5);
  const netWm2=2*aging.emissivity*SIGMA*radiatorK**4-radAbsorbedWm2;
  const enclosureDesignLeakKw=solveOuter(h.enclosure,radiatorK,200,100).outwardKW;
  const radiatorNeeded=1000*Math.max(.001,rejectedKw-enclosureDesignLeakKw)/Math.max(.001,netWm2);
@@ -256,9 +270,9 @@ export const assumptions=[
  {name:'Targeted reentry and impact spread',equation:'aD = −ρ |vrel| vrel /(2β), β = m/(CD A); CEN = J diag(σ²) Jᵀ',note:'The fixed target can be edited. Trial retrograde burn times span the final search hours, bounded by the final 18% of the mission. Guidance screens nominal trajectories using a flight mass including 65% of the initial propellant load. Actual propagation uses the carried inventory. The conditional 95% surface ellipse follows a zero-lift surviving reference body in a rotating USSA76 atmosphere, with independent uncertainties in density, ballistic coefficient, interface speed and heading. It does not represent breakup or casualty risk.'},
  {name:'Battery thermal balance',equation:'Cpack dTpack/dt = Ploss − Gpack (Tpack − Tloop)',note:'Pack mass sets heat capacity and conductance. Charge and discharge conversion losses enter the pack, and conductive exchange enters the loop with the opposite sign. The initial pack temperature and shroud boundary are independent inputs.'},
  {name:'Component thermal limits',equation:'Tmin(i, state) ≤ Ti(t) ≤ Tmax(i, state)',note:'Six component nodes have separate operating and survival bands. Actual powered service, current flow or exposure selects the applicable range. Counts and durations use linearly interpolated crossings over solver intervals up to 60 seconds. A derived minimum extends below the observed minimum by the chosen margin. A derived maximum extends above the observed maximum. Fixed neighboring bounds constrain each single-parameter solution.'},
- {name:'Payload keep-in geometry',equation:'cᵣ = min[r(z) − rstack(z) − lateral allowance], cₐ = H − Lstack − axial allowance',note:'From the adapter plane forward, the stack contains a separation adapter, launch-service stand-off, equipment enclosure, 12 PV leaves and six radiator leaves in a launch cassette, and a terminal cap. Compare the circumscribed radius to each linear keep-in segment, including payload axial motion. Overriding diameter or height scales the selected contour. Release-door sweep and vehicle-specific coupled loads need the provider interface drawing.'},
+ {name:'Payload keep-in geometry',equation:'cᵣ = min[r(z) − rstack(z) − lateral allowance], cₐ = H − Lstack − axial allowance',note:'From the adapter plane forward, the stack contains a separation adapter, launch-service stand-off, equipment enclosure, four PV blankets on their restrained rolls and four rigid radiator leaves at their attached roots, and a terminal cap. Compare the circumscribed radius to each linear keep-in segment, including payload axial motion. Overriding diameter or height scales the selected contour. Release-door sweep and vehicle-specific coupled loads need the provider interface drawing.'},
  {name:'Insulated equipment enclosure',equation:'Qout = εeff σ Acovered (Tin⁴ − Tout⁴) + Gfeed (Tin − Tout)',note:'Six sandwich walls support MLI and radiation shielding. Occupied sleeved penetrations subtract from wall, blanket and shield area. Fluid sleeves and cable glands conduct through the blanket. The outer-surface balance includes directional shortwave absorption, Earth IR, outward leakage and radiation to space. The pumped cold plates carry IT heat to separate radiator banks. Blanket properties, areal masses and 25% frame thermal participation are engineering assumptions.'},
- {name:'Reference architecture',equation:'4 PV wings · 2 radiator banks · 2 engines · 2 liquid tanks · 1 He bottle · 4 CMGs',note:'Four telescoping, accordion-folded wings surround a rectangular spine. Two radiator banks extend together toward +Z on a two-branch yoke. Two parallel engines fire away from the −Z deck. A regulated internal helium vessel supplies the separate internal fuel and oxidizer tanks. A gimbaled Ka dish, optical telescope and two opposing S patches share the avionics end. Dimensional estimates maintain constant planform aspect ratios.'},
+ {name:'Reference architecture',equation:'4 PV wings · 2 radiator banks · 2 engines · 2 liquid tanks · 1 He bottle · 4 CMGs',note:'Four strain-energy roll-out blankets extend from fixed port and starboard roots. Two radiator banks extend together toward +Z on a two-branch yoke. Two parallel engines fire away from the −Z deck. A regulated internal helium vessel supplies the separate internal fuel and oxidizer tanks. A gimbaled Ka dish, optical telescope and two opposing S patches share the avionics end. Dimensional estimates maintain constant planform aspect ratios.'},
  {name:'Solar power',equation:'P = 1,361 A ηcell ηdelivery cos θ × illumination × rʸ',note:'BOL material retention uses elapsed Julian years. Packing and delivery are a single multiplicative coefficient.'},
  {name:'Radiation and heat flow',equation:'Q = A [2εσT⁴ − α(G☉ + Galbedo) − εGIR]',note:'Physical panel planform is counted once and both faces emit. The sizing envelope uses a half-Earth view, 0.3 albedo and edge-on direct solar incidence at the radiator. The insulated enclosure sees assumed area-averaged shortwave and IR fluxes of 200 and 100 W/m²; its outward leak reduces the pumped radiator duty. Flight uses the instantaneous orientation.'},
  {name:'Battery energy',equation:'ΔE = (ηc Pcharge − Pdischarge/ηd) Δt',note:'Charge and discharge powers are bus-side values. Pack mass and volume include packaging. Chemical retention here is an assumed annual calendar factor.'},
@@ -266,7 +280,7 @@ export const assumptions=[
  {name:'Data handling',equation:'Rtext = tokens/s × serialized bytes/token × 8',note:'Decimal GB = 10⁹ bytes and TB = 10¹² bytes. Required goodput includes bulk arrivals. Worst-gap sizing assumes one contiguous daily access window. Flight visibility uses actual ground geometry.'},
  {name:'Rocket and mass flow',equation:'Δm = m₀(1 − exp[−Δv/(g₀ Isp)]); ṁ = T/(g₀ Isp)',note:'Two internal liquid vessels, a separate regulated helium bottle and two pressure-fed engines. kg/L densities. Protected maneuver/disposal allocations, reserve and residuals are separate from actual expenditure.'},
  {name:'Launch vehicle reference screen',equation:'mstack ≤ min(mission allowance, cited LEO reference), with independent radial and axial fit tests',note:'Provider capacities describe different conditions and dates. The mission-specific allowance is independently editable. Passing the nominal reference screen gives a planning comparison. Orbit-specific delivered performance requires provider analysis.'},
- {name:'Mass closure',equation:'mstack = (Σ mdry × (1 + margin)) + mpressurant + mfuel + moxidizer + madapter',note:'Mass margin is applied only to dry components. Shielding is body skin area × areal density. Launcher reference capacity and the editable mission-specific mass allowance are separate. Stored appendages occupy a forward cassette. Six structural walls, an exterior blanket and the internal frame each appear once in the ledger.'},
+ {name:'Mass closure',equation:'mstack = (Σ mdry × (1 + margin)) + mpressurant + mfuel + moxidizer + madapter',note:'Mass margin is applied only to dry components. Shielding is body skin area × areal density. Launcher reference capacity and the editable mission-specific mass allowance are separate. The stowed array drums and folded radiator banks remain attached to their operating pivots. Six structural walls, an exterior blanket and the internal frame each appear once in the ledger.'},
  {name:'Inverse sizing and life',equation:'Find the first envelope margin ≤ 0 across 0…30 years',note:'Analytic planning envelope assumes worst circular shadow at β=0, mean ram projection, moderate ECSS/JB-2006 atmospheric density, entered access fraction and design-state heat balance. Life bounds cover generation, SOC, thermal transfer, initial queue, link, latency, propellant, SSD write budget (5-year DWPD rating), mass and fairing. Ground-contact dynamics, CMG singularity and cumulative thermal transients require independent review of dispatch traces. The resolved flight timeline is a separate fidelity level.'}
 ];
 export function checks(){

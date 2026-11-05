@@ -1,4 +1,4 @@
-import {deploymentLayout,leafPose,leafCorners} from './deployment.js';
+import {deploymentLayout,mechanismPose,leafPose,leafCorners} from './deployment.js';
 // Two independent drawing scales. All lengths passed to the projections are in metres.
 const fmt = x => Number(x).toFixed(2);
 const line = (x1, y1, x2, y2, cls='detail') => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="${cls}"/>`;
@@ -17,10 +17,17 @@ function stowed(h){
   for(const [i,part] of f.stack.entries()){
     const sx=x+part.z0M*k,sw=part.lengthM*k,diam=part.radiusM*2*k;
     a+=rect(sx,y-diam/2,sw,diam,'bound');
-    const v=part.heightM*k;
-    a+=rect(sx,y-v/2,sw,v,['adapter','adapter','bus','panel','thermal'][i]);
-    if(i===3)for(let row=1;row<6;row++)a+=line(sx,y-v/2+v*row/6,sx+sw,y-v/2+v*row/6,'cell');
+    if(i===0)a+=rect(sx,y-part.widthM*k/2,sw,part.widthM*k,'adapter');
+    if(i===1)for(const sign of [-1,1])a+=line(sx,y+sign*f.stack[0].radiusM*.68*k,sx+sw,y+sign*h.bodyWidthM*.46*k,'mount');
   }
+  const kin=deploymentLayout(h),bus=f.stack.find(q=>q.part==='Insulated bus'),z0=x+(bus.z0M+h.bodyLengthM/2)*k;
+  const parked=mechanismPose(kin,0);
+  a+=rect(x+bus.z0M*k,y-h.bodyWidthM*k/2,h.bodyLengthM*k,h.bodyWidthM*k,'bus');
+  for(const q of parked.wings){
+    a+=line(z0+Math.min(h.bodyLengthM*.42,q.root[2])*k,y-q.side*h.bodyWidthM*.49*k,z0+q.root[2]*k,y-q.root[0]*k,'mount');
+    a+=rect(z0+(q.root[2]-kin.ww/2)*k,y-(q.root[0]+q.rollRadius)*k,kin.ww*k,2*q.rollRadius*k,'panel');
+  }
+  a+=rect(z0+kin.radRoot*k,y-kin.rw*k/2,kin.r*k,kin.rw*k,'thermal');
   const L=h.stowedLengthM*k;
   a+=line(x,y+57,x,228,'guide')+line(x+L,y+57,x+L,228,'guide')+dim(x,224,x+L,`${fmt(h.stowedLengthM)} m stack`,false);
   a+=text(22,271,`Keep-in Ø ${fmt(f.maxDiameterM)} m  /  stack Ø ${fmt(h.stowedDiameterM)} m`,'measure');
@@ -31,18 +38,20 @@ function stowed(h){
 function deployed(h){
   const bw=h.bodyWidthM,bh=h.bodyHeightM,bl=h.bodyLengthM,wl=h.wingLengthM,ww=h.wingWidthM,rl=h.radiatorLengthM,rw=h.radiatorWidthM;
   const {mountZ,rootX:solarRoot,radRoot:radiatorRoot}=deploymentLayout(h);
-  // Orthographic view at 30 degrees to the array normal; the PV and radiators lie on perpendicular planes.
-  const cs=Math.sqrt(3)/2,sn=.5,span=2*(solarRoot+wl),long=(radiatorRoot+rl)+Math.max(bl/2,mountZ+ww/2);
-  const maxX=Math.max((solarRoot+wl)*cs,rw*.5*sn+bh*.3,bw*.5*cs+bh*.5*sn),maxZ=Math.max(radiatorRoot+rl,mountZ+ww/2);
-  const k=Math.min(160/maxX,72/maxZ),cx=584,cy=155;
-  const project=([x,y,z])=>[cx+(x*cs-y*sn)*k,cy-z*k];
+  // Project the same terminal vertices as the scene, including tracking and splay.
+  const cs=Math.sqrt(3)/2,sn=.5,span=2*(solarRoot+wl),layout=deploymentLayout(h);
+  const points=layout.descriptors.flatMap(d=>leafCorners(leafPose(layout,d,1,h.input.solarTiltDeg),d));
+  const zMin=Math.min(-bl/2,...points.map(p=>p[2])),zMax=Math.max(bl/2,...points.map(p=>p[2])),long=zMax-zMin;
+  const maxX=Math.max(bw/2,...points.map(p=>Math.abs(p[0]*cs-p[1]*sn)));
+  const k=Math.min(160/maxX,139/long),cx=584,cy=155;
+  const project=([x,y,z])=>[cx+(x*cs-y*sn)*k,cy-(z-(zMin+zMax)/2)*k];
   const poly=(points,cls)=>`<polygon points="${points.map(p=>project(p).join(',')).join(' ')}" class="${cls}"/>`;
   const edge=(p,q,cls='detail')=>line(...project(p),...project(q),cls);
   let a=text(402,26,'02    DEPLOYED','eyebrow')+text(402,48,'Operating geometry','title');
-  const layout=deploymentLayout(h),pvY=Math.min(.018,.01*bh);
+  const pvY=0;
   for(const side of [-1,1])for(const end of [-1,1])
-    a+=edge([side*bw*.5,pvY,end*bl*.28],[side*solarRoot,pvY,end*mountZ],'mount');
-  for(const end of [-1,1])a+=edge([0,0,bl/2],[0,end*(rw/2+.82),radiatorRoot],'mount');
+    a+=edge([side*bw*.5,pvY,end*bl*.28],[side*solarRoot,pvY,layout.center+end*mountZ],'mount');
+  for(const end of [-1,1])a+=edge([0,0,bl/2],[0,end*layout.rootY,radiatorRoot],'mount');
   for(const leaf of layout.descriptors){
     const c=leafCorners(leafPose(layout,leaf,1,h.input.solarTiltDeg),leaf);
     a+=poly([c[0],c[1],c[3],c[2]],leaf.type==='pv'?'panel':'thermal');

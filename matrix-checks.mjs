@@ -14,7 +14,7 @@ assert.deepEqual(presetList.map(p=>p.h.trays),[4,12,12,26,981]);
 assert.ok(presetList.find(p=>p.id==='optical').h.initialQueueGB>reference.h.initialQueueGB);
 assert.ok(presetList.slice(0,3).every(p=>p.h.fit&&p.h.massMarginKg>=0));
 const legacyCarrier=presetList.find(p=>p.id==='carrier').h;
-assert.ok(legacyCarrier.fit&&legacyCarrier.fairing.radialClearanceM>0&&legacyCarrier.massMarginKg>0,'The shorter repacked carrier clears the selected fairing.');
+assert.ok(legacyCarrier.fit&&legacyCarrier.fairing.radialClearanceM>0&&legacyCarrier.massMarginKg>0,'The parked rolls and folded radiator banks clear the carrier fairing.');
 assert.ok(!presetList.at(-1).h.fit&&presetList.at(-1).h.massMarginKg<0);
 
 const custom=missionPreset({id:'user-test-fixture',name:'Night-shift node',description:'Short duty cycle',design:{...reference.design,duty:.2,aiPurpose:'agents'},solver:'workload',thermalTargets:{batteryOpMinK:'derive'}});

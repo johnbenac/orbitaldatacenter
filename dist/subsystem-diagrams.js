@@ -1,3 +1,4 @@
+import {DEPLOY_END_S} from './commissioning-clock.js';
 // Interactive engineering plates. Geometry is schematic except where dimensions are marked.
 import {aiPurposes} from './ai-purpose.js';
 import {purposeInfo,purposeId} from './purpose-display.js';
@@ -225,14 +226,14 @@ function launch({h,d,s},id){
  const f=h.fairing;
  const parts=[
  P('fairing','Payload keep-in','The selected profile gives the available radius at each axial station. Mission overrides scale the source contour.','launcher','adapter',[row('Vehicle',h.launcherLabel),row('Basis',f.basis),row('Usable diameter',val(f.maxDiameterM,'m')),row('Usable height',val(f.heightM,'m'))]),
- P('stack','Stowed assembly','Each folded section is tested at both ends and every intersecting taper station. The cassette includes all folded solar and radiator leaves.','solarM2','structure',[row('Stack length / diameter',val(h.stowedLengthM,'m')+' / '+val(h.stowedDiameterM,'m')),row('Limiting section',f.limitingPart),row('Minimum lateral gap',val(f.radialClearanceM,'m',3)),row('Axial gap',val(f.axialClearanceM,'m',3))]),
+ P('stack','Stowed assembly','Each folded section is tested at both ends and every intersecting taper station. The launch envelope includes the rolled solar wings on their saddles and the folded forward radiator banks.','solarM2','structure',[row('Stack length / diameter',val(h.stowedLengthM,'m')+' / '+val(h.stowedDiameterM,'m')),row('Limiting section',f.limitingPart),row('Minimum lateral gap',val(f.radialClearanceM,'m',3)),row('Axial gap',val(f.axialClearanceM,'m',3))]),
  P('adapter','Launch interface','The adapter remains on the launch stack at separation. The payload allowance is independently editable for the target mission.','launchAllowanceKg','adapter',[row('Adapter',val(d.adapterKg,'kg')),row('Launcher reference',val(d.referenceKg,'kg',0)),row('Mission allowance',val(d.launchAllowanceKg,'kg',0)),row('Launch mass margin',val(h.massMarginKg,'kg',0))]),
  P('trim','Insertion trim','The spacecraft uses its chemical engines to close the trim budget after separation. The mission clock drives achieved orbit and paid delta-v.','trimDv','propulsion',[row('Target altitude',val(d.altitudeKm,'km')),row('Achieved altitude',val(s.altitudeKm,'km')),row('Required trim',val(d.trimDv,'m/s')),row('Delivered trim',val(s.trimPaidDv,'m/s'))])];
  const x=61,y=117,k=Math.min(330/Math.max(f.heightM,h.stowedLengthM),100/Math.max(f.maxDiameterM,h.stowedDiameterM)),xm=z=>x+z*k;
  const prof=f.profile.map(([z,r])=>[xm(z),y-r*k]).concat(f.profile.slice().reverse().map(([z,r])=>[xm(z),y+r*k]));
  const art=pick(parts[0],29,32,384,164,`<polygon points="${prof.map(p=>p.join(',')).join(' ')}" class="sd-profile"/>`+T(52,41,'KEEP-IN CROSS SECTION','sd-over','start'))+
  path(`M40 ${y}H420`,'sd-centerline')+
- f.stack.map((r,i)=>pick(i===0?parts[2]:parts[1],xm(r.z0M),y-r.radiusM*k,Math.max(9,r.lengthM*k),Math.max(12,2*r.radiusM*k),rect(xm(r.z0M),y-r.radiusM*k,r.lengthM*k,2*r.radiusM*k,'sd-stack-outline')+rect(xm(r.z0M),y-r.heightM*k/2,r.lengthM*k,r.heightM*k,'sd-stack-'+(r.part.includes('terminal')?4:r.part.includes('cassette')?3:r.part.includes('bus')?2:0)))).join('')+
+ f.stack.map((r,i)=>pick(i===0?parts[2]:parts[1],xm(r.z0M),y-r.radiusM*k,Math.max(9,r.lengthM*k),Math.max(12,2*r.radiusM*k),rect(xm(r.z0M),y-r.radiusM*k,r.lengthM*k,2*r.radiusM*k,'sd-stack-outline')+rect(xm(r.z0M),y-r.heightM*k/2,r.lengthM*k,r.heightM*k,'sd-stack-'+(r.part.includes('terminal')?4:/roll|radiator|blanket/i.test(r.part)?3:r.part.includes('bus')?2:0)))).join('')+
  path(`M${x} 178v8H${xm(h.stowedLengthM)}v-8`,'sd-dim')+T((x+xm(h.stowedLengthM))/2,209,val(h.stowedLengthM,'m stack'),'sd-name')+
  T(437,56,'LATERAL MARGIN','sd-over','start')+T(437,83,val(f.radialClearanceM,'m',2),f.radialClearanceM<0?'sd-large sd-bad':'sd-large','start')+
  T(437,119,'AXIAL MARGIN','sd-over','start')+T(437,145,val(f.axialClearanceM,'m',2),f.axialClearanceM<0?'sd-large sd-bad':'sd-large','start')+
@@ -295,7 +296,7 @@ function conops({h,d,s,day,events},id){
  P('service',profile.name,profile.goal,q.training?'trainingBudgetDays':'serviceDeadlineS','compute',[row('Customer',profile.customer),...(q.purposeId==='agents'?[row('Parallel agents per assignment stage',val(d.agentFanout,'agents')),row('Internal peer traffic',val(s.aiPeerMbps,'Mbit/s')),row('Earth service concurrency',val(d.serviceConcurrency,'slots'))]:[]),row('Peak work estimate',val(q.activeUnitsPerSec,u+'/s',2)),row('Computed onboard',val(s.aiUnitsComputed,u)),row('Product returned',val(s.aiProductDeliveredGB,'GB',3))]),
  P('access','Transfer opportunity','Ground visibility and acquisition start a transfer from the queued recorder. The shareable clock preserves the event and design state.','network','communications',[row('Access mask',val(d.elevationDeg,'°')),row('Windows today',String(day.contactCount??'—')),row('Transfer backlog',val(s.queueGB,'GB')),row('Next scheduled event',next?.label||'Outside this window')],events.find(e=>e.type==='contact'&&e.end>=s.t)),
  P('retirement','Retirement plan','Chemical control protects disposal inventory. The selected retirement method sets the terminal maneuver and final state.','disposalDv','propulsion',[row('Disposal method',(d.disposalMethod||'reentry')),row('Protected stock',val(s.disposalProtectedKg,'kg')),row('Orbit-maintenance allocation',val(d.yearsSupply,'yr')),row('Mission state',s.disposalStatus||'Scheduled')])];
- const art=T(42,37,'NOMINAL SPACECRAFT SERVICE','sd-over','start')+flow(id,'M102 95H200','cyan',s.t>=1200)+flow(id,'M266 95H362','cyan',s.aiUnitRate>0)+flow(id,'M421 95H487','violet',s.t>=s.disposalStart)+
+ const art=T(42,37,'NOMINAL SPACECRAFT SERVICE','sd-over','start')+flow(id,'M102 95H200','cyan',s.t>=DEPLOY_END_S)+flow(id,'M266 95H362','cyan',s.aiUnitRate>0)+flow(id,'M421 95H487','violet',s.t>=s.disposalStart)+
  pick(parts[0],34,57,105,115,circle(80,94,23,'sd-device')+path('M80 76v18l12 9','sd-hardware')+named(80,145,'Schedule',val(d.duty*100,'% duty')))+
  pick(parts[1],179,53,107,115,glyph('rack',233,94,.8)+named(233,145,'Compute',val(s.itKW,'kW')))+
  pick(parts[2],330,53,112,115,glyph('dish',386,91,.84)+named(386,145,'Transfer',val(s.goodputMbps,'Mbit/s')))+
@@ -317,7 +318,7 @@ function environment({h,d,s,day},id){
    T(290,218,'SPACECRAFT EQUIPMENT MODEL ENDED AT INTERFACE','sd-over');
   return info('Atmospheric entry environment','Local air density, dynamic pressure and target location for the surviving reference body',parts,art,[legend('cyan','Relative flow'),legend('amber','Ground approach')],'Reference-body descent');
  }
- const exposed=s.t>=540&&!s.referenceBody,projected=s.deployment*h.radiatorM2/1000;
+ const exposed=s.t>=540&&!s.referenceBody,projected=s.radiatorCoupledM2/1000;
  const parts=[
  P('sun','Solar and Earth flux','Direct sunlight reaches the wings and radiator. Earth-reflected sunlight and longwave infrared enter the surface heat balance separately.','solarTiltDeg','solar',[row('Normal solar flux',exposed?val(s.solarIrradiance,'W/m²'):'Encapsulated'),row('Radiator albedo',exposed?val(s.albedoIrradiance,'W/m²'):'—'),row('Radiator IR',exposed?val(s.earthIRIrradiance,'W/m²'):'—'),row('Absorbed sunlight',exposed?val(projected*s.absorptivity*s.solarIrradiance*s.radiatorSunCos,'kW'):'—')]),
  P('flow','Relative atmosphere','Density and atmospheric-relative speed act on the ram-facing silhouette, producing drag and a torque about the spacecraft mass center.','solarCyclePhase','structure',[row('Daily F10.7 proxy',val(s.f107Daily,'sfu')),row('81-day F10.7 proxy',val(s.f107Mean,'sfu')),row('Density',exposed&&Number.isFinite(s.densityKgM3)?s.densityKgM3.toExponential(3)+' kg/m³':'—'),row('Silhouette / drag',val(s.ramAreaM2,'m²')+' / '+val(s.dragN,'N',5))]),

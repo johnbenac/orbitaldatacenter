@@ -16,8 +16,8 @@ export function deployedPlan(h){
  const b1=Math.cos(.38),b2=Math.sin(.38),u=([x,y])=>x*b1-y*b2;
  const sx=155/Math.max(...leaves.flatMap(({c})=>c.map(q=>Math.abs(u(q)))),w),sz=68/Math.max(...leaves.flatMap(({c})=>c.map(q=>Math.abs(q[2]))),l*.5),k=Math.min(sx,sz),xy=q=>[cx+u(q)*k,cy-q[2]*k];
  let a='';
- for(const side of [-1,1])for(const end of [-1,1])a+=line(cx,cy-end*l*.28*k,cx+side*g.rootX*b1*k,cy-end*g.mountZ*k,steel);
- for(const side of [-1,1])a+=line(...xy([0,0,l/2]),...xy([0,side*(g.rw/2+.82),g.radRoot]),steel);
+ for(const side of [-1,1])for(const end of [-1,1])a+=line(cx,cy-end*l*.28*k,cx+side*g.rootX*b1*k,cy-(g.center+end*g.mountZ)*k,steel);
+ for(const side of [-1,1])a+=line(...xy([0,0,l/2]),...xy([0,side*g.rootY,g.radRoot]),steel);
  for(const {d,c} of leaves){
   const seq=[0,1,3,2].map(i=>xy(c[i]).map(f).join(',')).join(' '),pv=d.type==='pv';
   a+=`<polygon points="${seq}" fill="${pv?solar:rad}" stroke="#c5d2ce" stroke-width=".65"/>`;

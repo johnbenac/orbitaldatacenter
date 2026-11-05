@@ -1,3 +1,4 @@
+import {DEPLOY_END_S} from './dist/commissioning-clock.js';
 import assert from 'node:assert/strict';
 import {createSimulation} from './dist/model.js';
 import {chronologicalAudit} from './dist/mission-worker.js';
@@ -12,7 +13,7 @@ const pass=m.events(0,DAY).find(e=>e.type==='burst'),idle=pass.end+5;
 assert.equal(at(idle,'junction').activity,'Powered idle');assert.equal(at(idle,'coldPlate').state,'operating');assert.equal(at(idle,'radiator').state,'operating');
 const off=createSimulation({...d,duty:0,idleComputePolicy:'off',pumpStandbyPolicy:'follow'}),shut=off.at(idle);assert.equal(shut.itKW,0);assert.equal(shut.servedPumpKW,0);assert.equal(shut.thermalQualification.find(x=>x.id==='junction').state,'survival');assert.equal(shut.thermalQualification.find(x=>x.id==='radiator').state,'operating');
 const powerless=createSimulation({...d,solarM2:5,batteryKWh:1,socInitial:d.socMin});
-let unserved=powerless.window(1200,DAY,450).find(s=>s.eclipse&&s.unmetKW>.1&&s.itKW<.001);assert.ok(unserved);assert.equal(unserved.thermalQualification.find(x=>x.id==='junction').state,'survival');assert.equal(unserved.thermalQualification.find(x=>x.id==='coolant').state,'survival');assert.equal(unserved.thermalQualification.find(x=>x.id==='enclosure').state,'operating');
+let unserved=powerless.window(DEPLOY_END_S,DAY,450).find(s=>s.eclipse&&s.unmetKW>.1&&s.itKW<.001);assert.ok(unserved);assert.equal(unserved.thermalQualification.find(x=>x.id==='junction').state,'survival');assert.equal(unserved.thermalQualification.find(x=>x.id==='coolant').state,'survival');assert.equal(unserved.thermalQualification.find(x=>x.id==='enclosure').state,'operating');
 const end=m.at(m.duration);assert.ok(end.thermalQualification.every(r=>r.status==='unassessed'));
 const cut=m.at(m.disposal().cutoff);assert.equal(cut.deployment,1);assert.equal(cut.thermalQualification.find(r=>r.id==='radiator').state,'operating');assert.equal(cut.thermalQualification.find(r=>r.id==='enclosure').state,'operating');
 const w=m.thermalWindow(0,m.duration),result=chronologicalAudit(d).result,audit=result.thermal;
@@ -25,7 +26,7 @@ for(const n of thermalNodes){
  }
 }
 const spans=m.thermalWindow(-600,700);near(spans.coveredSeconds,700);near(spans.rows.find(r=>r.id==='battery'&&r.state==='survival').durationS,600);
-const none=deriveBound(off.thermalWindow(1200,3600),'junction','operating','max');assert.equal(none.status,'no-data');assert.equal(none.valueK,null);assert.equal(none.coverageS,0);
+const none=deriveBound(off.thermalWindow(DEPLOY_END_S,3600),'junction','operating','max');assert.equal(none.status,'no-data');assert.equal(none.valueK,null);assert.equal(none.coverageS,0);
 const nested=deriveBound(m.thermalWindow(0,300),'enclosure','survival','max',3);assert.equal(nested.valueK,d.enclosureOpMaxK);assert.equal(nested.observedK,d.launchBoundaryK);
 const infeasible=deriveBound(audit,'battery','operating','min',200);assert.equal(infeasible.status,'infeasible');assert.equal(infeasible.valueK,null);
 assert.ok(validateDesign({...d,batterySurvivalMinK:d.batteryOpMinK+1}).length);

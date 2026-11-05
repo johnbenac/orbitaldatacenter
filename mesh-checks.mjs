@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {writeFileSync} from 'node:fs';
 import * as T from './dist/vendor/three.module.js';
 import {sizeDesign,missionStarter} from './dist/design.js';
 import {propulsionSectionDrawing} from './dist/propulsion-drawing.js';
@@ -49,4 +50,6 @@ for(const purpose of ['text','voice','batch','agents','finetune','pretrain']){
  }
  const drawing=propulsionSectionDrawing(hw);assert(!/NaN|undefined|Infinity/.test(drawing));assert(drawing.includes('Launch-axis section'));
 }
-console.log(JSON.stringify({meshes,geometries:geoms.size,checkedTriangles:checked,zeroAreaPoleTriangles:poles,closedSolids:closed.size,shellSides:craft.walls.length,occupiedPorts:craft.walls.reduce((n,w)=>n+w.userData.wall.holes.length,0)}));
+const audit={meshes,geometries:geoms.size,checkedTriangles:checked,zeroAreaPoleTriangles:poles,closedSolids:closed.size,shellSides:craft.walls.length,occupiedPorts:craft.walls.reduce((n,w)=>n+w.userData.wall.holes.length,0)};
+if(process.argv.includes('--write'))writeFileSync(new URL('./dist/surface-audit.js',import.meta.url),'// Reproduce using node mesh-checks.mjs --write.\nexport const surfaceAudit='+JSON.stringify(audit,null,2)+';\n');
+console.log(JSON.stringify(audit));

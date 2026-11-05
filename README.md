@@ -31,7 +31,7 @@ The thermal view maps six modeled nodes to fixed Kelvin color scales. Select a n
 
 ## Spacecraft baseline
 
-The persistent **Spacecraft architecture** and **Master equipment list** views are available from every phase. The ODC-01 Rev C bus keeps the same enclosure, four solar wings, two radiator banks, two internal liquid tanks, separate helium bottle and two engines across customer missions. A sized variant can exceed an envelope, including an engine's published range or a launch vehicle’s available fairing.
+The persistent **Spacecraft architecture** and **Master equipment list** views are available from every phase. The ODC-01 Rev D bus keeps the same enclosure, four solar wings, two radiator banks, two internal liquid tanks, separate helium bottle and two engines across customer missions. A sized variant can exceed an envelope, including an engine's published range or a launch vehicle’s available fairing.
 
 The equipment list gives separate power, dimensions and mass bases and sources. Mechanical Design filters equipment stations by WBS, part number or subsystem and calculates the selected group’s center of mass. Command & Data Handling records spacecraft commands and housekeeping alongside the AI payload. The equipment list separates supplier reference masses from the vehicle allocations and rolls them up through dry, wet and launch mass. CSV and JSON retain the work breakdown structure, source information and sizing basis. The quantitative PDR includes the installed equipment register, vessel volumes, engine stations, mass properties at depletion states and geometric clearance screens.
 
@@ -52,6 +52,12 @@ The service analysis records customer outcomes against the modeled direct contac
 **Share** restores the scenario, phase, domain, camera, clock and selected event. **Export & import** provides scenario JSON, telemetry CSV, a static-site bundle and the quantitative PDR ZIP. Scenario JSON and PDR packages can be imported from a design phase.
 
 The quick mission preview uses representative days for later mission ages. **Run mission analysis** integrates each mission day in sequence in a local Web Worker. Preparing a PDR uses the chronological run and includes the printable quantitative review, design budgets, evaluated clearances, thermal requirements, time histories and verification data. After preparation, the download link remains available in the current session.
+
+## Commissioning playback
+
+Open Phase E and select **Deploy spacecraft**, or use `?phase=E&domain=conops&chapter=commissioning`. The 20-minute study sequence begins at mission elapsed time 900 s. You can scrub it, pause it, select a stage or inspect the moving tip drum and radiator knuckle. At sequence end the clock pauses for verification. Continue to operations to follow the mission.
+
+Four roll-out solar blankets stay attached at their individual roots. Two forward radiator banks swing at their permanent root hinges, open their outer panels, latch and then admit coolant. The Sources and Architecture pages link the flight and supplier publications used for these mechanisms.
 
 ## Local verification
 

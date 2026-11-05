@@ -105,7 +105,7 @@ group('power margin',assume,[
  ['pvEfficiency','Enter beginning-of-life cell electrical efficiency at the assumed illumination and temperature. Account for panel packing and bus losses in the delivery factor.'],
  ['solarDelivery','Multiply packing fraction and downstream electrical efficiencies once. Include harness and regulated conversion in this combined factor.','0.90 active coverage × 0.95 electrical delivery gives 0.855.'],
  ['pvRetention','Derive an elapsed-year multiplier from radiation or flight degradation at a stated reference dose, orbit and duration.','90% output after five reference years gives 0.9^(1/5) ≈ 0.9791 per year.'],
- ['pvKgM2','Enter cell and substrate mass per square metre of installed wing planform. The hinge, carriage and joint ledger is separate.']
+ ['pvKgM2','Enter cell and substrate mass per square metre of installed wing planform. Deployment booms, release fittings and drive joints have their own allocation.']
 ]);
 group('perf dgx',estimate,[
  ['trayCount','Count whole installed compute trays. Check model replicas, memory fit, power, launch fit and heat rejection together.'],

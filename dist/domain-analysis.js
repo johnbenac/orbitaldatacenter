@@ -308,7 +308,7 @@ function readMetric(code,c){
 }
 const F=(source,receiver,quantity,value,unit,kind='Induced')=>({source,receiver,quantity,value:numberValue(value),unit,kind});
 export function environmentFlows({hardware:h,state:s}){
- const d=h.input,open=s.t>=540&&!s.referenceBody,exposed=open?Math.min(1,Math.max(0,s.deployment)):0,A=h.radiatorM2*exposed/1000;
+ const d=h.input,open=s.t>=540&&!s.referenceBody,A=open?s.radiatorCoupledM2/1000:0;
  const heatRows=[
   F('Sun','Solar-wing surface','Normal irradiance',s.t>=540?s.solarIrradiance:null,'W/m²','Natural'),
   F('Sun','Radiator coating','Absorbed direct shortwave',s.t>=540?A*s.absorptivity*s.solarIrradiance*s.radiatorSunCos:null,'kW','Natural'),

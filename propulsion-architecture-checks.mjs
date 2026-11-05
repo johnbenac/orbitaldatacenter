@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {DEPLOY_END_S} from './dist/commissioning-clock.js';
 import {sizeDesign,defaults,missionStarter} from './dist/design.js';
 import {propulsionReview} from './dist/spacecraft-architecture.js';
 import {createSimulation} from './dist/model.js';
@@ -26,11 +27,11 @@ for(const d of cases){
  assert.ok(wet.radiatorMarginM>0);
 }
 const base=createSimulation({...defaults,missionYears:.01});
-assert.equal(base.at(600).burn,false);near(base.at(1199.999).propellantKg,defaults.propellantKg);
-const on=base.at(1200.1),after=base.at(1220);assert.ok(on.burn&&on.deployment===1&&on.propellantKg<defaults.propellantKg);
+assert.equal(base.at(600).burn,false);near(base.at(DEPLOY_END_S-.001).propellantKg,defaults.propellantKg);
+const on=base.at(DEPLOY_END_S+.1),after=base.at(DEPLOY_END_S+20);assert.ok(on.burn&&on.deployment===1&&on.propellantKg<defaults.propellantKg);
 near(on.bodyZECI.reduce((sum,x,i)=>sum+x*on.velocityECI[i],0)/Math.hypot(...on.velocityECI),1);
 assert.ok(!after.burn&&after.trimPaidDv>1.99);
-const held=createSimulation({...defaults,missionYears:.01,thrustN:20000,solarM2:200,solarTiltDeg:90}),st=held.at(1210);
+const held=createSimulation({...defaults,missionYears:.01,thrustN:20000,solarM2:200,solarTiltDeg:90}),st=held.at(DEPLOY_END_S+10);
 assert.ok(!st.burn&&st.burnHold.length>0);near(st.propellantKg,defaults.propellantKg);
 const plan=held.disposal();assert.ok(!plan.feasible&&plan.reason.length>0);near(plan.usedKg,0);
 const hot=sizeDesign({...defaults,thrustN:20000});assert.ok(!propulsionReview(hot).clear&&hot.propulsion.engineMountMarginM<0);

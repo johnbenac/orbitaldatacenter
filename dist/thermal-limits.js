@@ -34,7 +34,7 @@ function activity(n,s,op){
  case 'junction':return op?s.burst?'Powered compute burst':'Powered idle':'Accelerators unpowered';
  case 'coldPlate':return op?'Cold plate on circulating loop':'Loop in standby';
  case 'coolant':return op?'Pump circulating coolant':'Pump off / unserved';
- case 'radiator':return op?(s.radiatorDeployment??s.deployment)<.999?'Partially exposed radiator':'Deployed passive radiator':s.deployment>0&&s.deployment<1?'Radiator in deployment cassette':'Radiator stowed';
+ case 'radiator':return op?(s.radiatorDeployment??s.deployment)<.999?'Radiator circuit partially admitted':'Latched radiators in service':s.deployment>0&&s.deployment<1?'Radiator circuits isolated':'Radiator stowed';
  case 'battery':return op?s.chargeKW>s.dischargeKW?'Pack charging':'Pack discharging':'Pack in standby';
  default:return op?'Exposed passive insulation':'Payload under launch boundary';
  }

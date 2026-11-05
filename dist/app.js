@@ -1,4 +1,7 @@
 import {defaults,controls,presets,applyPreset,applyAIPurpose,missionStarter,missionStarterContextKeys,sizeDesign,inverseSolve,solveModes,enumeratePresets,estimateLife,checks,sources,assumptions,validateDesign,ageProperties,YEAR} from './design.js';
+import {renderGyroBenchmark,renderAvionics,gyroCandidateDesign} from './flight-electronics.js';
+import {renderMechanical,bindMechanical,updateMechanical} from './mechanical-design.js';
+import {domainCoverage} from './domain-coverage.js';
 import {renderArchitecture} from './architecture-view.js';
 import {renderEquipmentList,bindEquipmentList} from './equipment-list.js';
 import {createSimulation,modelNotes} from './model.js';
@@ -62,7 +65,7 @@ function loadScenario(obj){
  if(v.tradeBase&&typeof v.tradeBase==='object'){const b=sizeDesign(v.tradeBase);if(!b.errors.length)view.tradeBase=b.input}
  referencePage=referenceIds.includes(v.reference)?v.reference:null;playing=false;initialChronology=!!v.chronological;
 }
-function scenario(){return {schema:'odc-scenario/1',modelVersion:'8.0',design:input,view:{...view,reference:referencePage,cameraStates:scene?.getCameraState?.()||view.cameraStates,t:Math.round(view.t*1000)/1000}}}
+function scenario(){return {schema:'odc-scenario/1',modelVersion:'9.0',design:input,view:{...view,reference:referencePage,cameraStates:scene?.getCameraState?.()||view.cameraStates,t:Math.round(view.t*1000)/1000}}}
 try{if(location.hash.startsWith('#design=')){loadScenario(decodeScenario(location.hash.slice(8)));initialShared=true}}catch(e){toast(e.message)}
 if(!initialShared){
  const q=new URLSearchParams(location.search),domain=q.get('domain')||q.get('subsystem'),phase=(q.get('phase')||'').toUpperCase(),chapter=chapters.find(c=>c.id===q.get('chapter'));
@@ -130,8 +133,8 @@ function powerHistory(){const keys=[['itKW','IT'],['storageKW','Storage'],['term
 function drawStudy(){const p=view.domain,entry=workspaceFor(p,hardware),study=$('study');if(!entry){study.hidden=true;return}study.hidden=false;const scope={day:'24 HOURS',now:'LOCAL HOUR',mission:sim.audit?'CHRONOLOGICAL':'MISSION PREVIEW'}[view.scope];
  let charts='<div class="chartgrid">'+entry.charts.map(drawChart).join('')+'</div>';
  if(p==='power')charts=powerHistory()+charts;
- if(p==='mass')charts='<div class="panelpad"><div class="smalltitle">Installed stack by allocation</div><div class="bars gap">'+hardware.massLedger.map((r,i)=>'<button data-inspect="'+esc(r.id)+'" title="'+esc(r.label)+' · '+fmt(r.kg)+' kg" style="width:'+100*r.kg/hardware.launchKg+'%;background:'+colors[i%colors.length]+'"></button>').join('')+'</div></div>'+charts;
- study.innerHTML=head(p==='mass'?'Mass distribution':'Subsystem telemetry',pages[p][1],'<span class="metacode">'+scope+'</span>')+charts;
+ if(p==='mass')charts='<div class="panelpad"><button class="btn" data-domain="mechanical">'+icon('box',14)+' Inspect component centers of mass</button></div>'+charts;
+ study.innerHTML=head(p==='mass'?'Mass through time':'Subsystem telemetry',pages[p][1],'<span class="metacode">'+scope+'</span>')+charts;
 }
 const eventColors={eclipse:'#596584',contact:'#75c9cc',burn:'#fbb875',reboost:'#ed9e64',trim:'#ed9e64',desat:'#b6a2db',burst:'#82ae9a',compute:'#82ae9a',deployment:'#d4a358',launch:'#edd4aa',separation:'#ac9fc3'};
 function eventColor(type){return eventColors[type]||'#b3bdca'}
@@ -150,7 +153,7 @@ function ledger(){const entry=workspaceFor(view.domain,hardware);if(!entry)retur
  if(view.domain==='power')add='<div class="panelpad"><h3>Bus load breakdown</h3>'+[['itKW','Compute'],['storageKW','Storage'],['terminalKW','Terminals'],['pumpKW','Pumps'],['cmgKW','CMGs'],['jointKW','Joints'],['coilKW','Magnetic coils'],['auxKW','Auxiliary loads']].map(([k,l],i)=>'<div class="loadrow"><span>'+l+'</span><div><b style="width:'+clamp(100*snap[k]/Math.max(.01,snap.loadKW),0,100)+'%;background:'+colors[i%6]+'"></b></div><strong>'+fmt(snap[k],3)+' kW</strong></div>').join('')+'</div>';
  if(view.domain==='thermal')add='<div class="panelpad shellbudget"><h3>Equipment enclosure</h3><p>Six closed structural faces carry '+fmt(hardware.enclosure.coveredAreaM2,2)+' m² of insulation. Coolant crosses the bulkheads through fitted penetrations. The chip-to-radiator path carries the compute load while the wall model accounts for heat that escapes or enters through the blanket and fittings.</p><div class="chips"><button class="chip" data-inspect="enclosure">Inspect the walls</button><button class="chip" data-action="coreview">Open the cutaway</button></div></div><div class="heatflow">'+[['junctionK','Junction'],['coldPlateK','Cold plate'],['coolantK','Coolant'],['radiatorK','Radiator']].map(([k,l])=>'<span>'+l+'<b>'+fmt(snap[k],1)+' K</b></span>').join('<i>→</i>')+'</div>';
  if(view.domain==='launch')add='<div class="panelpad"><button class="btn" data-action="fairingcompare">'+icon('ruler',14)+' Compare launcher envelopes</button></div>'+vehicleDrawings(hardware)+'<div class="panelpad"><div class="callout"><b>'+esc(hardware.launcherLabel)+'</b> · '+(hardware.fit?'Fits the assumed stowed envelope':'Stowed geometry exceeds the assumed envelope')+'. Mass-only lower bound '+Math.ceil(hardware.launchKg/Math.min(hardware.input.launchAllowanceKg,hardware.input.referenceKg))+' launch(es). '+(hardware.launchScreenFeasible?'One vehicle and its adapter make up the manifest.':'A multi-launch assembly manifest has not been modeled.')+'</div><button class="chip gap" data-action="launchseq">'+icon('play',12)+' View insertion sequence</button></div>';
- if(view.domain==='comm')add='<div class="panelpad"><div class="smalltitle">Installed terminals</div><div class="chips gap"><span class="tag">S-BAND / TT&C</span><span class="tag">26 GHz / KA DOWNLINK</span><span class="tag">1,550 nm / OPTICAL</span></div><p>Downlink carries queued payload. S-band provides the command uplink. Optical contacts assume clear sky.</p></div>';
+ if(view.domain==='comm')add='<div class="panelpad"><div class="smalltitle">Installed terminals</div><div class="chips gap"><span class="tag">S-BAND / tracking, telemetry and command</span><span class="tag">26 GHz / KA DOWNLINK</span><span class="tag">1,550 nm / OPTICAL</span></div><p>Downlink carries queued payload. S-band provides the command uplink. Optical contacts assume clear sky.</p></div>';
  return '<section class="panel lowerpan">'+head('Engineering readouts','list-checks','<span class="metacode">'+time(view.t)+'</span>')+add+'<div class="twocol">'+[entry.rows.slice(0,Math.ceil(entry.rows.length/2)),entry.rows.slice(Math.ceil(entry.rows.length/2))].map(a=>rowTable(['Quantity','Value'],a.map(read).join(''))).join('')+'</div></section>'
 }
 function eventTable(list,limit){const pick=typeof limit==='number'?list.slice(0,limit):list;return pick.length?rowTable(['Episode','Start · MET','Duration',''],pick.map(e=>tr(['<span class="dotlabel"><i class="legenddot" style="--c:'+eventColor(e.type)+'"></i>'+esc(e.label)+'</span>',time(e.start),fmt(e.end-e.start,1)+' s','<button class="iconbtn" aria-label="Inspect '+esc(e.label)+'">'+icon('chevron-right',14)+'</button>'],'data-event="'+esc(e.id)+'"')).join('')):'<div class="panelpad muted">No matching events in this window. <button class="textbutton" data-action="findnext">Find the next event</button></div>'}
@@ -172,14 +175,29 @@ function scenarioTests(){if(cachedTests)return cachedTests;const h=sizeDesign(de
  cachedTests=records;return records}
 function deploymentEvidence(){
  const rows=deploymentAudit.rows.map(x=>tr([esc(presetList.find(p=>p.id===x.id)?.name||x.id),fmt(x.minLeafGapM*1000,2),fmt(x.minSolarRadiatorGapM*1000,2),fmt(x.minHardwareGapM*1000,2),fmt(x.minCarriageGapM*1000,2)]));
- return '<section class="panel lowerpan">'+head('Deployment clearance','ruler','<span class="tag">BUILT-IN CONFIGURATIONS</span>')+'<div class="panelpad"><p>The four solar wings deploy first. The aft radiator clears the vehicle before the forward radiator moves. These rigid-body sweeps checked '+fmt(deploymentAudit.posesPerPreset,0)+' positions per preset, spaced '+fmt(deploymentAudit.stepSeconds,3)+' s apart. The numbers are minimum sampled gaps in millimetres. Flexure, manufacturing tolerances and custom designs require their own checks.</p></div>'+rowTable(['Preset','Any two leaves · mm','Solar to radiator · mm','Leaf to fixed hardware · mm','Carriage to other leaf · mm'],rows.join(''))+'<div class="panelpad"><h3>Suggested AI builds</h3><p>Reference geometry with each purpose’s suggested hardware, sampled at '+fmt(aiDeploymentAudit.posesPerPreset,0)+' positions. Signs indicate clearance (+) or overlap (−).</p></div>'+rowTable(['Purpose','Solar to radiator · mm','Fairing radial · m','Fairing axial · m'],aiDeploymentAudit.rows.map(x=>tr([esc(aiPurposes[x.id].label),fmt(x.minSolarRadiatorGapM*1000,2),plus(x.radialClearanceM),plus(x.axialClearanceM)])).join(''))+'</section>';
+ return '<section class="panel lowerpan">'+head('Deployment clearance','ruler','<span class="tag">BUILT-IN CONFIGURATIONS</span>')+'<div class="panelpad"><p>The four solar wings deploy first. The upper forward radiator clears the cassette before the lower radiator moves. These rigid-body sweeps checked '+fmt(deploymentAudit.posesPerPreset,0)+' positions per preset, spaced '+fmt(deploymentAudit.stepSeconds,3)+' s apart. The numbers are minimum sampled gaps in millimetres. Flexure, manufacturing tolerances and custom designs require their own checks.</p></div>'+rowTable(['Preset','Any two leaves · mm','Solar to radiator · mm','Leaf to fixed hardware · mm','Carriage to other leaf · mm'],rows.join(''))+'<div class="panelpad"><h3>Suggested AI builds</h3><p>Reference geometry with each purpose’s suggested hardware, sampled at '+fmt(aiDeploymentAudit.posesPerPreset,0)+' positions. Signs indicate clearance (+) or overlap (−).</p></div>'+rowTable(['Purpose','Solar to radiator · mm','Fairing radial · m','Fairing axial · m'],aiDeploymentAudit.rows.map(x=>tr([esc(aiPurposes[x.id].label),fmt(x.minSolarRadiatorGapM*1000,2),plus(x.radialClearanceM),plus(x.axialClearanceM)])).join(''))+'</section>';
 }
 function references(){
  if(referencePage==='architecture')return renderArchitecture(hardware,snap);
- if(referencePage==='equipment')return renderEquipmentList(hardware);
+ if(referencePage==='equipment')return renderEquipmentList(hardware,snap);
  if(referencePage==='checks'){const list=[...checks(),...scenarioTests()],passed=list.filter(x=>x.pass).length;return '<section class="panel">'+head('Surface geometry audit','scan-line','<span class="tag">REFERENCE BUILD</span>')+'<div class="panelpad"><p>Triangle winding and vertex normals were compared in '+fmt(surfaceAudit.geometries)+' unique geometries across the spacecraft and launch assemblies. Each exterior wall and the reflector passed closed-volume and paired-edge checks.</p></div>'+rowTable(['Geometry check','Measured'],[['Triangles with checked orientation',fmt(surfaceAudit.checkedTriangles)],['Zero-area triangles',fmt(surfaceAudit.zeroAreaPoleTriangles)],['Closed wall panels',fmt(surfaceAudit.shellSides)],['Occupied wall penetrations',fmt(surfaceAudit.occupiedPorts)]].map(x=>tr(x)).join(''))+'</section>'+deploymentEvidence()+'<section class="panel lowerpan">'+head('Numerical verification','list-checks','<span class="tag '+(passed===list.length?'':'warn')+'">'+passed+' / '+list.length+' PASS</span>')+rowTable(['Group','Reference calculation','Expected','Computed','Unit','Result'],list.map(c=>tr([c.group,esc(c.name),fmt(c.expected,5),fmt(c.actual,5),esc(c.unit),'<span class="'+(c.pass?'checkpass':'checkfail')+'">'+(c.pass?'Pass':'Review')+'</span>'])).join(''))+'</section>'}
  const d=hardware.input;const ledgerExamples=[['Solar generation','1.361 × '+fmt(d.solarM2)+' m² × '+fmt(d.pvEfficiency,3)+' × '+fmt(d.solarDelivery,3)+' × incidence × sunlight × retention × deployment',fmt(snap.solarKW)+' kW'],['Data generation',fmt(snap.tokensPerSec)+' tok/s × '+fmt(d.bytesPerToken)+' B/tok × 8',fmt(snap.tokensPerSec*d.bytesPerToken*8/1e6,5)+' Mbit/s text'],['Dry + consumables + adapter',fmt(hardware.dryKg)+' + '+fmt(hardware.propellantKg)+' + '+fmt(hardware.pressurantKg)+' + '+fmt(d.adapterKg)+' kg',fmt(hardware.launchKg)+' kg'],['Drag force','½ × '+fmt(snap.densityKgM3,4)+' kg/m³ × '+fmt(snap.relativeSpeedMs)+'² × '+fmt(d.cd)+' × '+fmt(snap.ramAreaM2)+' m²',fmt(snap.dragN,6)+' N']];
- return sourceNote()+sourceGuideIndex()+'<section class="panel">'+head('Live calculation sheet','activity','<span class="metacode">'+time(view.t)+'</span>')+rowTable(['Balance','Substitution','Result'],ledgerExamples.map(r=>tr(r.map(esc))).join(''))+'</section><section class="panel lowerpan">'+head('Model boundaries and equations','book-open')+'<div class="panelpad">'+assumptions.map(a=>'<details><summary>'+esc(a.name)+'</summary><p class="eq">'+esc(a.equation)+'</p><p>'+esc(a.note)+'</p></details>').join('')+'<h3 class="gap">Numerical method</h3>'+modelNotes.map(n=>'<p>'+esc(n)+'</p>').join('')+'</div></section><section class="panel lowerpan">'+head('Reference library','book-open','<span class="metacode">04 NOV 2026</span>')+'<div class="panelpad sourcegrid">'+sources.map(s=>'<a class="sourcecard" data-tip="Open the cited engineering reference in a new tab." href="'+esc(s.url)+'" target="_blank" rel="noopener">'+icon('square-arrow-out-up-right',14)+'<span><strong>'+esc(s.name)+'</strong><small>'+esc(s.note)+'</small></span></a>').join('')+'</div></section>';
+ return domainCoverage()+sourceNote()+sourceGuideIndex()+'<section class="panel">'+head('Live calculation sheet','activity','<span class="metacode">'+time(view.t)+'</span>')+rowTable(['Balance','Substitution','Result'],ledgerExamples.map(r=>tr(r.map(esc))).join(''))+'</section><section class="panel lowerpan">'+head('Model boundaries and equations','book-open')+'<div class="panelpad">'+assumptions.map(a=>'<details><summary>'+esc(a.name)+'</summary><p class="eq">'+esc(a.equation)+'</p><p>'+esc(a.note)+'</p></details>').join('')+'<h3 class="gap">Numerical method</h3>'+modelNotes.map(n=>'<p>'+esc(n)+'</p>').join('')+'</div></section><section class="panel lowerpan">'+head('Reference library','book-open','<span class="metacode">04 NOV 2026</span>')+'<div class="panelpad sourcegrid">'+sources.map(s=>'<a class="sourcecard" data-tip="Open the cited engineering reference in a new tab." href="'+esc(s.url)+'" target="_blank" rel="noopener">'+icon('square-arrow-out-up-right',14)+'<span><strong>'+esc(s.name)+'</strong><small>'+esc(s.note)+'</small></span></a>').join('')+'</div></section>';
+}
+function renderDiscipline(live=false){
+ const host=$('discipline-host'),id=view.domain,p=view.phase;
+ host.hidden=!!referencePage||!['attitude','avionics','mechanical'].includes(id);
+ if(host.hidden)return;
+ const anchor=$(p==='A'?'domain-readout':p==='B'?'engineering-toggle':p==='F'?'disposal-plot':'trade-input');
+ if(anchor.previousElementSibling!==host)anchor.parentNode?.insertBefore(host,anchor);
+ if(id==='mechanical'){
+  const route=p==='F'?sim.disposal():null;
+  const ctx=route?{route,entrySpeedMs:route.feasible&&Number.isFinite(route.entry)?sim.at(route.entry).relativeSpeedMs:null}:null;
+  if(live){updateMechanical(host,hardware,snap,p,ctx);return}
+  host.innerHTML=renderMechanical(hardware,snap,p,ctx);bindMechanical(host,hardware,snap,p,ctx);
+ }else if(!live||!host.matches(':focus-within, :hover')){
+  host.innerHTML=id==='attitude'?renderGyroBenchmark(hardware,snap,day,p):renderAvionics(hardware,snap,p);
+ }
 }
 function draw(){
  snap=sim.at(view.t);const p=view.phase,id=view.domain,ref=referencePage,def=phases[p],d=domains[id],a=!ref&&p==='A',b=!ref&&p==='B',c=!ref&&p==='C',flight=!ref&&['D','E','F'].includes(p),visual=c||flight;
@@ -189,13 +207,13 @@ function draw(){
  $('presetshelf').hidden=!a;$('phase-content').hidden=!a;$('system-choice').hidden=!b;$('diagram-host').hidden=!b;$('engineering-toggle').hidden=!b;
  $('primary').hidden=!visual;$('viewer').hidden=!visual;$('guidepanel').hidden=!visual;$('missionpath').hidden=!flight;$('storyextras').hidden=!flight;
  const detailed=b||(!ref&&view.detail&&p!=='A');
- renderPurposePanels();
+ renderPurposePanels();renderDiscipline();
  const fleet=$('fleet-host');fleet.hidden=!!ref||id!=='launcher';
  if(!fleet.hidden){const anchor=$(a?'phase-content':b?'diagram-host':'trade-input');if(anchor.previousElementSibling!==fleet)anchor.parentNode?.insertBefore(fleet,anchor);fleet.innerHTML=renderLaunchFleet(hardware,p)}
  $('study').hidden=true;$('kpis').hidden=true;$('timeline').hidden=!detailed;$('lower').hidden=!detailed;
  $('phase-extras').hidden=!!ref;$('phase-extras').innerHTML='';$('subsystem').innerHTML='';$('trade-input').hidden=!c;$('trade-output').hidden=!c;
  $('disposal-plot').hidden=!!ref||p!=='F';$('domain-readout').hidden=!!ref||p==='B';
- if(ref){$('pagecode').textContent=['architecture','equipment'].includes(ref)?'SPACECRAFT BASELINE  /  ODC–01':'ENGINEERING REFERENCE';const panel=$('subsystem');panel.innerHTML=references();if(ref==='equipment')bindEquipmentList(panel,hardware);return}
+ if(ref){$('pagecode').textContent=['architecture','equipment'].includes(ref)?'SPACECRAFT BASELINE  /  ODC–01':'ENGINEERING REFERENCE';const panel=$('subsystem');panel.innerHTML=references();if(ref==='equipment')bindEquipmentList(panel,hardware,snap);return}
  if(a){$('presetshelf').innerHTML=presetShelf(view,loadedPresets,hardware);$('phase-content').innerHTML=phaseA(hardware,view,result,k=>inputRow(k,false,'concept'));$('phase-extras').innerHTML=phaseHandoff('B',id)+sourceNote()}
  if(b){$('system-choice').innerHTML=designSection();renderDiagram();$('engineering-toggle').innerHTML=diagramTools();$('phase-extras').innerHTML=phaseHandoff('C',id)}
  if(visual){
@@ -298,7 +316,7 @@ function seekFlightCursor(t){
  if(view.phase==='E'&&!sim.audit&&t>=60*DAY){deferredFlightTime=t;prepareFlight();toast('The selected time will open when its chronological checkpoint is ready.');return}
  const lo=view.phase==='D'?-3600:view.phase==='F'?sim.ignition:view.phase==='E'?900:-3600;
  const hi=view.phase==='D'?900:view.phase==='E'?sim.ignition:view.phase==='F'?(sim.disposal()?.end??sim.duration):sim.duration;
- view.t=clamp(t,lo,hi);view.start=dayStart(view.t);refreshSamples();snap=sim.at(view.t);syncChapterToTime();scene?.update(hardware,snap);viewerInfo();renderObservation();if($('live-met'))$('live-met').textContent=time(view.t);if(view.phase==='F')renderDisposal();
+ view.t=clamp(t,lo,hi);view.start=dayStart(view.t);refreshSamples();snap=sim.at(view.t);syncChapterToTime();scene?.update(hardware,snap);viewerInfo();renderObservation();renderDiscipline(true);if($('live-met'))$('live-met').textContent=time(view.t);if(view.phase==='F')renderDisposal();
 }
 function setTime(t,clear=true){playing=false;if(!Number.isFinite(t))return;if(view.phase==='E'&&!sim.audit&&t>=60*DAY){deferredFlightTime=t;prepareFlight();toast('Resolving the selected flight time chronologically.');return}
  if(view.phase==='D')t=clamp(t,-3600,900);if(view.phase==='E')t=clamp(t,900,sim.ignition);if(view.phase==='F')t=clamp(t,sim.ignition,sim.disposal()?.end??sim.duration);view.t=clamp(t,-3600,sim.duration);if(clear)view.event=null;syncChapterToTime();if(view.t<view.start||view.t>=view.start+DAY)view.start=clamp(Math.floor(view.t/DAY)*DAY,0,Math.max(0,sim.duration-DAY));refreshSamples();draw()}
@@ -362,7 +380,7 @@ function changeParam(key,val,deep=false,opts={}){
   if(view.phase==='C'){scene?.update(hardware,snap);viewerInfo();renderObservation();renderTrade(false);$('phase-extras').innerHTML=missionTotals(currentContext(),view,time)+phaseHandoff('D',view.domain)}
   if(view.phase==='B'){$('system-choice').innerHTML=designSection();renderDiagram();kpis();drawStudy();lower();timeline()}
   if(view.phase!=='B')$('domain-readout').innerHTML=renderDomainReadout(view.domain,view.phase,currentContext());
-  if(view.domain==='purpose'||view.domain==='conops')renderPurposePanels();
+  if(view.domain==='purpose'||view.domain==='conops')renderPurposePanels();renderDiscipline();
   document.querySelectorAll('[data-param]').forEach(e=>{const v=hardware.input[e.dataset.param];if(document.activeElement!==e&&typeof v==='number')e.value=+v.toFixed(5);if(e.type==='range')e.style.setProperty('--pct',(100*(v-e.min)/(e.max-e.min))+'%')});if($('solvenote'))$('solvenote').innerHTML=solveNote();
  }});
 }
@@ -480,6 +498,9 @@ document.addEventListener('click',async e=>{const el=e.target.closest('button,[d
  if(el.dataset.studyPurpose){comparePurposes(el.dataset.studyPurpose);return}
  if(el.dataset.artifactCase){if(isEditable(view.phase))open('Model return budget',transferDesk(hardware,el.dataset.artifactCase==='trillion'),'ai-transfer');return}
  if(el.dataset.inspectBay){view.domain='prop';switchPhase('C');return}
+ if(el.dataset.gyroCase!==undefined&&isEditable(view.phase)){
+  const next=gyroCandidateDesign(input,el.dataset.gyroCase,hardware);if(next)reviewProposal(next,{label:'Change control moment gyroscope package',force:true,commit:resolved=>{input=next;view.modified=true;view.event=null;playing=false;recalc(resolved);draw()}});return;
+ }
  if(el.dataset.domain){goPage(el.dataset.domain);return}
  if(el.dataset.disposalMethod){if(view.phase==='A')changeParam('disposalMethod',el.dataset.disposalMethod,true);return}
  if(el.dataset.presetDownload){const p=loadedPresets.find(x=>x.id===el.dataset.presetDownload);if(p)presetDownload(p);return}
@@ -709,6 +730,7 @@ function advanceFlight(ms){
  if(p==='D'||p==='E'){const oldChapter=view.chapter;syncChapterToTime(snap);if(p==='D'&&t>=900)view.chapter='insertion';
   if(view.chapter!==oldChapter){scene?.setChapter?.(view.chapter);$('missionpath').innerHTML=flightChapters(view)}}
  if(wasDay!==view.start||!playing){draw();return}
+ if(Math.floor(ms/1000)!==Math.floor((ms-200)/1000))renderDiscipline(true);
  if(p==='B'){renderDiagram();updateDiagramClock()}else{
   const active=document.activeElement,key=active?.id==='flight-rate'||active?.closest?.('.flight-transport')||$('guidepanel').matches?.(':hover');
   scene?.update(hardware,snap);viewerInfo();if(!key)renderObservation();

@@ -69,6 +69,11 @@ export function makeLaunch(h){
  for(const section of stack){
   const z0=section.z0M,z1=section.z1M,H=Math.max(.025,z1-z0),w=section.widthM||hw,dep=section.heightM||hh,y=(z0+z1)/2,name=String(section.part).toLowerCase();
   if(/adapter|interface/.test(name)){cylinder(payload,0,y,0,section.radiusM*.81,section.radiusM,H,steel,'adapter');continue;}
+  if(name.includes('stand-off')){
+   const rad=stack[0].radiusM*.8;
+   for(const sx of [-1,1])for(const sz of [-1,1])tube(payload,v(sx*rad*.68,z0,sz*rad*.68),v(sx*.46*hw,z1,sz*.46*hh),.035,steel,'adapter');
+   continue;
+  }
   if(/bus|body|core|chassis/.test(name)){
    // The stack allowance includes parked hardware. Draw the insulated mold
    // line at its physical dimensions and the two nozzle exits at their stations.
@@ -76,11 +81,10 @@ export function makeLaunch(h){
    for(let i=0;i<5;i++){const cy=z0+H*(i+.5)/5;for(const side of [-1,1]){thermalMesh(box(payload,side*hw*.506,cy,0,hw*.014,H*.18,hh*.88,i%3===0?finish.foil:finish.panels,'structure'),'enclosure');thermalMesh(box(payload,0,cy,side*hh*.506,hw*.89,H*.18,hh*.014,i%2?finish.panels:finish.foil,'structure'),'enclosure');}}
    for(let x of [-1,1])for(let z of [-1,1])box(payload,x*hw*.49,y,z*hh*.49,hw*.034,H,hh*.034,steel,'structure');
    for(const exit of h.propulsion.engines){
-    const height=exit.throatY-exit.y;
-    const mount=cylinder(payload,exit.x,y+exit.z,(-exit.throatY+hh*.5)/2,exit.exitRadiusM*.4,exit.exitRadiusM*.4,-exit.throatY-hh*.5,steel,'propulsion');
+    const height=exit.throatZ-exit.z;
+    cylinder(payload,exit.x,y+(-H/2+exit.throatZ)/2,-exit.y,exit.exitRadiusM*.40,exit.exitRadiusM*.4,-exit.throatZ-H*.5,steel,'propulsion');
     const shell=shellBands([[exit.exitRadiusM,-height/2],[exit.exitRadiusM*.61,0],[exit.exitRadiusM*.25,height/2]],0,2*Math.PI);
-    const nozzle=mesh(payload,shell,dark,exit.x,y+exit.z,-(exit.throatY+exit.y)/2,'propulsion');
-    nozzle.rotation.x=-Math.PI/2;mount.rotation.x=-Math.PI/2;
+    mesh(payload,shell,dark,exit.x,y+(exit.throatZ+exit.z)/2,-exit.y,'propulsion');
    }
   }else if(/cassette|fold|wing|radiator|array|panel/.test(name)){
    box(payload,0,y,0,w*.92,H*.98,dep*.96,black,'payload');

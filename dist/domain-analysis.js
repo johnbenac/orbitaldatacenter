@@ -77,7 +77,7 @@ export const domains={
   ['Active ground terminal','Acquisition connects the spacecraft beam to the actual receiving terminal.','station groundLink rangeKm lineMbps goodputMbps commandGoodputKbps'],
   ['Last payload handoff','Read the terminal link state and separate received payload bytes from pending ground commands.','station terminalKW deliveredGB uploadedGB uplinkQueueMB queueGB']
  ],'deployment contact disposal coast impact graveyard'),
- power:spec('Battery & power','battery-charging','Array production, itemized demand and continuous charge balance.',
+ power:spec('Electrical Power','battery-charging','Array production, itemized demand and continuous charge balance.',
   'battery pv solarM2 batteryKWh socMin socMax targetSOC chargeC dischargeC','solarM2 batteryKWh solarTiltDeg duty','solarKW socPct',[
   ['Power subsystem requirements','Select installed sources and storage, the reserve floor and pack charge/discharge limits.','arrayArea packSize chargeLimit dischargeLimit floorPct targetPct'],
   ['Bus distribution','Connect production, storage and consumers at the same instant.','solarKW loadKW chargeKW dischargeKW curtailedKW unmetKW'],
@@ -86,7 +86,7 @@ export const domains={
   ['Bus state and stored energy','Check daily floor, stored energy, charge direction and any unserved demand.','socPct batteryKWh solarKW servedLoadKW dailyFloor unmetKWh'],
   ['Terminal energy','Review power drawdown and the energy inventory during shutdown, transfer and passivation.','phase solarKW servedLoadKW batteryKWh socPct unmetKWh']
  ],'deployment eclipse burst contact desat reboost disposal coast entry impact graveyard'),
- thermal:spec('Thermal','thermometer-sun','Heat production, enclosure leakage, rejection and qualified temperatures.',
+ thermal:spec('Thermal Control','thermometer-sun','Heat production, enclosure leakage, rejection and qualified temperatures.',
   'thermalMode radiatorM2 coating appliedHeatKw thermalResistanceKPerKw radiatorDesignK junctionLimitK initialBatteryK','radiatorM2 emissivity appliedHeatKw thermalResistanceKPerKw','junctionK thermalMinimumMarginK',[
   ['Thermal boundary conditions','Set heat sources, transport resistance, rejection surfaces and operating limits.','radiatorArea heatMode resistance targetRadiator maxJunction initialPackK'],
   ['Temperature and heat transport','Inspect each node against its active operating or survival range.','heatInputKW netRejectionKW enclosureLeakKW thermalMinimumMarginK'],
@@ -95,7 +95,7 @@ export const domains={
   ['Operating temperatures','Follow IT and battery heat to the loop and radiators, with a separate outer-blanket boundary.','junctionK batteryK packToLoopKW grossEmissionKW absorbedKW thermalMinimumMarginK'],
   ['Closeout thermal boundary','Review hardware survival temperatures until the modeled spacecraft thermal interval ends.','disposalStatus enclosureOuterK coolantK batteryK thermalMinimumMarginK modelBoundary']
  ],'launch deployment burst eclipse contact disposal coast entry impact graveyard'),
- attitude:spec('Attitude control','crosshair','Disturbances, pointing, reaction momentum and magnetic unloading.',
+ attitude:spec('Attitude Determination & Control','crosshair','Disturbances, pointing, reaction momentum and magnetic unloading.',
   'attitude rollDeg pitchDeg yawDeg cpOffsetM cmgMomentumNms cmgTorqueNm dipoleAm2','cpOffsetM dipoleAm2 rollDeg cmgMomentumNms','torqueNm momentumNms',[
   ['Attitude requirements','Choose the attitude law, pressure-center lever arm, torque capacity and unloading authority.','attitudeLaw cpOffset cmgCapacity cmgRating dipole'],
   ['Momentum management','Trace external torques into the four-CMG cluster and the commanded external unload.','dragTorqueNm solarTorqueNm gravityTorqueNm momentumNms unloadAuthorityNm'],
@@ -104,7 +104,7 @@ export const domains={
   ['Pointing and unloading','Track slews, stored momentum and the available external magnetic torque.','slewTorqueNm momentumNms cmgMarginNms magFieldUT unloadTorqueNm coilKW'],
   ['Transfer attitude loads','Inspect stored momentum and actuator power up to the spacecraft simulation boundary.','disposalStatus deploymentPct momentumNms cmgKW coilKW modelBoundary']
  ],'deployment contact desat maneuver reboost disposal coast entry graveyard'),
- prop:spec('Propellant','fuel','Chemical feed system, station keeping and retirement reserve.',
+ prop:spec('Propulsion','fuel','Chemical feed system, station keeping and retirement reserve.',
   'engine propellantKg yearsSupply isp thrustN mixtureRatio reserveFraction disposalMethod disposalDv graveyardAltitudeKm targetLatDeg targetLonDeg targetToleranceKm','propellantKg isp yearsSupply reserveFraction','propellantKg remainingDv',[
   ['Propulsion allocations','Choose an engine package and separate the maneuver, station-keeping and disposal allowances.','propLoad reqTrim maneuverDv yearsSupply disposalFloor mixture'],
   ['Propellant inventory','Reconcile separate liquid masses, pressurant inventory, installed thrust and protected propellant.','fuelKg oxidizerKg pressurant tankVolume thrust reserveKg'],
@@ -139,7 +139,25 @@ export const domains={
   ['Ascent and payload release','The launch vehicle carries the adapter and spacecraft through ascent. The spacecraft performs its own trim after separation.','phase launcherName lvHandoff launchMass adapterMass altitudeKm'],
   ['Delivered spacecraft record','The original launch manifest stays fixed while the spacecraft consumes propellant in orbit.','launcherName launchMass initialWet adapterMass wetKg lvCarrierService'],
   ['Carrier delivery closeout','Reconcile the original selected launch service with the spacecraft mass delivered at release and its recorded retirement outcome.','launcherName referenceMass launchMass initialWet adapterMass lvScreenMargin closureReason']
- ],'integration pad launch insertion deployment disposal coast entry impact graveyard')
+ ],'integration pad launch insertion deployment disposal coast entry impact graveyard'),
+ mechanical:spec('Mechanical Design','box','Equipment accommodation, structure, mechanisms, mass properties and atmospheric entry.',
+  'trayCount propellantKg batteryKWh shieldKgM2 skinKgM2','trayCount propellantKg batteryKWh skinKgM2','wetKg propellantKg',[
+  ['Mechanical design drivers','Set installed equipment quantities and structural areal masses against the payload envelope.','trays rawStorage initialWet launchMass'],
+  ['Equipment accommodation','Inspect each installed item at its body station and follow its contribution to the mass center.','dryMass initialWet radialClearance axialClearance'],
+  ['Integrated mass properties','Compare dry, wet, deployed and adapter-supported configurations using the equipment register.','dryMass initialWet launchMass propellantKg'],
+  ['Stack balance and separation','Inspect the launch center of mass from the adapter datum and the stowed payload envelope.','launchMass adapterMass stackLength radialClearance axialClearance'],
+  ['Changing mass distribution','Follow the center of mass as appendages move, liquid is consumed and the adapter separates.','deploymentPct wetKg fuelKg oxidizerKg'],
+  ['Mechanical disposition','Inspect retained hardware for a raised orbit or screen individual items for survival during targeted reentry.','disposalMode disposalStatus disposalUsedKg finalPerigee finalApogee']
+ ],'launch insertion deployment trim reboost maneuver disposal entry impact graveyard'),
+ avionics:spec('Command & Data Handling','panels-top-left','Spacecraft flight computer, command reception, health telemetry, recording and flight software.',
+  'commandKbps hkPeriodS hkRecorderMB uplinkBufferMB','hkPeriodS hkRecorderMB commandKbps','hkStoredMB cdhKW',[
+  ['Spacecraft command and telemetry requirements','Set the ground command traffic and cadence of spacecraft health measurements.','commandKbps hkPeriodS hkRateKbps hkRecorderMB'],
+  ['Flight computer and housekeeping recorder','Inspect the flight computer, command path, onboard health data and recorder capacity.','cdhKW commandDemandKbps hkRateKbps hkRecorderMB'],
+  ['Avionics in the integrated bus','Compare the avionics load and stored telemetry against recorder capacity and contact access.','cdhKW hkRateKbps hkStoredMB uplinkQueueMB'],
+  ['Flight computer checkout','Follow command availability and health telemetry through launch and separation.','phase cdhKW hkRateKbps hkStoredMB'],
+  ['Spacecraft housekeeping','Watch command backlog, ground contact and the housekeeping recorder at the mission instant.','cdhKW commandGoodputKbps uplinkQueueMB hkStoredMB hkOverwrittenMB'],
+  ['Last commands and telemetry','Inspect command delivery and the spacecraft recorder at retirement or entry interface.','disposalStatus cdhKW commandUploadedGB hkStoredMB']
+ ],'launch insertion deployment contact disposal entry impact graveyard')
 };
 
 const serviceFields={
@@ -165,7 +183,8 @@ const registry={};
 function fields(source,defs,note=''){
  for(const [id,label,unit='',key=id] of defs)registry[id]={label,unit,note,read:c=>c[source]?.[key],source};
 }
-fields('s',[
+fields('d',[['commandKbps','Ground command traffic','kbit/s'],['hkPeriodS','Housekeeping sample period','s'],['hkRecorderMB','Housekeeping recorder capacity','MB']]);
+fields('s',[['cdhKW','Spacecraft avionics demand','kW'],['hkRateKbps','Housekeeping production','kbit/s'],['hkStoredMB','Retained housekeeping','MB'],['hkOverwrittenMB','Housekeeping overwritten','MB'],['commandUploadedGB','Ground commands received','GB'],['commandDemandKbps','Ground command demand','kbit/s'],
  ['phase','Flight state','','flightPhase'],['disposalStatus','Retirement state'],['entryDynamicPressurePa','Reference-body dynamic pressure','Pa'],['entryReferenceDragMS2','Reference-body drag deceleration','m/s²'],['tokensGenerated','Onboard decode tokens','tok'],['tokensDelivered','Ground-received decode tokens','tok'],['tokensPerSec','Instantaneous aggregate decode','tok/s'],['prefillPerSec','Aggregate prefill','tok/s'],['perUserTps','Decode per active stream','tok/s'],['generatedGB','Payload generated since launch','GB'],['deliveredGB','Payload delivered since launch','GB'],['droppedGB','Payload dropped since launch','GB'],['queueGB','Current payload backlog','GB'],['textQueueGB','Queued output text','GB'],['bulkQueueGB','Queued bulk data','GB'],['textDeliveredGB','Text delivered since launch','GB'],['bulkDeliveredGB','Bulk delivered since launch','GB'],['uploadedGB','Command uplink since launch','GB'],['uplinkQueueMB','Queued ground commands','MB'],['occupiedTB','Occupied persistent storage','TB'],['freeTB','Free persistent storage','TB'],
  ['itKW','IT power','kW'],['solarKW','Generated bus power','kW'],['loadKW','Requested load','kW'],['servedLoadKW','Served electrical demand','kW'],['unmetKW','Unserved demand','kW'],['unmetKWh','Cumulative unserved energy','kWh'],['curtailedKW','Curtailed power','kW'],['chargeKW','Pack charging at bus','kW'],['dischargeKW','Pack discharging at bus','kW'],['socPct','Current pack SOC','%'],['batteryKWh','Stored battery energy','kWh'],['terminalKW','Terminal power','kW'],['jointKW','Joint power demand','kW'],['coilKW','Coil power','kW'],['cmgKW','CMG power','kW'],['pumpKW','Pump demand','kW'],['heatInputKW','Heat entering main node','kW'],['packLossKW','Battery conversion heat','kW'],['packToLoopKW','Pack-to-loop exchange','kW'],['netRejectionKW','Net radiator heat rejection','kW'],['grossEmissionKW','Gross radiator emission','kW'],['absorbedKW','Radiator environmental absorption','kW'],['enclosureLeakKW','Outward enclosure heat','kW'],
  ['thermalMinimumMarginK','Tightest live thermal limit','K'],['junctionK','Junction temperature','K'],['batteryK','Battery temperature','K'],['coldPlateK','Cold plate temperature','K'],['coolantK','Coolant temperature','K'],['enclosureOuterK','Outer boundary temperature','K'],['betaDeg','Signed solar beta','°'],['f107Daily','Previous-day F10.7 proxy','sfu'],['densityKgM3','Neutral density','kg/m³'],['magFieldUT','Local magnetic field','µT'],['ramAreaM2','Ram-facing silhouette','m²'],['dragN','Atmospheric drag','N'],['torqueNm','Disturbance torque','N·m'],['dragTorqueNm','Aerodynamic torque','N·m'],['gravityTorqueNm','Gravity-gradient torque','N·m'],['solarTorqueNm','Radiation-pressure torque','N·m'],['pointingErrorDeg','Pointing error','°'],['momentumNms','Stored cluster momentum','N·m·s'],['cmgMarginNms','Momentum headroom','N·m·s'],['cmgTorqueMarginNm','Steering torque headroom','N·m'],['unloadTorqueNm','Applied unloading torque','N·m'],['unloadAuthorityNm','Available unloading torque','N·m'],['slewTorqueNm','Commanded slew torque','N·m'],
@@ -330,6 +349,8 @@ function linkedFlows(id,c){
  const h=c.h,s=c.s,d=c.d;
  if(id==='environment')return environmentFlows(c);
  const all={
+ mechanical:[F('Pressure vessels','Spacecraft mass properties','Remaining liquid mass',s.propellantKg,'kg'),F('Integrated structure','Launcher','Launched stack',h.launchKg,'kg')],
+ avionics:[F('Electrical bus','Flight computer','Avionics draw',s.cdhKW,'kW'),F('Spacecraft sensors','Housekeeping recorder','Source rate',s.hkRateKbps,'kbit/s'),F('S-band receiver','Flight computer','Ground command delivery',s.commandGoodputKbps,'kbit/s')],
  conops:[F('Customer input','Onboard processing','Customer input consumed',s.aiInputConsumedGB,'GB'),F('Payload recorder',purposeInfo(h).customer,'Products received on Earth',s.aiProductDeliveredGB,'GB')],
  purpose:[F(purposeInfo(h).customer,'Staged input','Input held onboard',s.aiInputBufferGB,'GB'),F('Installed workload',purposeInfo(h).output,'Cumulative work',s.aiUnitsComputed,h.ai?.unit||'work units'),F('Recorder',purposeInfo(h).customer,'Returned product',s.aiProductDeliveredGB,'GB')],
  orbit:[F('Relative atmosphere','Exposed silhouette','Drag impulse since launch',s.dragImpulseNs,'N·s'),F('Chemical engines','Trajectory','Cumulative applied impulse',s.burnImpulseNs,'N·s')],
@@ -364,6 +385,8 @@ function auditRows(id,a){
  if(!a)return [];
  const end=a.finalState??{},E=a.energyKWh??{};
  const map={
+ mechanical:[['Liquid mass expended',end.propellantUsedKg,'kg'],['Final vehicle mass',end.wetKg,'kg']],
+ avionics:[['Command data received',end.commandUploadedGB,'GB'],['Housekeeping overwritten',end.hkOverwrittenMB,'MB']],
  purpose:[['Returned customer product',end.aiProductDeliveredGB,'GB'],['Campaign input consumed',end.aiInputConsumedGB,'GB'],['Customer product remaining',end.aiProductQueueGB,'GB']],
  conops:[['Thermally evaluated interval',a.thermal?.coveredSeconds,'s'],['Returned customer product',end.aiProductDeliveredGB,'GB'],['First in-flight limit',a.firstCrossing?.time,'s']],
  environment:[['Accumulated drag impulse',end.dragImpulseNs,'N·s'],['Environmental heat absorbed',E.absorbed,'kWh'],['Cumulative joint energy',E.joints,'kWh']],
@@ -418,6 +441,8 @@ function series(code,ctx){
 // Chronological day bins are reduced by minimum, maximum, incremental rate or cumulative stock.
 // A shared bin width gives both integrations a common horizontal time scale even if life differs.
 const missionTrend={
+ mechanical:['Spacecraft wet mass','kg','stock',r=>r.propellantUsedKg],
+ avionics:['Ground commands received','GB','sum',r=>r.commandUploadedGB??r.uploadedGB],
  conops:['Returned customer product','Mbit/s','rate',r=>r.aiProductDeliveredGB*8000],
  purpose:['Returned customer product','Mbit/s','rate',r=>r.aiProductDeliveredGB*8000],
  environment:['Mean absorbed environmental heat','kW','power',r=>r.energyKWh?.absorbed],
@@ -442,7 +467,7 @@ function missionSeries(c,id,width){
   const values=rows.slice(start,finish).map(get).filter(Number.isFinite);if(!values.length)continue;
   const sum=values.reduce((a,b)=>a+b,0);cumulative+=sum;
   let v;if(rule==='min')v=Math.min(...values);else if(rule==='max')v=Math.max(...values);
-  else if(rule==='stock')v=((id==='mass'||id==='launcher')?c.h.wetKg:c.h.propellantKg)-cumulative;
+  else if(rule==='stock')v=((id==='mass'||id==='mechanical'||id==='launcher')?c.h.wetKg:c.h.propellantKg)-cumulative;
   else if(rule==='sum')v=cumulative;else v=sum/span*(rule==='power'?3600:rule==='percent'?100:1);
   points.push({t:to,v});
  }

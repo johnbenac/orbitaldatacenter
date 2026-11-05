@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {Object3D,OrthographicCamera,Vector3} from './dist/vendor/three.module.js';
+import {projectedAxes} from './dist/coordinate-triad.js';
+const cam=new OrthographicCamera(),body=new Object3D(),near=(a,b)=>assert.ok(Math.abs(a-b)<1e-7);
+const axes=()=>projectedAxes(cam,body),xyz=a=>new Vector3(a.x,-a.y,a.depth);
+assert.deepEqual(axes().map(p=>p.label),['+X','+Y','+Z']);
+near(axes()[2].depth,1);body.rotation.x=-Math.PI/2;near(axes()[2].y,-1);
+cam.rotation.z=Math.PI/2;near(axes()[2].x,1);
+cam.position.set(42,27,-35);near(axes()[2].x,1);
+const orbit=projectedAxes(cam,null,true).map(xyz);near(orbit[0].clone().cross(orbit[1]).dot(orbit[2]),1);
+console.log('Positive XYZ, launch mounting, camera rotation, pan independence and right-handed inertial triad verified.');

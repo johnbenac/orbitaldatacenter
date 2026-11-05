@@ -28,8 +28,13 @@ export function surfaces(h,g,deployment,fluxOnly=false,burnDirection=0){
  else if(/nadir/.test(mode))base=g.radial;
  else if(/inertial/.test(mode))base=[1,0,0];
  else if(/manual/.test(mode)){const p=d.pitchDeg*DEG,y=d.yawDeg*DEG,along=unit(cross(g.normal,g.radial));base=g.radial.map((x,i)=>x*Math.cos(p)*Math.cos(y)+along[i]*Math.cos(p)*Math.sin(y)+g.normal[i]*Math.sin(p));}
- if(burnDirection)base=unit(g.velocityECI).map(n=>n*burnDirection);
- const ortho=unit(cross(base,Math.abs(base[2])>.9?[1,0,0]:[0,0,1])),axis=unit(cross(ortho,base));
+
+ let ortho=unit(cross(base,Math.abs(base[2])>.9?[1,0,0]:[0,0,1])),axis=unit(cross(ortho,base));
+ if(burnDirection||/nadir/.test(mode)){
+  const z=burnDirection?unit(g.velocityECI).map(n=>n*burnDirection):g.radial;
+  const guide=Math.abs(dot(z,g.sunECI))<.995?g.sunECI:(Math.abs(z[2])>.9?[1,0,0]:[0,0,1]);
+  axis=unit(cross(guide,z));base=unit(cross(z,axis));
+ }
  const pv=unit(base.map((x,i)=>x*Math.cos(roll+tilt)+axis[i]*Math.sin(roll+tilt))),rad=unit(axis.map((x,i)=>x*Math.cos(roll)-base[i]*Math.sin(roll))),normalCos=Math.max(0,dot(pv,g.sunECI));
  const sunlit=g.eclipse?0:1,radSunCos=Math.abs(dot(rad,g.sunECI)),earthDisk=(R/(R+g.altitudeKm))**2;
  const earthView=earthDisk*(.22+.78*Math.abs(dot(rad,g.radial))),albedo=1361*.30*Math.max(0,g.sunRadial)*earthView,earthIR=237*earthView;
@@ -41,7 +46,7 @@ export function surfaces(h,g,deployment,fluxOnly=false,burnDirection=0){
  const boxProjection=v=>h.bodyHeightM*h.bodyLengthM*Math.abs(dot(v,rad))+h.bodyWidthM*h.bodyLengthM*Math.abs(dot(v,bodyUp))+h.bodyWidthM*h.bodyHeightM*Math.abs(dot(v,bodyZ));
  const earthFraction=earthDisk*(.5*boxProjection(g.radial)/boxArea+.125),enclosureIRWm2=237*earthFraction,enclosureSolarWm2=1361*(sunlit*boxProjection(g.sunECI)/boxArea+.30*Math.max(0,g.sunRadial)*earthFraction);
  if(fluxOnly)return {enclosureSolarWm2,enclosureIRWm2};
- return {bodyUpECI:bodyUp,burnDirection,pvDeployment:motion.pv,radiatorDeployment:motion.radiator,deploymentStep:motion.step,deploymentTitle:motion.title,enclosureSolarWm2,enclosureIRWm2,pvNormalECI:pv,radiatorNormalECI:rad,ramBody,ramAreaM2:ramArea,solarIncidenceCos:normalCos,radiatorSunCos:radSunCos,earthView,solarKW,generationKW:solarKW,emissivity:eps,absorptivity:alpha,solarIrradiance:1361*sunlit,albedoIrradiance:albedo,earthIRIrradiance:earthIR,absorbedKW:h.radiatorM2*motion.radiator*(alpha*(1361*sunlit*radSunCos+albedo)+eps*earthIR)/1000,emissionCoeff:h.radiatorM2*2*eps*motion.radiator*SIGMA/1000};
+ return {bodyUpECI:bodyUp,bodyZECI:bodyZ,burnDirection,pvDeployment:motion.pv,radiatorDeployment:motion.radiator,deploymentStep:motion.step,deploymentTitle:motion.title,enclosureSolarWm2,enclosureIRWm2,pvNormalECI:pv,radiatorNormalECI:rad,ramBody,ramAreaM2:ramArea,solarIncidenceCos:normalCos,radiatorSunCos:radSunCos,earthView,solarKW,generationKW:solarKW,emissivity:eps,absorptivity:alpha,solarIrradiance:1361*sunlit,albedoIrradiance:albedo,earthIRIrradiance:earthIR,absorbedKW:h.radiatorM2*motion.radiator*(alpha*(1361*sunlit*radSunCos+albedo)+eps*earthIR)/1000,emissionCoeff:h.radiatorM2*2*eps*motion.radiator*SIGMA/1000};
 }
 export function linkBudget(d,g,pointingDeg,available){
  let mode=String(d.link||'auto').toLowerCase();

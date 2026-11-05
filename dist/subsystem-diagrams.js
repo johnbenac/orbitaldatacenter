@@ -42,6 +42,13 @@ function glyph(type,x,y,size=1,level=.5){
  case 'ssd':out=each(3,i=>rect(-26,-21+i*14,52,11,'sd-metal',2)+circle(-17,-15+i*14,1.8,'sd-led')+X(`M-10 ${-15+i*14}h25`,'sd-line'));break;
  case 'rack':out=rect(-24,-29,48,56,'sd-metal',3)+each(4,i=>rect(-18,-24+i*12,36,9,'sd-device',1)+circle(-12,-19+i*12,1.5,'sd-led')+X(`M-5 ${-19+i*12}h16`,'sd-line'));break;
  case 'solar':out=X('M-34 -18L29 -23L34 12L-29 19Z','sd-array')+each(5,i=>X(`M${-23+i*10} ${-19-i*.75}l5 35`,'sd-cells'))+X('M-32 -6l63 -6m-61 17l63 -6','sd-cells')+X('M-4 18v7h20','sd-hardware');break;
+ case 'fourWings':{
+  out=X('M-35 -12H35M-35 12H35','sd-hardware')+rect(-7,-20,14,40,'sd-metal',3);
+  for(const sign of [-1,1])for(const y of [-18,5]){
+   const x=sign<0?-49:13;
+   out+=`<g data-solar-wing="true">${rect(x,y,36,13,'sd-array',1)}${each(2,i=>X(`M${x+12*(i+1)} ${y}v13`,'sd-trace'))}${X(`M${x} ${y+6.5}h36`,'sd-cells')}</g>`;
+  }break;
+ }
  case 'battery':out=rect(-14,-30,28,55,'sd-metal',3)+rect(-6,-34,12,5,'sd-terminal',1)+each(5,i=>rect(-9,15-i*8,18,5,i<Math.round(frac(level)*5)?'sd-charge':'sd-unfilled',1));break;
  case 'dish':out=X('M-28 -20Q-31 12 3 15L23 -14Q-1 -6 -28 -20Z','sd-metal')+X('M-27 -19L8 -29L22 -14M-8 11L-13 26m-7 1h29m-15 -16l6 14','sd-hardware')+circle(8,-29,2.3,'sd-led');break;
  case 'patch':out=X('M-25 -13l38 -8 13 26 -39 10Z','sd-metal')+X('M-15 -8l21 -5 8 13 -21 6Z','sd-gold')+X('M-15 18v7m7 -8v9','sd-hardware');break;
@@ -61,18 +68,18 @@ function glyph(type,x,y,size=1,level=.5){
 function compute({h,d,s},id){
  const parts=[
  P('compute','Accelerator trays','Prompt prefill and token decoding share accelerator time. The estimator checks both compute and memory bandwidth.','trayCount','compute',[row('Installed',h.trays+' trays / '+h.chips+' accelerators'),row('Model',tech(d,'workload')),row('Decode on board',val(s.tokensPerSec,'tok/s',0)),row('Aggregate memory',val(h.memoryGB,'GB',0))]),
- P('memory','Model memory','Weights, context and KV cache occupy accelerator memory for every active model replica.','context','compute',[row('Weight precision',val(d.bits,'bit')),row('Weights per replica',val(h.modelGB,'GB')),row('KV per replica',val(h.kvGB,'GB')),row('Batch',d.batch+' streams / replica')]),
+ P('memory','High-bandwidth memory','Weights, context and KV cache occupy accelerator memory for every active model replica.','context','compute',[row('Weight precision',val(d.bits,'bit')),row('Weights per replica',val(h.modelGB,'GB')),row('KV per replica',val(h.kvGB,'GB')),row('Batch',d.batch+' streams / replica')]),
  P('storage','Solid-state recorder','Output text and bulk products share the recorder. Delivered bytes leave the queue when the terminal has a ground pass.','storageTB','storage',[row('Media',tech(d,'storage')),row('Installed / free',val(h.storageTB,'TB')+' / '+val(s.freeTB,'TB')),row('Queued text',val(s.textQueueGB,'GB')),row('Queued bulk data',val(s.bulkQueueGB,'GB'))]),
  P('cooling','Cold plate','Power dissipated in the trays enters a pumped loop through the cold plates.','thermalResistanceKPerKw','radiator',[row('Cold plate',val(s.coldPlateK,'K')),row('Tray resistance',val(d.thermalResistanceKPerKw,'K/kW')),row('Compute draw',val(s.itKW,'kW'))])];
  if(h.ai&&purposeId(h)!=='text'){
   const q=h.ai,profile=purposeInfo(h);
   parts[0]=P('compute','Accelerator trays',profile.phases[2],'trayCount','compute',[row('Installed',h.trays+' trays / '+h.chips+' accelerators'),row('Workload',q.label),row('Onboard work rate',val(s.aiUnitRate,q.unit+'/s',2)),row('Fabric efficiency',val(q.fabricEfficiency*100,'%'))]);
-  parts[1]=P('memory','Model state','Installed accelerator memory must hold the selected workload’s resident model and execution state.',q.training?'trainingStateBytes':'context','compute',[row('Model state',val(q.modelMemoryGB,'GB')),row('Installed memory',val(q.installedMemoryGB,'GB')),row('Headroom',val(q.memoryMarginGB,'GB'))]);
+  parts[1]=P('memory','High-bandwidth memory and model state','Installed accelerator memory must hold the selected workload’s resident model and execution state.',q.training?'trainingStateBytes':'context','compute',[row('Model state',val(q.modelMemoryGB,'GB')),row('Installed memory',val(q.installedMemoryGB,'GB')),row('Headroom',val(q.memoryMarginGB,'GB'))]);
   parts[2]=P('storage','Staging and output','Customer inputs and returned products share the recorder with persistent model files.','storageTB','storage',[row('Staged customer input',val(s.aiInputBufferGB,'GB')),row('Queued customer product',val(s.aiProductQueueGB,'GB')),row('Earth receipt',val(s.aiProductDeliveredGB,'GB'))]);
  }
  const art=path('M57 40H369V219H57Z','sd-boundary')+T(69,58,'COMPUTE ENCLOSURE','sd-over','start')+
  flow(id,'M154 115H239','cyan',(s.aiUnitRate??s.tokensPerSec)>0)+flow(id,'M318 115H444','cyan',s.offeredMbps>0)+flow(id,'M279 146V183h77','amber',s.itKW>0)+
- pick(parts[1],75,74,90,87,glyph('chip',119,108,.82)+named(120,152,'HBM',val(h.memoryGB,'GB',0)))+
+ pick(parts[1],65,70,113,109,glyph('chip',121,101,.7)+T(121,139,'High-bandwidth','sd-name')+T(121,153,'memory','sd-name')+T(121,169,val(h.memoryGB,'GB',0)))+
  pick(parts[0],218,66,115,100,glyph('rack',274,106,.94)+named(274,152,'Accelerators',h.trays+' trays'))+
  pick(parts[2],424,76,105,96,glyph('ssd',477,111,1)+named(477,154,'Recorder',val(s.queueGB,'GB queued'))) +
  pick(parts[3],355,166,84,65,glyph('cold',391,184,.72)+T(391,221,val(s.coldPlateK,'K'),'sd-value'))+
@@ -88,7 +95,7 @@ function power({h,d,s},id){
  P('loads','Load branches','IT, communications and platform hardware draw from the same bus at the current mission instant.','duty','compute',[row('IT',val(s.itKW,'kW')),row('Terminal',val(s.terminalKW,'kW')),row('Pump and storage',val(s.pumpKW+s.storageKW,'kW')),row('CMGs and torquers',val(s.cmgKW+s.coilKW,'kW'))])];
  const discharge=s.dischargeKW>.0001,charge=s.chargeKW>.0001;
  const art=flow(id,'M141 86H264','amber',s.solarKW>0)+flow(id,discharge?'M144 183H218V142H262':'M263 143H218V183H145','green',discharge||charge)+path('M277 65V195','sd-busbar')+
- pick(parts[0],39,44,130,91,glyph('solar',103,80,1.05)+named(103,121,'Solar wings',val(s.solarKW,'kW'))) +
+ pick(parts[0],39,43,130,102,glyph('fourWings',103,81,1.02)+named(103,121,'Four solar wings',val(s.solarKW,'kW'))) +
  pick(parts[1],52,151,109,93,glyph('battery',101,181,.83,s.socPct/100)+named(101,223,'Battery',val(s.socPct,'% SOC')))+
  pick(parts[2],239,43,78,165,rect(268,62,17,138,'sd-conductor',4)+T(278,32,'DC BUS','sd-over')+T(276,221,val(s.servedLoadKW,'kW'),'sd-value'))+
  pick(parts[3],412,39,125,177,[[71,'Compute',s.itKW],[129,'Terminal',s.terminalKW],[188,'Platform',Math.max(0,s.loadKW-s.itKW-s.terminalKW)]].map(([y,n,v])=>flow(id,`M287 ${y}H412`,'amber',v>.001)+circle(421,y,5,'sd-node')+T(435,y-2,n,'sd-name','start')+T(435,y+15,val(v,'kW'),'sd-value','start')).join(''))+T(179,172,discharge?'DISCHARGE':charge?'CHARGE':'IDLE','sd-over');
@@ -99,11 +106,11 @@ function comm({h,d,s,events},id){
  const active=!!s.station,next=events.find(e=>e.type==='contact'&&e.end>=s.t)||events.find(e=>e.type==='contact');
  const parts=[
  P('payload','Payload downlink','The queue feeds the selected payload terminal after acquisition. Line rate and application goodput have separate budgets.','link','communications',[row('Terminal',s.groundLink||d.link),row('Line rate',val(s.lineMbps,'Mbit/s')),row('Application goodput',val(s.goodputMbps,'Mbit/s')),row('Queued payload',val(s.queueGB,'GB'))]),
- P('command','Command uplink','Ground commands use the independent S-band uplink. The command channel has its own link budget and queue.','network','communications',[row('Ground command demand',val(s.commandDemandKbps,'kbit/s')),row('Delivered commands',val(s.commandGoodputKbps,'kbit/s')),row('Uplink physical rate',val(s.uplinkMbps,'Mbit/s')),row('Queued commands',val(s.uplinkQueueMB,'MB'))]),
+ P('command','Tracking, telemetry and command','Ground commands use the independent S-band uplink. The command channel has its own link budget and queue.','network','communications',[row('Ground command demand',val(s.commandDemandKbps,'kbit/s')),row('Delivered commands',val(s.commandGoodputKbps,'kbit/s')),row('Uplink physical rate',val(s.uplinkMbps,'Mbit/s')),row('Queued commands',val(s.uplinkQueueMB,'MB'))]),
  P('station','Ground endpoint','The beam terminates at the visible station selected by the geometry solver. The elevation mask defines access.','elevationDeg','communications',[row('Network',tech(d,'network')),row('Current endpoint',s.station||'No contact'),row('Slant range',active?val(s.rangeKm,'km'):'—'),row('Elevation',active?val(s.elevationDeg,'°'):'—')],next)];
  const art=path('M40 38H215V212H40Z','sd-boundary')+T(52,58,'SPACE SEGMENT','sd-over','start')+
  pick(parts[0],49,66,157,71,glyph(s.groundLink==='Optical'||(!active&&d.link==='optical')?'optic':'dish',86,94,.68)+T(123,92,'Payload','sd-name','start')+T(123,112,s.groundLink||'Standby','sd-value','start'))+
- pick(parts[1],49,139,157,68,glyph('patch',86,165,.66)+T(122,163,'S-band','sd-name','start')+T(122,182,'TT&C','sd-value','start'))+
+ pick(parts[1],49,139,168,68,glyph('patch',86,165,.66)+T(122,163,'S-band','sd-name','start')+T(122,180,'Tracking, telemetry','sd-over','start')+T(122,192,'and command','sd-over','start'))+
  flow(id,'M211 87Q355 52 470 109','cyan',s.goodputMbps>0)+flow(id,'M471 130Q363 188 213 167','violet',s.commandGoodputKbps>0)+T(330,49,val(s.goodputMbps,'Mbit/s'),'sd-value')+T(329,197,val(s.commandGoodputKbps,'kbit/s'),'sd-value')+
  path('M400 190Q500 153 571 188','sd-horizon')+
  pick(parts[2],433,83,120,137,glyph('dish',498,125,1.0)+named(498,202,s.station||'Ground network',active?val(s.rangeKm,'km'):groundSites(d.network).length+' sites'));
@@ -181,7 +188,7 @@ function prop({h,d,s},id){
  });
  const he=model.tanks.find(t=>t.id==='helium');
  parts.push(P('pressure','Pressurant and regulator','A separate helium bottle feeds a regulator. A check valve on each gas branch isolates the two tank ullages.',null,'propellant',[row('Helium load',val(h.pressurantKg,'kg',3)),row('Bottle volume',val(he.volumeL,'L',2)),row('Charge / feed pressure',val(model.bottlePa/1e5,'bar')+' / '+val(model.feedPa/1e5,'bar'))]),
-  P('engine','Twin thrust chambers','Separate filtered liquid feeds meet at each engine injector. Two parallel engines mounted on the thrust deck fire together along the body +Y axis.','engine','propulsion',[row('Engine package',tech(d,'engine')),row('Operating thrust',val(d.thrustN,'N')),row('Delivered Isp',val(d.isp,'s')),row('Integrated impulse',val(s.burnImpulseNs,'N·s',0))]),
+  P('engine','Twin thrust chambers','Separate filtered liquid feeds meet at each engine injector. Two parallel engines mounted on the thrust deck fire together along the body +Z axis.','engine','propulsion',[row('Engine package',tech(d,'engine')),row('Operating thrust',val(d.thrustN,'N')),row('Delivered Isp',val(d.isp,'s')),row('Integrated impulse',val(s.burnImpulseNs,'N·s',0))]),
   P('disposal','Disposal allocation','The disposal ledger reserves liquid for the selected terminal maneuver.','disposalDv','propellant',[row('Disposal state',s.disposalStatus||'Scheduled'),row('Protected inventory',val(s.disposalProtectedKg,'kg')),row('Disposal used',val(s.disposalUsedKg,'kg'))]));
  const tank=(x,i,col)=>{
   const t=model.tanks.find(t=>t.id===parts[i].id),kg=s[t.id+'Kg'],r=25,fill=Math.cbrt(frac(kg/d[t.id+'Density']/t.volumeL));
@@ -347,7 +354,29 @@ function data({h,d,s,day,events},id){
  return info('Payload custody','Separate text and bulk queues from completed ground deliveries',parts,art,[legend('cyan','Output text'),legend('violet','Bulk payload')],s.goodputMbps>0?'Delivering':'Buffering');
 }
 
-const builders={conops,purpose,environment,orbit,compute,data,comm,power,thermal,attitude,prop,mass,launch,launcher};
+function mechanical({h,d,s},id){
+ const parts=[
+ P('adapter','Separation interface','Launch loads pass through the adapter ring into the base of the bus. Mechanical coordinates use this plane when reporting launch height.','adapterKg','adapter',[row('Adapter',val(d.adapterKg,'kg')),row('Launch stack',val(h.launchKg,'kg'))]),
+ P('frame','Primary frame','The six enclosure faces and internal frames carry the installed equipment to the thrust and separation deck.','skinKgM2','structure',[row('Width × height',val(h.bodyWidthM,'m',2)+' × '+val(h.bodyHeightM,'m',2)),row('Length along +Z',val(h.bodyLengthM,'m',2))]),
+ P('mounts','Equipment and appendages','Equipment mounts connect the flight computer, compute trays, pressure vessels and deployable hardware to the structure.','trayCount','compute',[row('Installed trays',h.trays),row('Remaining propellant',val(s.propellantKg,'kg'))])];
+ const art=T(295,40,'LAUNCH LOAD PATH','sd-over')+flow(id,'M169 122H220','steel',false)+flow(id,'M371 122H419','steel',false)+
+ pick(parts[0],20,67,149,116,ellipse(94,109,31,9,'sd-metal')+ellipse(94,108,19,4,'sd-device')+named(94,147,'Adapter ring',val(d.adapterKg,'kg')))+
+ pick(parts[1],220,67,151,116,path('M269 94h52v32h-52zM269 94l52 32m0-32l-52 32','sd-hardware')+named(295,147,'Primary frame',val(h.bodyLengthM,'m body',2)))+
+ pick(parts[2],419,67,150,116,glyph('rack',494,108,.7)+named(494,147,'Installed equipment',h.trays+' compute trays'));
+ return info('Structural interfaces','From the separation ring to equipment attachments',parts,art,[legend('steel','Mechanical connection')],'Fixed load path');
+}
+function avionics({d,s},id){
+ const parts=[
+ P('uplink','Ground command queue','S-band passes carry spacecraft commands to the flight computer. The queue can grow during loss of contact.','commandKbps','communications',[row('Offered',val(d.commandKbps,'kbit/s')),row('Earth backlog',val(s.uplinkQueueMB,'MB'))]),
+ P('flight','Spacecraft flight computer','The computer runs command sequences and supervises spacecraft subsystems. AI workloads execute on the separate payload trays.',null,'avionics',[row('Flight electronics demand',val(s.cdhKW,'kW',3)),row('Commands received',val(s.commandGoodputKbps,'kbit/s'))]),
+ P('health','Housekeeping recorder','Stores time-tagged spacecraft health records between ground contacts. Capacity limits determine when older samples are overwritten.','hkRecorderMB','avionics',[row('Sample cadence',val(d.hkPeriodS,'s')),row('Recorder occupancy',val(s.hkStoredMB,'MB',3)),row('Overwritten',val(s.hkOverwrittenMB,'MB',3))])];
+ const art=flow(id,'M169 120H218','cyan',s.commandGoodputKbps>0)+flow(id,'M369 120H416','green',s.hkRateKbps>0)+
+ pick(parts[0],22,62,147,119,glyph('patch',96,104,.83)+named(95,149,'Ground commands',val(s.commandGoodputKbps,'kbit/s')))+
+ pick(parts[1],218,62,151,119,glyph('chip',292,105,.86)+named(294,149,'Flight computer',val(s.cdhKW*1000,'W')))+
+ pick(parts[2],416,62,151,119,glyph('ssd',492,105,.81)+named(492,149,'Health recorder',val(s.hkStoredMB,'MB',2)));
+ return info('Spacecraft avionics','Command execution and spacecraft health records',parts,art,[legend('cyan','Commands from Earth'),legend('green','Housekeeping telemetry')],s.flightPhase);
+}
+const builders={conops,purpose,environment,orbit,compute,data,comm,power,thermal,attitude,prop,mass,launch,launcher,mechanical,avionics};
 export const schematicPages=Object.keys(builders);
 const indexes=Object.fromEntries(schematicPages.map((k,i)=>[k,String(i+1).padStart(2,'0')]));
 const norm=({hardware:h,state:s,day={},events=[],selected,instance,qualificationWindow,thermalScale})=>({h,d:h.input,s,day,events,selected,instance,qualificationWindow,thermalScale});

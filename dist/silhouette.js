@@ -17,8 +17,8 @@ function project(polygons,dir){const ref=Math.abs(dir[2])>.95?[0,1,0]:[0,0,1],x0
 }
 export function ramSilhouette(h,ramBody,deployment){const [x,y,z]=ramBody,body=h.bodyHeightM*h.bodyLengthM*Math.abs(x)+h.bodyWidthM*h.bodyLengthM*Math.abs(y)+h.bodyWidthM*h.bodyHeightM*Math.abs(z);if(deployment<1)return project(layout(h,Math.max(0,deployment)),ramBody);
  let data=cache.get(h);if(!data){data={panels:layout(h,1),samples:new Map()};cache.set(h,data);}
- // The symmetric fore/aft banks allow folded latitude. Samples resolve exact polygon unions; 5° bilinear interpolation bounds runtime for multi-year sweeps.
- const azi=(Math.atan2(y,x)+2*Math.PI)%(2*Math.PI)/step,lat=Math.asin(Math.min(1,Math.abs(z)))/step,i=Math.floor(azi),j=Math.floor(lat),fa=azi-i,fl=lat-j;
+ // A projected union has the same area viewed along either end of the sightline. Samples resolve exact polygon unions; 5° bilinear interpolation bounds runtime for multi-year sweeps.
+ const sign=z<0?-1:1,azi=(Math.atan2(sign*y,sign*x)+2*Math.PI)%(2*Math.PI)/step,lat=Math.asin(Math.min(1,Math.abs(z)))/step,i=Math.floor(azi),j=Math.floor(lat),fa=azi-i,fl=lat-j;
  function sample(ai,li){ai=ai%72;li=Math.min(18,li);if(li===18)ai=0;const key=li*72+ai;let answer=data.samples.get(key);if(answer===undefined){const a=ai*step,b=li*step;answer=project(data.panels,[Math.cos(a)*Math.cos(b),Math.sin(a)*Math.cos(b),Math.sin(b)]);data.samples.set(key,answer);}return answer;}
  const a=sample(i,j)*(1-fa)+sample(i+1,j)*fa,b=sample(i,j+1)*(1-fa)+sample(i+1,j+1)*fa;return body+deployment*(a*(1-fl)+b*fl-body);
 }

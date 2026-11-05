@@ -9,72 +9,72 @@ export const aiDeploymentAudit={
       "launcher": "terran",
       "minLeafGapM": 0.002,
       "minSolarRadiatorGapM": 0.016,
-      "minHardwareGapM": 0.009,
+      "minHardwareGapM": 0.031,
       "minCarriageGapM": 0.002,
       "fit": true,
-      "radialClearanceM": 0.1043933,
-      "axialClearanceM": 2.62891166,
-      "meshFitMarginM": 0.21811457
+      "radialClearanceM": 0.22039356,
+      "axialClearanceM": 3.57800474,
+      "meshFitMarginM": 0.33411483
     },
     {
       "id": "voice",
       "launcher": "terran",
       "minLeafGapM": 0.002,
       "minSolarRadiatorGapM": 0.016,
-      "minHardwareGapM": 0.009,
+      "minHardwareGapM": 0.031,
       "minCarriageGapM": 0.002,
       "fit": true,
-      "radialClearanceM": 0.29268906,
-      "axialClearanceM": 2.97769874,
-      "meshFitMarginM": 0.40788996
+      "radialClearanceM": 0.44169409,
+      "axialClearanceM": 4.1968308,
+      "meshFitMarginM": 0.49732603
     },
     {
       "id": "batch",
       "launcher": "glenn",
       "minLeafGapM": 0.002,
       "minSolarRadiatorGapM": 0.016,
-      "minHardwareGapM": 0.009,
+      "minHardwareGapM": 0.031,
       "minCarriageGapM": 0.002,
       "fit": true,
-      "radialClearanceM": 0.69545515,
-      "axialClearanceM": 7.11046092,
-      "meshFitMarginM": 0.78243131
+      "radialClearanceM": 0.71614055,
+      "axialClearanceM": 8.5155754,
+      "meshFitMarginM": 0.49732603
     },
     {
       "id": "agents",
       "launcher": "glenn9",
       "minLeafGapM": 0.002,
       "minSolarRadiatorGapM": 0.016,
-      "minHardwareGapM": 0.009,
+      "minHardwareGapM": 0.031,
       "minCarriageGapM": 0.002,
       "fit": true,
-      "radialClearanceM": 0.39939126,
-      "axialClearanceM": 5.24582851,
-      "meshFitMarginM": 0.53526648
+      "radialClearanceM": 0.70857487,
+      "axialClearanceM": 7.76305653,
+      "meshFitMarginM": 0.49732603
     },
     {
       "id": "finetune",
       "launcher": "terran",
       "minLeafGapM": 0.002,
       "minSolarRadiatorGapM": 0.016,
-      "minHardwareGapM": 0.009,
+      "minHardwareGapM": 0.031,
       "minCarriageGapM": 0.002,
       "fit": true,
-      "radialClearanceM": 0.44550662,
-      "axialClearanceM": 3.86963321,
-      "meshFitMarginM": 0.63318572
+      "radialClearanceM": 0.48310071,
+      "axialClearanceM": 5.35880425,
+      "meshFitMarginM": 0.49732603
     },
     {
       "id": "pretrain",
       "launcher": "glenn9",
       "minLeafGapM": 0.002,
       "minSolarRadiatorGapM": 0.016,
-      "minHardwareGapM": 0.009,
+      "minHardwareGapM": 0.031,
       "minCarriageGapM": 0.002,
       "fit": false,
       "radialClearanceM": -7.66909155,
-      "axialClearanceM": -14.23301059,
-      "meshFitMarginM": -13.86401059
+      "axialClearanceM": -5.37873478,
+      "meshFitMarginM": -7.60247757
     }
   ]
 };

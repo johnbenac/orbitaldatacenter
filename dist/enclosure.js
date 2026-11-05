@@ -5,8 +5,8 @@ export function sizeEnclosure(d,w,h,l,trays){
  const pipe=.052,gland=.036,feed=.065;
  const mapping=[
   ['Port','x',-1,h*l,[gland,gland]],['Starboard','x',1,h*l,[gland,gland]],
-  ['Zenith deck','y',1,w*l,[gland]],['Thrust deck','y',-1,w*l,[gland,feed,feed]],
-  ['Forward bulkhead','z',1,w*h,[pipe,pipe]],['Aft bulkhead','z',-1,w*h,[pipe,pipe]]
+  ['Terminal deck','y',1,w*l,[gland]],['Service wall','y',-1,w*l,[gland]],
+  ['Forward radiator bulkhead','z',1,w*h,[pipe,pipe,pipe,pipe]],['Nadir thrust deck','z',-1,w*h,[feed,feed]]
  ];
  const walls=mapping.map(([id,axis,sign,grossAreaM2,portDiametersM])=>{
   const penetrationM2=portDiametersM.reduce((sum,x)=>sum+Math.PI*x*x/4,0),coveredAreaM2=grossAreaM2-penetrationM2;

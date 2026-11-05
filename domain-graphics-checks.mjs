@@ -34,4 +34,4 @@ for(const [id,item] of Object.entries(launchFleet)){
  rocket.update(packed,'pad',{domain:'data',phase:'D'});assert(rocket.parts.payload.visible);assert(rocket.parts.shell.visible);
  rocket.update({...active,t:175,flightPhase:'ascent'},'ascent',{domain:'launcher',phase:'D'});assert(!rocket.parts.boosters.some(x=>x.visible));if(item.stages===1)assert(!rocket.parts.upper.visible);
 }
-console.log('14 domains × C/D/E, per-part material ghosting and restoration, stage-preserving Phase D cameras, exact data routes and ten fleet configurations passed.');
+console.log('16 domains × C/D/E, per-part material ghosting and restoration, stage-preserving Phase D cameras, exact data routes and ten fleet configurations passed.');

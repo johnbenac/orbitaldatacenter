@@ -7,13 +7,15 @@ export const pages={
  orbit:['Orbit & Eclipse','orbit','Explore orbital geometry, shadow crossings, and the drag environment.'],
  compute:['Compute & Storage','cpu','Trace a workload from accelerator memory to the downlink queue.'],
  comm:['Communications','radio','Inspect ground visibility, link budgets, and bytes delivered through each pass.'],
- power:['Battery & Power','battery-charging','Follow solar generation, bus demand, and stored energy through eclipse.'],
- thermal:['Thermal','thermometer-sun','Inspect temperatures and heat transfer from chip junction to radiator.'],
- attitude:['Attitude Control','crosshair','Inspect disturbance torque, stored momentum, and magnetic unloading.'],
- prop:['Propellant','fuel','Reconcile tank inventory, allocated reserves, and chemical burn impulse.'],
+ power:['Electrical Power','battery-charging','Follow solar generation, bus demand, and stored energy through eclipse.'],
+ thermal:['Thermal Control','thermometer-sun','Inspect temperatures and heat transfer from chip junction to radiator.'],
+ attitude:['Attitude Determination & Control','crosshair','Inspect disturbance torque, stored momentum, and magnetic unloading.'],
+ prop:['Propulsion','fuel','Reconcile tank inventory, allocated reserves, and chemical burn impulse.'],
  mass:['Mass Budget','chart-no-axes-column-increasing','Trace every kilogram from installed hardware to the launched stack.'],
  launch:['Launch & Insertion','rocket','Compare stowed hardware, launch allowance, and the insertion sequence.'],
  launcher:['Launch vehicle','rocket','Compare provider references, recovery modes, upper stages and mission-specific launch allowances.'],
+ mechanical:['Mechanical Design','box','Trace each installed component to its body coordinates, mass properties and terminal disposition.'],
+ avionics:['Command & Data Handling','panels-top-left','Operate the spacecraft flight computer, command receiver and housekeeping recorder.'],
  architecture:['Spacecraft architecture','box','One spacecraft layout for all six customer missions. Inspect its fixed interfaces and the dimensions of your current build.'],
  equipment:['Master equipment list','list-checks','Trace each mass allocation to the installed hardware, its sizing basis and its published reference.'],
  sources:['Model & sources','book-open','Inspect the equations, assumptions, and reference hardware behind this design.'],
@@ -21,6 +23,9 @@ export const pages={
 };
 export const colors=['#f1ae67','#72cbd0','#a69cde','#87c7a5','#8599c9','#dc9f9d'];
 export const cfg={
+ mechanical:{metrics:['wetKg|Flight mass|kg','$dryKg|Dry mass|kg','propellantKg|Liquid inventory|kg','$launchKg|Launched stack|kg'],charts:['wetKg|Spacecraft mass|kg','propellantKg|Remaining liquids|kg'],rows:['$bodyWidthM|Bus width|m','$bodyHeightM|Bus height|m','$bodyLengthM|Bus length|m','$stowedLengthM|Stack height|m']},
+ avionics:{metrics:['cdhKW|Flight avionics load|kW','hkRateKbps|Housekeeping source rate|kbit/s','hkStoredMB|Housekeeping recorder|MB','uplinkQueueMB|Ground command backlog|MB'],charts:['hkStoredMB|Housekeeping recorder|MB','commandGoodputKbps|Commands received|kbit/s','hkOverwrittenMB|Housekeeping overwritten|MB','cdhKW|Flight avionics load|kW'],rows:['@hkPeriodS|Housekeeping sample cadence|s','@hkRecorderMB|Housekeeping recorder capacity|MB','commandUploadedGB|Commands received|GB']},
+
  conops:{charts:['aiUnitRate|Selected workload rate|work units/s','aiProductDeliveredGB|Customer product received|GB','solarKW|Solar supply|kW','loadKW|Bus demand|kW'],metrics:['@missionYears|Mission duration|yr','aiUnitsComputed|Computed onboard|work units','aiProductQueueGB|Customer output queued|GB','aiProductDeliveredGB|Customer product received|GB'],rows:['@duty|Scheduled compute duty|fraction','aiInputBufferGB|Staged customer input|GB','aiProductGeneratedGB|Product generated|GB','aiProductDeliveredGB|Product returned|GB','$launchKg|Launched mass|kg']},
  purpose:{charts:['aiUnitRate|Onboard work rate|work units/s','aiInputBufferGB|Input staged|GB','aiProductQueueGB|Unreturned customer product|GB','aiProductDeliveredGB|Customer product received|GB'],metrics:['aiUnitsComputed|Onboard work|work units','aiInputConsumedGB|Input processed|GB','aiProductQueueGB|Product backlog|GB','aiProductDeliveredGB|Received product|GB'],rows:['aiInputUploadedGB|Customer input received aboard|GB','aiInputConsumedGB|Customer input consumed|GB','aiProductGeneratedGB|Customer product generated|GB','aiProductDeliveredGB|Earth receipt|GB','aiHostKW|Host demand|kW','aiFabricKW|Fabric demand|kW']},
  environment:{charts:['solarIrradiance|Direct sunlight|W/m²','densityKgM3|Neutral atmospheric density|kg/m³','absorbedKW|Radiator environmental absorption|kW','dragTorqueNm|Aerodynamic torque|N·m'],metrics:['betaDeg|Solar beta|°','ramAreaM2|Ram silhouette|m²','absorbedKW|External heat absorbed|kW','magFieldUT|Local magnetic field|µT'],rows:['solarIrradiance|Direct solar irradiance|W/m²','albedoIrradiance|Earth albedo at radiator|W/m²','earthIRIrradiance|Earth IR at radiator|W/m²','enclosureSolarWm2|Enclosure shortwave irradiance|W/m²','enclosureIRWm2|Enclosure IR irradiance|W/m²','f107Daily|Daily 10.7 cm flux proxy|sfu','f107Mean|81-day 10.7 cm flux proxy|sfu','@ap|Geomagnetic activity|Ap','densityKgM3|Neutral density|kg/m³','dragN|Drag load|N','magFieldUT|Field magnitude|µT','packLossKW|Induced battery conversion heat|kW','jointKW|Drive demand|kW','solarTorqueNm|Solar radiation pressure torque|N·m','gravityTorqueNm|Gravity gradient torque|N·m']},

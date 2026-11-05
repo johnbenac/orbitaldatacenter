@@ -8,56 +8,56 @@ export const deploymentAudit={
       "id": "pathfinder",
       "minLeafGapM": 0.002,
       "minSolarRadiatorGapM": 0.016,
-      "minHardwareGapM": 0.009,
+      "minHardwareGapM": 0.031,
       "minCarriageGapM": 0.002,
       "fit": true,
-      "radialClearanceM": 0.44550662,
-      "axialClearanceM": 4.36833556,
-      "meshFitMarginM": 0.63318572
+      "radialClearanceM": 0.66304145,
+      "axialClearanceM": 5.68958013,
+      "meshFitMarginM": 0.49732603
     },
     {
       "id": "reference",
       "minLeafGapM": 0.002,
       "minSolarRadiatorGapM": 0.016,
-      "minHardwareGapM": 0.009,
+      "minHardwareGapM": 0.031,
       "minCarriageGapM": 0.002,
       "fit": true,
-      "radialClearanceM": 0.1043933,
-      "axialClearanceM": 2.62891166,
-      "meshFitMarginM": 0.21811457
+      "radialClearanceM": 0.22039356,
+      "axialClearanceM": 3.57800474,
+      "meshFitMarginM": 0.33411483
     },
     {
       "id": "optical",
       "minLeafGapM": 0.002,
       "minSolarRadiatorGapM": 0.016,
-      "minHardwareGapM": 0.009,
+      "minHardwareGapM": 0.031,
       "minCarriageGapM": 0.002,
       "fit": true,
-      "radialClearanceM": 0.1043933,
-      "axialClearanceM": 2.62891166,
-      "meshFitMarginM": 0.21811457
+      "radialClearanceM": 0.219334,
+      "axialClearanceM": 3.5693356,
+      "meshFitMarginM": 0.33305527
     },
     {
       "id": "carrier",
       "minLeafGapM": 0.002,
       "minSolarRadiatorGapM": 0.016,
-      "minHardwareGapM": 0.009,
+      "minHardwareGapM": 0.031,
       "minCarriageGapM": 0.002,
-      "fit": false,
-      "radialClearanceM": -0.37215762,
-      "axialClearanceM": 3.48751796,
-      "meshFitMarginM": -0.22036078
+      "fit": true,
+      "radialClearanceM": 0.26180634,
+      "axialClearanceM": 7.27625329,
+      "meshFitMarginM": 0.34546123
     },
     {
       "id": "scale",
       "minLeafGapM": 0.002,
-      "minSolarRadiatorGapM": 0.00561726,
-      "minHardwareGapM": 0.009,
+      "minSolarRadiatorGapM": 0.016,
+      "minHardwareGapM": 0.031,
       "minCarriageGapM": 0.002,
       "fit": false,
       "radialClearanceM": -38.0752946,
-      "axialClearanceM": -212.251744,
-      "meshFitMarginM": -211.882744
+      "axialClearanceM": -84.69349151,
+      "meshFitMarginM": -84.32449151
     }
   ]
 };

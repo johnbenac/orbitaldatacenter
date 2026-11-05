@@ -10,9 +10,9 @@
 .sd-art .sd-over{font-size:9px;letter-spacing:1.3px;fill:#a4bec4}.sd-art .sd-name{font:600 13px/1.15 system-ui,sans-serif;fill:#d6e4e5}
 .sd-art .sd-value{font-size:13px;fill:#bde4de;letter-spacing:-.2px}.sd-art .sd-large{font-size:21px;fill:#bfe4da;letter-spacing:-.9px}
 .sd-art .sd-world{font-size:13px;letter-spacing:4px;fill:#cde8eb}.sd-art .sd-bad{fill:var(--sc-red)}
-.sd-art .sd-hit{fill:transparent;stroke:transparent;stroke-width:1.2}.sd-pick{cursor:pointer;outline:none}
+.sd-art .sd-hit{fill:#83c6d808;stroke:#587681;stroke-opacity:.76;stroke-width:1;stroke-dasharray:3 3}.sd-pick{cursor:pointer;outline:none}
 .sd-pick:hover>.sd-hit,.sd-pick:focus-visible>.sd-hit{fill:#b4f0dd0d;stroke:#99cbc1;stroke-dasharray:3 4}
-.sd-pick[aria-pressed=true]>.sd-hit{fill:#b4f0dd08;stroke:#739a9d;stroke-dasharray:2 5}
+.sd-pick[aria-pressed=true]>.sd-hit{fill:#294148;fill-opacity:.74;stroke:#9fdbcf;stroke-opacity:1;stroke-width:1.5;stroke-dasharray:none}
 .sd-line,.sd-hardware,.sd-axes,.sd-dim,.sd-cells,.sd-rib,.sd-trace,.sd-liquid,.sd-tankline,.sd-winding,.sd-field,.sd-meridian,.sd-orbit,.sd-profile,.sd-boundary-line,.sd-stack-outline,.sd-centerline,.sd-busbar{fill:none;stroke-linecap:round;stroke-linejoin:round}
 .sd-hardware,.sd-axes,.sd-tankline{stroke:#c5d1d1;stroke-width:2}.sd-axes{stroke-width:1.3}
 .sd-metal,.sd-tank{fill:#405461;stroke:#d0d7d5;stroke-width:1.4}.sd-device,.sd-tank{fill:#21353c}.sd-device{stroke:#8faeaf;stroke-width:1}.sd-core{fill:#b89669;stroke:#f6c182;stroke-width:1.4}.sd-trace{stroke:#c6b18f;stroke-width:1.9}

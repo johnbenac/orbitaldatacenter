@@ -27,12 +27,13 @@ if(process.argv.includes('--five-year')){
   assert.ok(h.fit);const {result}=chronologicalAudit(h.input),p=result.terminal;
   assert.equal(p.targetMet,true);near(result.finalState.disposalUsedKg,p.usedKg);
   near(p.initialWet-result.finalState.wetKg,p.usedKg);
+  near(p.initialWet*(-Math.expm1(-p.paidDv/(h.input.isp*9.80665))),p.usedKg,.001);
   near(result.payloadServiceSeconds,p.start-1380,.01);
   near(result.thermal.coveredSeconds,p.entry??p.end,.01);
   if(method==='reentry'){
-   near(p.targetErrorKm,28.05,2);near(p.usedKg,122.01,.5);near(p.impact.speedMs,49.28,.5);near(p.footprint.semiMajorKm,426.9,2);assert.equal(result.impactCount,1);
+   near(p.targetErrorKm,28.05,2);near(p.usedKg,123.46,.5);near(p.impact.speedMs,49.28,.5);near(p.footprint.semiMajorKm,426.9,2);assert.equal(result.impactCount,1);
   }else{
-   near(p.finalPerigeeKm,899.41,1);near(p.finalApogeeKm,900.59,1);near(p.usedKg,165.55,.5);assert.equal(result.disposalCount,2);
+   near(p.finalPerigeeKm,899.41,1);near(p.finalApogeeKm,900.59,1);near(p.usedKg,167.49,.5);assert.equal(result.disposalCount,2);
   }
   console.log(method,JSON.stringify({usedKg:p.usedKg,paidDv:p.paidDv,targetErrorKm:p.targetErrorKm,finalPerigeeKm:p.finalPerigeeKm,finalApogeeKm:p.finalApogeeKm,actualSurfacePoint:p.impact,remainingKg:result.finalState.propellantKg}));
  }

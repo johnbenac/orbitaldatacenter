@@ -15,6 +15,8 @@ function source(id,title,url,locator,kind='Technical reference'){
  refs.set(id,record);
  return record;
 }
+source('flightio','NASA · LADEE flight computer and telemetry','https://technology.nasa.gov/patent/TOP2-239','Integrated avionics functional description · command ingest, telemetry output and engineering data');
+source('gyroref','Airbus · CMG 40-60 S','https://www.airbus.com/sites/g/files/jlcbta136/files/2022-10/AVIONICS-CMG40-60S-v6_2022.pdf','Interface and performance tables · per-unit mass, torque, momentum, dimensions and typical draw');
 source('seh','NASA Systems Engineering Handbook','https://www.nasa.gov/reference/4-0-system-design-processes/','Rev 2, §§4.1–4.4 · stakeholder expectations, requirements, logical decomposition and design solution');
 source('trade','NASA Systems Engineering Handbook','https://www.nasa.gov/reference/6-0-crosscutting-technical-management/','Rev 2, §6.8 · decision analysis and comparison of alternatives');
 source('smad','Larson & Wertz · Space Mission Analysis and Design','https://link.springer.com/book/9780792359012','3rd ed., 1999 · ISBN 978-0-7923-5901-2 · publisher catalog, print and licensed library access','Published handbook');
@@ -79,6 +81,12 @@ group('seh smad',missionBasis,[
  ['requiredTps','Estimate simultaneous users × required decode tokens per second per user during an active burst. Account for prompt handling, context and contact delay separately.','100 concurrent users × 100 output tok/s per user = 10,000 active tok/s.'],
  ['latencyTargetS','Specify the largest acceptable onboard time to first output token. Budget ground wait, uplink, prompt prefill and delivery separately for an end-to-end service objective.'],
  ['requiredLineMbps','Set an application-level contact goodput objective from bytes to deliver and the time actually available after acquisition.','75 decimal GB in 600 s requires 1,000 Mbit/s of net payload goodput.']
+]);
+group('flightio critical',missionBasis,[
+ ['commandKbps','Enter the average offered spacecraft command traffic during service. Estimate time-tagged sequence and maintenance uploads and spread them over the offered interval.','16 kbit/s is a traffic study assumption.'],
+ ['uplinkBufferMB','Size Earth-side command spooling for the longest expected ground-contact gap. Compare the queue and discarded requests over the mission.','At 16 kbit/s, 128 MB accommodates 17.78 hours of new commands.'],
+ ['hkPeriodS','Choose the recording cadence for platform health. The study records 256 bytes per sample, including time and validity flags.','One full sample per second produces 2.048 kbit/s.'],
+ ['hkRecorderMB','Size the circular engineering recorder for the required lookback. Count sensor channels, record size and sample cadence.','256 MB holds 1,000,000 full 256-byte records.']
 ]);
 group('power margin',assume,[
  ['solarM2','Sum the physical planform of all four photovoltaic wings. Size at elapsed age with eclipse recharge, pointing, packing and bus conversion losses.','At 1,361 W/m² and 30% efficiency, 1 m² yields 408.3 W before bus losses.'],
@@ -156,6 +164,10 @@ group('gnc actuator drag',assume,[
  ['cmgMomentumNms','Specify usable cluster momentum storage including geometry and steering reserve. Check integrated disturbance momentum between unloading opportunities.'],
  ['cmgTorqueNm','Specify the available clustered torque for the commanded axis and envelope. Assess slew transients with projected inertia growth and gimbal limitations.'],
  ['dipoleAm2','Use the combined commanded magnetic dipole and verify authority against the field component perpendicular to it.','1,000 A·m² perpendicular to 30 µT gives 0.030 N·m. Parallel alignment gives zero.']
+]);
+group('gyroref seh',hardware,[
+ ['cmgMomentumNms','Enter required directional momentum capacity for pointing, tracking and the time between unloads. Four catalog units are sized to this envelope with a 50% directional planning factor.','80 N·m·s selects four 40 N·m·s units with 160 N·m·s scalar sum. Compare the candidates against observed demand in Attitude Control.'],
+ ['cmgTorqueNm','Allocate torque for the worst commanded axis. The controller uses the selected cap. Four units must also satisfy the momentum requirement.']
 ]);
 group('thermosphere radioflux fluxarchive',assume,[
  ['solarCyclePhase','Choose where the selected orbit begins within the repeated eleven-year activity history. Phase changes density, accumulated drag and reboost consumption.'],
@@ -282,7 +294,7 @@ function options(key,rows){opts[key]=Object.fromEntries(rows.map(([id,advice,ids
 options('compute',[
  ['flight','Start here for a generic conduction-cooled flight-tray study. Replace power, mass and throughput with measurements for the proposed flight assembly.','perf gevst',hardware],
  ['dgx','Use this point to compare a complete terrestrial DGX enclosure. The NVIDIA H100 system uses eight GPUs and is rated up to 10.2 kW and 130.45 kg. The modeled idle load and space integration are engineering assumptions.','dgx h100 perf','Published terrestrial chassis ratings plus workbench integration assumptions.'],
- ['trillium','Use TPU v6e as a terrestrial silicon reference. Google publishes 918 BF16 TFLOP/s and 32 GB HBM per chip. The workbench assumes four chips per flight tray and supplies its own tray power and mass.','tpu perf','Published chip specifications plus an assumed flight-tray package.']
+ ['trillium','Use TPU v6e as a terrestrial silicon reference. Google publishes 918 BF16 TFLOP/s and 32 GB high-bandwidth memory per chip. The workbench assumes four chips per flight tray and supplies its own tray power and mass.','tpu perf','Published chip specifications plus an assumed flight-tray package.']
 ]);
 options('workload',[
  ['llama8','Use the smaller grouped-query model for a memory-efficient service. The preset assumes four-bit stored weights. Measure overhead and KV precision for your chosen checkpoint.','llama perf',estimate],

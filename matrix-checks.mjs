@@ -14,7 +14,7 @@ assert.deepEqual(presetList.map(p=>p.h.trays),[4,12,12,26,981]);
 assert.ok(presetList.find(p=>p.id==='optical').h.initialQueueGB>reference.h.initialQueueGB);
 assert.ok(presetList.slice(0,3).every(p=>p.h.fit&&p.h.massMarginKg>=0));
 const legacyCarrier=presetList.find(p=>p.id==='carrier').h;
-assert.ok(!legacyCarrier.fit&&legacyCarrier.fairing.radialClearanceM<0&&legacyCarrier.massMarginKg>0,'The enlarged installed envelope binds before launch mass on the legacy carrier.');
+assert.ok(legacyCarrier.fit&&legacyCarrier.fairing.radialClearanceM>0&&legacyCarrier.massMarginKg>0,'The shorter repacked carrier clears the selected fairing.');
 assert.ok(!presetList.at(-1).h.fit&&presetList.at(-1).h.massMarginKg<0);
 
 const custom=missionPreset({id:'user-test-fixture',name:'Night-shift node',description:'Short duty cycle',design:{...reference.design,duty:.2,aiPurpose:'agents'},solver:'workload',thermalTargets:{batteryOpMinK:'derive'}});
@@ -59,7 +59,7 @@ assert.match(presetShelf({preset:'custom',presetName:'<bio & "AI">'}),/&lt;bio &
 assert.deepEqual(domainIds,Object.keys(domains));
 for(const phase of 'ABCDEF')for(const domain of domainIds){
  const nav=domainNav({phase,domain});
- assert.equal((nav.match(/data-domain=/g)||[]).length,14);
+ assert.equal((nav.match(/data-domain=/g)||[]).length,16);
  assert.equal((nav.match(/aria-current="page"/g)||[]).length,1);
  const selected=nav.match(/<button[^>]*aria-current="page"[^>]*>/)[0];
  assert.ok(selected.includes('data-domain="'+domain+'"'),phase+' '+domain);
@@ -85,4 +85,4 @@ const assets=JSON.parse(readFileSync(new URL('./dist/assets.json',import.meta.ur
 assert.equal(new Set(assets).size,assets.length);
 for(const file of assets)assert.ok(statSync(new URL('./dist/'+file,import.meta.url)).isFile(),file);
 for(const file of ['app.js','matrix-ui.js','matrix.css','mission-presets.js','flight-chapters.js','domain-analysis.js','domain-analysis.css','deployment.js','entry.js','disposal-views.js'])assert.ok(assets.includes(file),file);
-console.log('Six mission identities, legacy link fixtures, saved design controls and portable preset persistence, fourteen-domain navigation across six phases, ordered flight chapters, URL replay and packaged assets passed.');
+console.log('Six mission identities, legacy link fixtures, saved design controls and portable preset persistence, sixteen-domain navigation across six phases, ordered flight chapters, URL replay and packaged assets passed.');

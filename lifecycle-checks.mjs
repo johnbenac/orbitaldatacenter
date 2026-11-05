@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {phases,lifecycleNav,chapterPhase,phaseFromView} from './dist/lifecycle.js';
-import {phaseA,phaseHandoff,isEditable,observationCard,analysisControls} from './dist/matrix-ui.js';
+import {domainIds,phaseA,phaseHandoff,isEditable,observationCard,analysisControls} from './dist/matrix-ui.js';
 import {controls,defaults,sizeDesign,inverseSolve} from './dist/design.js';
 import {createSimulation} from './dist/model.js';
 import {thermalInspector,requirementResults} from './dist/thermal-review.js';
@@ -17,8 +17,12 @@ for(const phase of Object.keys(phases))assert.equal(isEditable(phase),['A','B','
 const row=k=>'<input name="'+k+'">',ctx={hardware:h,state:st,sim,day:sim.daySummary(0),events:[],samples:[]};
 const definition=phaseA(h,{...v,phase:'A',domain:'conops'},inverseSolve(d),row);
 assert.match(definition,/name="missionYears"/);assert.match(definition,/name="targetLatDeg"/);
-const raised=sizeDesign({...d,disposalMethod:'graveyard'}),raisedDefinition=phaseA(raised,{...v,phase:'A',domain:'prop'},inverseSolve(raised.input),row);
+const raised=sizeDesign({...d,disposalMethod:'graveyard'}),raisedDefinition=phaseA(raised,{...v,phase:'A',domain:'conops'},inverseSolve(raised.input),row);
 assert.match(raisedDefinition,/name="graveyardAltitudeKm"/);assert.doesNotMatch(raisedDefinition,/name="targetLatDeg"/);
+for(const domain of domainIds.filter(k=>k!=='conops')){
+ const definition=phaseA(raised,{...v,phase:'A',domain},inverseSolve(raised.input),row);
+ assert.doesNotMatch(definition,/data-disposal-method=|name="graveyardAltitudeKm"|name="targetLatDeg"/,domain);
+}
 const reqLife=phaseA(h,{...v,phase:'A',domain:'conops',solve:'lifetime'},inverseSolve(d,'lifetime'),row);
 assert.match(reqLife,/name="propellantKg"/);assert.doesNotMatch(reqLife,/name="missionYears"/);
 const controlsByKey=Object.fromEntries(controls.map(c=>[c.key,c]));

@@ -3,13 +3,15 @@ import {controls,defaults,inverseSolve,presets,validateDesign} from './design.js
 const fields=Object.fromEntries(controls.map(c=>[c.key,c]));
 const rateNames={solar:'Solar generation',battery:'Eclipse energy',thermal:'Heat rejection',storage:'Storage capacity',downlink:'Link capacity',compute:'Compute service',propellant:'Propellant supply',diskLife:'Storage endurance',launcherReference:'Vehicle reference capacity',mass:'Launch allowance',fairing:'Stowed fit'};
 const dependencies={
- aiPurpose:['AI Data Center Purpose','Mission CONOPS','Compute & Storage','Data & Delivery','Communications','Battery & Power','Thermal','Mass Budget'],
- launcher:['Launch Vehicle','Launch & Insertion','Mass Budget','Orbit & Eclipse'],battery:['Battery & Power','Thermal','Mass Budget','Launch & Insertion'],
- compute:['Compute & Storage','Data & Delivery','Battery & Power','Thermal','Mass Budget'],workload:['Compute & Storage','Data & Delivery','Communications','Battery & Power'],
- storage:['Compute & Storage','Data & Delivery','Battery & Power','Mass Budget'],pv:['Battery & Power','Environment','Attitude Control','Mass Budget'],coating:['Thermal','Environment','Battery & Power'],
- engine:['Propellant','Orbit & Eclipse','Mass Budget','Mission CONOPS'],network:['Communications','Data & Delivery','Attitude Control','Battery & Power'],
- link:['Communications','Data & Delivery','Battery & Power','Attitude Control'],disposalMethod:['Mission CONOPS','Propellant','Orbit & Eclipse','Mass Budget'],
- attitude:['Environment','Attitude Control','Battery & Power','Propellant'],thermalMode:['Thermal','Battery & Power','Environment'],solarDriver:['Environment','Orbit & Eclipse','Propellant']
+ hkPeriodS:['Command & Data Handling','Electrical Power'],hkRecorderMB:['Command & Data Handling','Mechanical Design'],
+ commandKbps:['Communications','Command & Data Handling'],cmgMomentumNms:['Attitude Determination & Control','Mechanical Design','Electrical Power','Mass Budget'],cmgTorqueNm:['Attitude Determination & Control','Propulsion','Electrical Power'],
+ aiPurpose:['AI Data Center Purpose','Mission CONOPS','Compute & Storage','Data & Delivery','Communications','Electrical Power','Thermal','Mass Budget'],
+ launcher:['Launch Vehicle','Launch & Insertion','Mass Budget','Orbit & Eclipse'],battery:['Electrical Power','Thermal','Mass Budget','Mechanical Design','Launch & Insertion'],
+ compute:['Compute & Storage','Data & Delivery','Electrical Power','Thermal','Mass Budget'],workload:['Compute & Storage','Data & Delivery','Communications','Electrical Power'],
+ storage:['Compute & Storage','Data & Delivery','Electrical Power','Mass Budget'],pv:['Electrical Power','Environment','Attitude Determination & Control','Mass Budget'],coating:['Thermal','Environment','Electrical Power'],
+ engine:['Propulsion','Orbit & Eclipse','Mass Budget','Mission CONOPS'],network:['Communications','Data & Delivery','Attitude Determination & Control','Electrical Power'],
+ link:['Communications','Data & Delivery','Electrical Power','Attitude Determination & Control'],disposalMethod:['Mission CONOPS','Propulsion','Orbit & Eclipse','Mass Budget'],
+ attitude:['Environment','Attitude Determination & Control','Electrical Power','Propulsion'],thermalMode:['Thermal','Electrical Power','Environment'],solarDriver:['Environment','Orbit & Eclipse','Propulsion']
 };
 // Each item is an independently entered requirement whose validity can change
 // even when the preset does not supply a replacement value.

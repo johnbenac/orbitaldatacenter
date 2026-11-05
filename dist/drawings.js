@@ -1,4 +1,4 @@
-import {deploymentLayout} from './deployment.js';
+import {deploymentLayout,leafPose,leafCorners} from './deployment.js';
 // Two independent drawing scales. All lengths passed to the projections are in metres.
 const fmt = x => Number(x).toFixed(2);
 const line = (x1, y1, x2, y2, cls='detail') => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="${cls}"/>`;
@@ -32,29 +32,22 @@ function deployed(h){
   const bw=h.bodyWidthM,bh=h.bodyHeightM,bl=h.bodyLengthM,wl=h.wingLengthM,ww=h.wingWidthM,rl=h.radiatorLengthM,rw=h.radiatorWidthM;
   const {mountZ,rootX:solarRoot,radRoot:radiatorRoot}=deploymentLayout(h);
   // Orthographic view at 30 degrees to the array normal; the PV and radiators lie on perpendicular planes.
-  const cs=Math.sqrt(3)/2,sn=.5,span=2*(solarRoot+wl),long=2*(radiatorRoot+rl);
-  const maxX=Math.max((solarRoot+wl)*cs,rw*.5*sn+bh*.3,bw*.5*cs+bh*.5*sn),maxZ=Math.max(long/2,mountZ+ww/2);
+  const cs=Math.sqrt(3)/2,sn=.5,span=2*(solarRoot+wl),long=(radiatorRoot+rl)+Math.max(bl/2,mountZ+ww/2);
+  const maxX=Math.max((solarRoot+wl)*cs,rw*.5*sn+bh*.3,bw*.5*cs+bh*.5*sn),maxZ=Math.max(radiatorRoot+rl,mountZ+ww/2);
   const k=Math.min(160/maxX,72/maxZ),cx=584,cy=155;
   const project=([x,y,z])=>[cx+(x*cs-y*sn)*k,cy-z*k];
   const poly=(points,cls)=>`<polygon points="${points.map(p=>project(p).join(',')).join(' ')}" class="${cls}"/>`;
   const edge=(p,q,cls='detail')=>line(...project(p),...project(q),cls);
   let a=text(402,26,'02    DEPLOYED','eyebrow')+text(402,48,'Operating geometry','title');
-  const pvY=.01*bh,ry=-.225*bh;
-  for(const side of [-1,1])for(const end of [-1,1]){
-    const z=end*mountZ;
-    a+=edge([side*bw*.5,pvY,end*bl*.28],[side*solarRoot,pvY,z],'mount');
-    for(let leaf=0;leaf<3;leaf++){
-      const x=side*(solarRoot+wl*leaf/3),xr=side*(solarRoot+wl*(leaf+1)/3),z0=z-ww*.5,z1=z+ww*.5;
-      a+=poly([[x,pvY,z0],[xr,pvY,z0],[xr,pvY,z1],[x,pvY,z1]],'panel');
-      for(let j=1;j<4;j++)a+=edge([x+(xr-x)*j/4,pvY,z0],[x+(xr-x)*j/4,pvY,z1],'cell');
-      a+=edge([x,pvY,z],[xr,pvY,z],'cell');
-    }
-  }
-  for(const end of [-1,1]){
-    a+=edge([0,ry,end*bl/2],[0,ry,end*radiatorRoot],'mount');
-    const z0=end*radiatorRoot,z1=end*(radiatorRoot+rl);
-    a+=poly([[0,ry-rw/2,z0],[0,ry+rw/2,z0],[0,ry+rw/2,z1],[0,ry-rw/2,z1]],'thermal');
-    for(let j=1;j<6;j++)a+=edge([0,ry-rw/2,z0+(z1-z0)*j/6],[0,ry+rw/2,z0+(z1-z0)*j/6],'fin');
+  const layout=deploymentLayout(h),pvY=Math.min(.018,.01*bh);
+  for(const side of [-1,1])for(const end of [-1,1])
+    a+=edge([side*bw*.5,pvY,end*bl*.28],[side*solarRoot,pvY,end*mountZ],'mount');
+  for(const end of [-1,1])a+=edge([0,0,bl/2],[0,end*(rw/2+.82),radiatorRoot],'mount');
+  for(const leaf of layout.descriptors){
+    const c=leafCorners(leafPose(layout,leaf,1,h.input.solarTiltDeg),leaf);
+    a+=poly([c[0],c[1],c[3],c[2]],leaf.type==='pv'?'panel':'thermal');
+    const lerp=(p,q,t)=>p.map((v,i)=>v+(q[i]-v)*t);
+    for(const t of [.25,.5,.75])a+=edge(lerp(c[0],c[2],t),lerp(c[1],c[3],t),leaf.type==='pv'?'cell':'fin');
   }
   const side=bw/2,top=bh/2,front=bl/2;
   a+=poly([[-side,top,-front],[side,top,-front],[side,top,front],[-side,top,front]],'bus')+poly([[side,top,-front],[side,-top,-front],[side,-top,front],[side,top,front]],'adapter');

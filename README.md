@@ -23,7 +23,7 @@ The phase tabs select the kind of work. The domain navigation selects the subsys
 | E · Operations | Use the shared clock to inspect commissioning, compute bursts, ground contacts, reboost and momentum unloading. |
 | F · Decommissioning | Review the selected retirement maneuver, actual consumption, achieved trajectory and endpoint. Targeted reentry follows a modeled surviving reference body. Graveyard transfer reports the raised orbit. |
 
-The domains are Mission CONOPS, AI Data Center Purpose, Environment, Orbit & Eclipse, Compute & Storage, Data & Delivery, Communications, Battery & Power, Thermal, Attitude Control, Propellant, Mass Budget, Launch & Insertion, and Launch Vehicle.
+The domains are Mission CONOPS, AI Data Center Purpose, Environment, Orbit & Eclipse, Compute & Storage, Data & Delivery, Communications, Electrical Power, Thermal, Attitude Determination & Control, Propulsion, Mass Budget, Launch & Insertion, Launch Vehicle, Mechanical Design, and Command & Data Handling.
 
 In Phase E, open Communications and its engineering instruments. Select a ground pass on the timeline. Read the terminal acquisition, dish direction, CMG draw, pack charge and recorder queue at the same instant. Move the 24-hour window later in the mission to inspect the effects of aging hardware.
 
@@ -31,9 +31,9 @@ The thermal view maps six modeled nodes to fixed Kelvin color scales. Select a n
 
 ## Spacecraft baseline
 
-The persistent **Spacecraft architecture** and **Master equipment list** views are available from every phase. The ODC-01 Rev B bus keeps the same enclosure, four solar wings, two radiator banks, two internal liquid tanks, separate helium bottle and two engines across customer missions. A sized variant can exceed an envelope, including an engine's published range or a launch vehicle’s available fairing.
+The persistent **Spacecraft architecture** and **Master equipment list** views are available from every phase. The ODC-01 Rev C bus keeps the same enclosure, four solar wings, two radiator banks, two internal liquid tanks, separate helium bottle and two engines across customer missions. A sized variant can exceed an envelope, including an engine's published range or a launch vehicle’s available fairing.
 
-The equipment list separates supplier reference masses from the vehicle allocations and rolls them up through dry, wet and launch mass. CSV and JSON retain the work breakdown structure, source information and sizing basis. The quantitative PDR includes the installed equipment register, vessel volumes, engine stations, mass properties at depletion states and geometric clearance screens.
+The equipment list gives separate power, dimensions and mass bases and sources. Mechanical Design filters equipment stations by WBS, part number or subsystem and calculates the selected group’s center of mass. Command & Data Handling records spacecraft commands and housekeeping alongside the AI payload. The equipment list separates supplier reference masses from the vehicle allocations and rolls them up through dry, wet and launch mass. CSV and JSON retain the work breakdown structure, source information and sizing basis. The quantitative PDR includes the installed equipment register, vessel volumes, engine stations, mass properties at depletion states and geometric clearance screens.
 
 ## Save, share and export
 

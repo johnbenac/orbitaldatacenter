@@ -1,6 +1,6 @@
 const stage = (id,short,title,camera,page,intent) => ({id,short,title,camera,page,intent});
 export const chapters = [
-  stage('integration','Integration','Will the payload fit?', 'launch','launch','Inspect the folded spacecraft on its adapter and measure clearance against the selected payload envelope.'),
+  stage('integration','Integration','Visit the integration facility', 'launch','launch','Explore the equipment used to prepare each spacecraft subsystem, then check the assembled payload against its launch envelope.'),
   stage('pad','On the pad','The stack is ready for launch', 'launch','launch','See the integrated launch vehicle on its pad before liftoff.'),
   stage('ascent','Ascent','Ride the launch vehicle', 'launch','launch','Watch the illustrative ascent and the change in altitude before spacecraft separation.'),
   stage('insertion','Insertion','Separate from the upper stage', 'launch','orbit','Follow orbital insertion and upper-stage separation. The spacecraft trims its orbit after the appendages lock.'),

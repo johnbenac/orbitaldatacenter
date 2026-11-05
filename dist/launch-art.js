@@ -1,3 +1,4 @@
+import {buildBayEquipment} from './bay-equipment.js';
 import * as T from './vendor/three.module.js';
 const v=(x,y,z)=>new T.Vector3(x,y,z);
 function painted(w,h,draw){
@@ -28,49 +29,113 @@ function wallTexture(){return painted(1400,550,(g,w,h)=>{
 });}
 export function fitOutBay(ctx){
  const {facility,tower,halves,unit:u,R,baseR,baseY,maxH,h,profile,box,tube,mesh,cylinder,mat,steel,rib,dark,gold,black}=ctx;
- const floor=-u*.125,gy=u*1.22,wx=u*2.65,wz=-u*1.17,fixtures=[],iron=mat('#4c6067',.45),mark=mat('#cc9760'),graphite=mat('#29383f'),glow=new T.MeshBasicMaterial({color:0xe9dfc5}),cool=new T.MeshBasicMaterial({color:0xc3dce7});
+ const floor=-Math.max(.82,Math.min(1.45,R*.38)),gy=u*1.22,wx=u*2.20,wz=u*1.52,wallH=u*1.66,fixtures=[],iron=mat('#4c6067',.45),mark=mat('#cc9760'),graphite=mat('#29383f'),glow=new T.MeshBasicMaterial({color:0xe9dfc5}),cool=new T.MeshBasicMaterial({color:0xc3dce7});
  function plane(p,x,y,z,w,b,material,rotation=0){const m=mesh(p,new T.PlaneGeometry(w,b,rotation&&w>u*2?Math.min(128,Math.max(24,Math.ceil(w/u))):1,rotation&&b>u*2?Math.min(128,Math.max(20,Math.ceil(b/u))):1),material,x,y,z,'pad');m.rotation.x=rotation;return m;}
- const deck=plateTexture(),wall=wallTexture();plane(facility,0,floor,0,u*7,u*4.5,deck,-Math.PI/2);plane(facility,0,floor+u*.90,wz,u*6.0,u*1.8,wall);
- const sidewall=plane(facility,-wx,floor+u*.90,.1*u,u*4.0,u*1.8,wall);sidewall.rotation.y=Math.PI/2;
- for(let x=-3;x<=3;x++){
-  const xx=x*u*.76;
-  box(facility,xx,floor+u*.77,wz+.06*u,u*.031,u*1.54,u*.042,graphite);
-  box(facility,xx,floor+u*.77,wz+.084*u,u*.077,u*1.54,u*.012,iron);
-  box(facility,xx+u*.37,floor+u*1.02,wz+.083*u,u*.7,u*.038,u*.025,iron);
-  tube(facility,v(xx,floor+u*1.07,wz+.07*u),v(xx+.35*u,floor+u*1.32,wz+.07*u),u*.008,graphite);
-  tube(facility,v(xx+.35*u,floor+u*1.32,wz+.07*u),v(xx+.7*u,floor+u*1.07,wz+.07*u),u*.008,graphite);
-  box(facility,xx+.35*u,floor+u*1.10,wz+.092*u,u*.29,u*.017,u*.025,cool);
-  if(x%2===0){box(facility,xx+u*.14,floor+u*.16,wz+.11*u,u*.13,u*.30,u*.10,steel);for(let j=0;j<5;j++)box(facility,xx+u*.14,floor+u*(.10+j*.033),wz+.17*u,u*.094,u*.009,u*.011,graphite);}
+ const deck=plateTexture(),wall=wallTexture(),walls=[];
+ const slab=plane(facility,0,floor,0,2*wx,2*wz,deck,-Math.PI/2);slab.name='High-bay floor';slab.userData.floorY=floor;
+ function buildWall(x,z,width,yaw,name){
+  const panel=new T.Group();panel.name=name;panel.position.set(x,0,z);panel.rotation.y=yaw;facility.add(panel);
+  panel.userData.bayWall=true;walls.push(panel);
+  const face=plane(panel,0,floor+wallH/2,0,width,wallH,wall);
+  face.name='Opaque interior wall';
+  for(let j=0;j<=5;j++){
+   const span=width/5,xx=-width*.5+j*span;
+   box(panel,xx,floor+wallH*.50,.06*u,u*.039,wallH,.064*u,graphite);
+   if(j===5)continue;
+   const center=xx+span*.5;
+   box(panel,center,floor+wallH*.57,.071*u,span,.035*u,.054*u,iron);
+   tube(panel,v(xx,floor+wallH*.68,.067*u),v(center,floor+wallH*.85,.067*u),u*.007,steel);
+   tube(panel,v(center,floor+wallH*.85,.067*u),v(xx+span,floor+wallH*.68,.067*u),u*.007,steel);
+   box(panel,center,floor+wallH*.64,.083*u,u*.29,u*.019,u*.044,cool);
+   box(panel,center,floor+.55,.065*u,span,.075,.07,mark);
+  }
+ }
+ buildWall(0,-wz,2*wx,0,'Rear wall');buildWall(0,wz,2*wx,Math.PI,'Front wall');
+ buildWall(-wx,0,2*wz,Math.PI/2,'West wall');buildWall(wx,0,2*wz,-Math.PI/2,'East wall');
+ const roof=new T.Group();roof.name='High-bay roof';facility.add(roof);
+ const ceiling=plane(roof,0,floor+wallH,0,2*wx,2*wz,iron,Math.PI/2);ceiling.name='Ceiling liner';
+ for(let j=-2;j<=2;j++){
+  const z=j*wz*.40;box(roof,0,floor+wallH-u*.039,z,wx*2,u*.072,u*.038,graphite);
+  for(const x of [-wx*.58,wx*.58])box(roof,x,floor+wallH-u*.082,z,u*.36,u*.019,u*.07,glow);
  }
  // Load-bearing trolley and runway. Two rails carry the bridge; a paired cable falls to the rigging yoke.
  const span=u*1.18,zBridge=-R*.26;
  for(const side of [-1,1]){
-  const x=side*span;box(facility,x,gy*.5+floor*.5,-u*.64,u*.044,gy-floor,u*.068,graphite);
+  const x=side*span;
+  for(const z of [-u*.98,u*.81]){box(facility,x,(gy+floor)/2,z,u*.044,gy-floor,u*.068,graphite);box(facility,x,floor+.025,z,u*.069,.05,u*.09,iron);}
   box(facility,x,gy,-u*.09,u*.062,u*.077,u*2.15,iron);box(facility,x,gy+.041*u,-u*.09,u*.022,u*.016,u*2.15,rib);
  }
  for(const zz of [-1,1]){const z=zBridge+zz*u*.060;box(facility,0,gy+u*.070,z,span*2,u*.075,u*.038,mark);box(facility,0,gy+u*.114,z,span*2,u*.012,u*.047,gold);box(facility,0,gy+.03*u,z,span*2,u*.013,u*.05,graphite);}
- box(facility,.012*u,gy+u*.12,zBridge,u*.14,u*.09,u*.195,graphite);for(const j of [-1,1]){const drive=cylinder(facility,j*u*.059,gy+u*.115,zBridge,u*.034,u*.034,u*.17,iron,'pad',28);drive.rotation.x=Math.PI/2;}
- const yoke=h.stowedLengthM+u*.122;
- for(let side of [-1,1]){const x=side*u*.027;tube(facility,v(x,gy+.07*u,zBridge),v(x,yoke,zBridge),u*.0028,black);tube(facility,v(x,yoke,zBridge),v(side*h.bodyWidthM*.44,h.stowedLengthM*.96,zBridge),u*.0039,iron);}
- box(facility,0,yoke,zBridge,u*.089,u*.044,u*.038,mark);
- // The adapter sits on a triangulated wheeled ground fixture with leveling pads.
- function stand(p,cx,cz,size,top){
-  const deckH=u*.033,d=top-floor;box(p,cx,top-deckH*.5,cz,size*2,deckH,size*1.48,iron);
-  for(const side of [-1,1]){
-   box(p,cx,top-deckH*1.05,cz+side*size*.67,size*2.1,deckH*.55,deckH*.51,gold);
-   for(const end of [-1,1]){const x=cx+side*size*.79,z=cz+end*size*.51;box(p,x,(floor+top)/2,z,u*.033,d,u*.033,graphite);cylinder(p,x,floor+.012*u,z,u*.060,u*.069,.023*u,dark);box(p,x+.04*u,floor+.02*u,z,u*.055,.037*u,u*.050,iron);}
-   tube(p,v(cx-side*size*.79,floor+.035*u,cz+side*size*.52),v(cx+side*size*.79,top-.030*u,cz+side*size*.52),u*.013,steel);
-  }
+ const trolleyX=-.72*span,yoke=gy-.26*u;
+ box(facility,trolleyX,gy+u*.12,zBridge,u*.14,u*.09,u*.195,graphite);
+ for(const j of [-1,1]){
+  const drive=cylinder(facility,trolleyX+j*u*.052,gy+u*.11,zBridge,u*.034,u*.034,u*.16,iron,'pad',24);drive.rotation.x=Math.PI/2;
+  const x=trolleyX+j*u*.024;tube(facility,v(x,gy+.07*u,zBridge),v(x,yoke,zBridge),u*.0027,black);
  }
- const shadowMat=(function(){const m=painted(256,256,(g,w,h)=>{const d=g.createRadialGradient(w/2,h/2,0,w/2,h/2,w*.49);d.addColorStop(0,'rgba(4,10,14,.88)');d.addColorStop(.33,'rgba(4,11,16,.71)');d.addColorStop(.72,'rgba(5,13,18,.30)');d.addColorStop(1,'rgba(5,13,18,0)');g.fillStyle=d;g.fillRect(0,0,w,h);});m.transparent=true;m.depthWrite=false;m.polygonOffset=true;m.polygonOffsetFactor=-1;return m;})();
- const shadow=(p,x,z,dx,dz)=>plane(p,x,floor+.005*u,z,dx,dz,shadowMat,-Math.PI/2);
- shadow(facility,0,0,R*3.4,R*2.65);stand(facility,0,0,Math.max(R*.45,h.bodyWidthM*.70),-.005*u);
- for(const side of [-1,1]){const f=new T.Group();facility.add(f);fixtures.push({f,side});shadow(f,side*R*.34,0,R*2.7,R*2.8);stand(f,side*R*.42,0,R*.77,-.015*u);
-  for(const z of [-1,1]){const x=side*R*.54;box(f,x,.011*u,z*R*.62,R*.19,u*.061,R*.21,dark);}
+ box(facility,trolleyX,yoke,zBridge,u*.075,u*.046,u*.04,mark);
+ const hook=new T.Mesh(new T.TorusGeometry(u*.029,u*.006,8,20,Math.PI*1.55),steel);
+ hook.position.set(trolleyX,yoke-u*.04,zBridge);hook.rotation.z=.45;facility.add(hook);
+ // The lower adapter face defines y=0. Every support uses the same floor
+ // datum as the surrounding hall, regardless of vehicle height.
+ const pedestalWidth=Math.max(R*.45,h.fairing.stack[0].radiusM*1.12),plateH=.10,footH=.035,cellH=.075;
+ const shadowMat=painted(256,256,(g,w,h)=>{const d=g.createRadialGradient(w/2,h/2,0,w/2,h/2,w*.49);d.addColorStop(0,'rgba(4,10,14,.88)');d.addColorStop(.33,'rgba(4,11,16,.71)');d.addColorStop(.72,'rgba(5,13,18,.30)');d.addColorStop(1,'rgba(5,13,18,0)');g.fillStyle=d;g.fillRect(0,0,w,h);});
+ shadowMat.transparent=true;shadowMat.depthWrite=false;shadowMat.polygonOffset=true;shadowMat.polygonOffsetFactor=-1;
+ function stand(p,cx,width,depth,top,cells){
+  const bottom=floor+footH,deckBase=top-plateH,postTop=deckBase-(cells?cellH:0);
+  plane(p,cx,floor+.004,0,width*2.75,depth*2.9,shadowMat,-Math.PI/2);
+  const plate=box(p,cx,top-plateH/2,0,width*2,plateH,depth*2,iron);
+  for(const side of [-1,1]){
+   const x=cx+side*width*.85;
+   for(const end of [-1,1]){
+    const z=end*depth*.84;
+    cylinder(p,x,floor+footH/2,z,.115,.13,footH,dark);
+    box(p,x,(bottom+postTop)/2,z,.115,postTop-bottom,.115,graphite);
+    if(cells){const puck=cylinder(p,x,postTop+cellH/2,z,.103,.103,cellH,mark);puck.name='Pedestal load cell';}
+   }
+   tube(p,v(x,bottom,-depth*.84),v(x,postTop,depth*.84),.036,steel);
+   tube(p,v(cx-width*.85,bottom,side*depth*.84),v(cx+width*.85,postTop,side*depth*.84),.036,steel);
+  }
+  return plate;
+ }
+ stand(facility,0,pedestalWidth,pedestalWidth*.74,0,true).name='Adapter bearing plate';
+ const front=.74*pedestalWidth;
+ box(facility,0,floor*.45,front-.045,1.82*pedestalWidth,.115,.09,iron).name='Service crossbar';
+ const rim=R*profile[0][1]/Math.max(...profile.map(station=>station[1]));
+ if(halves.length){
+  // Each half translates with its own three-point carrier until encapsulation.
+  // The shoes touch the lower circumferential ring and clear the central pedestal.
+  for(const side of [-1,1]){
+   const f=new T.Group();f.name='Fairing half carrier';facility.add(f);fixtures.push({f,side});
+   stand(f,side*.87*rim,.18*rim,.72*rim,-.12,false);
+   for(const a of [.9,Math.PI/2,Math.PI-.9]){
+    const shoe=box(f,side*Math.sin(a)*rim,-.06,Math.cos(a)*rim,.19,.12,.19,dark);
+    shoe.name='Fairing rim shoe';
+   }
+  }
+ }else{
+  // Fixed cradle contacts the integral cargo enclosure outside its door opening.
+  for(const a of [-1.18,-.28,.75,3.08]){
+   const x=R*Math.sin(a),z=R*Math.cos(a),y=floor+footH;
+   cylinder(facility,x,floor+footH/2,z,.19,.22,footH,steel);
+   box(facility,x,(y-.12)/2,z,.19,-.12-y,.19,iron);
+   box(facility,x,-.06,z,.26,.12,.26,dark).name='Cargo mock-up rim shoe';
+  }
  }
  // Off-axis service cabinets and a grated platform at the hall wall give the floor physical scale.
  for(let j=0;j<4;j++){const x=(j*.16+.57)*u,z=-u*.67;box(facility,x,floor+u*.086,z,u*.12,u*.17,u*.094,graphite);box(facility,x,floor+u*.085,z+u*.052,u*.104,u*.142,u*.011,steel);box(facility,x,floor+u*.115,z+u*.064,u*.088,u*.024,u*.006,black);box(facility,x-.029*u,floor+u*.11,z+u*.068,u*.016,u*.007,u*.005,glow);}
- return opening=>fixtures.forEach(({f,side})=>{f.position.x=side*opening*R*2.25;});
+ const platformFront=Math.max(R*.45,h.fairing.stack[0].radiusM*1.12)*.74;
+ const kit=buildBayEquipment({...ctx,floor,platformFront});
+ const eye=v(),local=v();
+ function setViewFrom(camera){
+  if(!facility.visible||!camera)return;
+  camera.getWorldPosition(eye);facility.worldToLocal(eye);
+  for(const w of walls){local.copy(eye).sub(w.position).applyAxisAngle(v(0,1,0),-w.rotation.y);w.visible=local.z>.08;}
+  roof.visible=eye.y<floor+wallH-.08;
+ }
+ return {...kit,floorY:floor,get interfaceLabel(){return kit.portAnchor.name},setViewFrom,update(opening,domain,active){
+  fixtures.forEach(({f,side})=>{f.position.x=side*opening*R*2.25;});
+  kit.select(domain,active);
+ }};
 }
 export function payloadFinishes(){
  const foil=painted(256,220,(g,w,h)=>{const r=rng();g.fillStyle='#aa8553';g.fillRect(0,0,w,h);const pts=[];for(let j=0;j<8;j++){pts.push([]);for(let i=0;i<10;i++)pts[j].push([i*32+(r()-.5)*18,j*34+(r()-.5)*19]);}

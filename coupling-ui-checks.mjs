@@ -106,3 +106,46 @@ await change('', 'ksc-starship',{param:'launchSite'});await fire({action:'cancel
 await fire({watchLiftoff:''});await fire({launchTime:'4'});await fire({launchLens:'ship'});
 const clock=await snapshot();assert.equal(clock.view.t,4);assert.equal(clock.view.launchLens,'ship');assert.equal(clock.view.speed,1);assert.match(el('guidepanel').innerHTML,/Starbase/);
 console.log('Site-coupled launcher selection, cancel, liftoff clock, lens and share persistence passed.');
+
+// Rehearse the bay as a visitor: switch teams, inspect their tools, then share this exact stop.
+const {bayLesson}=await imp('bay-lessons.js');
+await fire({chapter:'integration'});
+const bayStart=await snapshot(),bayHardware=sizeDesign(bayStart.design);
+assert.equal(bayStart.view.phase,'D');assert.equal(bayStart.view.chapter,'integration');
+for(const domain of domainIds){
+ await fire({domain});
+ const now=await snapshot(), lesson=bayLesson(domain,bayHardware);
+ assert.equal(now.view.domain,domain);assert.equal(now.view.camera,'launch');
+ assert.equal(now.view.t,bayStart.view.t,domain+' kept time');assert.equal(now.view.chapter,'integration');
+ assert.deepEqual(now.design,bayStart.design,domain+' kept flight configuration');
+ assert.ok(el('guidepanel').innerHTML.includes(lesson.stationName),domain+' station');
+ assert.ok(el('storyextras').innerHTML.includes(lesson.facts[0].label),domain+' design evidence');
+}
+await fire({domain:'thermal'});assert.match(el('guidepanel').innerHTML,/Coolant service cart/);
+for(const lens of ['equipment','overview','interface']){
+ await fire({bayLens:lens});assert.equal((await snapshot()).view.bayLens,lens);
+ assert.match(el('cameras').innerHTML,new RegExp(`data-bay-lens="${lens}" aria-pressed="true"`));
+}
+await fire({bayToggle:'labels'});await fire({bayToggle:'isolate'});
+listeners.get('capture:toggle')({target:{matches:s=>s==='.bay-basis',open:true}});
+await fire({domain:'power'});assert.match(el('guidepanel').innerHTML,/Ground power cart/);
+assert.match(el('guidepanel').innerHTML,/data-chapter="pad"/);assert.match(el('storyextras').innerHTML,/data-bay-analysis/);
+const baySaved=await snapshot();assert.equal(baySaved.view.t,bayStart.view.t);assert.deepEqual(baySaved.design,bayStart.design);
+function checkBaySelection(view){
+ assert.equal(view.phase,'D');assert.equal(view.chapter,'integration');assert.equal(view.domain,'power');
+ assert.equal(view.camera,'launch');assert.equal(view.bayLens,'interface');assert.equal(view.bayBasis,true);
+ assert.equal(view.bayLabels,false);assert.equal(view.bayIsolate,false);
+ assert.equal(el('bay-display').hidden,false);assert.match(el('bay-display').innerHTML,/data-bay-toggle="labels" aria-pressed="false"/);
+ assert.match(el('bay-display').innerHTML,/data-bay-toggle="isolate" aria-pressed="false"/);
+ assert.match(el('storyextras').innerHTML,/<details class="bay-basis" open/);
+}
+checkBaySelection(baySaved.view);
+await fire({action:'share'});const bayFragment=el('dialogbody').innerHTML.match(/#design=[A-Za-z0-9_-]+/)[0];await fire({action:'close'});
+await fire({bayAnalysis:''});const analysis=await snapshot();assert.equal(analysis.view.phase,'C');assert.equal(analysis.view.domain,'power');assert.deepEqual(analysis.design,baySaved.design);
+assert.equal(el('bay-display').hidden,true);
+// A new app instance reads the same #design URL a recipient opens, including the bay display state.
+globalThis.location=new URL(bayFragment,'https://example.test');await imp('app.js?bay-share-restore');
+const bayRestored=await snapshot();checkBaySelection(bayRestored.view);assert.equal(bayRestored.view.t,baySaved.view.t);assert.deepEqual(bayRestored.design,baySaved.design);
+await fire({chapter:'pad'});const pad=await snapshot();assert.equal(pad.view.phase,'D');assert.equal(pad.view.chapter,'pad');assert.equal(pad.view.t,-8);
+assert.deepEqual(pad.design,bayRestored.design);assert.equal(el('bay-display').hidden,true);assert.doesNotMatch(el('guidepanel').innerHTML,/Inside the integration bay/);
+console.log('All integration teams, clock and design continuity, three lenses, display controls, reopened share, pad and analysis handoffs passed.');

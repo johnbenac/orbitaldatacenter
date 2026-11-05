@@ -24,29 +24,30 @@ function focusColor(part,domain,o){
  return sceneColors[part]||'native';
 }
 export function focusHardware(root){
- const items=[],tints=new Map(),native=new Map(),ghostLine=new T.LineBasicMaterial({color:0x70909f,transparent:true,opacity:.10,depthWrite:false});
+ const items=[],tints=new Map(),ghostLine=new T.LineBasicMaterial({color:0x70909f,transparent:true,opacity:.10,depthWrite:false});
  const carrier=new T.MeshBasicMaterial({color:0x8197a1,transparent:true,opacity:.28,depthWrite:false,side:T.FrontSide,toneMapped:false});
  const ghost=new T.MeshBasicMaterial({color:0x92a6b4,transparent:true,opacity:.13,depthWrite:false,side:T.FrontSide,toneMapped:false});
  for(const material of [ghost,ghostLine,carrier]){material.userData.shared=true;material.userData.domainGhost=true;}
- root.traverse(o=>{if((o.isLine||o.isMesh)&&o.material&&!Array.isArray(o.material))items.push({o,original:o.material,part:hardwarePart(o),order:o.renderOrder});});
+ root.traverse(o=>{if((o.isLine||o.isMesh)&&o.material&&!Array.isArray(o.material))items.push({o,original:o.material,part:hardwarePart(o)});});
  let last='';
- function clear(){if(!last)return;for(const {o,original,order}of items){o.material=original;o.renderOrder=order;}last='';}
+ function clear(){if(!last)return;for(const {o,original}of items){o.material=original;}last='';}
  return {apply(domain,selected=''){
   if(!domain||['conops','orbit'].includes(domain)||!domainSceneSpecs[domain]){clear();return;}const isolated=domain==='mass'?selected:'',signature=domain+'/'+isolated;if(signature===last)return;
   if(last)clear();last=signature;
-  for(const {o,part,original,order}of items){const color=isolated&&part!==isolated?null:focusColor(part,domain,o);
-   if(!color){o.material=o.isLine?ghostLine:['launcher','booster','fairing'].includes(part)?carrier:ghost;o.renderOrder=order+1;}
-   else if(color==='native'&&!o.isLine){
-    if(!native.has(original)){const m=original.clone();m.transparent=true;m.userData.shared=true;m.userData.domainFront=true;native.set(original,m);}
-    o.material=native.get(original);o.renderOrder=order+4;
-   }else if(color!=='native'){
+  for(const {o,part,original}of items){const color=isolated&&part!==isolated?null:focusColor(part,domain,o);
+   if(!color){o.material=o.isLine?ghostLine:['launcher','booster','fairing'].includes(part)?carrier:ghost;}
+   else if(color!=='native'){
     const base=original.color,lum=base?clamp(Math.sqrt(.2126*base.r+.7152*base.g+.0722*base.b)):1;
-    const level=Math.round(lum*14)/14,key=color+'/'+original.side+'/'+level;
-    if(!tints.has(key)){const m=new T.MeshStandardMaterial({color,roughness:.55,metalness:.28,side:original.side,emissive:color,emissiveIntensity:.075});m.color.multiplyScalar(.18+.89*level);m.userData.shared=true;m.userData.domainFront=true;m.transparent=true;tints.set(key,m);}
-    o.material=tints.get(key);o.renderOrder=order+4;
+    const level=Math.round(lum*14)/14,key=[color,original.side,level,original.transparent,original.opacity,original.depthWrite].join('/');
+    if(!tints.has(key)){
+     const m=new T.MeshStandardMaterial({color,roughness:.55,metalness:.28,side:original.side,emissive:color,emissiveIntensity:.075,
+      transparent:original.transparent,opacity:original.opacity,depthWrite:original.depthWrite});
+     m.color.multiplyScalar(.18+.89*level);m.userData.shared=true;tints.set(key,m);
+    }
+    o.material=tints.get(key);
    }
   }
- },clear,destroy(){clear();ghost.dispose();ghostLine.dispose();carrier.dispose();for(const m of [...native.values(),...tints.values()])m.dispose();}};
+ },clear,destroy(){clear();ghost.dispose();ghostLine.dispose();carrier.dispose();for(const m of tints.values())m.dispose();}};
 }
 const materials={text:0x91d7cb,bulk:0xd7ad75,write:0x83d3c3,down:0x99bff2};
 export function dataRoutes(craft,h){

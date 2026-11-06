@@ -1,36 +1,36 @@
 {
   "release": "site",
-  "source_commit": "17bdaae3022d602efd7cb77e41865046d3f188c0",
-  "index_sha256": "4ff4509a3e97444ac03447a2bfb38f2324aeecd99c08e80003242703b0e5b572",
+  "source_commit": "7906cf4abfb111901d59f64227824aebc2e64eec",
+  "index_sha256": "15fb41c546c4d364adbbc84c81d2bac43d8476b751c0385832171487fdb75984",
   "project": "orbitaldatacenter",
   "deployment": {
-    "id": "58ecf323-bea8-4804-a18e-1fcca7ddb52b",
-    "short_id": "58ecf323",
+    "id": "da53f971-e5c7-4b93-a29f-3472106f9d7b",
+    "short_id": "da53f971",
     "project_id": "8cfed813-a5e3-48d5-9451-47e81b01d88f",
     "project_name": "orbitaldatacenter",
     "environment": "production",
-    "url": "https://58ecf323.orbitaldatacenter-2o2.pages.dev",
-    "created_on": "2026-11-06T00:24:15.509481Z",
-    "modified_on": "2026-11-06T00:24:16.819801Z",
+    "url": "https://da53f971.orbitaldatacenter-2o2.pages.dev",
+    "created_on": "2026-11-06T03:09:40.655787Z",
+    "modified_on": "2026-11-06T03:09:42.24111Z",
     "latest_stage": {
       "name": "deploy",
       "started_on": null,
-      "ended_on": "2026-11-06T00:24:16.819801Z",
+      "ended_on": "2026-11-06T03:09:42.24111Z",
       "status": "success"
     },
     "deployment_trigger": {
       "type": "ad_hoc",
       "metadata": {
         "branch": "main",
-        "commit_hash": "17bdaae3022d602efd7cb77e41865046d3f188c0",
-        "commit_message": "fix(site): keep project links visible in a floating footer\r\n\r\nPin the project links above the viewport edge with a compact mobile layout.\r\nReserve scroll space so the last workbench content remains reachable.",
+        "commit_hash": "7906cf4abfb111901d59f64227824aebc2e64eec",
+        "commit_message": "feat(release): import upstream v26\r\n\r\nImport the verified Boiler ZIP while preserving local author links and SEO extensions.\r\nTrack the reviewed identity generator and record archive provenance.\r\n\r\nValidate all 50 application suites, 15 integration tests, asset and syntax checks,\r\nand desktop and mobile browser rendering.",
         "commit_dirty": true
       }
     },
     "stages": [
       {
         "name": "queued",
-        "started_on": "2026-11-06T00:24:15.509481Z",
+        "started_on": "2026-11-06T03:09:40.655787Z",
         "ended_on": null,
         "status": "active"
       },
@@ -55,7 +55,7 @@
       {
         "name": "deploy",
         "started_on": null,
-        "ended_on": "2026-11-06T00:24:16.819801Z",
+        "ended_on": "2026-11-06T03:09:42.24111Z",
         "status": "success"
       }
     ],

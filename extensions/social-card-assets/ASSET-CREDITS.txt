@@ -1,0 +1,25 @@
+Orbital Data Center LinkedIn banner — Blender orbital visualization
+
+Spacecraft geometry and original materials: exported from Orbital Data Center v21,
+using its live-text mission starter. This is an illustrative design configuration.
+The rendered scene is not evidence that a mission concept is feasible.
+
+Earth day and cloud textures: Solar System Scope / INOVE.
+https://www.solarsystemscope.com/textures/
+License: Creative Commons Attribution 4.0 International.
+https://creativecommons.org/licenses/by/4.0/
+Changes: mapped to 3D Earth and cloud spheres; day-map saturation and brightness
+adjusted; rendered with sunlight and an atmospheric scattering shell.
+
+Starfield skybox: NASA Scientific Visualization Studio, Deep Star Maps 2020.
+Visualization by Ernie Wright.
+https://svs.gsfc.nasa.gov/4851/
+Source: starmap_2020_4k.exr, rotated and exposure-adjusted in the scene.
+
+Lettering: Inter, bundled with its license in ../src/fonts/Inter-LICENSE.txt.
+Project logo and banner layout: existing Orbital Data Center and LinkedIn banner work.
+
+Reproduce the orbital scene with Blender:
+blender --background --python render-orbit.py
+Use -- --preview for the smaller draft render.
+The .blend file packs all image textures and can be opened independently.

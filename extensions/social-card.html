@@ -1,18 +1,28 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=1200,initial-scale=1"><title>Orbital Data Center social preview</title>
 <style>
-*{box-sizing:border-box}html,body{width:1200px;height:630px;margin:0;overflow:hidden}body{background:#10141a;color:#eef1f4;font-family:Arial,sans-serif}.card{height:100%;position:relative;padding:54px 62px;background:radial-gradient(ellipse at 85% 48%,#20323b 0,transparent 51%),#10141a}.grid{position:absolute;inset:0;background-image:linear-gradient(#8ccbd009 1px,transparent 1px),linear-gradient(90deg,#8ccbd009 1px,transparent 1px);background-size:42px 42px}.content{position:relative;z-index:1}.brand{color:#f6ac59;font:13px monospace;letter-spacing:3px;text-transform:uppercase;display:flex;align-items:center;gap:12px}.brand:before{content:"";width:26px;height:3px;background:#f6ac59}h1{font-weight:600;letter-spacing:-3px;font-size:65px;line-height:1.08;margin:56px 0 21px;max-width:630px}p{font-size:24px;line-height:1.5;color:#b9c7d0;width:550px;margin:0}.byline{position:absolute;bottom:52px;left:62px;right:62px;z-index:1;border-top:1px solid #566771;padding-top:22px;display:flex;justify-content:space-between;color:#b9c7d0;font-size:17px}.byline strong{color:#edf1f4;font-weight:500}.byline span:last-child{font:14px monospace;color:#f6ac59}.art{position:absolute;width:550px;height:500px;right:-55px;top:44px}
-</style></head><body><div class="card"><div class="grid"></div>
-<svg class="art" viewBox="0 0 550 500" xmlns="http://www.w3.org/2000/svg" fill="none" aria-hidden="true">
-<defs><radialGradient id="earth" cx="30%" cy="25%"><stop stop-color="#417787"/><stop offset=".62" stop-color="#1d4658"/><stop offset="1" stop-color="#11232e"/></radialGradient></defs>
-<circle cx="300" cy="240" r="133" fill="url(#earth)" stroke="#79cbd0" stroke-opacity=".6" stroke-width="1.4"/>
-<ellipse cx="300" cy="240" rx="57" ry="133" stroke="#8bd0d3" stroke-opacity=".3"/><ellipse cx="300" cy="240" rx="108" ry="133" stroke="#8bd0d3" stroke-opacity=".2"/>
-<ellipse cx="300" cy="240" rx="133" ry="48" stroke="#8bd0d3" stroke-opacity=".3"/><path d="M167 240h266M300 107v266" stroke="#8bd0d3" stroke-opacity=".3"/>
-<ellipse cx="300" cy="240" rx="242" ry="90" transform="rotate(-33 300 240)" stroke="#f6ac59" stroke-width="2"/>
-<ellipse cx="300" cy="240" rx="208" ry="172" transform="rotate(-33 300 240)" stroke="#7fa2ae" stroke-opacity=".2" stroke-dasharray="4 10"/>
-<g transform="translate(464 91) rotate(-33)"><rect x="-8" y="-13" width="16" height="26" rx="2" fill="#e9e1d0"/><path d="M-29-7h18V7h-18zM11-7h18V7H11z" fill="#72cbd0" stroke="#b4e3e6"/><path d="M0-24v11M-5-24H5" stroke="#f6ac59" stroke-width="2"/></g>
-<circle cx="300" cy="240" r="156" stroke="#70b2b8" stroke-opacity=".12"/><path d="M300 65v-17M300 432v-17M125 240h-17M492 240h-17" stroke="#72cbd0" stroke-opacity=".5"/>
-</svg>
-<div class="content"><div class="brand">Mission engineering workbench</div><h1>Orbital<br>Data Center</h1><p>Explore spacecraft design,<br>computing workloads, and life in orbit.</p></div>
-<div class="byline"><span>A project by <strong>John Benac</strong></span><span>orbitaldatacenter.design</span></div>
-</div></body></html>
+@font-face{font-family:Inter;src:url('social-card-assets/Inter-Regular.otf');font-weight:400}
+@font-face{font-family:Inter;src:url('social-card-assets/Inter-SemiBold.otf');font-weight:600}
+*{box-sizing:border-box}html,body{width:1200px;height:630px;margin:0;overflow:hidden}
+body{background:#10141a;color:#eef1f4;font-family:Inter,Arial,sans-serif}
+.card{width:1200px;height:630px;position:relative;overflow:hidden;background:radial-gradient(ellipse at 82% 38%,#20323b 0,transparent 65%),#10141a}
+.art{position:absolute;left:590px;top:45px;width:570px;height:480px;overflow:hidden;border:1px solid #405361;border-radius:18px;background:#030608;box-shadow:0 20px 60px #0005}
+.art img{width:100%;height:100%;object-fit:cover;object-position:center 58%}
+.concept{position:absolute;top:17px;left:20px;font-size:11px;font-weight:600;letter-spacing:1.8px;color:#d9e5eb}
+.credit{position:absolute;left:12px;right:12px;bottom:9px;padding:5px 6px;background:#05090ebd;color:#d9e5eb;font-size:8px}
+.content{position:absolute;left:60px;top:65px;width:525px;z-index:1}
+.brand{display:flex;align-items:center;gap:13px;font-size:17px;font-weight:600;letter-spacing:2px}
+.brand-icon{width:35px;height:35px;border-radius:9px;display:grid;place-items:center;background:#f6ac59;color:#10141a;font-size:23px}
+h1{font-size:49px;line-height:1.12;letter-spacing:-1.9px;font-weight:600;margin:62px 0 25px}
+h1 span{color:#f6ac59}p{font-size:23px;line-height:1.5;color:#b9c7d0;max-width:490px;margin:0}
+.pills{display:flex;gap:10px;margin-top:30px}.pill{font-size:13px;border:1px solid #405361;border-radius:24px;padding:10px 12px;white-space:nowrap}
+.pill:before{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;background:#f6ac59;margin-right:7px}.pill:nth-child(2):before{background:#72cbd0}.pill:nth-child(3):before{background:#89cba8}
+.byline{position:absolute;left:60px;right:40px;bottom:37px;display:flex;justify-content:space-between;align-items:center;border-top:1px solid #405361;padding-top:22px;font-size:16px;color:#b9c7d0}.byline strong{font-weight:600;color:#eef1f4}.url{color:#f6ac59;font-weight:600;font-size:19px;letter-spacing:.1px}
+</style></head><body><main class="card">
+<div class="art"><img src="social-card-assets/orbit.png" alt="Blender-rendered orbital data center spacecraft above Earth against a starfield"><div class="concept">ORBITAL DESIGN CONCEPT</div><div class="credit">Earth: Solar System Scope · CC BY 4.0 &nbsp; | &nbsp; Sky: NASA/SVS · Ernie Wright</div></div>
+<div class="content"><div class="brand"><img class="brand-icon" src="social-card-assets/odc-mark.svg" alt="">ORBITAL DATA CENTER</div>
+<h1>Explore the feasibility<br><span>of orbital data centers.</span></h1>
+<p>A space mission design wizard<br>for exploring the concept.</p>
+<div class="pills"><span class="pill">Mission design</span><span class="pill">Coupled analysis</span><span class="pill">Learning tool</span></div></div>
+<div class="byline"><span>A project by <strong>John Benac</strong></span><span class="url">orbitaldatacenter.design</span></div>
+</main></body></html>

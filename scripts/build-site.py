@@ -13,9 +13,10 @@ ROOT = Path(__file__).resolve().parents[1]
 ORIGIN = 'https://orbitaldatacenter.design'
 GITHUB = 'https://github.com/johnbenac/orbitaldatacenter'
 LINKEDIN = 'https://www.linkedin.com/in/johnbenac/'
-DESCRIPTION = ('Explore spacecraft sizing, orbital operations, power, thermal systems, '
-               'and AI workloads in John Benac’s interactive Orbital Data Center workbench.')
-IMAGE_ALT = 'Orbital Data Center — spacecraft mission workbench, a project by John Benac'
+DESCRIPTION = ('Explore the feasibility of orbital data centers with a space mission design wizard. '
+               'A learning tool for spacecraft sizing, power, thermal systems, and mission tradeoffs.')
+IMAGE_ALT = ('Explore the feasibility of orbital data centers — a mission design learning tool '
+             'by John Benac, with a Blender visualization of the spacecraft above Earth.')
 
 
 class CleanHead(HTMLParser):
@@ -63,7 +64,7 @@ class CleanHead(HTMLParser):
 
 def metadata(path, title, description):
     url = ORIGIN + path
-    image = ORIGIN + '/_site/social-card.png'
+    image = ORIGIN + '/_site/social-card.png?v=blender-orbit-1'
     person = {'@type': 'Person', '@id': ORIGIN + '/#john-benac', 'name': 'John Benac',
               'url': 'https://johnbenac.com/', 'sameAs': [LINKEDIN]}
     app = {'@type': 'WebApplication', '@id': ORIGIN + '/#workbench',
@@ -118,7 +119,7 @@ def build(source=ROOT, output=ROOT / '.build/public', extensions=ROOT / 'extensi
     clean = CleanHead()
     clean.feed(heads[0].group(1))
     head = ''.join(clean.parts) + '\n' + metadata(
-        '/', 'Orbital Data Center | Spacecraft Mission Workbench', DESCRIPTION)
+        '/', 'Orbital Data Center | Explore the Feasibility', DESCRIPTION)
     head += '\n<link rel="stylesheet" href="/_site/site.css">\n'
     html = html[:heads[0].start(1)] + head + html[heads[0].end(1):]
     footer = (extensions / 'footer.html').read_text()

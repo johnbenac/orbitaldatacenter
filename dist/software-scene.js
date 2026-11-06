@@ -18,7 +18,29 @@ function filmic(out,r,g,b,gain){
  out[1]=display(-.10208*x+1.10813*y-.00605*z);
  out[2]=display(-.00327*x-.07276*y+1.07602*z);
 }
-function imageData(map,level=0){let img=map?.image;if(!img||!(img.width&&img.height))return null;if(!pixels.has(img))pixels.set(img,[]);let levels=pixels.get(img);if(levels[level])return levels[level];const c=document.createElement('canvas');c.width=Math.max(1,img.width>>level);c.height=Math.max(1,img.height>>level);let ctx=c.getContext('2d',{willReadFrequently:true});ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";ctx.drawImage(img,0,0,c.width,c.height);const r=ctx.getImageData(0,0,c.width,c.height);levels[level]=r;return r;}
+// Read the source once. Halve cached pixels in memory so a first frame never
+// resamples the full sky survey through multiple synchronous canvas readbacks.
+function imageData(map,level=0){
+ const img=map?.image;if(!img?.width||!img.height)return null;
+ let levels=pixels.get(img);
+ if(!levels){
+  const c=document.createElement('canvas');c.width=img.width;c.height=img.height;
+  const ctx=c.getContext('2d',{willReadFrequently:true});
+  ctx.drawImage(img,0,0);
+  levels=[ctx.getImageData(0,0,c.width,c.height)];pixels.set(img,levels);c.width=c.height=1;
+ }
+ while(levels.length<=level){
+  const src=levels.at(-1),width=Math.max(1,src.width>>1),height=Math.max(1,src.height>>1);
+  if(width===src.width&&height===src.height)return src;
+  const data=new Uint8ClampedArray(width*height*4);
+  for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+   const a=4*(2*y*src.width+2*x),b=a+(src.width>1?4:0),c=a+(src.height>1?4*src.width:0),d=c+(b-a);
+   for(let ch=0;ch<4;ch++)data[4*(y*width+x)+ch]=(src.data[a+ch]+src.data[b+ch]+src.data[c+ch]+src.data[d+ch]+2)>>2;
+  }
+  levels.push({width,height,data});
+ }
+ return levels[level];
+}
 const vec=new T.Vector3(),mvp=new T.Matrix4(),normMat=new T.Matrix3(),sun=new T.Vector3(-3,6,4).normalize(),rim=new T.Vector3(4,1,-3).normalize();
 export function softRenderer(canvas){let width=1,height=1,depth,frame;const ctx=canvas.getContext('2d',{alpha:true}),aa=document.createElement('canvas'),raster=aa.getContext('2d',{alpha:true});return{setSize(w,h){const samples=w*h<460000?1.4:1;canvas.width=Math.round(w);canvas.height=Math.round(h);width=aa.width=Math.max(1,Math.round(w*samples));height=aa.height=Math.max(1,Math.round(h*samples));depth=new Float32Array(width*height);frame=ctx.createImageData(width,height);},render(scene,camera,keepColor=false){if(!frame)return;let img=frame.data;if(!keepColor)img.fill(0);depth.fill(Infinity);scene.updateMatrixWorld(true);camera.updateMatrixWorld();const lighting=scene.userData.lightState;
 const ev=scene.userData.exposureEV,gain=Number.isFinite(ev)?(1.16/.6)*2**ev:0,encoded=[0,0,0];

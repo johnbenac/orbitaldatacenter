@@ -24,7 +24,7 @@ for(const [id,vehicle] of Object.entries(launchFleet)){
  assert.equal(!!at('stage-separate'),vehicle.stages>1);
  assert.equal(!!at('jettison'),id!=='starship');
  assert.equal(!!at('door'),id==='starship');
- assert.equal(at('orbit').start,540);assert.equal(at('release').start,clock.release);
+ assert.equal(at('orbit').start,540);assert.equal(at('release').start,clock.eject??clock.release);
  assert.equal(at('release').end,at('clear').start);assert(at('clear').end==null);
  if(id==='longMarch5B')assert(!at('upper-start')&&!at('upper-cutoff'));
  if(id==='starship')assert(at('hot-stage').start<at('stage-separate').start&&at('door').start<at('release').start);
@@ -40,7 +40,7 @@ console.log('Ten carrier timelines match loading, exhaust, staging, insertion an
 
 for(const id of ['starship','glenn']){
  const h=sizeDesign(applyPreset(missionStarter('text'),'launcher',id)),sim=createSimulation(h);
- const release=launchClockFor(id).release,held=sim.at(release-.01),free=sim.at(release);
+ const c=launchClockFor(id),release=c.eject??c.release,held=sim.at(release-.01),free=sim.at(release);
  const attached=exportMechanical(h,held,'D'),separated=exportMechanical(h,free,'D');
  assert(held.carrierAttached&&attached.adapterAttached);assert(!free.carrierAttached&&!separated.adapterAttached);
  assert.equal(held.attitudeMode,'launch');assert.equal(free.attitudeMode,'insertion');

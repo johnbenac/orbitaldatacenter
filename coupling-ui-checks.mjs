@@ -186,10 +186,31 @@ await fire({phase:'A'});await fire({domain:'launcher'});await fire({useLauncher:
 await fire({phase:'B'});assert.match(el('fleet-host').innerHTML,/ODC-LI-01/);
 await fire({watchLoading:''});await fire({bayLens:'payload'});await fire({loadingAt:'-960'});
 let loadState=await snapshot();assert.equal(loadState.view.t,-960);assert.equal(loadState.view.bayLens,'payload');assert.equal(loadState.view.chapter,'integration');
-assert.match(el('loading-player').innerHTML,/Complete ship/);
+assert.match(el('loading-player').innerHTML,/Latch hatch/);
 await fire({loadingAt:'-660'});assert.match(el('loading-player').innerHTML,/Replay payload loading/);
 await fire({loadingPlay:''});loadState=await snapshot();
 assert.equal(loadState.view.t,-3000);assert.equal(loadState.view.speed,120);assert.equal(loadState.design.launcher,'starship');
+// Exercise the same UI buttons as the insertion director, including a direction
+// change while the clock is moving. Exact wall time makes the MET comparisons deterministic.
+const nativeClock=globalThis.performance;let wall=nativeClock.now();
+globalThis.performance={now:()=>wall};
+const advanceWall=ms=>{wall+=ms;frames.get(frameCount)(wall)};
+try{
+ await fire({loadingAt:'-960'});await change('flight-rate',10);await fire({loadingPlay:'reverse'});
+ assert.match(el('loading-player').innerHTML,/Pause reverse playback/);
+ advanceWall(800);assert.equal((await snapshot()).view.t,-968);
+ await fire({loadingPlay:''});advanceWall(800);assert.equal((await snapshot()).view.t,-960);
+ await fire({chapter:'insertion'});await fire({launchTime:'600'});await change('flight-rate',10);
+ await fire({action:'flightreverse'});assert.match(el('guidepanel').innerHTML,/Pause reverse playback/);
+ advanceWall(800);await fire({action:'flightplay'});advanceWall(800);
+ assert.equal((await snapshot()).view.t,600);
+ await fire({action:'flightreverse'});advanceWall(800);
+ assert.equal((await snapshot()).view.t,592);
+ await fire({loadingPlay:''}); // The bay-only button has no effect in orbit.
+ await fire({chapter:'integration'});await fire({loadingAt:'-3000'});await change('flight-rate',600);
+ await fire({loadingPlay:'reverse'});advanceWall(1500);
+ assert.equal((await snapshot()).view.t,-3600);
+}finally{globalThis.performance=nativeClock}
 console.log('Adapter-to-integration handoff, reversible payload milestones, follow camera and replay stay on one mission clock.');
 
 await fire({phase:'C'});await fire({camera:'spacecraft'});await fire({attitudeTime:'6402'});

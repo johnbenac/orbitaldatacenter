@@ -1,3 +1,4 @@
+import {terminalPattern} from './terminal-activity.js';
 import {attitudeGuidance} from './attitude-guidance.js';
 import {deploymentSchedule} from './deployment.js';
 import {ramSilhouette} from './silhouette.js';
@@ -59,19 +60,19 @@ export function selectedTerminal(d,available){
  if(/auto/.test(mode))name=available>1e4?'Optical':available>1?'Ka':'S-band';
  return name;
 }
-export function linkBudget(d,g,pointingDeg,available,acquisitionResidualDeg=0){
- const name=selectedTerminal(d,available);
+export function linkBudget(d,g,pointingDeg,available,acquisitionResidualDeg=0,patchOffAxisDeg=0,name=selectedTerminal(d,available)){
  const active=!!g.station, range=Math.max(1,g.rangeKm)*1000,atmos=2/Math.max(.20,Math.sin(g.elevationDeg*DEG));
- let line,gain=0,margin=0,width=0,draw=0,bandwidth,required=5,rxPowerDbm=0;
+ const width=terminalPattern(d,name).fullWidthRad/DEG,patchLossDb=12*(patchOffAxisDeg/80)**2;
+ let line,gain=0,margin=0,draw=0,bandwidth,required=5,rxPowerDbm=0;
  if(name==='Optical'){
-  const divergence=1.22*1.55e-6/(d.opticalApertureM||.1),jitter=(d.opticalJitterUrad??1.5)*1e-6,diam=.5,loss=10**(-(atmos+4)/10)*Math.exp(-2*(Math.hypot(jitter,acquisitionResidualDeg*DEG)/divergence)**2),receivedW=(d.opticalTxW??1)*Math.min(1,(diam/(2*range*divergence))**2)*loss;
-  rxPowerDbm=10*Math.log10(Math.max(1e-30,receivedW)*1000);bandwidth=2e9;line=Math.min(bandwidth,receivedW/(6.62607015e-34*299792458/1.55e-6)/100);margin=10*Math.log10(Math.max(1e-12,line)/1e9);width=2*divergence/DEG;draw=.24;
+  const divergence=width*DEG/2,jitter=(d.opticalJitterUrad??1.5)*1e-6,diam=.5,loss=10**(-(atmos+4)/10)*Math.exp(-2*(Math.hypot(jitter,acquisitionResidualDeg*DEG)/divergence)**2),receivedW=(d.opticalTxW??1)*Math.min(1,(diam/(2*range*divergence))**2)*loss;
+  rxPowerDbm=10*Math.log10(Math.max(1e-30,receivedW)*1000);bandwidth=2e9;line=Math.min(bandwidth,receivedW/(6.62607015e-34*299792458/1.55e-6)/100);margin=10*Math.log10(Math.max(1e-12,line)/1e9);draw=.24;
  }else{
-  const ka=name==='Ka',freq=ka?26e9:2.2e9,lambda=299792458/freq,dish=d.kaDishM||.60,db=x=>10*Math.log10(x),fspl=20*Math.log10(4*Math.PI*range/lambda);bandwidth=ka?250e6:2e6;gain=ka?db(.60*(Math.PI*dish/lambda)**2):5;width=ka?70*lambda/dish:80;
-  const pointLoss=12*((ka?Math.hypot(pointingDeg,acquisitionResidualDeg):pointingDeg)/width)**2,tx=ka?20:2,gt=ka?35:12,cn0=db(tx)+gain+gt-fspl-atmos-pointLoss-2+228.6;
+  const ka=name==='Ka',freq=ka?26e9:2.2e9,lambda=299792458/freq,dish=d.kaDishM||.60,db=x=>10*Math.log10(x),fspl=20*Math.log10(4*Math.PI*range/lambda);bandwidth=ka?250e6:2e6;gain=ka?db(.60*(Math.PI*dish/lambda)**2):5;
+  const pointLoss=ka?12*(Math.hypot(pointingDeg,acquisitionResidualDeg)/width)**2:patchLossDb,tx=ka?20:2,gt=ka?35:12,cn0=db(tx)+gain+gt-fspl-atmos-pointLoss-2+228.6;
   line=Math.min(bandwidth*2,10**((cn0-required)/10));margin=cn0-10*Math.log10(bandwidth*2)-required;draw=ka?.205:.035;
  }
- const freqUp=2.05e9,lossUp=20*Math.log10(4*Math.PI*range*freqUp/299792458),upCNo=47+5-10*Math.log10(500)-lossUp-3+228.6;
+ const freqUp=2.05e9,lossUp=20*Math.log10(4*Math.PI*range*freqUp/299792458),upCNo=47+5-patchLossDb-10*Math.log10(500)-lossUp-3+228.6;
  const uplinkRate=Math.min(2e6,10**((upCNo-5)/10))/1e6;
- return {groundLink:active?name:null,contact:active,lineMbps:active?line/1e6:0,uplinkMbps:active?uplinkRate:0,linkMarginDb:active?margin:0,antennaGainDbi:gain,beamwidthDeg:width,footprintKm:active?2*g.rangeKm*Math.tan(width*DEG/2):0,bandwidthMHz:bandwidth/1e6,rxPowerDbm,acquisitionSec:name==='Optical'?35:name==='Ka'?20:5,terminalKW:active?draw:.015};
+ return {groundLink:active?name:null,patchOffAxisDeg,patchLossDb,contact:active,lineMbps:active?line/1e6:0,uplinkMbps:active?uplinkRate:0,linkMarginDb:active?margin:0,antennaGainDbi:gain,beamwidthDeg:width,footprintKm:active?2*g.rangeKm*Math.tan(width*DEG/2):0,bandwidthMHz:bandwidth/1e6,rxPowerDbm,acquisitionSec:name==='Optical'?35:name==='Ka'?20:5,terminalKW:active?draw:.015};
 }

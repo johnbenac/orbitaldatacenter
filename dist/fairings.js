@@ -1,3 +1,4 @@
+import {starshipCargoFit} from './starship-cargo.js';
 import {adapterEnvelopeM,spacecraftInterface} from './payload-interface.js';
 import {deploymentLayout,terminalLayout,terminalStations} from './deployment.js';
 // Coordinates are metres from the payload adapter interface plane, positive forward.
@@ -53,8 +54,8 @@ export const fairings={
  },
  starship:{
   outerDiameterM:9,basis:'Historical concept proxy',source:'SpaceX · Starship Users Guide, March 2020, Figure 4',
-  sourceUrl:'https://www.spacex.com/media/starship_users_guide_v1.pdf#page=2',
-  note:'The 2020 concept specified a dynamic cargo envelope. The stations below reproduce its standard profile. Applying it to V3 is a planning assumption. V3 cargo-door sweep, payload release path and a mission-specific adapter need separate verification.',
+  sourceUrl:'https://www.spacex.com/media/starship_users_guide_v1.pdf#page=3',
+  note:'The 2020 concept specified a dynamic cargo envelope. The stations below reproduce its standard profile. Applying it to V3 is a planning assumption. The study checks its fixed lateral hatch separately from this interior envelope. SpaceX has not published this carriage or its clearances.',
   profile:[[0,4],[8,4],[9,3.85],[10,3.68],[11,3.49],[12,3.27],[13,3.04],[14,2.78],[15,2.51],[16,2.20],[17.24,1.80]]
  }
 };
@@ -135,5 +136,8 @@ export function fairingFit(d,stack){
  const axialClearanceM=heightM-stackHeightM-axialPaddingM;
  ratio=Math.min(ratio,heightM/(stackHeightM+axialPaddingM));
  const volumeM3=profile.slice(1).reduce((sum,[z,r],i)=>{const [z0,r0]=profile[i];return sum+Math.PI*(z-z0)*(r*r+r*r0+r0*r0)/3},0);
- return {...reference,profile,stack,maxDiameterM,heightM,referenceDiameterM,referenceHeightM,override,radialPaddingM,axialPaddingM,radialClearanceM,axialClearanceM,limitingPart,limitingZM,ratio,volumeM3,fit:radialClearanceM>=-1e-9&&axialClearanceM>=-1e-9};
+ const envelopeFit=radialClearanceM>=-1e-9&&axialClearanceM>=-1e-9;
+ const cargoAccess=d.launcher==='starship'?starshipCargoFit(stack,{radialPaddingM,axialPaddingM}):null;
+ if(cargoAccess)ratio=Math.min(ratio,cargoAccess.widthM/cargoAccess.requiredWidthM,cargoAccess.heightM/cargoAccess.requiredHeightM,cargoAccess.strokeM/(cargoAccess.strokeM-cargoAccess.depthMarginM));
+ return {...reference,profile,stack,maxDiameterM,heightM,referenceDiameterM,referenceHeightM,override,radialPaddingM,axialPaddingM,radialClearanceM,axialClearanceM,limitingPart,limitingZM,ratio,volumeM3,envelopeFit,cargoAccess,fit:envelopeFit&&(!cargoAccess||cargoAccess.fits)};
 }

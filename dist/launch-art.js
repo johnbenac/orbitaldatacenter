@@ -83,7 +83,7 @@ export function fitOutBay(ctx){
   return plate;
  }
  stand(facility,0,pedestalWidth,pedestalWidth*.74,0,true).name='Checkout bearing plate';
- stand(facility,layout.ringX,pedestalWidth,pedestalWidth*.74,0,false).name='Adapter bearing plate';
+ if(!layout.star)stand(facility,layout.ringX,pedestalWidth,pedestalWidth*.74,0,false).name='Adapter bearing plate';
  // Removable checkout standoffs bypass the engine bells.
  const H=h.payloadInterface?.upperFaceStationM??h.fairing.stack.find(q=>q.part==='Insulated bus').z0M;
  for(const a of [.25,1.82,3.39,4.96]){const rr=.66;cylinder(facility,rr*Math.cos(a),H*.5,rr*Math.sin(a),.038,.055,H,steel).name='Checkout hardpoint support';}
@@ -113,9 +113,9 @@ export function fitOutBay(ctx){
   for(const w of walls){local.copy(eye).sub(w.position).applyAxisAngle(v(0,1,0),-w.rotation.y);w.visible=local.z>.08;}
   roof.visible=eye.y<floor+wallH-.08;
  }
- return {...kit,...rig,layout,floorY:floor,get interfaceLabel(){return kit.portAnchor.name},setViewFrom,update(opening,domain,active,seq,pose){
+ return {...kit,...rig,layout,floorY:floor,get interfaceLabel(){return kit.portAnchor.name},setViewFrom,update(opening,domain,active,seq,pose,commBench){
   fixtures.forEach(({f,side})=>{f.rotation.y=active?Math.PI/2:0;f.position.set(active?layout.ringX:side*opening*R*2.25,0,active?-side*opening*R*2.25:0);});
-  kit.select(domain,active); if(seq&&pose){kit.track(pose,seq);rig.update(seq,pose);}
+  kit.select(domain,active,commBench); if(seq&&pose){kit.track(pose,seq);rig.update(seq,pose);}
 
  }};
 }

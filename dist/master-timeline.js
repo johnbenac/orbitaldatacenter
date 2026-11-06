@@ -4,6 +4,7 @@ import {INSERTION_MET} from './launch-effects-state.js';
 import {attitudeModes} from './attitude-guidance.js';
 import {DEPLOYMENT_STAGES,deploymentGuides} from './deployment.js';
 import {DEPLOY_START_S,DEPLOY_END_S,deploymentMET} from './commissioning-clock.js';
+import {terminalRuns} from './terminal-activity.js';
 import {masterLaunchEvents,launchHold} from './master-launch-events.js';
 
 const cache=new WeakMap();
@@ -65,16 +66,23 @@ function appendModes(rows,trace){
 
 // Time-clipped model step volumes shared by the timeline and the review packet.
 export function stationTransfers(trace,station,start,end){
- const amounts={direct_payload_gb:0,relay_payload_gb:0,received_commands_gb:0};
+ const amounts={direct_payload_gb:0,relay_payload_gb:0,received_commands_gb:0,downlinked_telemetry_gb:0,received_customer_input_gb:0,relay_customer_input_gb:0};
  for(const step of trace){
   if(step.station!==station||step.end<=start||step.start>=end)continue;
   const share=(Math.min(end,step.end)-Math.max(start,step.start))/(step.end-step.start);
-  amounts.direct_payload_gb+=step.directDeliveredGB*share;
-  amounts.relay_payload_gb+=step.relayDeliveredGB*share;
-  amounts.received_commands_gb+=step.commandReceivedGB*share;
+  for(const f of step.terminalActivity){
+   const {payload=0,command=0,telemetry=0,input=0}=f.services;
+   if(f.route==='relay'){
+    amounts.relay_payload_gb+=payload*share;amounts.relay_customer_input_gb+=input*share;
+   }else if(f.peer===station){
+    amounts.direct_payload_gb+=payload*share;amounts.received_commands_gb+=command*share;
+    amounts.downlinked_telemetry_gb+=telemetry*share;amounts.received_customer_input_gb+=input*share;
+   }
+  }
  }
  return amounts;
 }
+const terminalName={'Ka':'Ka reflector','S-band':'S-band patches','Optical':'Optical terminal'};
 function appendPass(rows,e,trace,limit){
  const station=e.station,close=Math.min(e.end,limit);
  const contact=trace.filter(s=>s.station===station&&s.start<close&&s.end>e.start);
@@ -83,21 +91,46 @@ function appendPass(rows,e,trace,limit){
  rows.push(row('aos'+suffix,e.start,station+' enters the contact schedule',owner,
   'The ground network selects '+station+' above the configured elevation mask. The terminal can now attempt acquisition.',
   'comm',{end:close,chapter,major:true,station,basis:'Modeled station geometry'}));
- const command=contact.find(s=>s.commandReceivedGB>0);
- if(command)rows.push(row('uplink'+suffix,command.start,'Spacecraft receives ground commands','Command & Data Handling',
-  'The powered S-band receiver begins taking queued command traffic from '+station+'.','avionics',
-  {seek:(command.start+command.end)/2,chapter:stageAt(command.start)==='operations'?'contact':stageAt(command.start),basis:'Integrated command channel'}));
- const lock=contact.find(s=>s.directPayloadLock),transfer=contact.find(s=>s.directDeliveredGB>0);
- if(lock)rows.push(row('lock'+suffix,lock.start,transfer===lock?'Terminal acquires '+station+' and begins transfer':'Direct payload terminal acquires '+station,'Communications',
-  'The direct terminal has satisfied its acquisition, pointing and power gates.'+(transfer===lock?' Buffered data begins moving to the station in the same integration interval.':''),'comm',
-  {chapter:'contact',seek:(lock.start+lock.end)/2,basis:'Integrated terminal state'}));
- if(transfer&&transfer!==lock)rows.push(row('transfer'+suffix,transfer.start,'Direct payload transfer begins','Data & Delivery',
-  'The recorder begins returning payload data to '+station+'.','data',{chapter:'contact',seek:(transfer.start+transfer.end)/2,basis:'Integrated station ledger'}));
+ const lock=contact.find(s=>s.directPayloadLock);
+ if(lock)rows.push(row('lock'+suffix,lock.start,(terminalName[lock.payloadTerminal]||'Direct payload terminal')+' · link acquired with '+station,'Communications',
+  'The terminal has met its acquisition, pointing and power requirements. Transfer intervals identify the data that crosses the link.','comm',
+  {chapter:stageAt(lock.start)==='operations'?'contact':stageAt(lock.start),station,seek:(lock.start+lock.end)/2,basis:'Integrated terminal state'}));
  const transfers=stationTransfers(contact,station,e.start,close),delivered=transfers.direct_payload_gb,uploaded=transfers.received_commands_gb;
  if(e.end<=limit){
   rows.push(row('los'+suffix,e.end,station+' contact window closes',owner,
-   'During this station window the spacecraft received '+bytes(uploaded)+' of command traffic and delivered '+bytes(delivered)+' of payload over the direct link.',
+   'During this station window the spacecraft received '+bytes(uploaded)+' of command traffic and delivered '+bytes(delivered)+' of payload over the direct link. The S-band patches returned '+bytes(transfers.downlinked_telemetry_gb)+' of housekeeping telemetry.',
    'comm',{chapter:stageAt(e.end)==='operations'?'contact':stageAt(e.end),station,major:true,basis:'Integrated station ledger',measurements:transfers}));
+ }
+}
+
+export function terminalMeasures({gb,mbps,services}){
+ return {transfer_gb:gb,mean_goodput_mbps:mbps,payload_gb:services.payload||0,command_gb:services.command||0,
+  telemetry_gb:services.telemetry||0,customer_input_gb:services.input||0};
+}
+const serviceNames={command:'commands',input:'customer input',telemetry:'housekeeping telemetry',payload:'payload data'};
+function appendTransfers(rows,trace,events){
+ const usedIds=new Set(),keyLanes=new Set(),passes=events.filter(e=>e.type==='contact');
+ for(const run of terminalRuns(trace)){
+  const {terminal,direction,route,peer,services,start,end,seek}=run;
+  const receive=direction==='rx',relay=route==='relay';
+  const servicesUsed=Object.keys(serviceNames).filter(k=>services[k]>0);
+  const contents=servicesUsed.map(k=>serviceNames[k]).join(' and ');
+  const pass=!relay&&passes.find(p=>p.station===peer&&p.start<end&&p.end>start);
+  // Keep the historical first command / first delivery anchors on existing shared links.
+  const legacy=pass&&(receive&&services.command?'uplink-'+pass.id:!receive&&services.payload?'transfer-'+pass.id:null);
+  const id=legacy&&!usedIds.has(legacy)?legacy:'traffic-'+terminal.toLowerCase()+'-'+route+'-'+direction+'-'+start.toFixed(6);
+  usedIds.add(id);
+  const lane=terminal+'-'+route+'-'+direction,major=!keyLanes.has(lane);
+  keyLanes.add(lane);
+  const title=terminalName[terminal]+' '+(receive?'uplink':'downlink')+' · '+contents;
+  const where=relay?'the assumed relay':peer;
+  const detail=servicesUsed.map(k=>bytes(services[k])+' of '+serviceNames[k]).join(' and ');
+  const description=(receive?'The spacecraft receives '+detail+' from ':'The spacecraft sends '+detail+' to ')+where+' during this interval.'+
+   (relay?' The relay schedule supplies the connection. Its orbital position is unspecified.':'');
+  rows.push(row(id,start,title,'Communications',description,'comm',{
+   end,seek,major,phase:phaseAt(seek),chapter:stageAt(seek)==='operations'?'contact':stageAt(seek),station:relay?null:peer,
+   transfer:{terminal,direction,route,peer},basis:'Integrated terminal traffic',measurements:terminalMeasures(run)
+  }));
  }
 }
 
@@ -132,6 +165,7 @@ function operationalRows(sim,window){
     'The duty schedule permits a compute burst. Execution also requires staged input, resident model state and electrical power.','compute',{end:close}));
   }
  }
+ appendTransfers(rows,trace,events);
  const firstWork=trace.find(s=>s.aiUnitRate>0);
  if(firstWork)rows.push(row('first-useful-work',firstWork.start,'First useful compute begins','Compute payload',
   'The installed payload begins processing staged work under the selected AI mission profile.','compute',{major:true,basis:'Integrated compute ledger'}));
@@ -158,6 +192,6 @@ export function masterTimeline(sim){
  });
  const rows=[...launchRows,...orbitalRows].sort((a,b)=>a.start-b.start);
  const sources=[...new Map(rows.filter(r=>r.sourceUrl).map(r=>[r.sourceUrl,{title:r.sourceTitle,url:r.sourceUrl}])).values()];
- const timeline={rows,start:rows[0].start,end:window.end,endReason:window.endReason,sources,launchHold:hold};
+ const timeline={rows,firstOperationsPassId:window.pass?.id??null,start:rows[0].start,end:window.end,endReason:window.endReason,sources,launchHold:hold};
  cache.set(sim,{audit:sim.audit,timeline});return timeline;
 }

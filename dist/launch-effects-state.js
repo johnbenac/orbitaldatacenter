@@ -20,12 +20,51 @@ export function launchClockFor(id){
   coreCutoff:star?142:falcon?231:single?INSERTION_MET:170,
   stageSeparation:single?null:star?142:falcon?234:170,
   boosterCutoff:falcon?144:128,boosterSeparation:falcon?147:128,
-  hotStage:star?140:null,upperIgnition:single?null:star?140:falcon?240:177,
+  hotStage:star?140:null,
+  ...(star?{boostbackStart:147,boostbackCutoff:187}:{}),
+  upperIgnition:single?null:star?140:falcon?240:177,
   upperCutoff:single?null:star?491:INSERTION_MET,
   fairingJettison:star?null:falcon?257:230,doorOpen:star?INSERTION_MET:null,
-  release:star?575:INSERTION_MET,releaseClear:star?635:600
+  hatchClear:star?552:null,eject:star?585:null,release:star?575:INSERTION_MET,releaseClear:star?635:600,
+  carriageHome:star?660:null,hatchLatched:star?680:null
  });
  clockCache.set(id,clock);return clock;
+}
+// V3 ship-following ascent animation. Flight 14's published clock places
+// separation at 142 s and boostback at 147–187 s. Flight 13 webcast frames
+// show a prompt directional turn, five pilot engines, and a 33-engine high-
+// thrust portion. Angles, group ramps and accelerations approximate that
+// visual sequence; SpaceX has not published relative-position telemetry.
+function recoveryCommand(dt,c){
+ const ignite=c.boostbackStart-c.stageSeparation,cutoff=c.boostbackCutoff-c.stageSeparation;
+ const ramp=(a,b)=>smooth((dt-a)/(b-a));
+ const pilot=.82*(1-ramp(cutoff-1,cutoff));
+ const middle=ramp(ignite,ignite+3)*(1-ramp(cutoff-7,cutoff-2));
+ const outer=ramp(ignite+2,ignite+7)*(1-ramp(cutoff-17,cutoff-12));
+ return {angleRad:150*Math.PI/180*ramp(0,14),coreThrottle:pilot,middleThrottle:middle,outerThrottle:outer};
+}
+export function superHeavyDeparture(t){
+ const c=launchClockFor('starship'),elapsed=Math.max(0,t-c.stageSeparation);
+ // Integrate the difference in thrust accelerations in the local staging
+ // plane. Shared velocity and local gravity cancel at release. +Y is along
+ // the ascending ship; +Z rotation tips the booster nose toward −X.
+ const end=Math.min(elapsed,c.boostbackCutoff-c.stageSeparation);
+ let sideM=0,axialM=0,vx=0,vy=0;
+ for(let u=0;u<end;u+=.25){
+  const dt=Math.min(.25,end-u),cmd=recoveryCommand(u+dt*.5,c);
+  const accel=47*(5*cmd.coreThrottle+8*cmd.middleThrottle+20*cmd.outerThrottle)/33;
+  const ax=-Math.sin(cmd.angleRad)*accel,ay=Math.cos(cmd.angleRad)*accel-10.5;
+  sideM+=(vx+ax*dt*.5)*dt;axialM+=(vy+ay*dt*.5)*dt;
+  vx+=ax*dt;vy+=ay*dt;
+ }
+ return {...recoveryCommand(elapsed,c),sideM,axialM};
+}
+// The aft inspection camera clears the separating booster's rendered envelope.
+export function shipEngineViewAvailable(id,t){
+ return id==='starship'&&t>=launchClockFor(id).stageSeparation+45&&t<INSERTION_MET;
+}
+export function payloadFreeMET(id){
+ const clock=launchClockFor(id);return clock.eject??clock.release;
 }
 export function launchEffectsAt(t,id,siteId){
  const site=launchSiteFor(id,siteId),fuel=launchPropulsionFor(id);

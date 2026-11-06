@@ -18,6 +18,8 @@ function sanity(m){
   assert(r.owner&&r.title&&r.description&&r.basis,r.id);
  }
 }
+const campaignTest=nominal.rows.find(r=>r.id==='launch-functional');
+assert.equal(campaignTest.status,'planned');assert.equal(campaignTest.domain,'comm');assert.equal(campaignTest.seek,null);
 sanity(nominal);assert.equal(masterTimeline(sim),nominal);
 const pass=sim.events(0,DAY).find(e=>e.type==='contact'&&e.start>=DEPLOY_END_S);
 assert.equal(nominal.end,pass.end);assert(nominal.endReason.includes(pass.station));
@@ -34,6 +36,24 @@ assert.match(duringDeployment.description,/delivered 0 bytes of payload/);
 const relay=masterTimeline(createSimulation({...design,serviceRoute:'relay'}));sanity(relay);
 assert(!relay.rows.some(r=>r.id.startsWith('lock-contact')));
 assert(relay.rows.filter(r=>r.id.startsWith('los-contact')).every(r=>r.description.includes('0 bytes of payload')));
+// Every hardware use links to real traffic inside its interval. AOS and lock are separate events.
+const near=(actual,expected)=>assert(Math.abs(actual-expected)<1e-7*Math.max(1,expected),actual+' vs '+expected);
+for(const [mode,terminal] of [['s','S-band'],['ka','Ka'],['optical','Optical']]){
+ const model=createSimulation({...design,link:mode}),m=masterTimeline(model),flows=m.rows.filter(r=>r.transfer);
+ assert(flows.some(r=>r.transfer.terminal==='S-band'&&r.transfer.direction==='rx'&&r.measurements.command_gb>0));
+ assert(flows.some(r=>r.transfer.terminal==='S-band'&&r.transfer.direction==='tx'&&r.measurements.telemetry_gb>0));
+ const payload=flows.filter(r=>r.transfer.terminal===terminal&&r.transfer.direction==='tx'&&r.measurements.payload_gb>0);
+ assert(payload.length,terminal+' direct downlink');
+ for(const row of flows){
+  const {transfer:f,measurements:v}=row;
+  assert.equal(row.domain,'comm');assert(row.seek>row.start&&row.seek<row.end);
+  assert(model.at(row.seek).terminalActivity.some(a=>a.terminal===f.terminal&&a.direction===f.direction&&a.peer===f.peer&&a.route===f.route),row.id+' replay');
+  near(v.transfer_gb,v.command_gb+v.telemetry_gb+v.payload_gb+v.customer_input_gb);
+ }
+ near(payload.reduce((a,r)=>a+r.measurements.payload_gb,0),m.rows.filter(r=>r.id.startsWith('los-')).reduce((a,r)=>a+r.measurements.direct_payload_gb,0));
+}
+assert(relay.rows.filter(r=>r.transfer?.route==='relay').every(r=>r.station===null&&r.transfer.peer==='Assumed relay'));
+
 const missing=masterTimeline(createSimulation({...design,network:'svalbard',inclinationDeg:0,elevationDeg:75}));sanity(missing);
 assert.equal(missing.end,DEPLOY_END_S+DAY);assert(!missing.rows.some(r=>r.id.startsWith('aos-contact')));assert.match(missing.endReason,/No complete/);
 const held=masterTimeline(createSimulation({...design,cmgMomentumNms:30,trimDv:15,fairingM:1}));sanity(held);

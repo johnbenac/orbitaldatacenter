@@ -1,9 +1,28 @@
 // Installed mass and body stations. Distances in m, masses in kg. Instance stations
 // for a group use equal unit masses unless its measured weight shares are supplied.
-import {deploymentLayout,leafPose,mechanismPose} from './deployment.js';
+import {deploymentLayout,leafPose,mechanismPose,terminalLayout} from './deployment.js';
 
 const xyz=o=>[o.x,o.y,o.z];
 const mean=(points,weights=null)=>points.reduce((out,p,i)=>out.map((v,k)=>v+p[k]*(weights?weights[i]:1/points.length)),[0,0,0]);
+// The terminal allocation separates the fixed radio/positioner allowance from
+// its aperture-scaled moving head. Head centroids are geometry surrogates.
+// Axes are right-handed local X/Y/Z expressed in the spacecraft body frame.
+export function terminalMassElements(h,attitude=null){
+ const d=h.input,layout=terminalLayout(h.bodyWidthM,h.bodyHeightM,d.kaDishM,d.opticalApertureM);
+ const definitions=[
+  ['05.02','dish',10,10*d.kaDishM**2,d.kaDishM/2,.42*d.kaDishM,layout.kaHeight,-layout.kaPin+.21*d.kaDishM,attitude?.dishBoresightBody??attitude?.dish],
+  ['05.03','optic',7,250*d.opticalApertureM**2,.8*d.opticalApertureM,d.opticalApertureM,layout.opticalHeight,-layout.opticalPin+.5*d.opticalApertureM,attitude?.opticalBoresightBody??attitude?.optic]
+ ];
+ return definitions.flatMap(([wbs,id,fixedKg,headKg,radiusM,lengthM,height,offset,direction])=>{
+  const foot=h.propulsion.stations[wbs],norm=direction?Math.hypot(...direction):0;
+  const n=norm>0?direction.map(v=>v/norm):[0,1,0],az=Math.atan2(n[0],n[2]),el=Math.atan2(Math.hypot(n[0],n[2]),n[1]);
+  const axes=[[Math.cos(az),0,-Math.sin(az)],n,[Math.sin(az)*Math.cos(el),-Math.sin(el),Math.cos(az)*Math.cos(el)]];
+  return [
+   {id:id+'-base',wbs,massKg:fixedKg,centroidM:foot,dimensionsM:[radiusM*.8,lengthM*.5,radiusM*.8],moving:false},
+   {id:id+'-head',wbs,massKg:headKg,centroidM:foot.map((v,i)=>v+(i===1?height:0)+offset*n[i]),radiusM,lengthM,axes,symmetryAxis:1,moving:true}
+  ];
+ });
+}
 export function heliumDistribution(p,remainingKg){
  const left=Math.max(0,Math.min(1,remainingKg/(p.fuelKg+p.oxidizerKg)));
  const inTanks=[0,1].map(i=>p.feedPa*(p.tanks[i].volumeL-left*p.liquidL[i])*.001/(2077.1*p.temperatureK));
@@ -43,6 +62,7 @@ function partsAt(h,deploy,attitude){
  const p=h.propulsion,d=h.input,w=h.bodyWidthM,b=h.bodyHeightM,l=h.bodyLengthM;
  const supplied=p.stations||{},rows=equipmentAllocations(h);
  const leaves=leafGroups(h,deploy,attitude),engines=p.engines.map(e=>e.throatZ!=null?[e.x,e.y,.5*(e.throatZ+e.z)]:[e.x,.5*(e.throatY+e.y),e.z]);
+ const terminals=terminalMassElements(h,attitude);
  const stack=h.fairing?.stack||[],bus=stack.find(v=>/insulated bus/i.test(v.part)),adapter=stack[0];
  const suppliedPoint=(wbs,id)=>supplied[wbs]||supplied[id]||[0,0,0];
  const radii=p.tanks.map(xyz);
@@ -52,6 +72,11 @@ function partsAt(h,deploy,attitude){
   '09.01':[[0,0,adapter&&bus?(adapter.z0M+h.payloadInterface.upperFaceStationM-bus.z0M-bus.z1M)/2:-l*.5-.24]]
  };
  for(const row of rows){
+  if(row.wbs==='05.02'||row.wbs==='05.03'){
+   const parts=terminals.filter(p=>p.wbs===row.wbs),total=parts.reduce((sum,p)=>sum+p.massKg,0);
+   row.stationsM=parts.map(p=>p.centroidM);row.stationShares=parts.map(p=>p.massKg/total);
+   row.centroidM=mean(row.stationsM,row.stationShares);continue;
+  }
   // Integration model may explicitly locate individual units (e.g. CMGs).
   const direct=supplied[row.wbs],preferred=(Array.isArray(direct?.[0])?direct:null);
   const centers=points[row.wbs]||preferred||[suppliedPoint(row.wbs,row.id)];

@@ -64,13 +64,15 @@ function inspector(row,rows,h){
   '<div class="mtl-time-large">'+timelineTime(row.start,row.precision)+'</div><div class="mtl-event-meta"><span>Phase '+esc(row.phase)+'</span><span>'+esc(names[row.segment])+'</span></div>'+
   '<h3>'+esc(row.title)+'</h3><p>'+esc(row.description)+'</p>'+
   '<dl class="mtl-facts"><div><dt>Lead</dt><dd>'+esc(row.owner||'Mission operations')+'</dd></div><div><dt>Timing basis</dt><dd>'+esc(row.basis)+'</dd></div>'+
+  (row.transfer?'<div><dt>Signal path</dt><dd>'+esc(row.transfer.direction==='rx'?row.transfer.peer+' → spacecraft':'Spacecraft → '+row.transfer.peer)+'</dd></div><div><dt>Mean goodput</dt><dd>'+esc(row.measurements.mean_goodput_mbps.toLocaleString('en-US',{maximumSignificantDigits:4}))+' Mbit/s</dd></div>':'')+
   (row.status?'<div><dt>Event status</dt><dd>'+esc(row.status)+'</dd></div>':'')+
   (duration?'<div><dt>Interval end</dt><dd>'+timelineTime(row.end,row.precision)+'<small> · '+esc(duration)+'</small></dd></div>':'')+
   '<div><dt>'+(day?'Planning date':'Event time')+'</dt><dd>'+esc((row.precision==='hour'?'Approx. ':'')+utc(h.input.epoch,row.start,day))+'</dd></div></dl>'+
   (sourceLink(row.sourceUrl,row.sourceTitle)?'<div class="mtl-row-source">'+sourceLink(row.sourceUrl,row.sourceTitle)+'</div>':'')+
-  (finite(target)?'<button type="button" class="mtl-open" data-mtl-jump="'+esc(row.id)+'" title="Pause the mission at '+timelineTime(target)+' and inspect this event.">'+icon('play',15)+' View in simulation '+icon('arrow-up-right',14)+'</button>':'<div class="mtl-plan-note">'+icon('book-open',15)+'<span>'+(
+  (finite(target)?'<button type="button" class="mtl-open" data-mtl-jump="'+esc(row.id)+'" title="Pause the mission at '+timelineTime(target)+' and inspect this event.">'+icon('play',15)+(row.transfer?' View active transfer ':' View in simulation ')+icon('arrow-up-right',14)+'</button>':'<div class="mtl-plan-note">'+icon('book-open',15)+'<span>'+(
    row.status==='blocked'?'The current integration hold prevents this step.':
-   day?'Planning entry · approximate campaign day':row.precision==='hour'?'Planning entry · approximate launch-day hour':'Outside the recorded flight sequence')+'</span></div>')+'</aside>';
+   day?'Planning entry · approximate campaign day':row.precision==='hour'?'Planning entry · approximate launch-day hour':'Outside the recorded flight sequence')+'</span></div>')+
+  (row.id==='launch-functional'?'<button type="button" class="mtl-open" data-mtl-lab>Open communications test bench '+icon('arrow-up-right',14)+'</button>':'')+'</aside>';
 }
 function ledger(model,rows,selected,view){
  const all=!!view.timelineAll;
@@ -93,7 +95,7 @@ const formatSources=[
 ];
 function basisAndExports(){
  const links=formatSources.map(([title,url])=>sourceLink(url,title));
- return '<footer class="mtl-footer"><details class="mtl-basis"><summary>'+icon('book-open',15)+' How to read this timeline</summary><p>T− and T+ are continuous offsets from liftoff. A real countdown can pause its procedure clock during a hold. The workbench uses a continuous mission clock and the design epoch gives the UTC time of liftoff.</p><p>The opening campaign dates and early launch-control shifts are planning allowances. The animated integration sequence starts at T−01:00:00. Select a row for its time basis, then open its flight view where available.</p><h4>Published timeline examples</h4><p>NASA’s countdown brief distinguishes procedure time and liftoff time. The Europa Clipper event list and Arianespace launch kit show how teams move from a campaign chronology to a timed flight sequence.</p><div class="mtl-sources">'+links.join('')+'</div></details><div class="mtl-exports"><span>Export full timeline</span><a data-mtl-export="csv" download>'+icon('download',13)+' CSV</a><a data-mtl-export="json" download>'+icon('download',13)+' JSON</a></div></footer>';
+ return '<footer class="mtl-footer"><details class="mtl-basis"><summary>'+icon('book-open',15)+' How to read this timeline</summary><p>T− and T+ are continuous offsets from liftoff. A real countdown can pause its procedure clock during a hold. The workbench uses a continuous mission clock and the design epoch gives the UTC time of liftoff.</p><p>The opening campaign dates and early launch-control shifts are planning allowances. The animated integration sequence starts at T−01:00:00. Select a row for its time basis, then open its flight view where available. A terminal transfer row covers one continuous interval of transmitted or received data. View active transfer opens a moment inside that interval.</p><h4>Published timeline examples</h4><p>NASA’s countdown brief distinguishes procedure time and liftoff time. The Europa Clipper event list and Arianespace launch kit show how teams move from a campaign chronology to a timed flight sequence.</p><div class="mtl-sources">'+links.join('')+'</div></details><div class="mtl-exports"><span>Export full timeline</span><a data-mtl-export="csv" download>'+icon('download',13)+' CSV</a><a data-mtl-export="json" download>'+icon('download',13)+' JSON</a></div></footer>';
 }
 function contents(model,h,view){
  const rows=visibleTimelineRows(model,view),selected=selectedRow(rows,view);
@@ -115,7 +117,7 @@ function revealRow(el,id){
  const headingHeight=scroller.querySelector('thead')?.getBoundingClientRect().height||26;
  if(r.top<box.top+headingHeight||r.bottom>box.bottom)scroller.scrollTop+=r.top-box.top-headingHeight-(box.height-headingHeight)*.36;
 }
-export function bindMasterTimeline(host,model,h,view,{onOpen,onExport,onView,fileFor}={}){
+export function bindMasterTimeline(host,model,h,view,{onOpen,onCommLab,onExport,onView,fileFor}={}){
  const el=host.matches?.('[data-master-timeline]')?host:host.querySelector('[data-master-timeline]');
  if(!el||el.dataset.bound)return;
  el.dataset.bound='true';
@@ -134,6 +136,7 @@ export function bindMasterTimeline(host,model,h,view,{onOpen,onExport,onView,fil
   if(!b||!el.contains(b))return;
   const d=b.dataset;
   if(d.mtlExport){if(!b.hasAttribute('href')){event.preventDefault();onExport?.(d.mtlExport)}return}
+  if(d.mtlLab!=null){onCommLab?.();return}
   if(d.mtlJump){const r=model.rows.find(r=>r.id===d.mtlJump);if(r&&finite(flightTime(r)))onOpen?.(r);return}
   const patch={};
   if(d.mtlSegment!=null)patch.timelineSegment=d.mtlSegment;

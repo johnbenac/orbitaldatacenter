@@ -43,11 +43,27 @@ globalThis.URL.createObjectURL=blob=>{exported=blob;return 'blob:geometry-checks
 const originalTimer=globalThis.setTimeout;
 globalThis.setTimeout=(handler,ms,...args)=>{const t=originalTimer(handler,ms,...args);if(ms===30000)t.unref();return t};
 const t=sim.story('contact').instant,view={page:'overview',chapter:'contact',camera:'spacecraft',preset:'reference',t,start:0,event:sim.story('contact')};
+view.commWorksheet={designRevision:packetIdentity({design:study,modelVersion:'2',view},sim.duration).revision,rehearsal:{goalGB:25,ran:true},tests:[{id:'sband',setting:0,ran:true},{id:'ka',setting:32,ran:true},{id:'optical',setting:0,ran:false}]};
 exported=await makePacket({scenario:{schema:'odc-scenario/1',modelVersion:'2',design:study,view},hardware:hw,sim,result:inverseSolve(study),snap:sim.at(t),day:sim.daySummary(0),events:sim.events(0,86400),audit});
 const zip=await JSZip.loadAsync(await exported.arrayBuffer());
+for(const file of ['attitude/selected-inertia.json','attitude/control-state.json','attitude/model-basis.json','attitude/dynamics.csv'])assert.ok(zip.file(file),file);
+const exportedInertia=JSON.parse(await zip.file('attitude/selected-inertia.json').async('text'));
+const exportedControl=JSON.parse(await zip.file('attitude/control-state.json').async('text'));
+assert.equal(exportedInertia.tensorKgM2.length,9);
+exportedInertia.tensorKgM2.forEach((value,i)=>near(value,exportedControl.model.inertiaKgM2[i],1e-8));
+assert.equal(exportedControl.model.gimbalAnglesRad.length,4);
+assert.match(await zip.file('attitude/dynamics.csv').async('text'),/articulation_momentum_body_Nms/);
 for(const file of ['mechanical/installed-stations.csv','mechanical/component-resources.csv','mechanical/launch-mass-properties.json','mechanical/terminal-disposition.json','attitude/gyro-benchmark.json','attitude/pointing-power-heat.csv','attitude/mission-mode-duration-s.json','design/master-equipment-list.csv','design/mass-rollup.json','propulsion/geometric-screens.csv','propulsion/depletion-mass-properties.csv','propulsion/tank-installation.csv','propulsion/engine-stations.csv','design/launch-vehicle.json','design/fairing-fit.csv','design/fairing-stations.csv','design/stowed-stack.csv','design/enclosure-walls.csv','operations/chapter-samples.csv','operations/selected-story.json','operations/disposal.json','PDR.html'])assert.ok(zip.file(file),file);
 const timeline=JSON.parse(await zip.file('operations/master-timeline.json').async('text'));
 assert.equal(timeline.launcher,hw.input.launcher);
+const commChecks=JSON.parse(await zip.file('verification/communications-ground-tests.json').async('text'));
+assert.equal(commChecks.design_revision,view.commWorksheet.designRevision);
+assert.deepEqual(commChecks.test_plan.map(r=>[r.test,r.result]),[['sband','pass'],['ka','fail'],['optical','unrun']]);
+assert.equal(commChecks.completed_runs.length,2);
+const rehearsal=JSON.parse(await zip.file('verification/first-contact-rehearsal.json').async('text'));
+assert.equal(rehearsal.goalGB,25);assert.equal(rehearsal.outcome,'missed');assert.equal(rehearsal.pass.directPayloadGB,0);
+assert(commChecks.completed_runs.every(r=>r.requirements.length&&r.assumptions.length&&r.source.url));
+assert.match(await zip.file('PDR.html').async('text'),/Communications ground verification/);
 assert.equal(timeline.events.find(r=>r.id==='launch-liftoff').start_met_s,0);
 assert.equal(timeline.events[0].replay_met_s,null);
 assert.equal(timeline.events[0].start_utc.length,10);
@@ -62,8 +78,12 @@ const passes=lines.slice(1).map(cells=>Object.fromEntries(lines[0].map((k,i)=>[k
 assert.ok(passes.some(p=>Number(p.relay_payload_gb)>0));assert.ok(passes.every(p=>Number(p.direct_payload_gb)===0));
 for(const call of timeline.events.filter(e=>e.direct_payload_gb!=null)){
  const pass=passes.find(p=>p.station===call.station&&Math.abs(Number(p.end)-call.start_met_s)<.1);assert.ok(pass);
- near(+pass.direct_payload_gb,call.direct_payload_gb);near(+pass.relay_payload_gb,call.relay_payload_gb);near(+pass.received_commands_gb,call.received_commands_gb);
+ near(+pass.direct_payload_gb,call.direct_payload_gb);near(+pass.relay_payload_gb,call.relay_payload_gb);near(+pass.received_commands_gb,call.received_commands_gb);near(+pass.downlinked_telemetry_gb,call.downlinked_telemetry_gb);near(+pass.received_customer_input_gb,call.received_customer_input_gb);
 }
+const activity=await zip.file('operations/terminal-activity.csv').async('text');
+assert.match(activity,/mean_goodput_mbps/);assert.match(activity,/"S-band","rx","direct"/);assert.match(activity,/"S-band","tx","direct"/);
+assert.match(activity,/"Optical","tx","relay"/);
+assert(timeline.events.some(r=>r.terminal==='S-band'&&r.direction==='tx'&&r.telemetry_gb>0&&r.end_met_s>r.start_met_s));
 const carrier=JSON.parse(await zip.file('design/launch-vehicle.json').async('text'));
 assert.equal(carrier.selection,hw.input.launcher);assert.equal(carrier.reference.referenceKg,hw.input.referenceKg);
 near(carrier.limitingMassScreenKg,hw.launchScreenMarginKg);assert.ok(carrier.reference.sourceUrl.startsWith('https://'));

@@ -47,6 +47,12 @@ function radio(s){
   [fact('Customer downlink capacity',s.aiRouteDownMbps,'Mbit/s'),fact('Customer output flowing',s.aiOutputMbps,'Mbit/s')],link('Inspect the recorder','data'));
  if(!s.station)return card('What does a faster antenna buy during a gap?','A direct transfer needs a station above its elevation mask. More link capacity helps during contact. Staged work and recorder space determine how the spacecraft uses the gap.',
   [fact('Direct stations in view','None'),fact('Data waiting',s.queueGB,'GB')],chapter('Inspect a ground pass','contact'));
+ const live=s.terminalActivity||[];
+ const housekeeping=live.find(f=>f.route==='direct'&&f.services.telemetry>0);
+ const payload=live.find(f=>f.route==='direct'&&f.services.payload>0);
+ if(housekeeping&&!payload)return card('What is the spacecraft sending before bulk data moves?',
+  'The fixed S-band patch can send live housekeeping while the payload terminal waits for acquisition, sufficient pointing accuracy, or data in the recorder.',
+  [fact('Ground station',s.station),fact('Housekeeping to station',housekeeping.services.telemetry*8e6/housekeeping.seconds,'kbit/s')],link('Inspect spacecraft telemetry','avionics'));
  if(!s.acquired)return card('The station is visible. Is the link ready?','A pass begins when the station rises into view. Acquisition time and pointing clearance can delay payload transfer after that instant.',
   [fact('Visible station',s.station),fact('Time in view',s.contactAgeSec,'s'),fact('Acquisition setting',s.acquisitionSec,'s')],link('Inspect pointing','attitude'));
  return card('How much of the link is moving files?','Coding overhead, the service allocation, and the available queue all affect delivery. The application rate measures the bytes actually leaving the recorder.',
@@ -128,7 +134,22 @@ function launch(id,h,s){
   return card('What powers the spacecraft before its arrays open?','The solar wings are restrained, and the battery supplies the spacecraft bus in the flight model. Opening arrays later changes the energy source. Circulating coolant through latched radiators changes the heat path.',
    [fact('Array generation',s.solarKW,'kW'),fact('Battery to bus',s.dischargeKW,'kW'),fact('Spacecraft bus served',s.servedLoadKW,'kW')],chapter('Watch deployment','commissioning'));
  }
- if(id==='avionics'||id==='comm')return card('How does a checkout differ from a customer transfer?','Engineers can command spacecraft electronics and read their health before the customer payload starts. In flight the housekeeping recorder and command channel remain separate from the AI product queue.',
+ if(id==='comm'){
+  if(s.flightPhase==='integration')return card('Which parts of the link does this setup exercise?',
+   'The command rack, conducted Ka receiver and shrouded optical head reproduce different parts of a ground contact. Select a bench to compare the sent stimulus with what its receiver can recover.',
+   [fact('S-band role','Command and telemetry'),fact('Ka role','Bulk downlink'),fact('Optical role','Fine-pointed transfer')],chapter('Review the pad configuration','pad'));
+  if(ground)return card('What carries checkout data once the fairing is closed?',
+   'Couplers and the optical test head come off before the spacecraft moves. On the pad this study keeps spacecraft transmissions inhibited. Prelaunch status can travel through a launcher umbilical where the interface provides it.',
+   [fact('Ground fixtures','Removed'),fact('Spacecraft flight link','Inhibited'),fact('Customer data sent',0,'bytes')],chapter('Follow liftoff','ascent'));
+  if(s.carrierAttached)return card('Whose telemetry can you hear during ascent?',
+   'The launcher has its own communications system. While it carries the data center, this study keeps the data center’s radios and laser off the air. The vehicle must separate before its first independent contact.',
+   [fact('Spacecraft','Attached to launcher'),fact('Active spacecraft transfers',(s.terminalActivity||[]).length),fact('Payload goodput',s.goodputMbps,'Mbit/s')],chapter('Inspect separation','insertion'));
+  const flows=s.terminalActivity||[],direction=dir=>flows.filter(x=>x.terminal==='S-band'&&x.direction===dir).reduce((sum,x)=>sum+x.mbps*1000,0);
+  return card('Has the spacecraft established its own link?',
+   'Release permits the first independent radio contact. The fixed patches can accept commands and return health samples when a ground station is visible and the receiver acquires. Bulk service comes later in commissioning.',
+   [fact('Visible ground station',s.station||'None'),fact('S-band receive',direction('rx'),'kbit/s'),fact('S-band send',direction('tx'),'kbit/s')],chapter('See communications during deployment','commissioning'));
+ }
+ if(id==='avionics')return card('How does a checkout differ from a customer transfer?','Engineers can command spacecraft electronics and read their health before the customer payload starts. In flight the housekeeping recorder and command channel remain separate from the AI product queue.',
   [fact('Health sample size',h.cdh.packetBytes,'bytes'),fact('Engineering recorder',d.hkRecorderMB,'MB'),fact('Customer output on board',s.aiProductQueueGB,'GB')],link('Inspect the customer recorder','data'));
  return card('What can launch with the data center before it computes anything?','Model weights and staged input can travel in storage. Having the input on board allows the payload to begin work after commissioning even if the next upload must wait for contact.',
   [fact('Resident model weights',h.weightsTB,'TB'),fact('Staged AI input',s.aiInputBufferGB,'GB'),fact('Current work rate',s.aiUnitRate,rate(h))],chapter('Follow commissioning','commissioning'));

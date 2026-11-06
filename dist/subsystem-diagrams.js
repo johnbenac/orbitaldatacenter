@@ -1,4 +1,4 @@
-import {launchClockFor} from './launch-effects-state.js';
+import {payloadFreeMET} from './launch-effects-state.js';
 import {DEPLOY_END_S} from './commissioning-clock.js';
 // Interactive engineering plates. Geometry is schematic except where dimensions are marked.
 import {aiPurposes} from './ai-purpose.js';
@@ -108,17 +108,21 @@ function power({h,d,s},id){
 
 function comm({h,d,s,events},id){
  const active=!!s.station,next=events.find(e=>e.type==='contact'&&e.end>=s.t)||events.find(e=>e.type==='contact');
+ const direct=(s.terminalActivity||[]).filter(f=>f.route==='direct');
+ const byService=key=>direct.reduce((a,f)=>a+(f.services[key]||0)*8000/f.seconds,0);
+ const down=byService('payload'),up=byService('command')+byService('input'),hk=byService('telemetry');
+ const antenna=direct.find(f=>f.services.payload>0)?.terminal||s.groundLink;
  const parts=[
- P('payload','Payload downlink','The queue feeds the selected payload terminal after acquisition. Line rate and application goodput have separate budgets.','link','communications',[row('Terminal',s.groundLink||d.link),row('Line rate',val(s.lineMbps,'Mbit/s')),row('Application goodput',val(s.goodputMbps,'Mbit/s')),row('Queued payload',val(s.queueGB,'GB'))]),
- P('command','Tracking, telemetry and command','Ground commands use the independent S-band uplink. The command channel has its own link budget and queue.','network','communications',[row('Ground command demand',val(s.commandDemandKbps,'kbit/s')),row('Delivered commands',val(s.commandGoodputKbps,'kbit/s')),row('Uplink physical rate',val(s.uplinkMbps,'Mbit/s')),row('Queued commands',val(s.uplinkQueueMB,'MB'))]),
+ P('payload','Payload downlink','The queue feeds the selected payload terminal after acquisition. Line rate and application goodput have separate budgets.','link','communications',[row('Direct terminal',antenna||d.link),row('Line rate',val(s.lineMbps,'Mbit/s')),row('Payload to station',val(down,'Mbit/s')),row('Queued payload',val(s.queueGB,'GB'))]),
+ P('command','Tracking, telemetry and command','Ground commands and customer uploads share the S-band uplink. The same radio returns live housekeeping samples on its downlink while the onboard recorder archives them.','network','communications',[row('Ground command demand',val(s.commandDemandKbps,'kbit/s')),row('Delivered commands',val(s.commandGoodputKbps,'kbit/s')),row('Uplink physical rate',val(s.uplinkMbps,'Mbit/s')),row('Queued commands',val(s.uplinkQueueMB,'MB')),row('Housekeeping to station',val(hk*1000,'kbit/s'))]),
  P('station','Ground endpoint','The beam terminates at the visible station selected by the geometry solver. The elevation mask defines access.','elevationDeg','communications',[row('Network',tech(d,'network')),row('Current endpoint',s.station||'No contact'),row('Slant range',active?val(s.rangeKm,'km'):'—'),row('Elevation',active?val(s.elevationDeg,'°'):'—')],next)];
  const art=path('M40 38H215V212H40Z','sd-boundary')+T(52,58,'SPACE SEGMENT','sd-over','start')+
- pick(parts[0],49,66,157,71,glyph(s.groundLink==='Optical'||(!active&&d.link==='optical')?'optic':'dish',86,94,.68)+T(123,92,'Payload','sd-name','start')+T(123,112,s.groundLink||'Standby','sd-value','start'))+
+ pick(parts[0],49,66,157,71,glyph(antenna==='Optical'||(!active&&d.link==='optical')?'optic':antenna==='S-band'||(!active&&d.link==='s')?'patch':'dish',86,94,.68)+T(123,92,'Payload','sd-name','start')+T(123,112,antenna||'Standby','sd-value','start'))+
  pick(parts[1],49,139,168,68,glyph('patch',86,165,.66)+T(122,163,'S-band','sd-name','start')+T(122,180,'Tracking, telemetry','sd-over','start')+T(122,192,'and command','sd-over','start'))+
- flow(id,'M211 87Q355 52 470 109','cyan',s.goodputMbps>0)+flow(id,'M471 130Q363 188 213 167','violet',s.commandGoodputKbps>0)+T(330,49,val(s.goodputMbps,'Mbit/s'),'sd-value')+T(329,197,val(s.commandGoodputKbps,'kbit/s'),'sd-value')+
+ flow(id,'M211 87Q355 52 470 109','cyan',down>0)+flow(id,'M471 130Q363 188 213 180','violet',up>0)+flow(id,'M213 156Q353 134 470 120','amber',hk>0)+T(330,49,val(down,'Mbit/s'),'sd-value')+T(329,197,val(up*1000,'kbit/s'),'sd-value')+
  path('M400 190Q500 153 571 188','sd-horizon')+
  pick(parts[2],433,83,120,137,glyph('dish',498,125,1.0)+named(498,202,s.station||'Ground network',active?val(s.rangeKm,'km'):groundSites(d.network).length+' sites'));
- return info('Ground link geometry','Separate application downlink and S-band command uplink',parts,art,[legend('cyan','Downlink → ground'),legend('violet','Uplink → vehicle')],active?(s.acquired?'Link acquired':'Acquiring'):'Out of view');
+ return info('Ground link geometry','Direct payload and engineering traffic at the selected ground station',parts,art,[legend('cyan','Payload → station'),legend('amber','Telemetry → station'),legend('violet','Uplink → spacecraft')],active?(s.acquired?'Link acquired':'Acquiring'):'Out of view');
 }
 
 function thermal({h,d,s,qualificationWindow,thermalScale},id){
@@ -173,7 +177,7 @@ function orbit({d,s,day,events},id){
 function attitude({h,d,s},id){
  const parts=[
  P('torque','Disturbance torque','Aerodynamic drag, solar radiation pressure and gravity gradients load the attitude-control cluster.','cpOffsetM','cmg',[row('Ram silhouette',val(s.ramAreaM2,'m²')),row('Aerodynamic',val(s.dragTorqueNm,'N·m',5)),row('Solar / gravity',val(s.solarTorqueNm,'N·m',5)+' / '+val(s.gravityTorqueNm,'N·m',5)),row('CP offset',val(d.cpOffsetM,'m',3))]),
- P('cmg','Four-CMG pyramid','Four spinning rotors exchange angular momentum with the spacecraft during pointing and acquisition. The cluster model tracks a reduced-order momentum envelope.','cmgMomentumNms','cmg',[row('Stored momentum',val(s.momentumNms,'N·m·s')),row('Cluster capacity',val(d.cmgMomentumNms,'N·m·s')),row('Pointing error',val(s.pointingErrorDeg,'°',4)),row('Electrical draw',val(s.cmgKW,'kW',3))]),
+ P('cmg','Four-CMG pyramid','Four spinning rotors exchange angular momentum with the spacecraft during pointing and acquisition. The simulation resolves four gimbal angles, their steering geometry and the vector sum of rotor momentum.','cmgMomentumNms','cmg',[row('Stored momentum',val(s.momentumNms,'N·m·s')),row('Cluster capacity',val(d.cmgMomentumNms,'N·m·s')),row('Pointing error',val(s.pointingErrorDeg,'°',4)),row('Electrical draw',val(s.cmgKW,'kW',3))]),
  P('unload','Magnetic unloading','The torquers apply an external torque perpendicular to the local magnetic field. Available authority changes along the orbit.','dipoleAm2','cmg',[row('Coil state',s.desat?'Unloading':'Standby'),row('Local field',val(s.magFieldUT,'µT')),row('Available torque',val(s.unloadAuthorityNm,'N·m',5)),row('Applied unload',val(s.unloadTorqueNm,'N·m',5))])];
  const art=pick(parts[0],26,43,143,155,path('M82 142V73M82 142L133 151M82 142L46 162','sd-axes')+flow(id,'M89 137L126 103','amber',s.torqueNm>.0001)+T(82,63,'Z','sd-over')+T(142,155,'X','sd-over')+T(39,178,'Y','sd-over')+named(102,201,'Disturbance',val(s.torqueNm,'N·m',4)))+
  flow(id,'M164 119H213','amber',s.torqueNm>0)+
@@ -248,7 +252,7 @@ function launcher({h,d,s}){
  const vehicle=launchFleet[d.launcher],reference=vehicle.referenceKg,stack=h.launchKg,pad=launchSiteFor(d.launcher,d.launchSite);
  const parts=[
   P('carrier','Carrier propulsion',vehicle.architecture,'launcher','launcher',[row('Provider',vehicle.provider),row('Status',vehicle.status),row('Axial stages',String(vehicle.stages)),row('Strap-on boosters',String(vehicle.boosters)),row('Recovery',vehicle.recovery)]),
-  P('delivery','Payload delivery stage',vehicle.stages===1?'The direct-injection core releases its payload.':'The upper stage carries the payload adapter to injection. The modeled payload release occurs at T+'+launchClockFor(h.input.launcher).release+' s.','trimDv','adapter',[row('Service boundary',s.carrierAttached?'Spacecraft attached':'Spacecraft released'),row('Initial spacecraft wet mass',val(h.wetKg,'kg',0)),row('Launch-only adapter',val(d.adapterKg,'kg',0)),row('Target altitude',val(d.altitudeKm,'km'))]),
+  P('delivery','Payload delivery stage',vehicle.stages===1?'The direct-injection core releases its payload.':'The upper stage carries the payload adapter to injection. The modeled payload release occurs at T+'+payloadFreeMET(h.input.launcher)+' s.','trimDv','adapter',[row('Service boundary',s.carrierAttached?'Spacecraft attached':'Spacecraft released'),row('Initial spacecraft wet mass',val(h.wetKg,'kg',0)),row('Launch-only adapter',val(d.adapterKg,'kg',0)),row('Target altitude',val(d.altitudeKm,'km'))]),
   P('benchmark','Provider payload reference',vehicle.description,'launcher','launcher',[row('LEO reference',val(reference,'kg',0)),row('Reference conditions',vehicle.referenceOrbit),row('Reference headroom',val(h.launchReferenceMarginKg,'kg',0))]),
   P('allowance','Mission allowance','The current manifest must meet the entered allowance, the catalogue reference mass screen and the tapered fairing fit.','launchAllowanceKg','payload',[row('Entered allowance',val(d.launchAllowanceKg,'kg',0)),row('Integrated stack',val(stack,'kg',0)),row('Governing mass headroom',val(h.launchScreenMarginKg,'kg',0)),row('Fairing fit',h.fit?'Fits profile':'Exceeds profile')]),
   P('launchpad','Launch complex',pad.siteNote,'launchSite','launcher',[row('Launch complex',pad.name),row('Range',pad.range),row('Location',pad.region+' · '+pad.country),row('Evidence',pad.statusLabel),row('Coordinate basis',pad.pinBasis)])

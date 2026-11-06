@@ -19,6 +19,10 @@ export const G0=9.80665, SIGMA=5.670374419e-8, SOLAR=1361, YEAR=31557600;
 const clamp=(x,lo,hi)=>Math.min(hi,Math.max(lo,x));
 const rad=x=>x*Math.PI/180;
 export const sources=[
+ ['NASA Systems Engineering Handbook · Phase D','https://www.nasa.gov/reference/3-7-project-phase-d-system-assembly-integration-and-test-launch/','Phase D covers assembly, integration, verification, validation and launch. The bench reproduces selected ground procedures using the current design.'],
+ ['NASA · Ground network compatibility tests, §11.7','https://www.nasa.gov/smallsat-institute/sst-soa/ground-data-systems-and-mission-operations/','The ground station and mission operations center take part in an end-to-end command and telemetry exchange. A local ground-system replica and a controlled RF connection are possible test configurations.'],
+ ['NASA Glenn · SCaN Testbed receiver comparison','https://ntrs.nasa.gov/api/citations/20200002144/downloads/20200002144.pdf','A known pseudorandom bit sequence allows comparison of the transmitted and recovered data. The Ka bench uses a project-specific conducted connection.'],
+ ['MIT Lincoln Laboratory · TBIRD preflight pointing and alignment','https://ntrs.nasa.gov/citations/20210026049','The team characterized pointing feedback and transmit/receive alignment through environmental testing. The optical bench uses the installed ODC aperture and its own study limits.'],
  ['NASA Scientific Visualization Studio · Deep Star Maps 2020','https://svs.gsfc.nasa.gov/4851/','The orbital sky uses the celestial-coordinate survey map. Right ascension and declination fix the Milky Way and stars in inertial space. The simulator places the Sun separately from its orbital ephemeris.'],
  ...propulsionSources,
  ['NASA · iROSA deployed in orbit','https://www.nasa.gov/blogs/spacestation/2021/06/20/spacewalkers-successfully-deploy-solar-arrays/','Approximately 18 m of roll-out solar array deployed in six minutes on June 20, 2021. The ODC model uses four smaller/equivalently scaled blanket wings and a selected timeline.'],

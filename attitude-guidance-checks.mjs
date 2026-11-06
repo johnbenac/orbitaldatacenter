@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {defaults,sizeDesign} from './dist/design.js';
 import {geometry,dot,unit,cross,DEG} from './dist/orbit.js';
 import {bankNormal,deploymentLayout,leafPose,leafAxes} from './dist/deployment.js';
-import {attitudeGuidance,attitudeLimits,interpolateAttitudeState} from './dist/attitude-guidance.js';
+import {attitudeGuidance,attitudeLimits} from './dist/attitude-guidance.js';
 const h=sizeDesign(defaults),close=(x,y,tol=1e-8)=>assert.ok(Math.abs(x-y)<tol,`${x} vs ${y}`),length=v=>Math.hypot(...v);
 const angle=(a,b)=>Math.acos(Math.max(-1,Math.min(1,dot(a,b))))/DEG;
 const qAngle=(a,b)=>2*Math.acos(Math.min(1,Math.abs(a.reduce((sum,v,i)=>sum+v*b[i],0))))/DEG;
@@ -67,7 +67,4 @@ for(let k=0;k<=25;k++){
 assert.equal(state.terminalState,'tracking');close(state.terminalErrorDeg,0,1e-5);close(dot(state.terminalBoresightECI,target),1);
 const masked=attitudeGuidance(nadir,site(g.radial),{deployment:1,contactAge:80,terminal:'Optical'});assert.equal(masked.terminalState,'travel limit');assert.equal(masked.terminalReachable,false);assert.ok(masked.terminalErrorDeg>=104);
 const frozen=attitudeGuidance(h,{...geometry(defaults,time+600),flightPhase:'entry'},{previous:state.attitudeState,deployment:1});assert.equal(frozen.attitudeMode,'passive');assert.deepEqual(frozen.attitudeState.q,state.attitudeState.q);close(frozen.wingPitchDeg,state.wingPitchDeg);assert.equal(frozen.terminalErrorDeg,null);
-const a=prev.attitudeState,b={...a,q:a.q.map(v=>-v),wing:a.wing+1,upper:a.upper-.4,dish:[.5,Math.sqrt(.75),0],momentum:a.momentum+5};
-const mid=interpolateAttitudeState(a,b,.5);close(qAngle(mid.q,a.q),0,1e-5);close(mid.wing,a.wing+.5);close(mid.momentum,a.momentum+2.5);close(Math.hypot(...mid.dish),1);
-assert.equal(interpolateAttitudeState(a,b,0),a);assert.equal(interpolateAttitudeState(a,b,1),b);
 console.log('Attitude guidance verified across a sunlit/eclipsed orbit, body policies, bounded CMG slews, both burn directions, aperture acquisition, signed radiator drives and retirement.');

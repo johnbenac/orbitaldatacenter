@@ -18,9 +18,9 @@ export function configureObserver(camera,foreground,frame,s,aspect,launchStack){
  if(camera.aspect!==aspect){camera.aspect=aspect;camera.updateProjectionMatrix();}
  camera.updateMatrixWorld();
 }
-export function createEarthBackdrop(planet,atmosphere,onReady){
+export function createEarthBackdrop(planet,atmosphere,onReady,compactTextures=false){
  const scene=new T.Scene(),globe=planet.clone(),air=atmosphere.clone(),skyCam=new T.PerspectiveCamera(49,1,.0001,30);
- const sky=createCelestialSky(onReady);
+ const sky=createCelestialSky(onReady,compactTextures);
  const sun=new T.DirectionalLight(0xfff3e1,2.65),fill=new T.AmbientLight(0x91adc2,.19);
  scene.add(sky.group,globe,air,sun,fill);
  function updateSky(s,atVehicle){

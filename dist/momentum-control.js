@@ -1,6 +1,6 @@
 // Disturbance momentum is stored in inertial axes. A rotating body frame must
 // not rotate yesterday's impulse with today's spacecraft attitude.
-import {R,cross,dot} from './orbit.js';
+import {R,MU,cross,dot} from './orbit.js';
 
 export function localFieldUT(radial,altitudeKm){
  // The terrestrial magnetic moment points toward geographic south.
@@ -27,4 +27,11 @@ export function availableControl(limits,d,storedMomentum,previousTorque){
   maneuverMomentumNms:Math.min(limits.maneuverMomentumNms,Math.max(0,d.cmgMomentumNms-storedMomentum)),
   maneuverTorqueNm:Math.min(limits.maneuverTorqueNm,Math.max(0,steeringTorque-previousTorque))
  };
+}
+
+// Tensor and radial direction are both expressed in the achieved body frame.
+// MU and orbit radius share kilometre units, giving the required inverse s².
+export function gravityGradientTorque(tensor,radialBody,altitudeKm){
+ const ir=[0,1,2].map(i=>tensor[3*i]*radialBody[0]+tensor[3*i+1]*radialBody[1]+tensor[3*i+2]*radialBody[2]);
+ return cross(radialBody,ir).map(v=>v*3*MU/(R+altitudeKm)**3);
 }

@@ -33,7 +33,7 @@ export function exhaustFactory(){
     out[i+3]=255*s.opacity*(.62+.38*a)*(1-smoothTail(v))*(.78+.22*b);
    });
    const shape=[[.032,-1],[s.wide*.78,-.86],[s.wide,-.70],[s.wide*.79,-.5],[1.17,-.23],[.96,-.08],[.91,0]].map(([x,y])=>new T.Vector2(x,y*s.length));
-   const geom=new T.LatheGeometry(shape,12);const mat=new T.MeshBasicMaterial({map:texture,transparent:true,depthWrite:false,side:T.FrontSide,toneMapped:false});
+   const geom=new T.LatheGeometry(shape,12);geom.normalizeNormals();const mat=new T.MeshBasicMaterial({map:texture,transparent:true,depthWrite:false,side:T.FrontSide,toneMapped:false});
    entry={geom,mat};cache.set(type,entry);
   }
   const m=new T.Mesh(entry.geom,merged?entry.mat.clone():entry.mat);m.scale.setScalar(r);if(merged){m.material.opacity=.51;m.scale.y*=.72;g.name=type+' merged exhaust shear layer';g.userData.mergedJet=true;}m.renderOrder=2;g.add(m);return g;

@@ -74,7 +74,10 @@ export function masterLaunchEvents(h){
  }
  const plan=(day,key,title,owner,description,source,major=false)=>add('ground',key,day*DAY,title,owner,description,{basis:planningBasis,precision:'day',seek:null,source,major});
  plan(-21,'receipt','Receive the spacecraft','Ground processing','Receive the shipped vehicle for processing at '+profile.facility+'. Inspect its shipping record and establish conditioned ground support.',receiving,true);
- plan(-14,'functional','Run end-to-end spacecraft checkout','Spacecraft test','Exercise flight commands and telemetry through the ground checkout equipment. Confirm the spacecraft can report its own state before access becomes restricted.',receiving);
+ add('ground','functional',-14*DAY,'Rehearse the spacecraft communications links','Communications and mission operations','Plan the end-to-end command and telemetry checkout, Ka data comparison and optical alignment check while the flight interfaces are accessible. The bench lets you rehearse these procedures on the selected design.',{
+  basis:planningBasis,precision:'day',seek:null,domain:'comm',major:true,status:'planned',
+  source:{title:'NASA · Ground Data Systems and Mission Operations, §11.7',url:'https://www.nasa.gov/smallsat-institute/sst-soa/ground-data-systems-and-mission-operations/'}
+ });
  plan(-7,'service','Service and verify the propulsion system','Propulsion','Plan the load and leak checks for the spacecraft’s '+number(h.propellantKg)+' kg propellant inventory. The simulation begins with this inventory already aboard.',receiving);
  plan(-2,'payload-review','Review payload readiness for integration','Mission integration','Review mass, mating interfaces and the stowed envelope for '+fleet.family+' at '+site.name+'. Record any open items before releasing the payload to the integration team.',campaign,true);
 
@@ -113,20 +116,36 @@ export function masterLaunchEvents(h){
   add('ascent','strap-separate',clock.boosterSeparation,'Separate '+fleet.boosters+' side boosters','Launch vehicle','The side boosters move away from the central core. Their shared separation time is the workbench staging cue.',{major:true});
  }
  if(star){
-  add('ascent','hot-stage',clock.hotStage,'Starship hot staging begins','Launch propulsion','Super Heavy reduces to three center engines. The ship engines ignite while the ship and booster are still connected.',{major:true});
+  add('ascent','hot-stage',clock.hotStage,'Starship hot staging begins','Launch propulsion','Most booster engines shut down. The retained pilot engines keep firing as the six ship engines start.',{major:true});
  }else{
   add(single?'insertion':'ascent','core-cutoff',clock.coreCutoff,single?'Core engine cutoff at insertion':'Main engine cutoff','Launch propulsion','Main-stage thrust ends.'+(single?' The Long March 5B core delivers the payload directly to the insertion state.':' The launch vehicle prepares to pass flight to its upper stage.'),{major:true});
  }
  if(!single){
-  add('ascent','stage-separate',clock.stageSeparation,star?'Starship separates from Super Heavy':'Separate the core stage','Launch vehicle',star?'The booster engines shut down and the ship clears Super Heavy under its own thrust.':'The spent first stage falls away and the payload remains attached to the upper stage.',{major:true});
+  add('ascent','stage-separate',clock.stageSeparation,star?'Starship separates from Super Heavy':'Separate the core stage','Launch vehicle',star?'Starship accelerates clear on six engines while Super Heavy starts its directional flip toward the return path.':'The spent first stage falls away and the payload remains attached to the upper stage.',{major:true});
+  if(star)add('ascent','boostback',clock.boostbackStart,'Super Heavy boostback ignition','Launch propulsion','The booster is already turning as its return burn builds. The camera continues with Starship. Relative distances and the turn profile are illustrative.',{end:clock.boostbackCutoff,major:true,basis:'SpaceX Flight 14 event clock · nominal V3 animation',source:{title:'SpaceX · Flight 14 mission and timeline',url:'https://www.spacex.com/launches/starship-flight-14'}});
   if(!star)add('ascent','upper-start',clock.upperIgnition,'Upper-stage ignition','Launch propulsion','The upper-stage engine sequence begins. The upper stage carries the spacecraft toward its insertion conditions.');
   add(clock.upperCutoff===INSERTION_MET?'insertion':'ascent','upper-cutoff',clock.upperCutoff,star?'Starship engine cutoff':'Upper-stage engine cutoff','Launch propulsion',star?'The ship coasts with its cargo enclosed until the insertion handoff.':'Upper-stage thrust ends as the reference ascent reaches the insertion boundary.');
  }
  if(!star)add('ascent','jettison',clock.fairingJettison,'Begin fairing separation','Launch vehicle','The two fairing halves move apart. The payload remains on the carrier until commanded release.',{major:true});
  const altitudeKm=Math.hypot(...path.achieved.positionECI)-R;
  add('insertion','orbit',INSERTION_MET,'Reach the insertion handoff','Flight dynamics','The nine-minute site-derived trajectory reaches '+number(altitudeKm,1)+' km. '+(path.gapKm>.02?'The requested orbit begins '+number(path.gapKm)+' km from the site-derived endpoint. The workbench permits this independent orbit study.':'The site-derived endpoint joins the requested insertion state.'),{basis:'Calculated ascent endpoint',major:true,domain:'launch',measurements:{altitude_km:altitudeKm,endpoint_gap_km:path.gapKm,plane_error_deg:path.planeErrorDeg}});
- if(star)add('insertion','door',clock.doorOpen,'Open the retained cargo door','Payload deployment','The hinged nose door opens while the payload remains on its fitting. This is the workbench large-cargo configuration.',{basis:'Large-cargo concept animation',source:profile.interface.source});
- add('insertion','release',clock.release,'Release the spacecraft','Payload deployment',star?'With the cargo door open, the spacecraft moves clear of the ship and its retained door.':'The spacecraft begins separating from its launch fitting. The adapter remains with the carrier.',{end:clock.releaseClear,basis:'Separation animation',major:true});
- add('insertion','clear',clock.releaseClear,'Complete initial separation','Spacecraft operations','The spacecraft and carrier have reached the end of the modeled clearance maneuver. Solar wings and radiator packs remain stowed until commissioning.',{basis:'Separation animation'});
+ if(star){
+  const a=h.fairing.cargoAccess,allowed=h.fairing.fit&&h.payloadInterface?.passes!==false;
+  const basis='ODC reusable side-loading concept · illustrative clock';
+  if(!allowed)add('insertion','cargo-hold',clock.doorOpen,'Hold the cargo mechanism','Payload deployment',loadingHoldText(h),{basis,major:true,status:'held',domain:'launch'});
+  else{
+   const step=(key,met,title,description,measurements,end)=>add('insertion',key,met,title,'Payload deployment',description,{basis,major:true,measurements,end});
+   step('door',clock.doorOpen,'Open the retained side hatch','The hinge opens the leeward aperture below the fixed forward flaps. The windward thermal shield stays attached.',{width_m:a.widthM,height_m:a.heightM},clock.hatchClear);
+   step('carriage-out',clock.hatchClear,'Extend the loaded carriage','The fully open hatch clears the path. Rails carry the upright spacecraft outward to its release station.',{stroke_m:a.strokeM},clock.release);
+   step('fitting-release',clock.release,'Release clamps and clear the fitting','At full extension the guides separate the spacecraft from the adapter before it begins lateral free drift.',{stroke_m:a.strokeM},clock.eject);
+   step('release',clock.eject,'Release spacecraft sideways','The stowed vehicle leaves the guided fitting outside the hull and drifts away from the ship.',{release_margin_m:a.depthMarginM},clock.releaseClear);
+   step('clear',clock.releaseClear,'Spacecraft clears the carrier','The free spacecraft has moved clear of the retained mechanism. The empty carriage now retracts.');
+   step('carriage-home',clock.carriageHome,'Carriage home · close the hatch','The empty carriage is inboard. The side hatch closes against its frame.',null,clock.hatchLatched);
+   step('hatch-latched',clock.hatchLatched,'Hatch latched','The cargo opening is closed with the carriage and adapter retained. Both forward flaps stay on the fixed hull.');
+  }
+ }else{
+  add('insertion','release',clock.release,'Release the spacecraft','Payload deployment','The spacecraft begins separating from its launch fitting. The adapter remains with the carrier.',{end:clock.releaseClear,basis:'Separation animation',major:true});
+  add('insertion','clear',clock.releaseClear,'Complete initial separation','Spacecraft operations','The spacecraft and carrier have reached the end of the modeled clearance maneuver. Solar wings and radiator packs remain stowed until commissioning.',{basis:'Separation animation'});
+ }
  return rows.sort((a,b)=>a.start-b.start);
 }

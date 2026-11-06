@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
+import {nominalCheckoutDesign} from './verification-fixtures.mjs';
 import {sizeDesign} from './dist/design.js';
 import {createSimulation} from './dist/model.js';
 import {groundOffset,renderDisposalView} from './dist/disposal-views.js';
-const h=sizeDesign({disposalMethod:'reentry'}),sim=createSimulation(h),p=sim.disposal();
+const h=sizeDesign(nominalCheckoutDesign()),sim=createSimulation(h),p=sim.disposal();
 assert(p.feasible&&p.impact&&p.footprint?.points.length>4);
 const [e,n]=groundOffset(p.target,p.impact);assert(Math.abs(Math.hypot(e,n)-p.targetErrorKm)<1e-5);
 const a=p.footprint.bearingDeg*Math.PI/180;

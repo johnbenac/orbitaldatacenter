@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import {writeFileSync} from 'node:fs';
 import * as T from './dist/vendor/three.module.js';
-import {sizeDesign,missionStarter} from './dist/design.js';
+import {sizeDesign,missionStarter,applyPreset,defaults} from './dist/design.js';
+import {launchClockFor} from './dist/launch-effects-state.js';
+import {launchFleet} from './dist/launch-fleet.js';
 import {propulsionSectionDrawing} from './dist/propulsion-drawing.js';
 import {makeCraft} from './dist/craft.js';
 import {makeLaunch} from './dist/launch-scene.js';
@@ -10,9 +12,79 @@ const g=new Proxy({},{get:(_,key)=>['createLinearGradient','createRadialGradient
 globalThis.document={createElement:()=>({width:512,height:256,getContext:()=>g})};
 const V=()=>new T.Vector3(), h=sizeDesign({}),craft=makeCraft(h),launch=makeLaunch(h), closed=new Set(craft.walls.map(m=>m.geometry));
 const geoms=new Map(),a=V(),b=V(),c=V(),m=V(),n=V(),normal=V();let checked=0,poles=0,meshes=0;
-for(const root of [craft.root,launch.root]){root.updateMatrixWorld(true);root.traverse(o=>{if(!o.isMesh)return;meshes++;assert(o.matrixWorld.determinant()>0);geoms.set(o.geometry,o.name||o.userData.part||o.parent.userData.part);if(o.name==='Closed reflector shell')closed.add(o.geometry);});}
+function addMeshes(root,description){
+ root.updateMatrixWorld(true);root.traverse(o=>{
+  if(!o.isMesh)return;
+  meshes++;const name=description+' · '+(o.name||o.userData.part||o.parent.userData.part||o.geometry.type);
+  assert(o.matrixWorld.determinant()>0,'Reflected or singular mesh '+name);
+  geoms.set(o.geometry,name);
+  if(o.name==='Closed reflector shell')closed.add(o.geometry);
+ });
+}
+// Cast against the actual front-side flight meshes. Winding and a normal can
+// agree on every triangle of a one-sided shell yet its inside is invisible.
+function auditStarshipHull(model){
+ const {shell}=model.parts,door=shell.getObjectByName('Retained cargo door'),clock=launchClockFor('starship');
+ const hull=[],leaf=[];shell.traverse(o=>{
+  if(o.isMesh&&/^(Fixed cargo shell|Fixed nose crown|Leeward plug door)( liner)?$/.test(o.name)){
+   assert.equal(o.material.side,T.FrontSide,o.name);assert(!o.material.transparent&&o.material.depthWrite,o.name);
+   hull.push(o);if(o.name.startsWith('Leeward plug door'))leaf.push(o);
+  }
+ });
+ assert(hull.length>leaf.length&&leaf.length===2);
+ const pose=(t,phase)=>{model.update({t,flightPhase:phase,altitudeKm:phase==='ascent'?80:550},phase,{phase:'D',domain:'launcher'});model.root.updateMatrixWorld(true)};
+ const hits=(origin,direction,target)=>new T.Raycaster(origin,direction,0,15).intersectObjects(target,false);
+ function probe(frame,y,theta,target,closed=true){
+  const center=frame.localToWorld(new T.Vector3(0,y,0)),normal=new T.Vector3(Math.sin(theta),0,Math.cos(theta)).transformDirection(frame.matrixWorld);
+  const far=center.clone().addScaledVector(normal,9);
+  const inside=hits(center,normal,target),outside=hits(far,normal.clone().negate(),target);
+  if(!closed){assert(!inside.some(h=>h.distance<5)&&!outside.some(h=>h.distance>4&&h.distance<6),'An open hatch obstructs its own aperture');return;}
+  assert(inside.length&&outside.length,'Missing inner or outer surface at y='+y+' theta='+theta);
+  const thick=9-outside[0].distance-inside[0].distance;
+  assert(thick>.040&&thick<.085,'Finite opaque wall thickness at y='+y+' theta='+theta+': '+thick);
+ }
+ for(const [t,state] of [[clock.doorOpen,'closed'],[clock.hatchClear+.1,'open'],[clock.hatchLatched+.1,'closed'],[clock.hatchClear+.1,'open']]){
+  pose(t,'insertion');
+  for(const y of [3.25,8.25,12.65]){
+   for(const angle of [.21,1.48,2.97])probe(shell,y,angle,hull);
+   probe(shell,y,Math.PI*1.5+.013,hull,state==='closed');
+   // Moving door faces use its own local coordinate frame at every position.
+   probe(door.getObjectByName('Cargo door skin'),y,Math.PI*1.5+.013,leaf);
+  }
+  for(const angle of [.21,1.48,2.97,4.63])probe(shell,17.15,angle,hull);
+  const cap=shell.getObjectByName('Fixed nose tip cap'),axis=new T.Vector3(0,1,0).transformDirection(shell.matrixWorld);
+  assert(cap,'Solid nose cap');
+  assert(hits(shell.localToWorld(new T.Vector3(.004,22,.003)),axis,[cap]).length,'Open axial sightline through nose');
+  assert(hits(shell.localToWorld(new T.Vector3(.004,31,.003)),axis.negate(),[cap]).length,'Nose cap exterior');
+ }
+}
+function auditHalfShells(model,id){
+ const split=launchClockFor(id).fairingJettison,halves=model.parts.shell.children.filter(o=>o.userData.halfSide);
+ assert.equal(halves.length,2,id);
+ for(const t of [split-1,split+13]){
+  model.update({t,flightPhase:'ascent',altitudeKm:70},'ascent',{phase:'D',domain:'launcher'});model.root.updateMatrixWorld(true);
+  for(const half of halves){
+   const outer=half.getObjectByName('Fairing half shell'),liner=half.getObjectByName('Fairing interior liner');
+   const a=new T.Vector3(.98*half.userData.halfSide,0,.15).normalize().transformDirection(half.matrixWorld);
+   const eye=half.localToWorld(new T.Vector3(0,1.1,0));
+   const near=new T.Raycaster(eye,a).intersectObject(liner,false)[0];
+   const far=new T.Raycaster(eye.clone().addScaledVector(a,20),a.negate()).intersectObject(outer,false)[0];
+   assert(near&&far,id+' missing inner or outer fairing face at '+t);
+   assert(20-far.distance-near.distance>.01,id+' split fairing should have material thickness');
+  }
+ }
+}
+addMeshes(craft.root,'Reference spacecraft');
+for(const id of Object.keys(launchFleet)){
+ const model=id===h.input.launcher?launch:makeLaunch(sizeDesign(applyPreset(defaults,'launcher',id)));
+ addMeshes(model.root,id);if(id==='starship')auditStarshipHull(model);else auditHalfShells(model,id);
+}
 for(const [geo,name] of geoms){
  const p=geo.attributes.position,no=geo.attributes.normal,idx=geo.index,edges=new Map();let volume=0;
+ assert(no&&no.count===p.count,'Missing vertex normals '+name);
+ for(let i=0;i<no.count;i++){
+  const len=n.fromBufferAttribute(no,i).length();assert(Math.abs(1-len)<1e-4,'Non-unit vertex normal '+name+' '+i+' length '+len);
+ }
  for(let i=0;i<(idx?.count??p.count);i+=3){
   const ids=[0,1,2].map(k=>idx?idx.getX(i+k):i+k);[a,b,c].forEach((v,k)=>v.fromBufferAttribute(p,ids[k]));assert([a,b,c].every(v=>Number.isFinite(v.x+v.y+v.z)));
   normal.subVectors(b,a).cross(m.subVectors(c,a));if(normal.lengthSq()<1e-21){poles++;continue;}
@@ -50,6 +122,6 @@ for(const purpose of ['text','voice','batch','agents','finetune','pretrain']){
  }
  const drawing=propulsionSectionDrawing(hw);assert(!/NaN|undefined|Infinity/.test(drawing));assert(drawing.includes('Launch-axis section'));
 }
-const audit={meshes,geometries:geoms.size,checkedTriangles:checked,zeroAreaPoleTriangles:poles,closedSolids:closed.size,shellSides:craft.walls.length,occupiedPorts:craft.walls.reduce((n,w)=>n+w.userData.wall.holes.length,0)};
+const audit={launcherVariants:Object.keys(launchFleet).length,meshes,geometries:geoms.size,checkedTriangles:checked,zeroAreaPoleTriangles:poles,closedSolids:closed.size,shellSides:craft.walls.length,occupiedPorts:craft.walls.reduce((n,w)=>n+w.userData.wall.holes.length,0)};
 if(process.argv.includes('--write'))writeFileSync(new URL('./dist/surface-audit.js',import.meta.url),'// Reproduce using node mesh-checks.mjs --write.\nexport const surfaceAudit='+JSON.stringify(audit,null,2)+';\n');
 console.log(JSON.stringify(audit));

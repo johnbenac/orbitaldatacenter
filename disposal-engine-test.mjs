@@ -1,5 +1,6 @@
 import {DEPLOY_END_S} from './dist/commissioning-clock.js';
 import assert from 'node:assert/strict';
+import {nominalCheckoutDesign} from './verification-fixtures.mjs';
 import {defaults,applyPreset,normalizeDesign,sizeDesign} from './dist/design.js';
 import {createSimulation} from './dist/model.js';
 import {chronologicalAudit} from './dist/mission-worker.js';
@@ -7,10 +8,10 @@ import {R,MU,YEAR,DAY} from './dist/orbit.js';
 import {entryDensity,distanceKm,surfacePoint} from './dist/entry.js';
 const near=(a,b,t=1e-5)=>assert.ok(Math.abs(a-b)<=t,`${a} vs ${b} ± ${t}`);
 near(entryDensity(0),1.225);near(entryDensity(80),1.846e-5,1e-10);near(distanceKm({latDeg:0,lonDeg:179.9},{latDeg:0,lonDeg:-179.9}),R*Math.PI*.2/180);
-const base=createSimulation(defaults),p=base.disposal();assert.equal(p.outcome,'impact');assert.equal(p.method,'reentry');assert.equal(p.target.latDeg,-48.9);assert.equal(p.target.lonDeg,-123.4);assert.ok(p.targetErrorKm<p.target.toleranceKm);assert.ok(p.start<p.cutoff&&p.cutoff<p.entry&&p.entry<p.end);
+const base=createSimulation(nominalCheckoutDesign()),p=base.disposal();assert.equal(p.outcome,'impact');assert.equal(p.method,'reentry');assert.equal(p.target.latDeg,-48.9);assert.equal(p.target.lonDeg,-123.4);assert.ok(p.targetErrorKm<p.target.toleranceKm);assert.ok(p.start<p.cutoff&&p.cutoff<p.entry&&p.entry<p.end);
 near(base.at(p.entry).altitudeKm,120,.0001);near(base.at(p.end).altitudeKm,0,.0001);assert.ok(p.impact.speedMs>0&&p.impact.speedMs<100);assert.equal(base.at(p.end).disposalStatus,'impact');near(base.at(p.entry).propellantKg,base.at(p.end).propellantKg);near(base.at(p.entry).disposalUsedKg,p.usedKg);
 const middle=base.at((p.entry+p.end)/2);assert.ok(middle.altitudeKm<120&&middle.altitudeKm>0);assert.ok(middle.referenceBody&&middle.entryReferenceDragMS2>0&&middle.entryDynamicPressurePa>0);assert.ok(middle.thermalQualification.every(r=>r.status==='unassessed'));near(middle.tokensGenerated,base.at(p.end).tokensGenerated);
-const final=base.at(p.end);near(distanceKm(surfacePoint(defaults,p.end,final.positionECI),p.impact),0,.001);near(distanceKm(p.target,p.impact),p.targetErrorKm);assert.ok(p.footprint.points.length>=73);assert.ok(p.footprint.semiMajorKm>=p.footprint.semiMinorKm&&p.footprint.semiMinorKm>0);near(distanceKm(p.impact,p.footprint.points[0]),p.footprint.semiMajorKm);near(distanceKm(p.impact,p.footprint.points[24]),p.footprint.semiMinorKm);near(p.footprint.confidence,.95);assert.equal(base.story('deorbit').end,p.end);
+const final=base.at(p.end);near(distanceKm(surfacePoint(base.hardware.input,p.end,final.positionECI),p.impact),0,.001);near(distanceKm(p.target,p.impact),p.targetErrorKm);assert.ok(p.footprint.points.length>=73);assert.ok(p.footprint.semiMajorKm>=p.footprint.semiMinorKm&&p.footprint.semiMinorKm>0);near(distanceKm(p.impact,p.footprint.points[0]),p.footprint.semiMajorKm);near(distanceKm(p.impact,p.footprint.points[24]),p.footprint.semiMinorKm);near(p.footprint.confidence,.95);assert.equal(base.story('deorbit').end,p.end);
 const d={...defaults,missionYears:3.25*DAY/YEAR},g=createSimulation({...d,disposalMethod:'graveyard'}),q=g.disposal();assert.ok(q.feasible&&q.targetMet);assert.equal(q.burns.length,2);assert.equal(q.entry,null);assert.ok(!q.impact&&!q.footprint);near(q.finalPerigeeKm,d.graveyardAltitudeKm,5);near(q.finalApogeeKm,d.graveyardAltitudeKm,5);
 let mass=0;for(const burn of q.burns){const a=g.at(burn.start),b=g.at(burn.end);assert.ok(g.at((burn.start+burn.end)/2).burn);near(a.propellantKg-b.propellantKg,burn.usedKg,.0001);near(burn.dvMs,9.80665*d.isp*Math.log(a.wetKg/b.wetKg),.0001);near(burn.usedKg*9.80665*d.isp,(burn.end-burn.start)*d.thrustN,.001);mass+=burn.usedKg;}
 near(q.usedKg,mass,.0001);near(g.at(q.burns[0].end).propellantKg,g.at(q.burns[1].start).propellantKg);assert.equal(g.at(q.end).disposalStatus,'graveyard');assert.equal(g.events(q.start-.1,q.end-q.start+1).filter(e=>e.type==='disposal').length,2);

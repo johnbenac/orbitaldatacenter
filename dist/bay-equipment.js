@@ -1,11 +1,12 @@
 // Representative integration tools in metres. Ground articles stay outside the flight mass ledger.
 import * as T from './vendor/three.module.js';
-import {bayStationFor} from './bay-lessons.js';
+import {bayStationFor,commFixtures} from './bay-lessons.js';
+import {terminalStations,terminalLayout} from './deployment.js';
 const V=(...n)=>new T.Vector3(...n);
 const metallic=(c,m=.22,r=.5)=>new T.MeshStandardMaterial({color:c,metalness:m,roughness:r});
 const tools={
  checkout:['Checkout console','#568f92','CHECKOUT'], compute:['Payload test rack','#688aab','PAYLOAD TEST'],
- data:['File-transfer test set','#719883','DATA TEST'], rf:['Radio test set','#a28b54','RF CHECKOUT'],
+ data:['File-transfer test set','#719883','DATA TEST'],
  power:['Ground power cart','#bd814c','GROUND POWER'], thermal:['Coolant service cart','#528f94','COOLANT SERVICE'],
  attitude:['Attitude test bench','#77799d','ATTITUDE TEST'], propulsion:['Propulsion service cart','#a4865c','INERT GAS'],
  mass:['Weighing equipment','#778f65','WEIGH STATION'], alignment:['Alignment telescope','#a1885e','ALIGNMENT'],
@@ -25,13 +26,12 @@ export function buildBayEquipment(ctx){
  const {h,facility,R,floor,platformFront,box,cylinder,tube}=ctx;
  const steel=metallic('#aab8b7',.58),charcoal=metallic('#34434b'),rubber=metallic('#273037',.05,.86),cream=metallic('#dbded1'),amber=metallic('#c79353'),cyan=metallic('#639d9e'),blue=metallic('#557c9b');
  const white=new T.MeshBasicMaterial({color:'#bfd6ce'}),green=new T.MeshBasicMaterial({color:'#82bc9f'});
- const labels={thermal:'Spacecraft coolant supply and return',propulsion:'Spacecraft inert-gas test port',power:'Spacecraft ground-power receptacle',rf:'Starboard S-band patch',fit:'Payload survey target',alignment:'Vehicle alignment target',mass:'Load-cell junction box',environment:'Particle sampling inlet',adapter:'Adapter mounting plane'};
+ const labels={thermal:'Spacecraft coolant supply and return',propulsion:'Spacecraft inert-gas test port',power:'Spacecraft ground-power receptacle',fit:'Payload survey target',alignment:'Vehicle alignment target',mass:'Load-cell junction box',environment:'Particle sampling inlet',adapter:'Adapter mounting plane'};
  const cache=new Map(),station=new T.Group(),vehicleAnchor=new T.Object3D(),portAnchor=new T.Object3D(),equipmentAnchor=new T.Object3D();
  station.name='Active ground support station';station.userData.bayRole='equipment';facility.add(station,vehicleAnchor,portAnchor,equipmentAnchor);
  const platformZ=platformFront,serviceY=floor*.45,bus=h.fairing.stack.find(a=>a.part==='Insulated bus');
  // In launch coordinates the front (+Z) service wall is spacecraft −Y.
  const busFace=V(0,bus.z0M+h.bodyLengthM*.58,h.bodyHeightM*.5);
- const patch=V(h.bodyWidthM*.49,bus.z0M+h.bodyLengthM*.80,-h.bodyHeightM*.26);
  vehicleAnchor.position.copy(busFace);
  const anchor=(p,x,y,z)=>{const g=new T.Group();g.position.set(x,y,z);p.add(g);return g;};
  const cyl=(p,x,y,z,rt,rb,len,m,n=20)=>cylinder(p,x,y,z,rt,rb,len,m,undefined,n);
@@ -103,11 +103,6 @@ export function buildBayEquipment(ctx){
    display(p,-.21,.92,.384,.48,.21);frontDisc(p,.32,.91,.39,.064,.040,rubber);frontDisc(p,.32,.92,.423,.037,.03,amber);
    for(const x of [-.30,.00,.30])frontDisc(p,x,.63,.389,.059,.065,charcoal);
    for(let i=0;i<5;i++)box(p,.595,.46+i*.069,0,.010,.027,.42,charcoal);
-  }else if(id==='rf'){
-   box(p,0,.38,-.06,.72,.24,.46,charcoal);cyl(p,0,.94,-.06,.064,.077,.9,steel);
-   const horn=anchor(p,0,1.54,-.05);horn.name='Radio horn pointing axis';horn.userData.measurementAxis=true;
-   cyl(horn,0,0,0,.185,.047,.40,amber,4);cyl(horn,0,.208,0,.154,.154,.01,charcoal,4);
-   box(p,.36,.82,.18,.28,1.10,.28,accent);display(p,.36,1.18,.342,.24,.18);
   }else if(id==='alignment'||id==='fit'){
    const y=id==='alignment'?1.28:1.48;
    for(let j=0;j<3;j++){const a=2*Math.PI*j/3;const foot=V(.43*Math.cos(a),.29,.32*Math.sin(a));
@@ -176,29 +171,106 @@ export function buildBayEquipment(ctx){
   const latch=frontDisc(item,x,portY,portZ+.077,.056,.075,color);
   latch.name='Spacecraft umbilical coupling';latch.userData.bayRole='interface';
  }
+ // Each fixture stays in the bay. The optical head and RF hat are removable
+ // ground equipment. Once pickup begins the free spacecraft carries neither.
+ function commStation(key){
+  const {name,point,label,color}=commFixtures[key],optical=key==='optical',sband=key==='sband';
+  const w=h.bodyWidthM,b=h.bodyHeightM,l=h.bodyLengthM,d=h.input;
+  const beam=Math.min(.17,Math.min(w,b)*.052),ap=d.opticalApertureM;
+  const opt=terminalStations(w,l,d).optical,fixture=terminalLayout(w,b,d.kaDishM,ap);
+  // Live mount maps body (x,y,z) to launch (x,z,-y). These two faces match
+  // the parked flight geometry. The Ka checkout connector uses the service panel.
+  const target=sband?V(w*.5+beam*.595,bus.z0M+l*.80,-b*.26):optical?
+   V(opt[0],bus.z0M+l*.5+opt[1],-(b*.5+fixture.opticalHeight-fixture.opticalPin+ap*1.035)):
+   V(portX,portY,portZ+.115);
+  const pos=V(sband?Math.max(w/2+1.5,R*.84):optical?opt[0]-.75:Math.min(1.8,R*.56),
+   floor,optical?Math.min(target.z-1.85,-R-1.40):Math.max(R+1.48,platformZ+2.13));
+  const same=cache.get(chosen);
+  if(!same){
+   const item=new T.Group(),accent=metallic(color);
+   item.name=name;item.userData.stationId=chosen;
+   const p=anchor(item,pos.x,pos.y,pos.z);
+   p.rotation.y=optical?Math.PI-.25:sband?.54:-.16;
+   trolley(p,1.36,.88);rack(p,'data',accent);
+   box(p,0,1.39,.28,1.18,.24,.12,charcoal);namePlate(p,0,1.39,.342,1.10,label,color);
+   const hookup=new T.Group();hookup.name='Removable checkout hookup';hookup.userData.bayRole='interface';item.add(hookup);
+   const port=V(.37,.65,.432);frontDisc(p,port.x,port.y,port.z-.015,.045,.044,amber);
+   let socket;
+   if(optical){
+    const rad=Math.max(.105,ap*.75),arm=.42;
+    const head=anchor(hookup,target.x,target.y,target.z);head.name='Enclosed optical test head';
+    frontDisc(head,0,0,-.036,rad,.075,rubber).name='Light-tight optical boot';
+    frontDisc(head,0,0,-arm/2-.07,rad*.94,arm,cream);
+    for(const z of [-.13,-.33])frontDisc(head,0,0,z,rad*1.09,.035,accent);
+    box(head,0,0,-arm-.12,.23,.21,.19,accent).name='Collimator beacon and focal-plane sensor';
+    const mastZ=target.z-.30;
+    box(hookup,target.x,floor+.028,mastZ,.46,.056,.40,charcoal);
+    const span=target.y-rad-floor-.08;
+    cyl(hookup,target.x,floor+.07+span*.5,mastZ,.026,.044,span,steel);
+    socket=V(target.x,target.y,target.z-arm-.22);
+    // Reticle on the rack identifies the collimated-beacon alignment bench.
+    frontDisc(p,.24,1.03,.386,.10,.018,charcoal);
+    frontDisc(p,.24,1.03,.397,.082,.006,blue);
+    box(p,.24,1.03,.403,.134,.006,.003,white);box(p,.24,1.03,.403,.006,.134,.003,white);
+   }else if(sband){
+    const cap=anchor(hookup,target.x,target.y,target.z);cap.name='Shielded S-band test hat';
+    const height=w*.21+.06,depth=b*.14+.05;
+    box(cap,.012,0,0,.024,height,depth,rubber);box(cap,.083,0,0,.125,height,depth,accent);
+    socket=V(target.x+.183,target.y,target.z);
+    const jack=cyl(cap,.16,0,0,.025,.025,.046,steel);jack.rotation.z=Math.PI/2;
+   }else{
+    // A terminated coupler taps the transmitter at a test port before the reflector.
+    const fitting=anchor(hookup,target.x,target.y,target.z-.072);
+    fitting.name='Ka conducted RF test port';
+    box(fitting,0,0,-.02,.19,.15,.04,steel);
+    frontDisc(fitting,0,0,.013,.037,.03,amber);
+    socket=target.clone();frontDisc(fitting,0,0,.048,.023,.044,charcoal);
+    for(let j=0;j<6;j++)box(p,-.20+j*.061,.69,.407,.018,.16,.075,charcoal);
+    namePlate(p,-.05,.80,.401,.77,'ATTENUATOR',color);
+   }
+   // All bend control points stay above the floor. Route the patch coax
+   // outside the lateral hardware before it rises up the spacecraft side.
+   const start=p.localToWorld(port),rad=optical?.014:.021;
+   const clear=sband?V(Math.max(target.x+.40,h.stowedDiameterM*.5+.14),floor+rad,target.z):
+    optical?V(socket.x,floor+rad,socket.z-.22):V(socket.x,floor+rad,Math.max(portZ+.6,platformZ+.35));
+   const flat=V(start.x,floor+rad,start.z+(optical?-.25:.25));
+   const route=new T.CurvePath();
+   route.add(new T.CubicBezierCurve3(start,start.clone().add(V(0,0,optical?-.2:.2)),flat.clone().add(V(0,.12,0)),flat));
+   route.add(new T.LineCurve3(flat,clear));
+   route.add(new T.CubicBezierCurve3(clear,clear.clone().add(V(0,.24,0)),V(clear.x,socket.y,clear.z),socket));
+   const lead=new T.Mesh(new T.TubeGeometry(route,54,rad,8,false),optical?cyan:rubber);
+   lead.name=optical?'Optical bench tether':'Shielded RF test coax';hookup.add(lead);
+   cache.set(chosen,item);station.add(item);
+  }
+  const item=cache.get(chosen);
+  item.visible=true;station.name=name;station.userData.stationId=chosen;
+  equipmentAnchor.position.copy(pos).y+=1.02;
+  vehicleAnchor.position.copy(target);portAnchor.position.copy(target);portAnchor.name=point;
+ }
  let chosen,portAtRest,vehicleAtRest;
- function select(domain,on=true){
-  const key=bayStationFor(domain);
+ function select(domain,on=true,bench='sband'){
+  const isComm=domain==='comm',id=Object.hasOwn(commFixtures,bench)?bench:'sband',key=isComm?(id==='sband'?'rf':'rf-'+id):bayStationFor(domain);
   station.visible=on;
-  fittings.visible=on&&!['alignment','rf','fit','environment','adapter'].includes(key);
+  fittings.visible=on&&!isComm&&!['alignment','fit','environment','adapter'].includes(key);
   if(!on||chosen===key)return;chosen=key;
   for(const object of cache.values())object.visible=false;
+  if(isComm){
+   commStation(id);portAtRest=portAnchor.position.clone();vehicleAtRest=vehicleAnchor.position.clone();return;
+  }
   let item=cache.get(key);
-  const optics=['alignment','fit','rf'].includes(key),room=key==='environment';
-  const pos=V(key==='rf'?Math.max(h.bodyWidthM/2+.95,R*.60):Math.min(1.8,R*.56),floor,Math.max(R+1.48,platformZ+2.13));
-  vehicleAnchor.position.copy(key==='rf'?patch:busFace);
+  const optics=['alignment','fit'].includes(key),room=key==='environment';
+  const pos=V(Math.min(1.8,R*.56),floor,Math.max(R+1.48,platformZ+2.13));
+  vehicleAnchor.position.copy(busFace);
   const aim=optics?vehicleAnchor.position:groundPort;
   if(!item){
    const [title,color,label]=tools[key],accent=metallic(color,.27),w=['attitude','thermal','adapter'].includes(key)?1.55:1.26;
    item=new T.Group();item.name=key==='fit'&&h.input.launcher==='starship'?'Cargo-envelope clearance gauge':title;item.userData.stationId=key;const p=anchor(item,pos.x,pos.y,pos.z);p.rotation.y=-.16;
    trolley(p,w,.86);instrument(p,key,accent);namePlate(p,0,.315,.445,w*.76,label,color);
    if(optics){
-    const port=vehicleAnchor.position,axis=p.getObjectByProperty('name',key==='rf'?'Radio horn pointing axis':key==='fit'?'Survey head pointing axis':'Telescope pointing axis');
+    const port=vehicleAnchor.position,axis=p.getObjectByProperty('name',key==='fit'?'Survey head pointing axis':'Telescope pointing axis');
     axis.quaternion.setFromUnitVectors(V(0,1,0),p.worldToLocal(port.clone()).sub(axis.position).normalize());
-    if(key!=='rf'){
-     const target=anchor(item,port.x,port.y,port.z+.024);target.name='Optical survey target';target.userData.bayRole='interface';
-     box(target,0,0,0,.16,.16,.040,charcoal);box(target,0,0,.022,.10,.013,.005,cream);box(target,0,0,.023,.012,.10,.006,cream);
-    }
+    const target=anchor(item,port.x,port.y,port.z+.024);target.name='Optical survey target';target.userData.bayRole='interface';
+    box(target,0,0,0,.16,.16,.040,charcoal);box(target,0,0,.022,.10,.013,.005,cream);box(target,0,0,.023,.012,.10,.006,cream);
    }
    if(!room&&!optics&&key!=='adapter'){
     const hoses=key==='thermal'?2:1;
@@ -223,7 +295,7 @@ export function buildBayEquipment(ctx){
    station.add(item);cache.set(key,item);
   }
   item.visible=true;station.name=item.name;station.userData.stationId=key;
-  equipmentAnchor.position.copy(pos).y+=['alignment','fit','rf','attitude'].includes(key)?1.34:.86;
+  equipmentAnchor.position.copy(pos).y+=['alignment','fit','attitude'].includes(key)?1.34:.86;
   portAnchor.position.copy(key==='adapter'?V(0,.025,h.fairing.stack[0].radiusM):key==='mass'?V(-.85*platformZ/.74,-.1375,platformZ*.84):aim);
   if(room){const probe=item.getObjectByName('Particle sampling inlet');facility.worldToLocal(probe.getWorldPosition(portAnchor.position));}
   if(!room&&!optics&&!['adapter','mass'].includes(key))portAnchor.position.set(portX,portY,portZ+.115);
@@ -244,7 +316,7 @@ export function buildBayEquipment(ctx){
    const jumpers=[],lugs=[];
    active.traverse(o=>{
     if(['Spacecraft umbilical coupling','Vehicle service bulkhead','Optical survey target'].includes(o.name))lugs.push([o,o.position.clone(),o.quaternion.clone()]);
-    if(['Stand-to-spacecraft jumper','Jumper strain relief','Pedestal manifold outlet'].includes(o.name))jumpers.push(o);
+    if(['Stand-to-spacecraft jumper','Jumper strain relief','Pedestal manifold outlet','Removable checkout hookup'].includes(o.name))jumpers.push(o);
    }); active.userData.pickup={jumpers,lugs};
   }
   for(const lead of active.userData.pickup.jumpers)lead.visible=state.seat===0;

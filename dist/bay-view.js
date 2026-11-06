@@ -1,8 +1,9 @@
 import {icon} from './icons.js';
 import {domains} from './domain-analysis.js';
 import {bayLesson} from './bay-lessons.js';
+import {integrationState} from './integration-sequence.js';
 import {integrationProfile} from './integration-profiles.js';
-import {starshipEvidence} from './starship-evidence.js';
+import {starshipEvidence,cargoClearanceSummary} from './starship-evidence.js';
 
 const esc=value=>String(value??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
 const numeric=(value,p)=>typeof value==='number'?value.toLocaleString('en-US',{maximumFractionDigits:p??1}):String(value??'—');
@@ -15,15 +16,17 @@ export function bayCameraControls(view,cameraButtons,cameraName){
  <details class="bay-alt-cameras"><summary>${chosen?'Other cameras':esc(cameraName)}</summary><div>${cameraButtons}</div></details>`;
 }
 export function bayGuide(h,s,v){
- const l=bayLesson(v.domain,h,s),p=integrationProfile(h.input.launcher,h.input.launchSite);
+ const l=bayLesson(v.domain,h,v.commBench),p=integrationProfile(h.input.launcher,h.input.launchSite);
  const carrier=v.domain==='launcher',ship=p.kind==='ship-bay';
- const question=carrier?(ship?'How does a large spacecraft get inside Starship?':'How does the spacecraft meet its rocket?'):l.question;
- const explanation=carrier?p.handling:l.explanation;
- const procedure=carrier?p.mating:l.procedure;
+ const disconnected=v.domain==='comm'&&integrationState(s?.t).seat>0&&h.payloadInterface.passes;
+ const question=disconnected?'What happens to the test equipment at pickup?':carrier?(ship?'How does a large spacecraft get inside Starship?':'How does the spacecraft meet its rocket?'):l.question;
+ const explanation=disconnected?'The ground crew disconnects the test interface before the crane moves the spacecraft. Follow the payload to the launcher or return to checkout to inspect the connection.':carrier?p.handling:l.explanation;
+ const procedure=disconnected?'The rack stays on the integration floor. The spacecraft carries its own radios and optical terminal forward.':carrier?p.mating:l.procedure;
  return `<aside class="bay-guide"><header><span class="bay-emblem">${icon(domains[v.domain].icon,20)}</span><div><small>${esc(p.location)}</small><b>${esc(domains[v.domain].label)}</b></div></header>
  <h2>${esc(question)}</h2><p class="bay-explainer">${esc(explanation)}</p>
  <div class="bay-crew"><span>${icon('wrench',14)} ${esc(p.facility)}</span><h3>${carrier?'Loading and mating':esc(l.stationName)}</h3><p>${esc(procedure)}</p></div>
- ${carrier?`<p class="bay-study-note"><strong>Study tooling · ${esc(l.stationName)}</strong><br>${ship?'The workbench pairs a V3 tank and engine section with a proposed large-cargo nose. The cargo-deck drilling shown here is our design assumption.':'Two work areas are shown together. The receiving end of the rocket and its supports are at inspection height. Tooling and travel distances are illustrative.'}</p>`:''}
+ ${ship&&['launch','launcher'].includes(v.domain)?cargoClearanceSummary(h.fairing):''}
+ ${carrier?`<p class="bay-study-note"><strong>Study tooling · ${esc(l.stationName)}</strong><br>${ship?'An intact Starship receives the spacecraft through a retained side hatch. The carriage, locks and launcher-side drilling are project assumptions.':'Two work areas are shown together. The receiving end of the rocket and its supports are at inspection height. Tooling and travel distances are illustrative.'}</p>`:''}
  ${!['launch','launcher'].includes(v.domain)&&s?.t> -3000?'<button class="textbutton" data-loading-at="-3600">Return to ground checkout</button>':''}
  <button class="bay-to-pad" data-chapter="pad">${['launcher','launch'].includes(v.domain)?'See '+esc(h.launcherLabel)+' on the pad':'Follow the spacecraft to the pad'} ${icon('arrow-right',15)}</button></aside>`;
 }
@@ -37,7 +40,7 @@ export function facilityNotes(h){
  </details>`;
 }
 export function bayEvidence(h,s,v){
- const l=bayLesson(v.domain,h,s),facts=l.facts||[],ids=Object.keys(domains),idx=ids.indexOf(v.domain),next=ids[(idx+1)%ids.length];
+ const l=bayLesson(v.domain,h,v.commBench),facts=l.facts||[],ids=Object.keys(domains),idx=ids.indexOf(v.domain),next=ids[(idx+1)%ids.length];
  const read=f=>`<div class="bay-fact"><dt>${esc(f.label)}</dt><dd>${esc(numeric(f.value,f.precision))} <span>${esc(f.unit)}</span></dd></div>`;
  return `<section class="bay-evidence panel" aria-label="Design evaluation"><header><div><span class="bay-eyebrow">Design evaluation</span><h2>${esc(l.title)}</h2></div><button class="textbutton" data-bay-analysis data-tip="Open this subsystem in the integrated design analysis to compare design changes.">Analyze in Phase C ${icon('arrow-up-right',14)}</button></header>
  <dl class="bay-facts">${facts.map(read).join('')}</dl><p class="bay-meaning bay-${esc(l.status)}">${icon(l.status==='exceeds'?'triangle-alert':l.status==='within'?'check':'info',15)}<span>${esc(l.interpretation)}</span></p>

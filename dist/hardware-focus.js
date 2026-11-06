@@ -59,12 +59,12 @@ export function dataRoutes(craft,h){
  const P=(x,y,z)=>V(x*w,y*b*craft.internal.scale.y+craft.internal.position.y,z*l);
  const inBus=o=>craft.root.worldToLocal(o.getWorldPosition(V()));
  const chip=h.rackLayout.slots.at(-1),cpu=V(chip.x,chip.y,chip.z),bulk=P(-.44,-.13,-.27),sw=inBus(craft.avionics),ssd=inBus(craft.recorder),top=P(-.27,.54,-.35);
- const targets={Ka:craft.dish,Optical:craft.optic,'S-band':craft.patches[0]};
+ const targets=[['Ka',craft.dish],['Optical',craft.optic],['S-band',craft.patches[0],0],['S-band',craft.patches[1],1]];
  const smoothPath=points=>new T.CatmullRomCurve3(points,false,'centripetal');
- function add(key,points,channel=key,terminal=null){
+ function add(key,points,channel=key,terminal=null,patch=null){
   const path=smoothPath(points),color=materials[channel],tube=new T.Mesh(new T.TubeGeometry(path,28,w*.008,8,false),new T.MeshBasicMaterial({color,toneMapped:false}));tube.userData.sceneFlow=true;root.add(tube);
   const pulse=new T.Mesh(new T.SphereGeometry(w*.026,14,9),new T.MeshBasicMaterial({color,toneMapped:false}));pulse.userData.sceneFlow=true;root.add(pulse);
-  routes.push({key,path,tube,pulse,terminal});
+  routes.push({key,path,tube,pulse,terminal,patch});
  }
  add('text',[cpu,P(-.08,.20,-.24),P(-.28,.19,-.30),sw]);
  add('bulk',[bulk,P(-.38,-.14,-.33),sw]);
@@ -72,7 +72,7 @@ export function dataRoutes(craft,h){
  // Each physical terminal has its own routing branch. All endpoints are fixed
  // in the bus frame at the gimbal hardpoints; the terminal head points separately.
  craft.root.updateMatrixWorld(true);
- for(const [name,obj]of Object.entries(targets)){const at=craft.root.worldToLocal(obj.getWorldPosition(V()));add('down',[ssd,P(.18,.24,-.43),P(-.16,.31,-.38),sw,P(-.28,.38,-.35),top,V(at.x,top.y+.06*b,at.z),at],'down',name);}
+ for(const [name,obj,patch]of targets){const at=craft.root.worldToLocal(obj.getWorldPosition(V()));add('down',[ssd,P(.18,.24,-.43),P(-.16,.31,-.38),sw,P(-.28,.38,-.35),top,V(at.x,top.y+.06*b,at.z),at],'down',name,patch);}
  // The purpose cutaway traces customer input through local staging. A relay
  // contract has no located spacecraft endpoint, so its cue ends at the switch.
  add('consume',[ssd,P(-.14,-.11,-.4),sw,P(-.16,.1,-.30),cpu],'bulk');
@@ -80,10 +80,15 @@ export function dataRoutes(craft,h){
  add('relay',[ssd,P(.01,.25,-.38),sw],'down');
  return {root,routes,update(s,visible,kind='data'){
   root.visible=visible;if(!visible)return;const rates=routeRates(h,s);
-  for(const r of routes){let on;if(kind==='purpose'){
-    const q=h.ai||{},relay=s.aiRoute==='relay',service=s.aiUnitRate>0;
-    on=r.terminal?!relay&&r.terminal===s.groundLink&&s.aiOutputMbps>0:r.key==='consume'?service&&q.inputBytesPerUnit>0:r.key==='produce'?service&&q.outputBytesPerUnit>0:r.key==='relay'?relay&&s.aiRelayOn&&s.aiOutputMbps>0:false;
-   }else on=r.terminal?r.terminal===s.groundLink&&rates.down>0:rates[r.key]>0;
+  const payload=s.terminalActivity?.find(f=>f.direction==='tx'&&f.services.payload>0);
+  const peer=payload?.route==='direct'?payload.terminal:null,patch=s.stationDirectionBody?.[0]>=0?1:0;
+  for(const r of routes){let on;
+   if(r.terminal)on=r.terminal===peer&&(r.patch==null||r.patch===patch)&&(kind!=='purpose'||s.aiOutputMbps>0);
+   else if(r.key==='relay')on=payload?.route==='relay'&&(kind!=='purpose'||s.aiOutputMbps>0);
+   else if(kind==='purpose'){
+    const q=h.ai||{},service=s.aiUnitRate>0;
+    on=r.key==='consume'?service&&q.inputBytesPerUnit>0:r.key==='produce'?service&&q.outputBytesPerUnit>0:false;
+   }else on=rates[r.key]>0;
    r.tube.visible=on;r.pulse.visible=on;
    if(on){const progress=((s.t*.19+(r.key==='write'?.31:r.key==='down'?.61:.12))%1+1)%1;r.pulse.position.copy(r.path.getPointAt(progress));}
   }
@@ -91,12 +96,15 @@ export function dataRoutes(craft,h){
 }
 export function hardwareAnchor(id,c,h,s){
  const w=h.bodyWidthM,y=h.bodyHeightM,l=h.bodyLengthM,P=(x,yy,z)=>V(w*x,y*yy,l*z);
- const centre=o=>o?.getWorldPosition(V());
+ const centre=o=>o?.getWorldPosition(V()),patch=c.apertures.patches[s.stationDirectionBody?.[0]>=0?1:0];
  switch(id){
  case 'compute':{const p=h.rackLayout.slots.at(-1);return c.root.localToWorld(V(p.x,p.y,p.z));}
  case 'storage':return centre(c.recorder);case 'avionics':return centre(c.avionics);
- case 'dish':return centre(c.dish);case 'optic':return centre(c.optic);case 'patch':return centre(c.patches[0]);
- case 'activeTerminal':return centre(s.groundLink==='Optical'?c.optic:s.groundLink==='S-band'?c.patches[0]:c.dish);
+ case 'dish':return centre(c.apertures.Ka);case 'optic':return centre(c.apertures.Optical);case 'patch':return centre(patch);
+ case 'activeTerminal':{
+  const t=s.terminalActivity?.find(a=>a.direction==='tx'&&a.services.payload>0)?.terminal||s.groundLink;
+  return centre(t==='Optical'?c.apertures.Optical:t==='Ka'?c.apertures.Ka:patch);
+ }
  case 'solarRoot':case 'radiatorRoot':{const kind=id==='solarRoot'?'solar':'radiator',m=deploymentLayout(h).mounts.find(m=>m.kind===kind&&m.side===1);return c.root.localToWorld(V(...m.root));}
  case 'cmg':return centre(c.cmgs[0].g);case 'torquer':return centre(c.torquers[0]);
  case 'fuel':case 'oxidizer':case 'helium':return centre(c.tankMap[id]);case 'engine':return centre(c.engines[0]);

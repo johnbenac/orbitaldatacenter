@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import {readFileSync,statSync} from 'node:fs';
 import {createSimulation} from './dist/model.js';
+import {sizeDesign} from './dist/design.js';
+import {nominalCheckoutDesign} from './verification-fixtures.mjs';
 import {chapters} from './dist/flight-chapters.js';
 import {chapterPhase,flightChapters} from './dist/lifecycle.js';
 import {domainIds,domainNav,observationCard} from './dist/matrix-ui.js';
@@ -9,7 +11,7 @@ import {addToShelf,designName,missionPreset,parsePreset,presetList,presetShelf,r
 import {encodeScenario,decodeScenario} from './dist/exports.js';
 
 const reference=presetList.find(p=>p.id==='reference');
-const sim=createSimulation(reference.h);
+
 assert.deepEqual(presetList.map(p=>p.h.trays),[4,12,12,26,981]);
 assert.ok(presetList.find(p=>p.id==='optical').h.initialQueueGB>reference.h.initialQueueGB);
 // Preserve the legacy vehicle choices and report how each existing envelope handles the new hull.
@@ -69,21 +71,32 @@ for(const phase of 'ABCDEF')for(const domain of domainIds){
  const selected=nav.match(/<button[^>]*aria-current="page"[^>]*>/)[0];
  assert.ok(selected.includes('data-domain="'+domain+'"'),phase+' '+domain);
 }
+// Navigation must expose a full, authorized mission from launch through a
+// successful return. Use a site-aligned, directly integrated flight instead
+// of depending on a five-year representative preview for the legacy carrier.
+const mission=nominalCheckoutDesign();
+const hardware=sizeDesign(mission),sim=createSimulation(hardware);
+assert.ok(hardware.fit&&hardware.launchScreenMarginKg>=0);
+assert.equal(sim.disposal().outcome,'impact');
+assert.ok(sim.disposal().targetErrorKm<=mission.targetToleranceKm);
+const heldModel=createSimulation(reference.h),held=heldModel.story('deorbit');
+assert.equal(held.status,heldModel.disposal().feasible?'available':'infeasible');
+if(!heldModel.disposal().feasible){assert.ok(heldModel.disposal().reason);assert.equal(heldModel.disposal().usedKg,0);}
 const modelChapters=sim.story();
 assert.deepEqual(modelChapters.map(c=>c.id),chapters.map(c=>c.id));
 let previous=-Infinity;
 for(const c of chapters){
  const e=sim.story(c.id);assert.equal(e.status,'available');assert.ok(e.start>=previous);previous=e.end;
  assert.ok(e.start<=e.instant&&e.instant<=e.end);
- const phase=chapterPhase(c.id),view={phase,domain:c.page,preset:'reference',chapter:c.id,t:e.instant,camera:c.camera,event:e};
+ const phase=chapterPhase(c.id),view={phase,domain:c.page,preset:'starter',chapter:c.id,t:e.instant,camera:c.camera,event:e};
  const flightNav=flightChapters(view);
  assert.ok(flightNav.includes('data-chapter="'+c.id+'" aria-current="step"'));
  const siblings=chapters.filter(ch=>chapterPhase(ch.id)===phase);
  assert.equal((flightNav.match(/data-chapter=/g)||[]).length,siblings.length);
- const ctx={hardware:reference.h,state:sim.at(e.instant),sim,events:[],day:{}};
+ const ctx={hardware,state:sim.at(e.instant),sim,events:[],day:{}};
  const panel=observationCard(view,ctx,'MET');
  assert.match(panel,/data-action="flightplay"/);assert.doesNotMatch(panel,/NaN|undefined|Infinity/);
- const scenario={schema:'odc-scenario/1',modelVersion:'4.0',design:reference.design,view};
+ const scenario={schema:'odc-scenario/1',modelVersion:'4.0',design:mission,view};
  assert.deepEqual(decodeScenario(encodeScenario(scenario)),scenario);
 }
 const assets=JSON.parse(readFileSync(new URL('./dist/assets.json',import.meta.url),'utf8'));

@@ -1,6 +1,6 @@
 // A history entry is a place in the workbench. The installed design stays shared.
 const visitKey='odc-navigation';
-const placeKeys=['phase','domain','chapter','camera','start','t','scope','detail','instruments','event','inspect','tradeKey','purposePreview','timelineRow','timelineSegment','timelineAll','timelineFollow','teachEvent','teachFolded','bayLens','launchLens','deploymentLens','thermalNode','flightLoop'];
+const placeKeys=['phase','domain','chapter','camera','start','t','scope','detail','instruments','event','inspect','tradeKey','purposePreview','rfFilter','rfPage','commBench','timelineRow','timelineSegment','timelineAll','timelineFollow','teachEvent','teachFolded','bayLens','launchLens','deploymentLens','thermalNode','flightLoop'];
 const filters=['data-mel-search','data-mel-sub','data-mel-evidence','data-mech-find','data-mech-sub','data-mech-pose'];
 const scrollBoxes=['#rail','#nav','.mtl-scroll','.mel-scroll','.mech-planes'];
 function visible(selector){return Array.from(document.querySelectorAll(selector)).find(el=>el.getClientRects().length)}

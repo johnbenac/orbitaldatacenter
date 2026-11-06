@@ -21,8 +21,8 @@ for(const [kind,num,r] of [['superHeavy',33,4.5],['starship',6,4.5],[null,9,1.83
 }
 update(star,141);near(p.lower.position.y,0);update(star,145);assert(p.lower.position.y<0);update(star,270);assert(p.shell.visible&&!p.lower.visible);
 const door=p.shell.getObjectByName('Retained cargo door');
-update(star,545,'insertion');assert(door.rotation.y>0&&p.payload.position.x===0);const pivot=door.position.clone();
-update(star,590,'insertion');assert(door.rotation.y>1.8&&door.position.equals(pivot)&&p.payload.position.x>0);assert(p.upper.visible&&p.shell.visible);
+update(star,545,'insertion');assert(door.rotation.y<0&&p.payload.position.x===0);const pivot=door.position.clone();
+update(star,590,'insertion');assert(door.rotation.y< -1.8&&door.position.equals(pivot)&&p.payload.position.x<0);assert(p.upper.visible&&p.shell.visible);
 const falcon=load('falconHeavy'),f=falcon.parts;update(falcon,-10,'pad');assert.equal(f.boosters.length,2);
 for(const core of [f.lower,...f.boosters]){assert.equal(byName(core,'Falcon landing leg').length,4);assert.equal(byName(core,'Stowed Falcon grid fin').length,4);assert.equal(byName(core,'Merlin 1D').length,9);}
 assert.equal(f.boosterBase.parent,f.boosters[0]);update(falcon,145);near(f.boosters[0].rotation.z,0);update(falcon,155);assert(f.boosters[0].rotation.z>0);assert.equal(byName(f.boosters[0],'Falcon landing leg').filter(o=>o.visible).length,4);

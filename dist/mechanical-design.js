@@ -1,4 +1,4 @@
-import {launchClockFor} from './launch-effects-state.js';
+import {payloadFreeMET} from './launch-effects-state.js';
 import {renderLaunchStructure} from './launch-structure.js';
 import {buildEquipmentList,filterEquipmentRows} from './equipment-list.js';
 import {componentMassProperties,equipmentAllocations} from './component-stations.js';
@@ -21,7 +21,7 @@ const sectionPhase=phase=>phase==='A'?'launch':phase==='B'?'deployed':'current';
 function pose(h,s,key){
  if(key==='launch')return [h.propellantKg,0,true];
  if(key==='deployed')return [h.propellantKg,1,false];
- return [s?.propellantKg??h.propellantKg,s?.deployment??1,s?.carrierAttached??(s?.t??Infinity)<launchClockFor(h.input.launcher).release];
+ return [s?.propellantKg??h.propellantKg,s?.deployment??1,s?.carrierAttached??(s?.t??Infinity)<payloadFreeMET(h.input.launcher)];
 }
 function stateFor(h,s,mode){
  const [remaining,progress,adapter]=pose(h,s,mode);

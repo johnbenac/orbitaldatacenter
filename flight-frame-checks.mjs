@@ -9,6 +9,7 @@ import {makeCraft} from './dist/craft.js';
 import {pointingGeometry,pointingViewAllowed} from './dist/pointing-guide.js';
 import {hardwareAnchor} from './dist/hardware-focus.js';
 import {attitudeGuidance} from './dist/attitude-guidance.js';
+import {clusterState} from './dist/attitude-dynamics.js';
 
 const V=(...a)=>new T.Vector3(...a),Y=V(0,1,0),Z=V(0,0,1);
 const brush=new Proxy({},{get:(_,k)=>k==='createLinearGradient'?()=>({addColorStop(){}}):()=>{}});
@@ -32,6 +33,17 @@ function shot(t){
 }
 assert(shot(4200).distanceTo(shot(5100))>.2,'orbit advances across the ground in the close camera');
 const craft=makeCraft(h),rad=craft.rads[0],ends=craft.mechanismAudit.banks[0];
+for(const encoders of [[0,0,0,0],[.4,-.8,1.1,-.2],[-2,2.7,.1,-1.3]]){
+ const physics=clusterState(encoders,h.cmg.rawUnitMomentumNms);
+ for(const c of craft.cmgs){c.gimbal.rotation.z=encoders[c.index];c.spin.rotation.x=1.9;}
+ craft.root.updateMatrixWorld(true);
+ for(const c of craft.cmgs){
+  const rotorAxis=Y.clone().transformDirection(c.rotor.matrixWorld);
+  assert(rotorAxis.distanceTo(V(...physics.rotorAxes[c.index]))<1e-12,'Rendered gyro rotor follows physical gimbal encoder');
+  const pivot=c.g.getWorldPosition(V());
+  assert(pivot.distanceTo(V(...h.propulsion.stations['04.01'][c.index]))<1e-12,'Gyro torques retain their installed mounts');
+ }
+}
 for(const [a,b,c,r,t] of [[0,-45,45,0,0],[76,-63,31,24,-49],[-123,-34,65,-70,83],[-123,-34,65,50,80]]){
  const guidance={wingPitchDeg:a,upperRadiatorPitchDeg:b,lowerRadiatorPitchDeg:c,upperRadiatorRollDeg:r,lowerRadiatorRollDeg:t};
  craft.positionPanels(1,guidance);craft.root.updateMatrixWorld(true);

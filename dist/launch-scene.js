@@ -1,4 +1,4 @@
-import {launchClockFor,INSERTION_MET} from './launch-effects-state.js';
+import {launchClockFor,INSERTION_MET,superHeavyDeparture} from './launch-effects-state.js';
 // Launch assemblies use metres and a +Y vehicle axis. The fairing radius profile
 // and stowed sections come from the sizing solver; the support equipment is illustrative.
 import * as T from './vendor/three.module.js';
@@ -6,6 +6,7 @@ import {missionPatchMaterial,mountMissionPatch} from './fairing-patch.js';
 import {buildLaunchGround,buildAscentWake,exhaustFactory,launchEffectsAt,launchRiseM} from './launch-ground.js';
 import {launchSiteFor,launchPropulsionFor} from './launch-sites.js';
 import {buildStarship,falconRecovery,launchNozzles,shipNose} from './launch-hardware.js';
+import {cargoBay,starshipCargoFit,starshipCargoFlight} from './starship-cargo.js';
 import {integrationState} from './integration-sequence.js';
 import {integrationProfile} from './integration-profiles.js';
 import {flightInterfaceGeometry} from './payload-interface-mesh.js';
@@ -53,7 +54,7 @@ export function makeLaunch(h,repaint){
  if(!star)for(const side of [-1,1]){
   const g=group(shell,'fairing'),begin=side<0?Math.PI:0, angle=Math.PI;
   const body=mesh(g,shellBands(outerProfile,begin,angle),ivory,0,0,0);
-  mesh(g,shellBands(inside.slice().reverse(),begin,angle),mat('#a6a89b',.34),0,0,0);
+  mesh(g,shellBands(inside.slice().reverse(),begin,angle),mat('#a6a89b',.34),0,0,0).name='Fairing interior liner';
   for(const cap of [[outerProfile.at(-1),inside.at(-1)],[inside[0],outerProfile[0]]])mesh(g,shellBands(cap,begin,angle),rib,0,0,0);
   function radius(y){for(let j=1;j<outerProfile.length;j++)if(y<=outerProfile[j][1]){const[a,z]=outerProfile[j-1],[b,zz]=outerProfile[j];return a+(b-a)*(y-z)/(zz-z);}return .01;}
   for(let row=0;row<=9;row++){const y=maxH*(.025+row*.101),r=radius(y)-skin*1.13,thk=row%3===0?R*.023:R*.012;
@@ -80,6 +81,7 @@ export function makeLaunch(h,repaint){
  const hw=h.bodyWidthM,hh=h.bodyHeightM,bl=h.bodyLengthM,stack=f.stack;
  // The vehicle-side adapter stays with the carrier at spacecraft separation.
  const fitting=group(stage,'adapter'),adapter=stack[0],spacer=stack[1],record=integrationProfile(d.launcher,d.launchSite);
+ const access=star?(f.cargoAccess??starshipCargoFit(stack,d)):null,canLoad=!star||h.payloadInterface.passes&&f.fit&&access.fits;
  const lowerR=record.interface.diameterMm/2000,upperR=spacecraftInterface.pcdM/2;
  function annulus(parent,outer,inner,y0,y1,material){
   return mesh(parent,shellBands([[outer,y0],[outer,y1],[inner,y1],[inner,y0],[outer,y0]],0,Math.PI*2,72),material,0,0,0,'adapter');
@@ -90,6 +92,35 @@ export function makeLaunch(h,repaint){
  for(let j=0;j<12;j++){
   const a=j*Math.PI/6,b=a+Math.PI/6;
   for(const t of [a,b])tube(fitting,v(lowerR*Math.cos(t),.07,lowerR*Math.sin(t)),v(upperR*Math.cos(a),seatY-.035,upperR*Math.sin(a)),.022,steel,'adapter');
+ }
+ const lifters=[];
+ if(star)for(let i=0;i<3;i++){
+  const a=(i+.5)*2*Math.PI/3,px=Math.cos(a)*.675,pz=Math.sin(a)*.675;
+  cylinder(fitting,px,seatY*.72,pz,.042,.054,seatY*.48,dark,'adapter');
+  const rod=cylinder(fitting,px,seatY*.88,pz,.025,.025,1,gold,'adapter');
+  rod.name='Guided separation plunger';lifters.push(rod);
+ }
+ // The stud circle bolts a flight flange to a separation fitting. Retracting
+ // latches and pilots release the flange; fixed structural fasteners stay put.
+ const shoes=[],clamps=[];
+ if(star){
+  for(const z of [-.28,.28]){
+   const rim=Math.sqrt((spacecraftInterface.outerM/2)**2-z*z),slide=group(fitting,'adapter');
+   slide.name='Two-axis separation shoe';
+   box(fitting,1.15,seatY*.49,z,.11,seatY*.98,.12,steel,'adapter');
+   const stem=box(fitting,1.15,seatY-.05,z,.068,.12,.075,rib,'adapter');
+   slide.position.set(rim,seatY+.009,z);
+   box(slide,.33,0,0,.43,.085,.09,dark,'adapter');
+   const piston=box(slide,.095,0,0,.19,.044,.055,gold,'adapter');
+   const stop=box(slide,.018,0,0,.036,.05,.08,rib,'adapter');
+   shoes.push({slide,piston,stop,stem});
+  }
+  for(const sign of [-1,1]){
+   const latch=group(fitting,'adapter');latch.name='Retracting launch clamp';
+   latch.position.set(0,seatY,sign*.71);
+   box(latch,0,-.018,0,.12,.12,.06,dark,'adapter');
+   box(latch,0,.044,-sign*.036,.12,.025,.12,gold,'adapter');clamps.push({latch,sign});
+  }
  }
  const fixedRing=mesh(payload,flightInterfaceGeometry(T),rib,0,seatY,0,'structure');fixedRing.rotation.x=-Math.PI/2;
  fixedRing.name='Spacecraft aft interface · ODC-LI-01';
@@ -158,6 +189,10 @@ export function makeLaunch(h,repaint){
  }
  const flames=[],boosters=[],makeExhaust=exhaustFactory(),fuel=launchPropulsionFor(d.launcher);
  const bellShell=shellBands([[1,-1.30],[.69,-.65],[.41,0],[.36,0],[.64,-.65],[.94,-1.30],[1,-1.30]],0,Math.PI*2,32);
+ // Seen from directly aft, a hollow plume skin has no projected area at its
+ // mouth. The luminous exit plane belongs to the jet and extinguishes with it.
+ const exitFace=new T.CircleGeometry(.91,40).rotateX(Math.PI/2);
+ const exitLight=new T.MeshBasicMaterial({color:0xccdeff,toneMapped:false});
  function engines(p,r,y,count){
   if(!count){
    if(count==null){const fire=makeExhaust(p,0,y,0,r*.54,'unknown');fire.name='Concept combined exhaust envelope';flames.push({fire,p});}
@@ -166,7 +201,12 @@ export function makeLaunch(h,repaint){
   for(const {x,z,diam,kind} of launchNozzles(count,r,star?(p===lower?'superHeavy':'starship'):null)){
    const bell=mesh(p,bellShell,dark,x,y,z);bell.scale.setScalar(diam);
    bell.name=kind==='Raptor Vacuum'?kind:star?'Raptor 3':parallel?(p===upper?'Merlin Vacuum':'Merlin 1D'):'Engine nozzle';
-   const channel=p===lower?'core':p===upper?'upper':'booster',fire=makeExhaust(p,x,y-diam*1.30,z,diam,fuel[channel]);flames.push({fire,p});
+   const channel=p===lower?'core':p===upper?'upper':'booster',fire=makeExhaust(p,x,y-diam*1.30,z,diam,fuel[channel]);
+   if(star&&p===upper){
+    fire.userData.engineFamily=kind==='Raptor Vacuum'?'vacuum':'sea-level';
+    const face=mesh(fire,exitFace,exitLight,0,0,0);face.name='Luminous Raptor exit';face.scale.setScalar(diam);
+   }
+   flames.push({fire,p});
   }
  }
  engines(lower,baseR,baseY+(star?baseR*.136*1.30:0),fleet.coreEngines);if(!single)engines(upper,baseR,-stage2,fleet.upperEngines);
@@ -198,36 +238,68 @@ export function makeLaunch(h,repaint){
   const vehicleStudy=context.domain==='launcher'&&reference,integration=!vehicleStudy&&(phase==='integration'||reference),pad=phase==='pad'||vehicleStudy,asc=phase==='ascent',insert=phase==='insertion',commission=phase==='commissioning';
   const directCraft=commission||['deorbit','entry','infeasible'].includes(phase);
   const t=s.t,fx=launchEffectsAt(t,d.launcher,d.launchSite),up=asc?clamp(t/INSERTION_MET):0,level=asc?Math.max(0,s.altitudeKm||0):0;
-  envelope.visible=integration||context.phase==='D'&&context.domain&&context.domain!=='launcher'&&context.domain!=='conops'&&(pad||asc&&(star||t<fairingT));facility.visible=integration;tower.visible=pad||(asc&&t<35);lower.visible=pad||(asc&&(single||t<separationT+45))||(single&&insert);upper.visible=!single&&!integration&&!directCraft;payload.visible=!directCraft;shell.visible=integration||pad||(asc&&(star||t<fairingT+46))||(star&&insert);
+  envelope.visible=integration||context.phase==='D'&&context.domain&&context.domain!=='launcher'&&context.domain!=='conops'&&(pad||asc&&(star||t<fairingT));facility.visible=integration;tower.visible=pad||(asc&&t<35);lower.visible=pad||(asc&&(single||t<(star?clock.boostbackCutoff:separationT+45)))||(single&&insert);upper.visible=!single&&(star||!integration)&&!directCraft;payload.visible=!directCraft;shell.visible=integration||pad||(asc&&(star||t<fairingT+46))||(star&&insert);
   parked.visible=reference;referenceParts.forEach(o=>o.visible=reference);const opening=reference&&!vehicleStudy?.80:integration?clamp((-600-t)/2400)*.90:asc&&!star?clamp((t-fairingT)/46):star&&insert?clamp((t-clock.doorOpen)/(clock.release-clock.doorOpen)):0;
-  const working=phase==='integration',groundTime=h.payloadInterface.passes?t:Math.min(t,-3000),seq=working?integrationState(groundTime):null,pose=working?bayHandlingPose(h,layout,seq):null;
-  bay.update(pose?.opening??opening,context.domain,working,seq,pose);ship?.openDoor(working?0:opening);halves.forEach(({g,side})=>{
+  const working=phase==='integration',groundTime=h.payloadInterface.passes&&canLoad?t:Math.min(t,-3000),seq=working?integrationState(groundTime):null,pose=working?bayHandlingPose(h,layout,seq):null;
+  const cargo=star?starshipCargoFlight(t,clock,canLoad,access.liftStrokeM):null;
+  bay.update(pose?.opening??opening,context.domain,working,seq,pose,context.commBench);
+  if(ship){
+   ship.openDoor(working?pose.opening:insert?cargo.hatch:0,working?pose.carriageM:insert?cargo.carriageM:0);
+   const lift=insert?(cargo.pinLiftM||0):0;
+   for(const plunger of lifters){plunger.scale.y=.15+lift;plunger.position.y=seatY-.075+lift/2;}
+   const kick=insert?cargo.kickM:0;
+   for(const {slide,piston,stop,stem} of shoes){
+    stem.scale.y=.12+lift;stem.position.y=seatY-.05+lift*.5;
+    slide.position.y=seatY+.009+lift;piston.scale.x=.19+kick;piston.position.x=.095-kick*.5;stop.position.x=.018-kick;
+   }
+   const closed=working?pose.lift>=1:!insert||cargo.clamped;
+   for(const {latch,sign} of clamps)latch.position.z=sign*(closed?.71:.83);
+
+  }
+halves.forEach(({g,side})=>{
    // Stow each half across the aisle; the crane approaches the ring along X.
    g.position.set(working?0:side*opening*R*(asc?3.7:2.25),asc?-opening*R*2:0,working?-side*pose.opening*R*2.25:0);
    g.rotation.y=working?Math.PI/2:0;g.rotation.z=asc?-side*opening*.9:0;
   });
+  const departure=star&&asc&&t>=separationT?superHeavyDeparture(Math.min(t,clock.boostbackCutoff)):null;
   const stageDrop=asc&&!single?clamp((t-separationT)/45):0;const sideDrop=asc?clamp((t-sideSeparationT)/(parallel?25:40)):0;
   for(const q of boosters){q.br.visible=pad||asc&&t<sideSeparationT+(parallel?25:40);q.br.position.set(q.dx*(q.rad+sideDrop*baseR*3),baseY-sideDrop*stage1*.36,q.dz*(q.rad+sideDrop*baseR*3));q.br.rotation.z=q.dx*sideDrop*.16;}
- lower.position.set(0,-stageDrop*stage1*.75,stageDrop*R);lower.rotation.z=stageDrop*.15;
-  stage.position.set(0,0,0);stage.rotation.z=asc?-up*.76:insert?-.8:0;
+  if(departure){
+   // Lower-stage mesh vertices are in stack coordinates. Compensate for
+   // their offset from the origin so the booster flips about its own centre.
+   const cy=baseY+.5*stage1,a=departure.angleRad;
+   lower.rotation.z=a;
+   lower.position.set(departure.sideM+cy*Math.sin(a),departure.axialM+cy*(1-Math.cos(a)),0);
+  }else{lower.position.set(0,-stageDrop*stage1*.75,stageDrop*R);lower.rotation.z=stageDrop*.15;}
+  stage.position.set(0,0,0);stage.rotation.set(0,0,asc?-up*.76:insert?-.8:0);
   // Begin with a stationary pad camera; then follow the vehicle as it clears the tower.
   // Keep coordinates local afterwards to avoid precision loss on the metre-scale vehicle.
   const rise=asc?(t<=35?launchRiseM(t,d.launcher):level*1000):0;
   const lag=asc?allH*.34*(1-Math.exp(-rise/(allH*.34)))*(1-clamp((t-10)/16)):0;
   stage.position.y=lag;tower.position.y=asc?lag-rise:0;ground.update(t,fx,(pad&&!vehicleStudy||asc)&&!reference);wake.update(t,fx,asc);
 
-  const release=clamp((t-clock.release)/(clock.releaseClear-clock.release));upper.position.y=insert?-release*stage2*1.5:0;if(single&&insert)lower.position.y=-release*baseR*4;shell.position.y=star?upper.position.y:0;payload.position.x=star&&insert?release*baseR*3.5:0;
-  payload.position.y=insert?release*R*1.45:0;
-  if(merged){merged.visible=(asc||pad&&!vehicleStudy&&!reference)&&fx.ignition>.06&&t<clock.hotStage;merged.scale.set(1+up*.33,Math.max(.01,fx.ignition)*(1+.03*Math.sin(5*t)),1+up*.33);}
+  const release=clamp((t-clock.release)/(clock.releaseClear-clock.release));upper.position.y=insert&&!star?-release*stage2*1.5:0;if(single&&insert)lower.position.y=-release*baseR*4;shell.position.y=star?upper.position.y:0;payload.position.x=star&&insert?-cargo.payloadM:0;
+  payload.position.y=star?cargoBay.deckM+(insert?cargo.liftM:0):insert?release*R*1.45:0;
+  if(merged){
+   const cluster=departure?departure.outerThrottle:t<clock.hotStage?fx.ignition:0;
+   merged.visible=(asc||pad&&!vehicleStudy&&!reference)&&cluster>.06;
+   merged.scale.set(1+up*.33,Math.max(.01,cluster)*(1+.03*Math.sin(5*t)),1+up*.33);
+  }
   flames.forEach(({fire,p},i)=>{const hotStaging=star&&p===lower&&t>=clock.hotStage&&t<clock.coreCutoff;
-   const throttle=hotStaging?(i<3?1:0):p===lower?fx.ignition:p===upper?fx.upperPower:fx.boosterPower;
+   // Three center engines and two opposite mid-ring engines are lit in the
+   // Flight 13 staging frames. Subsequent groups light as boostback builds.
+   const pilot=i<4||i===8;
+   const throttle=departure&&p===lower?(pilot?departure.coreThrottle:i<13?departure.middleThrottle:departure.outerThrottle):
+    hotStaging?(pilot?.82:0):p===lower?fx.ignition:p===upper?fx.upperPower:fx.boosterPower;
    fire.visible=!!throttle&&(asc||pad&&!vehicleStudy&&!reference);if(!fire.visible)return;
    const pulse=1+.055*Math.sin(9*t+i*.69)+.023*Math.sin(t*13.2-i);
-   fire.scale.set(1+up*.62,Math.max(.025,throttle)*pulse*(1+up*.45),1+up*.62);
+   // Keep the six emitting planes registered to the actual bell diameters.
+   const spread=fire.userData.engineFamily?1:1+up*.62;
+   fire.scale.set(spread,Math.max(.025,throttle)*pulse*(1+up*.45),spread);
   });
-  fitting.visible=!directCraft;fitting.rotation.z=0;fitting.position.set(0,star?shell.position.y:insert?upper.position.y:0,0);
+  fitting.visible=!directCraft;fitting.rotation.z=0;fitting.position.set(star&&insert?-cargo.carriageM:0,star?cargoBay.deckM:insert?upper.position.y:0,0);
   shell.position.x=shell.position.z=0;shell.rotation.z=0;payload.rotation.z=0;payload.position.z=0;
-  upper.position.x=0;upper.rotation.z=0;envelope.position.set(0,0,0);envelope.rotation.z=0;
+  upper.position.x=0;upper.rotation.z=0;envelope.position.set(0,star?cargoBay.deckM:0,0);envelope.rotation.z=0;
   if(working){
    const receiver=single?lower:upper;
    receiver.visible=true;receiver.position.set(layout.receiverX,layout.portY,0);
@@ -240,14 +312,36 @@ export function makeLaunch(h,repaint){
    shell.position.copy(pose.shell);shell.rotation.z=pose.angle;
    envelope.position.copy(pose.assembly);envelope.rotation.z=pose.angle;
   }
+  const cargoHeld=star&&!canLoad&&!working;
+  if(cargoHeld)payload.visible=false;
   root.visible=!directCraft;
   const center=v();let zoomH=integration?Math.max(maxH,h.stowedLengthM)*.76:insert?Math.max(maxH*.62,h.stowedLengthM*.82):asc&&t>220?Math.max(stage2+maxH,allH*.51)*.59:allH*.59;
   if(integration){center.y=maxH*.49;center.x=-unit*.047;}else if(insert)center.y=payload.position.y+h.stowedLengthM*.33;else if(asc&&t>220)center.y=(maxH-stage2)*.5;else center.y=(maxH+baseY)*.5;
   if(pad||asc&&t<26){const padWeight=asc?1-clamp((t-12)/14):1;center.y-=allH*.044*padWeight;center.y+=lag*.42;zoomH+=allH*.075*padWeight+lag*.28;}
   if(working){center.set(layout.ringX*.33,maxH*.46,0);zoomH=Math.max(maxH*.83,layout.space*1.28);}
-  if(!integration)center.applyAxisAngle(v(0,0,1),stage.rotation.z);
+  if(star&&insert){
+   // Stay on the carrier through relatch. Then translate the entire scene
+   // into spacecraft-centred coordinates for the commissioning handoff.
+   const hand=clamp((t-clock.hatchLatched)/(900-clock.hatchLatched)),blend=hand*hand*(3-2*hand);
+   const assemblyCenter=payload.position.clone().add(liveMount.position);
+   stage.quaternion.slerp(new T.Quaternion().setFromAxisAngle(v(1,0,0),Math.PI/2),blend);
+   stage.position.copy(assemblyCenter).applyQuaternion(stage.quaternion).multiplyScalar(-blend);
+   center.set(assemblyCenter.x*.47,Math.max(7,h.stowedLengthM*.54)+cargoBay.deckM,0).lerp(assemblyCenter,blend);
+   center.applyQuaternion(stage.quaternion).add(stage.position);
+   zoomH=(1-blend)*Math.max(13.5,h.stowedLengthM*.88,(cargo.payloadM+7)*.56)+blend*Math.max(h.stowedLengthM*.76,7);
+  }else if(!integration){
+   if(star&&asc&&t>=separationT-5){
+    // A finite wide shot provides room astern for the flip. Ease back in on
+    // the ship as Super Heavy leaves the shot; never frame its whole flight.
+    const ease=(a,b)=>{const u=clamp((t-a)/(b-a));return u*u*(3-2*u)};
+    const wide=ease(separationT-5,separationT+6),follow=ease(separationT+7,separationT+23);
+    center.y=((maxH+baseY)*.5-42*wide)*(1-follow)+(capH-stage2)*.5*follow;
+    zoomH=(allH*(.59+.74*wide))*(1-follow)+(capH+stage2)*.64*follow;
+   }
+   center.applyAxisAngle(v(0,0,1),stage.rotation.z);
+  }
   const backdrop=integration?'hangar':pad||asc&&level<15?'ground':asc&&level<95?'sky':'space';
-  return {center,half:zoomH,environment:backdrop,directCraft,reference,vehicleStudy,phase,opening:pose?.opening??opening,bayTime:working?t:null,launchFX:fx};
+  return {center,half:zoomH,environment:backdrop,cargoHeld,directCraft,reference,vehicleStudy,phase,opening:pose?.opening??opening,bayTime:working?t:null,launchFX:fx};
  }
  return {root,update,bay,faceLaunchClouds(camera){ground.faceClouds(camera);wake.faceClouds(camera);},geometry:{heightM:allH,diameterM:baseR*2,upperLengthM:stage2,lowerLengthM:stage1,stages:fleet.stages,sideBoosters:boosters.length},parts:{payload,fitting,liveMount,shell,fairingPatch,facility,tower,stage,lower,upper,boosterBase,sideOutlines,boosters:boosters.map(q=>q.br)}};
 }

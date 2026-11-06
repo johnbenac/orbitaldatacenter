@@ -1,3 +1,4 @@
+import {clusterState} from './attitude-dynamics.js';
 import {spacecraftInterface} from './payload-interface.js';
 import {flightInterfaceGeometry} from './payload-interface-mesh.js';
 import * as T from './vendor/three.module.js';
@@ -22,7 +23,7 @@ function trimPoleTriangles(g){
  }
  g.setIndex(out);g.clearGroups();return g;
 }
-function obj(p,g,m,x,y,z,id){const a=new T.Mesh(g,m);a.position.set(x,y,z);if(id)a.userData.part=id;p.add(a);return a;}
+function obj(p,g,m,x,y,z,id){if(g.type==='LatheGeometry')g.normalizeNormals();const a=new T.Mesh(g,m);a.position.set(x,y,z);if(id)a.userData.part=id;p.add(a);return a;}
 function box(p,x,y,z,w,h,d,m,id){let a=obj(p,boxG,m,x,y,z,id);a.scale.set(w,h,d);return a;}
 function cyl(p,x,y,z,rTop,rBot,height,m,id,n=16,open=false){const radius=Math.max(rTop,rBot,.00001),geom=cylinderGeom(+(rTop/radius).toFixed(5),+(rBot/radius).toFixed(5),n,open);let a=obj(p,geom,m,x,y,z,id);a.scale.set(radius,height,radius);return a;}
 const sphereG=new T.SphereGeometry(1,48,28);sphereG.userData.shared=true;
@@ -289,7 +290,13 @@ const opticalGimbal=pedestal(...stationsRF.optical,terminal.opticalFork,terminal
    g.head.rotation.x=Math.atan2(Math.hypot(a.x,a.z),a.y);
   }
  }
- const patches=[-1,1].map(side=>box(root,side*w*.49,y0*.52,l*.3,beam*.35,hgt*.14,w*.21,bronze,'communications'));
+ const patches=[-1,1].map(side=>box(root,side*(w*.5+beam*.42),y0*.52,l*.3,beam*.35,hgt*.14,w*.21,bronze,'communications'));
+// Physical aperture centers. Local +Y is the radiating face normal.
+ const mouth=(parent,x,y,rotationZ=0)=>{
+  const o=new T.Object3D();o.position.set(x,y,0);o.rotation.z=rotationZ;parent.add(o);return o;
+ };
+ const apertures={Ka:mouth(reflectorHead,0,dishD*.162),Optical:mouth(barrel,0,ap*1.035),
+  patches:patches.map((patch,i)=>mouth(patch,i?.5:-.5,0,(i?-1:1)*Math.PI/2))};
 // The rack drawing uses the MEL's occupied slots in body metres. A batch
 // per material avoids a separate draw call for every tray in the large builds.
 const rack=join(internal,0,0,0,'compute'),cabinet=h.rackLayout;
@@ -343,13 +350,17 @@ for(let axis=0;axis<3;axis++){const p=join(internal,-w*.34+(axis===0?w*.11:0),hg
 }
 // Four physical mechanisms occupy a transverse forward face outside the rack allocation.
 const gyroPack=join(root,0,0,0,'cmg');gyroPack.visible=false;
-const dims=propulsion.installDims['04.01'];
+const dims=propulsion.installDims['04.01'],gyroAxes=clusterState([0,0,0,0],1);
 for(const [i,station] of propulsion.stations['04.01'].entries()){
- const g=join(gyroPack,...station,'cmg'),a=i*Math.PI/2+Math.PI/4,r=.46*Math.min(dims[0],dims[1]);
- const rotor=cyl(g,0,0,0,r*.73,r*.73,dims[2]*.45,bronze,'cmg');rotor.rotation.x=Math.PI/2;
- const ring=new T.Mesh(new T.TorusGeometry(r,r*.075,12,48),ivory);g.add(ring);
+ const g=join(gyroPack,...station,'cmg'),r=.46*Math.min(dims[0],dims[1]);
+ const x=new T.Vector3(...gyroAxes.rotorAxes[i]),z=new T.Vector3(...gyroAxes.gimbalAxes[i]),y=z.clone().cross(x).normalize();
+ const mount=join(g,0,0,0,'cmg');
+ mount.quaternion.setFromRotationMatrix(new T.Matrix4().makeBasis(x,y,z));
+ const gimbal=join(mount,0,0,0,'cmg'),spin=join(gimbal,0,0,0,'cmg');
+ const rotor=cyl(spin,0,0,0,r*.73,r*.73,dims[2]*.45,bronze,'cmg');rotor.rotation.z=-Math.PI/2;
+ const ring=new T.Mesh(new T.TorusGeometry(r,r*.075,12,48),ivory);ring.rotation.y=Math.PI/2;gimbal.add(ring);
  box(g,0,-dims[1]*.43,0,dims[0]*.89,dims[1]*.08,dims[2]*.96,steel,'cmg');
- cmgs.push({g,rotor,a});
+ cmgs.push({g,gimbal,spin,rotor,index:i});
 }
 for(const e of propulsion.engines){
  const engine=join(root,e.x,e.y,e.z,'propulsion'),r=e.exitRadiusM,ht=e.throatZ-e.z;engine.rotation.x=Math.PI/2;
@@ -416,4 +427,4 @@ function positionPanels(progress,attitude){
  appendages.updateWorldMatrix(true,true);hoses.forEach(updateHose);
 }
 positionPanels(1);
-return{root,internal,skin,enclosure,service,shelf,tankMap,engines,regulator:regulatorParts[0],walls,wings,panels,mechanismAudit,appendages,recorder,avionics,torquers,driveCount,shownDrives,trayRows,positionPanels,rads,cmgs,cells,leds,dish,optic,pointTerminals,patches,plumes,gyroPack,bw,bh,bl,wingspan:2*(panelL+kin.rootX),spanZ:kin.radRoot+2*kin.r*Math.SQRT1_2+Math.max(bl/2,-kin.center+kin.mountZ+panelW/2)};}
+return{root,internal,skin,enclosure,service,shelf,tankMap,engines,regulator:regulatorParts[0],walls,wings,panels,mechanismAudit,appendages,recorder,avionics,torquers,driveCount,shownDrives,trayRows,positionPanels,rads,cmgs,cells,leds,dish,optic,pointTerminals,patches,apertures,plumes,gyroPack,bw,bh,bl,wingspan:2*(panelL+kin.rootX),spanZ:kin.radRoot+2*kin.r*Math.SQRT1_2+Math.max(bl/2,-kin.center+kin.mountZ+panelW/2)};}

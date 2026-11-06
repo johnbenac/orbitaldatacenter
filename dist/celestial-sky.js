@@ -22,14 +22,14 @@ function solarImage(){
  ctx.putImageData(im,0,0);
  const texture=new T.CanvasTexture(c);texture.colorSpace=T.SRGBColorSpace;return texture;
 }
-export function createCelestialSky(onReady){
+export function createCelestialSky(onReady,compactTextures=false){
  const group=new T.Group();group.name='Inertial celestial sphere';
  const shell=new T.SphereGeometry(16,80,40),uv=shell.attributes.uv;
  for(let i=0;i<uv.count;i++)uv.setX(i,1-uv.getX(i));
  const fieldMaterial=new T.MeshBasicMaterial({color:0x0c141d,side:T.BackSide,depthWrite:false});
  const field=new T.Mesh(shell,fieldMaterial);field.name='Milky Way · equatorial sky survey';
  field.renderOrder=-20;fieldMaterial.userData.celestial=true;fieldMaterial.userData.globeTexture=true;
- const survey=new T.TextureLoader().load(new URL('./vendor/sky-equatorial.jpg',import.meta.url).href,texture=>{
+ const survey=new T.TextureLoader().load(new URL(compactTextures?'./vendor/sky-equatorial-small.jpg':'./vendor/sky-equatorial.jpg',import.meta.url).href,texture=>{
   texture.colorSpace=T.SRGBColorSpace;texture.wrapS=T.RepeatWrapping;
   fieldMaterial.color.setScalar(2.1);fieldMaterial.map=texture;fieldMaterial.needsUpdate=true;onReady?.();
  });

@@ -31,13 +31,13 @@ const pcd='Launch-side bolt-circle diameter';
 const face=(name,diameterMm,bolts,status,basis,source,diameterMeaning=pcd)=>({name,diameterMm,diameterMeaning,bolts,status,basis,source});
 const star={
  family:'starship',kind:'ship-bay',facility:'Starbase ship high bay · cargo study',location:'Starbase, Texas',
- handling:'A bridge crane handles a single upright spacecraft and its forward cargo assembly. The tanks, aft flaps and six engines belong to the ship below the cargo deck.',
- mating:'SpaceX’s 2020 concept moved the enclosed payload upright to the pad and lifted it onto the ship. This study brings the lift inside a high bay to show the vehicle and its load path together.',
- provenance:'Large-cargo ground sequence and support fixtures are workbench assumptions. SpaceX has published a large-payload concept and flown a different dispenser for flat satellites.',
- interface:face('Proposed cargo-deck fitting',2000,48,'study','The 2,000 mm circle and 48 positions are workbench choices for the cradle foot. SpaceX’s heritage clamp-band sizes describe payload separation hardware. The guide supplies no V3 cradle-foot bolt drawing.',sources.star),
+ handling:'The complete ship stands on its ground support. An elevated bridge crane places the upright spacecraft on the extended carriage outside the leeward hatch. The fixed nose, windward tiles, flaps, tanks and engines stay together.',
+ mating:'Once the hoist clears the spacecraft, the carriage draws the load sideways into the bay. Launch locks secure the carriage to the primary structure. The hatch closes for transport and ascent.',
+ provenance:'ODC engineering concept. The hatch dimensions, reinforced perimeter, carriage, lock locations and timing are study assumptions. SpaceX published a tilting adapter concept in 2020 and subsequently flew a dispenser for flat satellites.',
+ interface:face('Study carriage fitting',2000,48,'study','The 2,000 mm circle and 48 positions are workbench choices for the adapter foot on the moving carriage. SpaceX’s heritage clamp-band sizes describe payload separation hardware. The guide supplies no V3 carriage bolt drawing.',sources.star),
  evidence:[
  item('Provider concept · 2020','The guide describes upright integration in a cleanroom. In orbit, a retained door opens and the payload and adapter tilt for release. It lists 937, 1,194, 1,666 and 2,624 mm clamp-band options.',sources.star),
- item('Photographed hardware','Ringwatchers documents the sliding slot and dispenser in Ship 33’s forward barrel with labeled photographs. The assembly photographs show how hardware can be installed before the forward section joins the vehicle.',sources.observed),
+ item('Photographed hardware','Ringwatchers documents the sliding slot and dispenser in Ship 33’s forward barrel with labeled photographs. The identified hardware is for stacked, flat satellites.',sources.observed),
  item('Flight evidence · 2026','Flight 13 deployed 20 flat Starlink V3 satellites. That flight demonstrates the dispenser workload. The large door and dedicated cargo cradle shown here are a separate design study.',sources.flight)
  ]
 };
@@ -106,9 +106,9 @@ const glenn9={
  interface:face('Proposed 9×4 high-capacity fitting',3169.9,120,'study','This is an explicit carryover of the 2018 high-capacity 7×2 bolt pattern for comparison. Blue Origin’s 9×4 facility announcement does not establish this as the 9×4 attachment.',sources.glenn)
 };
 const shipsElsewhere={
- 'ksc-starship':['Florida ship high bay · study','Kennedy Space Center · LC-39A proposal','The FAA review identifies work at Roberts Road to support future Starship integration. This high-bay interior and its large-payload transfer are modeled from the Texas study.',sources.florida],
+ 'ksc-starship':['Florida ship high bay · study','Kennedy Space Center · LC-39A proposal','SpaceX describes a Florida Gigabay with elevated work platforms, cranes and work cells for integration and refurbishment. The carriage and loading station in this hall are the ODC concept.',ref('SpaceX · Future of Building Starship','https://www.spacex.com/updates')],
  'cape-slc37':['Cape ship high bay · study','Cape Canaveral · SLC-37 proposal','The FAA review covers proposed SLC-37 operations. A Texas-derived high bay and local cargo transfer are workbench assumptions for this site.',sources.cape],
- 'louisiana-study':['Louisiana ship high bay · study','Pecan Island · proposed campus','Louisiana announced a new spaceport campus. The selected hall, service decks and indoor cargo lift are concept assumptions for that proposal.',sources.louisiana]
+ 'louisiana-study':['Louisiana ship high bay · study','Pecan Island · proposed campus','Louisiana announced a planned Pecan Island campus with vehicle processing and propellant infrastructure. The pictured hall, service decks and lateral loading equipment are study assumptions.',sources.louisiana]
 };
 const profiles={terran,terranX:terran,glenn,glenn9,starship:star,falconHeavy:falcon,vulcan6:vulcan,ariane64:ariane,longMarch5B:cz5,longMarch9:cz9};
 const facilities={};

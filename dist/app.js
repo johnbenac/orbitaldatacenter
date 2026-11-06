@@ -1,3 +1,8 @@
+import {renderAttitudeEngineering} from './attitude-engineering.js';
+import {flightButtons} from './flight-transport.js';
+import {updateCommRehearsal} from './comm-rehearsal.js';
+import {updateCommTestConsole} from './comm-test-console.js';
+import {terminalMonitor,terminalWindow,signalGuide} from './terminal-console.js';
 import {masterTimeline} from './master-timeline.js';
 import {workspaceHistory} from './workspace-history.js';
 import {renderMasterTimeline,bindMasterTimeline} from './timeline-view.js';
@@ -10,13 +15,14 @@ import {paintFieldGuide,referenceLesson} from './field-guide.js';
 import {comparisonEvents,chooseComparison,compareMoments,eventOptions,eventMomentsMarkup} from './event-explorer.js';
 import {orbitalLightingAvailable,cameraExposure} from './orbit-lighting.js';
 import {hasLoadingDirector,loadingEnd,loadingPlayer,refreshLoadingPlayer} from './payload-loading.js';
-import {INTEGRATION_TIMES} from './integration-sequence.js';
+import {INTEGRATION_TIMES,integrationState} from './integration-sequence.js';
 import {integrationProfile} from './integration-profiles.js';
 import {bayLesson} from './bay-lessons.js';
 import {createChoiceCues} from './choice-cues.js';
 import {entryRoute,entryClock,windowStartFor,tabCheckpoint} from './workspace-route.js';
 const choiceCues=createChoiceCues();
-let loadingPlayback=false;
+let loadingPlayback=false,playDirection=1;
+const replayMotion=()=>playing?playDirection:0;
 import {bayCameraControls,bayGuide,bayEvidence,bayDisplayControls,facilityNotes} from './bay-view.js';
 import {launchGuide,launchSegment,launchSequence,refreshLaunchGuide,showLaunchDirector,siteApproach} from './launch-director.js';
 import {launchSitesFor,launchSiteFor} from './launch-sites.js';
@@ -42,7 +48,7 @@ import {recommendedDomainCamera} from './domain-scene.js';
 import {icon} from './icons.js';
 import {vehicleDrawings} from './drawings.js';
 import {pages,workspaceFor,colors,overlayNames,componentMap} from './workspaces.js';
-import {encodeScenario,decodeScenario,scenarioBlob,telemetryBlob,timelineFile,makePacket,packetIdentity,restoreFile,zipLibrary} from './exports.js';
+import {encodeScenario,decodeScenario,scenarioBlob,telemetryBlob,timelineFile,makePacket,packetIdentity,normalizeCommWorksheet,restoreFile,zipLibrary} from './exports.js';
 import {aiDeploymentAudit} from './ai-deployment-audit.js';
 import {deploymentAudit} from './deployment-audit.js';
 import {surfaceAudit} from './surface-audit.js';
@@ -65,7 +71,7 @@ const plus=(n)=>n>=0?'+'+fmt(n):fmt(n);
 const clocks=t=>{const sec=Math.floor(Math.max(0,t)%DAY);return [Math.floor(sec/3600),Math.floor(sec/60)%60,sec%60].map(x=>String(x).padStart(2,'0')).join(':')};
 const time=t=>t<0?'T−'+clocks(-t):'D'+String(Math.floor(t/DAY)+1).padStart(3,'0')+' '+clocks(t);
 const cv={launch:['Launch configuration','rocket','04'],spacecraft:['Spacecraft','satellite','02'],orbit:['Earth Orbit','globe','01'],core:['Compute Core','cpu','03']};
-const defaultView={phase:'A',timelineRow:null,timelineSegment:'all',timelineAll:false,timelineFollow:false,domain:'conops',teachEvent:'',teachFolded:false,lighting:'realistic',exposureEV:0,orbitVectors:true,deploymentLens:'vehicle',launchLens:'wide',bayLens:'overview',bayIsolate:true,bayLabels:true,bayBasis:false,bayClock:false,purposePreview:null,studyDays:0,tradeKey:null,tradeBase:null,presetName:null,detail:false,thermalNode:'junction',thermalScope:'window',thermalPadding:0,thermalScale:'working',thermalAuto:true,pointingAuto:true,flightLoop:'surfaces',thermalTargets:{},cameraStates:null,camera:'spacecraft',t:7800,preset:'starter',starterPurpose:'text',starterContext:null,modified:false,chapter:'integration',instruments:false,start:0,scope:'day',mode:'size',solve:'installed',speed:30,event:null,overlays:[],inspect:null};
+const defaultView={phase:'A',commBench:'sband',commWorksheet:null,rfFilter:null,rfPage:0,timelineRow:null,timelineSegment:'all',timelineAll:false,timelineFollow:false,domain:'conops',teachEvent:'',teachFolded:false,lighting:'realistic',exposureEV:0,orbitVectors:true,deploymentLens:'vehicle',launchLens:'wide',bayLens:'overview',bayIsolate:true,bayLabels:true,bayBasis:false,bayClock:false,purposePreview:null,studyDays:0,tradeKey:null,tradeBase:null,presetName:null,detail:false,thermalNode:'junction',thermalScope:'window',thermalPadding:0,thermalScale:'working',thermalAuto:true,pointingAuto:true,flightLoop:'surfaces',thermalTargets:{},cameraStates:null,camera:'spacecraft',t:7800,preset:'starter',starterPurpose:'text',starterContext:null,modified:false,chapter:'integration',instruments:false,start:0,scope:'day',mode:'size',solve:'installed',speed:30,event:null,overlays:[],inspect:null};
 let view={...defaultView},input=missionStarter('text'),hardware,sim,result,snap,samples=[],daySamples=[],events=[],day={},life,plotStart=0,plotEnd=DAY,scene=null,playing=false,lastTick=0,toastId,rebuildId,daysig='',eventFilter='all',modal=null,pickedRow='',initialShared=false;
 let orderJob=null,packetOrderAbort=null,lastOrder=null,landingReplay=null;const serviceCache=new WeakMap();
 let help,referencePage=null,loadedPresets=[],tradeCache=null,tradeBusy=false,flightSyncError='',pendingFlightSeek=null;
@@ -78,16 +84,19 @@ function liveDate(t){return new Date(Date.parse(input.epoch)+t*1000).toISOString
 function starterContext(d){return Object.fromEntries(missionStarterContextKeys.map(k=>[k,d[k]]))}
 const referenceIds=['architecture','equipment','timeline','sources','checks'];
 const timelineSegment=value=>['ground','countdown','ascent','insertion','commissioning','operations'].includes(value)?value:'all';
+const commBenchId=value=>['sband','ka','optical'].includes(value)?value:'sband';
 const timelineRowId=value=>typeof value==='string'&&value.length<=140?value:null;
 function loadScenario(obj){
  if(obj?.schema!=='odc-scenario/1'||!obj.design||typeof obj.design!=='object')throw Error('Choose an Orbital Data Center scenario JSON or PDR package.');
  const h=sizeDesign(obj.design);if(h.errors.length)throw Error(h.errors[0]);
  const v=obj.view||{},domain=[v.domain,v.page,v.subsystem].find(k=>Object.hasOwn(domains,k))||'conops';
  input={...h.input};view={...defaultView,domain,phase:phaseFromView(v),preset:typeof v.preset==='string'?v.preset:'custom',presetName:typeof v.presetName==='string'?v.presetName.slice(0,64):null,modified:!!v.modified,
+  commBench:commBenchId(v.commBench),commWorksheet:v.commWorksheet?.designRevision&&Array.isArray(v.commWorksheet.tests)?{designRevision:String(v.commWorksheet.designRevision).slice(0,8),tests:normalizeCommWorksheet(v.commWorksheet.tests.slice(0,3)),rehearsal:Number.isFinite(v.commWorksheet.rehearsal?.goalGB)&&v.commWorksheet.rehearsal.goalGB>0?{goalGB:v.commWorksheet.rehearsal.goalGB,ran:v.commWorksheet.rehearsal.ran===true}:null}:null,
+  rfFilter:['S-band','Ka','Optical'].includes(v.rfFilter)?v.rfFilter:null,rfPage:Math.max(0,Math.floor(Number(v.rfPage)||0)),
   timelineRow:timelineRowId(v.timelineRow),timelineSegment:timelineSegment(v.timelineSegment),timelineAll:v.timelineAll===true,timelineFollow:v.timelineFollow===true,
   starterPurpose:Object.hasOwn(aiPurposes,v.starterPurpose)?v.starterPurpose:h.input.aiPurpose,starterContext:v.preset==='starter'?starterContext(missionStarter(h.input.aiPurpose,v.starterContext??h.input)):null,
   bayLens:['equipment','interface','payload','endOn','sideOn'].includes(v.bayLens)?v.bayLens:'overview',bayIsolate:v.bayIsolate!==false,bayLabels:v.bayLabels!==false,teachEvent:typeof v.teachEvent==='string'?v.teachEvent:'',teachFolded:!!v.teachFolded,bayBasis:!!v.bayBasis,bayClock:!!v.bayClock,lighting:v.lighting==='studio'?'studio':'realistic',exposureEV:cameraExposure(v.exposureEV),orbitVectors:v.orbitVectors!==false,
-  launchLens:['base','pad','ship','fairing'].includes(v.launchLens)?v.launchLens:'wide',deploymentLens:['vehicle','wing','hinge'].includes(v.deploymentLens)?v.deploymentLens:'vehicle',purposePreview:Object.hasOwn(aiPurposes,v.purposePreview)?v.purposePreview:null,studyDays:[1,7,30,60,90].includes(v.studyDays)?v.studyDays:0,detail:!!v.detail,instruments:!!v.instruments,thermalNode:thermalNodes.some(n=>n.id===v.thermalNode)?v.thermalNode:'junction',thermalScope:v.thermalScope==='mission'?'mission':'window',thermalScale:v.thermalScale==='full'?'full':'working',thermalAuto:v.thermalAuto!==false,pointingAuto:v.pointingAuto!==false,flightLoop:Object.hasOwn(flightLoops,v.flightLoop)?v.flightLoop:'surfaces',thermalPadding:clamp(Number(v.thermalPadding)||0,0,100),thermalTargets:sanitizeTargets(v.thermalTargets),
+  launchLens:['base','pad','ship','fairing','engines'].includes(v.launchLens)?v.launchLens:'wide',deploymentLens:['vehicle','wing','hinge'].includes(v.deploymentLens)?v.deploymentLens:'vehicle',purposePreview:Object.hasOwn(aiPurposes,v.purposePreview)?v.purposePreview:null,studyDays:[1,7,30,60,90].includes(v.studyDays)?v.studyDays:0,detail:!!v.detail,instruments:!!v.instruments,thermalNode:thermalNodes.some(n=>n.id===v.thermalNode)?v.thermalNode:'junction',thermalScope:v.thermalScope==='mission'?'mission':'window',thermalScale:v.thermalScale==='full'?'full':'working',thermalAuto:v.thermalAuto!==false,pointingAuto:v.pointingAuto!==false,flightLoop:Object.hasOwn(flightLoops,v.flightLoop)?v.flightLoop:'surfaces',thermalPadding:clamp(Number(v.thermalPadding)||0,0,100),thermalTargets:sanitizeTargets(v.thermalTargets),
   t:Number.isFinite(v.t)?Math.max(-3600,v.t):defaultView.t,start:Number.isFinite(v.start)?Math.max(0,v.start):0,scope:['day','now','mission'].includes(v.scope)?v.scope:'day',solve:Object.hasOwn(solveModes,v.solve)?v.solve:'installed',chapter:chapters.some(c=>c.id===v.chapter)?v.chapter:'operations',camera:Object.hasOwn(cv,v.camera)?v.camera:'spacecraft',cameraStates:v.cameraStates||null,
   overlays:Array.isArray(v.overlays)?v.overlays.filter(x=>Object.hasOwn(overlayNames,x)):[],speed:[1,10,30,120,600].includes(v.speed)?v.speed:30,event:v.event&&typeof v.event.label==='string'&&Number.isFinite(v.event.start)&&Number.isFinite(v.event.end)?v.event:null,inspect:typeof v.inspect==='string'?v.inspect:null,
   chronological:!!v.chronological,tradeKey:Object.hasOwn(controlByKey,v.tradeKey)?v.tradeKey:null};
@@ -96,6 +105,7 @@ function loadScenario(obj){
 }
 function integrating(){return !referencePage&&view.phase==='D'&&snap?.flightPhase==='integration'}
 function syncBayView(){
+ scene?.setCommBench?.(view.commBench);
  scene?.setBayView?.(view.bayLens,view.bayLabels);
  scene?.setBayIsolation?.(view.bayIsolate);
 }
@@ -104,7 +114,7 @@ function selectBayLens(key){
  view.bayLens=key;view.camera='launch';draw();$('cameras').querySelector('[data-bay-lens="'+key+'"]')?.focus({preventScroll:true});
 }
 function commissioning(){return !referencePage&&view.phase==='E'&&view.chapter==='commissioning'}
-function scenario(){return {schema:'odc-scenario/1',modelVersion:'18.0',design:input,view:{...view,reference:referencePage,cameraStates:scene?.getCameraState?.()||view.cameraStates,t:Math.round(view.t*1000)/1000}}}
+function scenario(){return {schema:'odc-scenario/1',modelVersion:'19.0',design:input,view:{...view,reference:referencePage,cameraStates:scene?.getCameraState?.()||view.cameraStates,t:Math.round(view.t*1000)/1000}}}
 const checkpoint=tabCheckpoint(window,location,scenario);
 try{
  const restored=checkpoint.read()||(location.hash.startsWith('#design=')?decodeScenario(location.hash.slice(8)):null);
@@ -113,6 +123,7 @@ try{
 if(!initialShared){
  const q=new URLSearchParams(location.search);
  Object.assign(view,entryRoute(q));
+ view.commBench=commBenchId(q.get('bench'));
  if(q.get('reference')==='timeline'){view.timelineRow=timelineRowId(q.get('row'));view.timelineSegment=timelineSegment(q.get('segment'));view.timelineAll=q.get('events')==='all'}
  if(Object.hasOwn(flightLoops,q.get('loop')))view.flightLoop=q.get('loop');
  if(q.get('lighting')==='studio')view.lighting='studio';
@@ -125,6 +136,8 @@ if(!initialShared){
   const useStarter=q.get('build')==='suggested'||(!p&&q.get('build')!=='current');
   input=applyAIPurpose(input,goal,useStarter);if(useStarter){view.preset='starter';view.starterPurpose=goal}else view.modified=true;
  }
+ const studyLink=q.get('link');
+ if(['s','ka','optical','auto'].includes(studyLink)&&studyLink!==input.link){input={...input,link:studyLink};view.modified=true}
  const requestedLV=q.get('launcher');
  if(Object.hasOwn(presets.launcher,requestedLV)){
   input=applyPreset(input,'launcher',requestedLV);input.launchSite=launchSiteFor(requestedLV,q.get('site')).id;
@@ -132,7 +145,7 @@ if(!initialShared){
  }
  // Fresh studies adopt the selected pad and epoch once. Imported scenarios and legacy presets own their orbital elements.
  if(!p)input={...input,...siteApproach(input).angles};
- if(view.phase==='D'){view.speed=['ascent','pad'].includes(view.chapter)?1:30;view.launchLens=['base','pad','ship','fairing'].includes(q.get('lens'))?q.get('lens'):'wide';}
+ if(view.phase==='D'){view.speed=['ascent','pad','insertion'].includes(view.chapter)?1:30;view.launchLens=['base','pad','ship','fairing','engines'].includes(q.get('lens'))?q.get('lens'):'wide';}
  if(['equipment','interface','payload','endOn','sideOn'].includes(q.get('bay')))view.bayLens=q.get('bay');
  const preview=q.get('preview');if(Object.hasOwn(aiPurposes,preview))view.purposePreview=preview;
  const method=q.get('disposal');if(['graveyard','reentry'].includes(method)){input.disposalMethod=method;view.modified=view.modified||method!==defaults.disposalMethod}
@@ -145,6 +158,7 @@ function recalc(resolved=null,sample=true){
  auditAbort?.abort();flightSyncError='';pendingFlightSeek=null;tradeCache=null;view.chronological=false;
  result=resolved||inverseSolve(input,view.solve);hardware=result.hardware;view.aiPurpose=hardware.input.aiPurpose;sim=createSimulation(hardware);life=estimateLife(hardware);
  view.t=clamp(view.t,-3600,sim.duration);view.start=clamp(view.start,0,Math.max(0,sim.duration-DAY));
+ if(view.commWorksheet&&view.commWorksheet.designRevision!==packetIdentity(scenario(),sim.duration).revision)view.commWorksheet=null;
  daysig='';refreshPacketBadge();if(sample){refreshSamples();snap=sim.at(view.t)}
 }
 function refreshSamples(force=false){
@@ -265,7 +279,7 @@ function references(){
  if(referencePage==='timeline')return renderMasterTimeline(masterTimeline(sim),hardware,view);
  if(referencePage==='architecture')return renderArchitecture(hardware,snap);
  if(referencePage==='equipment')return renderEquipmentList(hardware,snap);
- if(referencePage==='checks'){const list=[...checks(),...scenarioTests()],passed=list.filter(x=>x.pass).length;return '<section class="panel">'+head('Surface geometry audit','scan-line','<span class="tag">REFERENCE BUILD</span>')+'<div class="panelpad"><p>Triangle winding and vertex normals were compared in '+fmt(surfaceAudit.geometries)+' unique geometries across the spacecraft and launch assemblies. Each exterior wall and the reflector passed closed-volume and paired-edge checks.</p></div>'+rowTable(['Geometry check','Measured'],[['Triangles with checked orientation',fmt(surfaceAudit.checkedTriangles)],['Zero-area triangles',fmt(surfaceAudit.zeroAreaPoleTriangles)],['Closed wall panels',fmt(surfaceAudit.shellSides)],['Occupied wall penetrations',fmt(surfaceAudit.occupiedPorts)]].map(x=>tr(x)).join(''))+'</section>'+deploymentEvidence()+'<section class="panel lowerpan">'+head('Numerical verification','list-checks','<span class="tag '+(passed===list.length?'':'warn')+'">'+passed+' / '+list.length+' PASS</span>')+rowTable(['Group','Reference calculation','Expected','Computed','Unit','Result'],list.map(c=>tr([c.group,esc(c.name),fmt(c.expected,5),fmt(c.actual,5),esc(c.unit),'<span class="'+(c.pass?'checkpass':'checkfail')+'">'+(c.pass?'Pass':'Review')+'</span>'])).join(''))+'</section>'}
+ if(referencePage==='checks'){const list=[...checks(),...scenarioTests()],passed=list.filter(x=>x.pass).length;return '<section class="panel">'+head('Surface geometry audit','scan-line','<span class="tag">'+surfaceAudit.launcherVariants+' LAUNCHERS</span>')+'<div class="panelpad"><p>Triangle winding and vertex normals were compared in '+fmt(surfaceAudit.geometries)+' geometry buffers across the spacecraft and launch fleet. Rays cast from both sides check the reusable hatch, heat-shield liner, fixed nose and conventional fairing halves in closed and open configurations. The spacecraft walls and reflector also passed closed-volume and paired-edge checks.</p></div>'+rowTable(['Geometry check','Measured'],[['Triangles with checked orientation',fmt(surfaceAudit.checkedTriangles)],['Zero-area triangles',fmt(surfaceAudit.zeroAreaPoleTriangles)],['Closed wall panels',fmt(surfaceAudit.shellSides)],['Occupied wall penetrations',fmt(surfaceAudit.occupiedPorts)]].map(x=>tr(x)).join(''))+'</section>'+deploymentEvidence()+'<section class="panel lowerpan">'+head('Numerical verification','list-checks','<span class="tag '+(passed===list.length?'':'warn')+'">'+passed+' / '+list.length+' PASS</span>')+rowTable(['Group','Reference calculation','Expected','Computed','Unit','Result'],list.map(c=>tr([c.group,esc(c.name),fmt(c.expected,5),fmt(c.actual,5),esc(c.unit),'<span class="'+(c.pass?'checkpass':'checkfail')+'">'+(c.pass?'Pass':'Review')+'</span>'])).join(''))+'</section>'}
  const d=hardware.input;const ledgerExamples=[['Solar generation','1.361 × '+fmt(d.solarM2)+' m² × '+fmt(d.pvEfficiency,3)+' × '+fmt(d.solarDelivery,3)+' × incidence × sunlight × retention × deployment',fmt(snap.solarKW)+' kW'],['Data generation',fmt(snap.tokensPerSec)+' tok/s × '+fmt(d.bytesPerToken)+' B/tok × 8',fmt(snap.tokensPerSec*d.bytesPerToken*8/1e6,5)+' Mbit/s text'],['Dry + consumables + adapter',fmt(hardware.dryKg)+' + '+fmt(hardware.propellantKg)+' + '+fmt(hardware.pressurantKg)+' + '+fmt(d.adapterKg)+' kg',fmt(hardware.launchKg)+' kg'],['Drag force','½ × '+fmt(snap.densityKgM3,4)+' kg/m³ × '+fmt(snap.relativeSpeedMs)+'² × '+fmt(d.cd)+' × '+fmt(snap.ramAreaM2)+' m²',fmt(snap.dragN,6)+' N']];
  return pointingApproach(hardware)+deploymentReferences()+domainCoverage()+sourceNote()+sourceGuideIndex()+'<section class="panel">'+head('Live calculation sheet','activity','<span class="metacode">'+time(view.t)+'</span>')+rowTable(['Balance','Substitution','Result'],ledgerExamples.map(r=>tr(r.map(esc))).join(''))+'</section><section class="panel lowerpan">'+head('Model boundaries and equations','book-open')+'<div class="panelpad">'+assumptions.map(a=>'<details><summary>'+esc(a.name)+'</summary><p class="eq">'+esc(a.equation)+'</p><p>'+esc(a.note)+'</p></details>').join('')+'<h3 class="gap">Numerical method</h3>'+modelNotes.map(n=>'<p>'+esc(n)+'</p>').join('')+'</div></section><section class="panel lowerpan">'+head('Reference library','book-open','<span class="metacode">04 NOV 2026</span>')+'<div class="panelpad sourcegrid">'+sources.map(s=>'<a class="sourcecard" data-tip="Open the cited engineering reference in a new tab." href="'+esc(s.url)+'" target="_blank" rel="noopener">'+icon('square-arrow-out-up-right',14)+'<span><strong>'+esc(s.name)+'</strong><small>'+esc(s.note)+'</small></span></a>').join('')+'</div></section>';
 }
@@ -273,20 +287,23 @@ function renderDiscipline(live=false){
  const host=$('discipline-host'),id=view.domain,p=view.phase;
  host.hidden=!!referencePage||integrating()&&!view.detail&&id!=='software'||!['attitude','avionics','mechanical','software'].includes(id);
  if(host.hidden)return;
- const anchor=$(p==='A'?'domain-readout':p==='B'?'engineering-toggle':p==='F'?'disposal-plot':id==='software'&&['D','E'].includes(p)?'event-explorer':'trade-input');
+ const anchor=$(p==='A'?'domain-readout':p==='B'?'kpis':p==='F'?'disposal-plot':id==='software'&&['D','E'].includes(p)?'event-explorer':'trade-input');
  if(anchor.previousElementSibling!==host)anchor.parentNode?.insertBefore(host,anchor);
+ const engineeringBasisOpen=host.querySelector('.ae-basis')?.open,softwareBasisOpen=host.querySelector('.fs-basis')?.open;
  if(id==='software'){
   const readback=host.querySelector('[data-flight-readback]');
-  if(live&&readback){readback.innerHTML=renderFlightConsole(hardware,snap,p,view.flightLoop);return}
-  host.innerHTML=flightSoftware(hardware,snap,p,view.flightLoop);
+  if(live&&readback)readback.innerHTML=renderFlightConsole(hardware,snap,p,view.flightLoop);
+  else host.innerHTML=flightSoftware(hardware,snap,p,view.flightLoop);
  }else if(id==='mechanical'){
   const route=p==='F'?sim.disposal():null;
   const ctx=route?{route,entrySpeedMs:route.feasible&&Number.isFinite(route.entry)?sim.at(route.entry).relativeSpeedMs:null}:null;
   if(live){updateMechanical(host,hardware,snap,p,ctx);return}
   host.innerHTML=renderMechanical(hardware,snap,p,ctx);bindMechanical(host,hardware,snap,p,ctx);
  }else if(!live||!host.matches(':focus-within, :hover')){
-  host.innerHTML=id==='attitude'?renderGyroBenchmark(hardware,snap,day,p):renderAvionics(hardware,snap,p);
+  host.innerHTML=id==='attitude'?renderAttitudeEngineering(hardware,snap,p)+renderGyroBenchmark(hardware,snap,day,p):renderAvionics(hardware,snap,p);
  }
+ if(engineeringBasisOpen)host.querySelector('.ae-basis')?.setAttribute('open','');
+ if(softwareBasisOpen)host.querySelector('.fs-basis')?.setAttribute('open','');
 }
 let attitudeChart=null;
 function updatePointingPanels(){
@@ -325,7 +342,7 @@ function ensureScene(){
   scene.setExposureEV(view.exposureEV);
   scene.setOrbitVectors(view.orbitVectors);
   if(view.cameraStates)scene.setCameraState(view.cameraStates);
-  scene.update(hardware,snap);
+  scene.setSignalPlayback?.(replayMotion());scene.update(hardware,snap);
   scene.setOverlays(effectiveLayers());
   scene.highlight(view.inspect||'');
   status.hidden=true;
@@ -362,6 +379,45 @@ function refreshLesson(){
  if(phase==='C')return; // The trade view supplies its already matched pair of simulations.
  if(phase==='A'||phase==='B')showLesson(designTeaching(phase,id,hardware,snap));
  else showLesson(flightTeaching(phase,id,hardware,snap,view,phase==='F'?sim.disposal():null));
+}
+let rfLogCache=null,rfHardware=null,rfLastMonitor='';
+function refreshCommBench(){
+ const visible=!referencePage&&view.phase==='D'&&view.domain==='comm';
+ const chapter=visible&&integrating()&&integrationState(view.t).seat>0?'closeout':view.chapter;
+ updateCommTestConsole($('comm-test-console'),visible?hardware:null,chapter,selectCommBench,view.commBench,openCommLab,view.commWorksheet?.tests,saveCommTests);
+ updateCommRehearsal($('comm-rehearsal'),sim,visible&&chapter==='integration',view.commWorksheet?.rehearsal,saveCommRehearsal);
+}
+function selectCommBench(id){
+ view.commBench=commBenchId(id);
+ syncBayView();
+ if(integrating()){renderObservation();$('storyextras').innerHTML=bayEvidence(hardware,snap,view)+facilityNotes(hardware)+bayTimeControls()}
+ checkpoint.save();
+}
+function saveCommTests(tests){saveCommWorksheet({tests})}
+function saveCommRehearsal(rehearsal){saveCommWorksheet({rehearsal})}
+function saveCommWorksheet(change){
+ view.commWorksheet={tests:[],...view.commWorksheet,...change,designRevision:packetIdentity(scenario(),sim.duration).revision};
+ checkpoint.save();refreshPacketBadge();
+}
+function openCommLab(){
+ view.domain='comm';view.bayLens='equipment';jumpGuide('integration');
+ $('comm-test-console').scrollIntoView({block:'start'});
+}
+function refreshRadio(){
+ const visible=!referencePage&&['C','D','E'].includes(view.phase)&&['comm','data'].includes(view.domain)&&!snap.carrierAttached&&!snap.referenceBody&&!snap.orbitLost;
+ const monitor=$('rf-monitor'),log=$('rf-log');monitor.hidden=!visible;log.hidden=!visible;
+ if(!visible)return;
+ const details=terminalMonitor(snap);
+ if(details!==rfLastMonitor){$('rf-mon-grid').innerHTML=details;rfLastMonitor=details}
+ $('rf-play').textContent=playing&&playDirection>0?'Pause':'Watch at 1×';$('rf-play').hidden=!playing&&!snap.terminalActivity?.length;
+ $('rf-peer').textContent=snap.station?snap.station+' in view':'Between direct contacts';
+ if(rfHardware!==hardware){$('rf-pattern-key').innerHTML=signalGuide(hardware);rfHardware=hardware}
+ const start=view.start,end=Math.min(start+DAY,sim.duration);
+ const filter=view.rfFilter||({ka:'Ka',optical:'Optical',s:'S-band'}[hardware.input.link])||'S-band';
+ if(rfLogCache?.model===sim&&rfLogCache.audit===sim.audit&&rfLogCache.start===start&&rfLogCache.filter===filter&&rfLogCache.page===view.rfPage)return;
+ const runs=sim.terminalRuns(start,end-start);
+ log.innerHTML=terminalWindow(hardware,runs,start,end,filter,view.rfPage);
+ rfLogCache={model:sim,audit:sim.audit,start,filter,page:view.rfPage};
 }
 function refreshEventExplorer(){
  const visible=!referencePage&&view.phase==='E'&&!commissioning();
@@ -407,10 +463,11 @@ function draw(){
  checkpoint.schedule([view.phase,referencePage||view.domain,view.chapter,view.camera].join('/'));
  snap=sim.at(view.t);const p=view.phase,id=view.domain,ref=referencePage,def=phases[p],d=domains[id],a=!ref&&p==='A',b=!ref&&p==='B',c=!ref&&p==='C',flight=!ref&&['D','E','F'].includes(p),visual=c||flight;
  if(!visual){updatePointingPanels();$('orbit-lighting').hidden=true;$('flight-vectors').hidden=true}
- const bay=integrating();document.body.dataset.bay=String(bay);
+ const bay=integrating();document.body.dataset.bay=String(bay);scene?.setSignalPlayback?.(visual?replayMotion():0);refreshRadio();
+ refreshCommBench();
  positionGuide();refreshLesson();refreshEventExplorer();
  const loader=$('loading-player');loader.hidden=!(bay&&hasLoadingDirector(id));
- loader.innerHTML=loader.hidden?'':loadingPlayer(hardware,snap,playing);
+ loader.innerHTML=loader.hidden?'':loadingPlayer(hardware,snap,replayMotion());
  $('viewer-heading').textContent=bay?'Integration facility':'Flight view';
  $('bay-display').hidden=!bay;
  setNav();const bar=lifecycleNav(p);if(bar!==phaseHTML){assignNav($('lifecycle'),bar);phaseHTML=bar}document.body.classList.toggle('storypage',visual);document.body.classList.toggle('subsystems-page',b);document.body.dataset.phase=p;
@@ -428,7 +485,7 @@ function draw(){
  $('disposal-plot').hidden=!!ref||p!=='F';$('domain-readout').hidden=!!ref||p==='B';
  if(ref){$('pagecode').textContent=['architecture','equipment','timeline'].includes(ref)?'SPACECRAFT BASELINE  /  ODC–01':'ENGINEERING REFERENCE';const panel=$('subsystem');panel.innerHTML=references();if(ref==='equipment')bindEquipmentList(panel,hardware,snap);
   if(ref==='timeline')bindMasterTimeline(panel,masterTimeline(sim),hardware,view,{
-   onOpen:openTimelineEvent,onExport:exportMasterTimeline,fileFor:masterDownload,onView:patch=>{Object.assign(view,patch);checkpoint.save();}
+   onOpen:openTimelineEvent,onCommLab:openCommLab,onExport:exportMasterTimeline,fileFor:masterDownload,onView:patch=>{Object.assign(view,patch);checkpoint.save();}
   });
   choiceCues.update('reference/'+ref,document);return}
  if(a){$('presetshelf').innerHTML=presetShelf(view,loadedPresets,hardware);$('phase-content').innerHTML=phaseA(hardware,view,result,k=>inputRow(k,false,'concept'));$('phase-extras').innerHTML=phaseHandoff('B',id)+sourceNote()}
@@ -436,6 +493,7 @@ function draw(){
  if(visual){
   ensureScene();
   if(bay){const facility=integrationProfile(hardware.input.launcher,hardware.input.launchSite);$('title').textContent=facility.facility;$('subtitle').textContent=facility.location+' · '+(hasLoadingDirector(id)?'Follow the data center from its checkout stand to the flight vehicle.':'Select a subsystem to inspect the tools used before the payload leaves its stand.'); $('pagecode').textContent='Phase D  /  Launch preparation';$('clockstatus').textContent='Preparing for launch';}
+  if(bay&&id==='comm'){$('title').textContent='Communications verification';$('subtitle').textContent='Run a ground test, then locate its fixture on the spacecraft. '+integrationProfile(hardware.input.launcher,hardware.input.launchSite).facility+'.'}
   if(commissioning()){$('title').textContent='Spacecraft deployment';$('subtitle').textContent='Follow each restraint, roll and hinge from separation to Sun acquisition.'}
   scene?.setDomain?.(commissioning()&&id!=='software'?'conops':id,p);scene?.setControlLoop?.(view.flightLoop);scene?.setDeploymentLens?.(view.deploymentLens);scene?.setLaunchLens?.(view.launchLens);scene?.setChapter?.(view.chapter);syncBayView();chooseCamera(view.camera);scene?.update(hardware,snap);scene?.setOverlays(effectiveLayers());scene?.highlight(view.inspect||'');syncThermalToggle();viewerInfo();renderObservation();
   if(c){renderTrade(true);$('phase-extras').innerHTML=missionTotals(currentContext(),view,time)+phaseHandoff('D',id)}
@@ -623,7 +681,7 @@ function refreshFlightCalls(){
  bar.innerHTML='<div><small>'+esc(model.launchHold?'CONDITIONAL FLIGHT STUDY':exactStart?'AT THE FLIGHT CLOCK':'MOST RECENT CALLOUT')+'</small><strong>'+esc(now?.title||'Awaiting first call')+'</strong></div>'+
   (next?'<button class="textbutton" data-next-master-call="'+esc(next.id)+'">Next call · '+esc(next.title)+' →</button>':'<span>End of this timeline</span>');
 }
-function viewerInfo(){refreshFlightCalls();syncLighting();updatePointingPanels();const ribbon=$('eventribbon');if(ribbon)ribbon.hidden=true;const early=view.t<DEPLOY_END_S;$('imagestate').textContent=early?time(view.t)+'  /  '+(view.t<0?'PREFLIGHT':view.t>=0&&view.t<35?Math.round(Math.max(0,snap.altitudeKm)*1000)+' M':Math.round(snap.altitudeKm)+' KM'):'ORB '+String(snap.orbitNumber).padStart(3,'0')+'  /  '+fmt(snap.altitudeKm,0)+' KM';$('craftid').textContent=designName(view);$('craftphase').textContent=view.camera==='core'?'CUTAWAY · ENCLOSURE OPEN FOR INSPECTION':early?({integration:'PAYLOAD INTEGRATION',pad:'LAUNCH PAD',ascent:'ASCENT',insertion:'ORBITAL INSERTION',commissioning:'DEPLOYMENT'})[snap.flightPhase]||'COMMISSIONING':snap.flightPhase==='entry'?'ENTRY INTERFACE':snap.burn?'CHEMICAL BURN':snap.station?'CONTACT · '+snap.station.toUpperCase():snap.eclipse?'EARTH SHADOW':'SUNLIT ORBIT'}
+function viewerInfo(){if(!referencePage&&view.phase==='D'&&view.domain==='comm')refreshCommBench();scene?.setSignalPlayback?.(replayMotion());refreshRadio();refreshFlightCalls();syncLighting();updatePointingPanels();const ribbon=$('eventribbon');if(ribbon)ribbon.hidden=true;const early=view.t<DEPLOY_END_S;$('imagestate').textContent=early?time(view.t)+'  /  '+(view.t<0?'PREFLIGHT':view.t>=0&&view.t<35?Math.round(Math.max(0,snap.altitudeKm)*1000)+' M':Math.round(snap.altitudeKm)+' KM'):'ORB '+String(snap.orbitNumber).padStart(3,'0')+'  /  '+fmt(snap.altitudeKm,0)+' KM';$('craftid').textContent=designName(view);$('craftphase').textContent=view.camera==='core'?'CUTAWAY · ENCLOSURE OPEN FOR INSPECTION':early?({integration:'PAYLOAD INTEGRATION',pad:'LAUNCH PAD',ascent:'ASCENT',insertion:'ORBITAL INSERTION',commissioning:'DEPLOYMENT'})[snap.flightPhase]||'COMMISSIONING':snap.flightPhase==='entry'?'ENTRY INTERFACE':snap.burn?'CHEMICAL BURN':snap.station?'CONTACT · '+snap.station.toUpperCase():snap.eclipse?'EARTH SHADOW':'SUNLIT ORBIT'}
 function openFieldGuide(key,option){
  const r=fieldGuidance(key,hardware.input,{option:option||hardware.input[key]});if(!r)return;
  $('guide-name').textContent=r.title;$('guide-body').innerHTML=helpBody(key,hardware.input,option);help?.hide();if(!$('guide-dialog').open)$('guide-dialog').showModal();
@@ -664,7 +722,7 @@ function openTimelineEvent(row){
  view.phase=row.phase;view.domain=row.domain;view.chapter=row.chapter;view.camera=row.camera;
  view.mode='fly';view.event=null;view.detail=false;view.inspect=null;
  view.deploymentLens='vehicle';view.launchLens='wide';view.bayLens=row.segment==='ground'?'payload':'overview';
- if(row.segment==='countdown'||row.segment==='ascent')view.speed=1;
+ if(row.segment==='countdown'||row.segment==='ascent'||row.segment==='insertion')view.speed=1;
  view.t=t;view.start=dayStart(t);playing=false;loadingPlayback=false;
  refreshSamples();snap=sim.at(t);draw();checkpoint.save();window.scrollTo({top:0,behavior:'instant'});
 }
@@ -771,7 +829,7 @@ function audit(){
 function packetIsCurrent(){
  if(!packetInfo||packetInfo.window_start_met_s!==view.start||packetInfo.instant_met_s!==Math.round(view.t*1000)/1000||packetInfo.phase!==view.phase)return false;
  const id=packetIdentity(scenario(),sim.duration);
- return id.revision===packetInfo.revision&&id.window_end_met_s===packetInfo.window_end_met_s&&id.order_study_days===packetInfo.order_study_days;
+ return id.revision===packetInfo.revision&&id.window_end_met_s===packetInfo.window_end_met_s&&id.order_study_days===packetInfo.order_study_days&&id.communications_tests===packetInfo.communications_tests;
 }
 function refreshPacketBadge(){
  if(!packetInfo)return;
@@ -849,12 +907,12 @@ async function actions(a,el){switch(a){
  case 'thermal-audit':await thermalAudit();break;
  case 'phasecontrols':if(isEditable(view.phase))phaseControls();break;
 
- case 'diagramplay':if(playing){playing=false;draw()}else startFlight();break;
+ case 'diagramplay':toggleFlight(1);break;
  case 'domainfields':case 'hardware':if(isEditable(view.phase)){view.mode='size';a==='hardware'?params():phaseControls()}break;
  case 'instruments':view.detail=!view.detail;draw();break;
  case 'pinbaseline':view.tradeBase={...input};tradeCache=null;renderTrade(true);toast('Current design pinned for trade studies.');break;
  case 'missioncalc':await fullAudit();break;case 'comparemissions':await compareMissions();break;
- case 'retryflight':prepareFlight();break;case 'flightplay':if(playing){playing=false;draw()}else startFlight();break;
+ case 'retryflight':prepareFlight();break;case 'flightplay':case 'flightreverse':toggleFlight(a==='flightreverse'?-1:1);break;
  case 'flightrestart':{const phase=view.phase,type={contact:'contact',reboost:'reboost',desat:'desat',operations:'burst'}[view.chapter];const current=events.find(e=>e.type===type&&view.t>=e.start&&view.t<=e.end);const t=phase==='F'?sim.ignition:current?.start??sim.story(view.chapter)?.start;setTime(t??DEPLOY_END_S);startFlight();break}
  case 'newpreset':if(view.phase==='A'){if(modal)close();view.purposePreview=input.aiPurpose;goPage('conops');$('purpose-host').querySelector('[data-preview-purpose="'+view.purposePreview+'"]')?.focus({preventScroll:true})}break;case 'loadpreset':if(view.phase==='A')$('presetin').click();break;case 'savepreset':savePresetDialog();break;case 'commitpreset':storePreset();break;case 'managepresets':if(view.phase==='A')shelfDialog();break;
  case 'fairingcompare':fairingDialog();break;
@@ -895,6 +953,22 @@ document.addEventListener('click',async e=>{const el=e.target.closest('button,[d
   else if(action.phase&&Object.hasOwn(phases,action.phase))switchPhase(action.phase);
   return;
  }
+ if(el.dataset.cvLocate!==undefined&&integrating()){selectBayLens('interface');$('viewer').scrollIntoView({block:'start'});return}
+ if(el.dataset.rfPlay!==undefined){if(playing&&playDirection>0){playing=false;draw()}else{view.speed=1;startFlight()}return}
+ if(el.dataset.rfFind!==undefined){$('rf-log').scrollIntoView({block:'center'});$('rf-log').querySelector('[aria-pressed="true"]')?.focus({preventScroll:true});return}
+ if(el.dataset.rfSelect||el.dataset.rfPage!==undefined){
+  if(el.dataset.rfSelect){view.rfFilter=el.dataset.rfSelect;view.rfPage=0}
+  else view.rfPage=Math.max(0,Math.floor(Number(el.dataset.rfPage)||0));
+  refreshRadio();checkpoint.save();
+  const selector=el.dataset.rfSelect?'[data-rf-select="'+view.rfFilter+'"]':'.rf-log-footer button:not([disabled])';
+  $('rf-log').querySelector(selector)?.focus({preventScroll:true});return;
+ }
+ if(el.dataset.rfReplay!==undefined){
+  const t=Number(el.dataset.rfReplay);if(!Number.isFinite(t))return;
+  referencePage=null;view.phase=t<DEPLOY_START_S?'D':'E';view.domain='comm';view.camera='spacecraft';view.timelineFollow=false;view.mode='fly';view.speed=1;
+  setTime(t);$('viewer').scrollIntoView({block:'start'});return;
+ }
+ if(el.dataset.rfPolicy!==undefined){goPage('comm');switchPhase('A');fieldEditor('link');return}
  if(el.dataset.compareMoment!=null&&eventStudy?.selected){
   const index=Number(el.dataset.compareMoment);if(!Number.isInteger(index)||index<0||index>2)return;
   view.teachEvent=eventStudy.selected.id;view.event={...eventStudy.selected};setTime(eventStudy.comparison.times[index],false);return;
@@ -937,10 +1011,12 @@ document.addEventListener('click',async e=>{const el=e.target.closest('button,[d
  if(el.dataset.watchLoading!=null){referencePage=null;view.domain='launcher';view.bayLens='overview';jumpGuide('integration');window.scrollTo({top:0,behavior:'instant'});return}
  if(integrating()&&el.dataset.loadingAt!=null){const t=Number(el.dataset.loadingAt);if(INTEGRATION_TIMES.includes(t)&&t<=loadingEnd(hardware)){view.camera='launch';if(view.bayLens!=='payload')view.bayLens='overview';setTime(t)}return}
  if(integrating()&&el.dataset.loadingPlay!=null){
-  if(playing){playing=false;loadingPlayback=false;draw();return}
-  const end=loadingEnd(hardware);
-  if(view.t>=end||view.t<INTEGRATION_TIMES[1])setTime(end===INTEGRATION_TIMES[1]?INTEGRATION_TIMES[0]:INTEGRATION_TIMES[1]);
-  if(view.bayLens!=='payload')view.bayLens='overview';view.camera='launch';view.speed=120;loadingPlayback=true;startFlight();return;
+  const direction=el.dataset.loadingPlay==='reverse'?-1:1,end=loadingEnd(hardware);
+  if(playing&&playDirection===direction){playing=false;draw();return}
+  if(direction>0&&(view.t>=end||view.t===INTEGRATION_TIMES[0])){
+   setTime(end===INTEGRATION_TIMES[1]?INTEGRATION_TIMES[0]:INTEGRATION_TIMES[1]);view.speed=120;
+  }else if(direction<0&&view.t>end)setTime(end);
+  if(view.bayLens!=='payload')view.bayLens='overview';view.camera='launch';loadingPlayback=true;startFlight(direction);return;
  }
  if(el.dataset.lighting&&['realistic','studio'].includes(el.dataset.lighting)&&!$('orbit-lighting').hidden){
   view.lighting=el.dataset.lighting;syncLighting();checkpoint.save();return;
@@ -969,7 +1045,7 @@ document.addEventListener('click',async e=>{const el=e.target.closest('button,[d
   const next={...input,...siteApproach(hardware.input).angles};reviewProposal(next,{label:'Align the insertion orbit with this site and launch epoch',force:true,commit:resolved=>{input=next;view.modified=true;playing=false;view.event=null;recalc(resolved);draw()}});return
  }
  if(el.dataset.launchTime!=null&&view.phase==='D'){const t=Number(el.dataset.launchTime);if(Number.isFinite(t)){view.speed=1;view.camera='launch';setTime(t)}return}
- if(el.dataset.launchLens&&view.phase==='D'){view.launchLens=['base','pad','ship','fairing'].includes(el.dataset.launchLens)?el.dataset.launchLens:'wide';view.camera='launch';draw();return}
+ if(el.dataset.launchLens&&view.phase==='D'){view.launchLens=['base','pad','ship','fairing','engines'].includes(el.dataset.launchLens)?el.dataset.launchLens:'wide';view.camera='launch';draw();return}
  if(el.dataset.attitudeFlight!=null){view.domain='attitude';jumpGuide('operations');return}
  if(el.dataset.attitudeTime!=null){setTime(Number(el.dataset.attitudeTime));return}
  if(el.dataset.disposalTime){playing=false;setTime(Number(el.dataset.disposalTime));view.phase='F';view.chapter='deorbit';draw();return}
@@ -1002,7 +1078,7 @@ document.addEventListener('input',e=>{const el=e.target;
  if(el.id==='deploy-cursor'){
   playing=false;view.t=clamp(DEPLOY_START_S+el.valueAsNumber,DEPLOY_START_S,DEPLOY_END_S);snap=sim.at(view.t);
   scene?.update(hardware,snap);viewerInfo();refreshLesson();refreshCommissioning(document,hardware,snap);
-  const button=$('dep-play');if(button)button.textContent=view.t>=DEPLOY_END_S?'Replay':'Play deployment';return;
+  renderObservation();return;
  }if(el.id==='field-filter'){const v=el.value.toLowerCase().trim();document.querySelectorAll('[data-query]').forEach(b=>b.hidden=!b.dataset.query.includes(v));return}if(el.id==='ad-seek'){playing=false;seekFlightCursor(el.valueAsNumber);return}if(el.id==='flight-cursor'){playing=false;const [a,b]=flightRange(),t=a+(b-a)*el.valueAsNumber/10000;seekFlightCursor(t);return}if(el.matches('input[type=range][data-param]')){clearTimeout(rebuildId);const v=el.valueAsNumber,key=el.dataset.param;el.style.setProperty('--pct',100*(v-el.min)/(el.max-el.min)+'%');rebuildId=setTimeout(()=>changeParam(key,v),45)}});
 document.addEventListener('change',e=>{const el=e.target;try{
  if(el.id==='event-choice'){
@@ -1043,7 +1119,7 @@ function jumpGuide(id,run=false){
  const c=chapters.find(x=>x.id===id);if(!c)return;
  playing=false;referencePage=null;const e=sim.story(id);
  if(!e||e.status==='unavailable'){toast(e?.reason||'No matching modeled event.');draw();return}
- view.phase=chapterPhase(id);view.chapter=id;view.event=null;if(id==='pad'||id==='ascent')view.speed=1;view.t=id==='pad'?-8:clamp(e.start??e.instant,-3600,sim.duration);view.camera=c.camera;view.start=dayStart(view.t);refreshSamples();snap=sim.at(view.t);draw();if(view.phase==='E')prepareFlight();else if(view.phase==='F')prepareCloseout();if(run)startFlight();if(id==='commissioning')window.scrollTo({top:0,behavior:'instant'})
+ view.phase=chapterPhase(id);view.chapter=id;view.event=null;if(id==='pad'||id==='ascent'||id==='insertion')view.speed=1;view.t=id==='pad'?-8:clamp(e.start??e.instant,-3600,sim.duration);view.camera=c.camera;view.start=dayStart(view.t);refreshSamples();snap=sim.at(view.t);draw();if(view.phase==='E')prepareFlight();else if(view.phase==='F')prepareCloseout();if(run)startFlight();if(id==='commissioning')window.scrollTo({top:0,behavior:'instant'})
 }
 function fairingDialog(){
  const rows=Object.entries(presets.launcher).map(([k,v])=>{const h=sizeDesign(applyPreset(hardware.input,'launcher',k)),f=h.fairing;return '<tr><td><strong>'+esc(v.label)+'</strong><small>'+esc(f.basis)+'</small></td><td>'+fmt(f.outerDiameterM,2)+' m</td><td>'+fmt(f.maxDiameterM,2)+' × '+fmt(f.heightM,2)+' m</td><td>'+plus(f.radialClearanceM)+' m</td><td>'+plus(f.axialClearanceM)+' m</td><td>'+(isEditable(view.phase)?'<button class="chip" data-use-launcher="'+k+'">Select</button>':k===hardware.input.launcher?'Selected launcher':'Comparison')+'</td></tr>'});
@@ -1067,7 +1143,7 @@ function switchPhase(id){
  if(stage){const e=sim.story(stage);view.chapter=stage;view.t=(fromLaunch||id==='D'||id==='F'?e.start:e.instant)??e.instant??view.t}
  else if(view.t<DEPLOY_END_S||view.t>=sim.ignition){view.chapter='operations';view.t=sim.story('operations').instant||1250}
  view.camera=fromLaunch?'spacecraft':id==='D'?'launch':recommendedCamera(id,view.domain);
- view.start=dayStart(view.t);refreshSamples();if(id==='E')playing=!fromLaunch&&!matchMedia('(prefers-reduced-motion: reduce)').matches;lastTick=performance.now();draw();if(id==='E')prepareFlight();else if(id==='F')prepareCloseout();window.scrollTo({top:0,behavior:'instant'});
+ view.start=dayStart(view.t);refreshSamples();if(id==='E')playDirection=1;if(id==='E')playing=!fromLaunch&&!matchMedia('(prefers-reduced-motion: reduce)').matches;lastTick=performance.now();draw();if(id==='E')prepareFlight();else if(id==='F')prepareCloseout();window.scrollTo({top:0,behavior:'instant'});
 }
 function syncThermalToggle(){const b=$('thermal-toggle'),on=effectiveLayers().includes('thermal');b?.setAttribute('aria-pressed',String(on));if(b)b.disabled=view.camera==='orbit'}
 
@@ -1099,7 +1175,7 @@ function sectionHeader(index,title,description,actions=''){return '<header class
 function designSection(){const d=domains[view.domain],params=purposeDomainFields(view.domain,hardware.input).filter(k=>controlByKey[k]&&k!=='disposalMethod').slice(0,4);
  return sectionHeader('01','Design',purposeStageDescription(view.domain,'B',hardware),'<div class="chips"><button class="btn" data-action="domainfields">Edit design inputs</button>'+(view.domain==='thermal'?'<button class="btn" data-action="tempbands">Thermal limits</button>':'')+'</div>')+'<div class="base-assumptions">'+params.map(k=>{const c=controlByKey[k],v=displaySetting(k,hardware.input[k]);return '<button class="chip" data-edit-input="'+esc(k)+'"><small>'+esc(c.label)+'</small><b>'+esc(fmt(v))+' '+esc(c.unit||'')+'</b></button>'}).join('')+'</div>';
 }
-function diagramTools(){return sectionHeader('02','Analysis','Read the response of this design at the mission clock. Select a time or event to follow its effects.')+`<div class="diagram-toolbar"><div><button class="btn" data-action="diagramplay">${icon(playing?'pause':'play',13)} ${playing?'Pause':'Run clock'}</button><button class="textbutton" data-action="window" id="diagram-clock">${esc(time(view.t))} ${icon('clock-3',13)}</button><button class="textbutton" data-action="events">Select event</button></div></div>`}
+function diagramTools(){return sectionHeader('02','Analysis','Read the response of this design at the mission clock. Select a time or event to follow its effects.')+`<div class="diagram-toolbar"><div>${flightButtons(replayMotion(),'Run clock')}<button class="textbutton" data-action="window" id="diagram-clock">${esc(time(view.t))} ${icon('clock-3',13)}</button><button class="textbutton" data-action="events">Select event</button></div></div>`}
 function updateDiagramClock(){if($('diagram-clock'))$('diagram-clock').textContent=time(view.t)}
 
 
@@ -1120,9 +1196,9 @@ function toggleThermal(){const was=effectiveLayers().includes('thermal');view.ov
 function currentContext(includeService=true){return {hardware,state:snap,sim,service:includeService&&view.phase!=='D'&&['purpose','conops'].includes(view.domain)?serviceFor(sim,view.start):null,audit:sim.audit,day,events,samples:daySamples,windowStart:view.start,windowEnd:Math.min(sim.duration,view.start+DAY)}}
 function bayTimeControls(){
  const rates=[1,10,30,120,600].map(rate=>`<option value="${rate}" ${view.speed===rate?'selected':''}>${rate}×</option>`).join('');
- return `<details class="bay-time panel" ${view.bayClock||view.detail?'open':''}><summary>Mission clock and engineering instruments</summary><div class="bay-playback"><button class="btn" data-action="flightplay">${icon(playing?'pause':'play',13)} ${playing?'Pause':'Play launch preparation'}</button><label>Playback speed <select id="flight-rate">${rates}</select></label></div>${flightPlayer()}</details>`;
+ return `<details class="bay-time panel" ${view.bayClock||view.detail?'open':''}><summary>Mission clock and engineering instruments</summary><div class="bay-playback">${flightButtons(replayMotion(),'Play launch preparation')}<label>Playback speed <select id="flight-rate">${rates}</select></label></div>${flightPlayer()}</details>`;
 }
-function renderObservation(){$('guidepanel').innerHTML=integrating()?bayGuide(hardware,snap,view):commissioning()?commissioningGuide(hardware,snap,view,playing):showLaunchDirector(view)?launchGuide(hardware,snap,view,playing):observationCard({...view,isPlaying:playing},currentContext(!lessonInRail()),time(view.t),lessonInRail())}
+function renderObservation(){$('guidepanel').innerHTML=integrating()?bayGuide(hardware,snap,view):commissioning()?commissioningGuide(hardware,snap,view,replayMotion()):showLaunchDirector(view)?launchGuide(hardware,snap,view,replayMotion()):observationCard({...view,isPlaying:replayMotion()},currentContext(!lessonInRail()),time(view.t),lessonInRail());if(showLaunchDirector(view)&&!integrating())refreshLaunchGuide(document,hardware.input,snap)}
 function renderDisposal(){
  const p=sim.disposal(),host=$('disposal-plot'),expanded=host.querySelector('details[open]')!=null;
  scene?.setDisposalPlan?.(p);host.innerHTML=renderDisposalView(hardware,snap,p);if(expanded){const d=host.querySelector('details');if(d)d.open=true}
@@ -1221,36 +1297,49 @@ function prepareCloseout(){
  if(view.phase!=='F'||sim.audit)return;const owner=sim,preview=sim.disposal();
  audit().then(()=>{if(owner!==sim||view.phase!=='F')return;const now=sim.disposal(),fraction=clamp((view.t-preview.start)/Math.max(1,preview.end-preview.start),0,1);view.t=now.start+(now.end-now.start)*fraction;view.start=dayStart(view.t);refreshSamples();draw()}).catch(err=>{if(err.name!=='AbortError'&&view.phase==='F')toast(err.message)})
 }
-function startFlight(){
+function toggleFlight(direction){
+ if(playing&&direction===playDirection){playing=false;draw();return}
+ loadingPlayback=false;startFlight(direction)
+}
+function playbackBounds(){
+ if(loadingPlayback)return [INTEGRATION_TIMES[0],loadingEnd(hardware)];
+ if(view.phase==='D')return [INTEGRATION_TIMES[0],DEPLOY_START_S];
+ if(commissioning())return [DEPLOY_START_S,DEPLOY_END_S];
+ if(view.phase==='E')return [DEPLOY_START_S,sim.ignition];
+ if(view.phase==='F')return [sim.ignition,sim.disposal()?.end??sim.duration];
+ return [Math.min(0,view.t),sim.duration];
+}
+function startFlight(direction=1){
  const p=view.phase;if(!['B','C','D','E','F'].includes(p))return;
- if(p==='D'&&view.t>=539.999&&view.t<540&&siteApproach(hardware.input).gapKm>.02){setTime(540);toast('Opened the independently specified operating orbit.')}
- if(commissioning()&&view.t>=DEPLOY_END_S)setTime(DEPLOY_START_S);
+ if(direction>0&&p==='D'&&view.t>=539.999&&view.t<540&&siteApproach(hardware.input).gapKm>.02){setTime(540);toast('Opened the independently specified operating orbit.')}
  if(p==='E'&&flightSyncError&&!commissioning()){prepareFlight();return}
  if(p==='F'&&sim.disposal()?.feasible===false){toast(sim.disposal().reason);return}
- let limit=p==='D'?900:p==='F'?sim.disposal()?.end:p==='E'?sim.ignition:sim.duration;
- if(Number.isFinite(limit)&&view.t>=limit)setTime(p==='D'?-3600:p==='F'?sim.ignition:DEPLOY_END_S);
- playing=true;lastTick=performance.now();draw();if(p==='E')prepareFlight()
+ const [start,end]=playbackBounds();
+ if(direction<0&&view.t<=start){playing=false;draw();toast('At the start of this recording. Select a later instant to play in reverse.');return}
+ if(direction>0&&view.t>=end)setTime(start);
+ playDirection=direction;playing=true;lastTick=performance.now();draw();if(p==='E')prepareFlight()
 }
 let lastInstrumentPaint=0,lastAnalysisPaint=0;
 function advanceFlight(ms){
- const p=view.phase,end=loadingPlayback&&integrating()?loadingEnd(hardware):p==='D'?DEPLOY_START_S:commissioning()?DEPLOY_END_S:p==='E'?sim.ignition:p==='F'?(sim.disposal()?.end??sim.duration):sim.duration;
- let t=Math.min(end,view.t+Math.min(2,(ms-lastTick)/1000)*view.speed);lastTick=ms;
+ const p=view.phase,[start,end]=playbackBounds();
+ const elapsed=clamp((ms-lastTick)/1000,0,2);
+ const t=clamp(view.t+playDirection*elapsed*view.speed,start,end);lastTick=ms;
  if(p==='E'&&!sim.audit&&t>=60*DAY){awaitFlightWindow(t);draw();return}
  if(p==='D'&&view.t<539.999&&t>=539.999&&siteApproach(hardware.input).gapKm>.02){
   playing=false;setTime(539.999);toast('Site ascent complete. Review the insertion mismatch or continue with the requested orbit.');return
  }
- const wasDay=view.start;view.t=t;view.start=dayStart(t);refreshSamples();snap=sim.at(t);if(t>=end){playing=false;loadingPlayback=false}
+ const wasDay=view.start;view.t=t;view.start=dayStart(t);refreshSamples();snap=sim.at(t);if(t===(playDirection>0?end:start)){playing=false;loadingPlayback=false}
  if(p==='D'||p==='E'){const oldChapter=view.chapter;syncChapterToTime(snap);if(p==='D'&&t>=900)view.chapter='insertion';
   if(view.chapter!==oldChapter){if(p==='D'){draw();return}if(view.chapter==='commissioning'||oldChapter==='commissioning'){draw();return}scene?.setChapter?.(view.chapter);$('missionpath').innerHTML=flightChapters(view)}}
  if(wasDay!==view.start||!playing){draw();return}
  const analysisDue=ms-lastAnalysisPaint>=1000;
  if(analysisDue){refreshPacketBadge();lastAnalysisPaint=ms;refreshLesson();refreshEventExplorer();if(!integrating()||view.detail||view.domain==='software')renderDiscipline(true);refreshLaunchStops()}
  if(p==='B'){renderDiagram();updateDiagramClock()}else{
-  scene?.update(hardware,snap);
+  scene?.setSignalPlayback?.(replayMotion());scene?.update(hardware,snap);
   if(ms-lastInstrumentPaint<180&&!analysisDue)return;
   lastInstrumentPaint=ms;
   const active=document.activeElement,key=active?.id==='flight-rate'||active?.closest?.('.flight-transport')||$('guidepanel').matches?.(':hover');
-  viewerInfo();if(integrating()&&hasLoadingDirector(view.domain))refreshLoadingPlayer(document,hardware,snap,playing);if(commissioning())refreshCommissioning(document,hardware,snap);else if(!integrating()){if(showLaunchDirector(view))refreshLaunchGuide(document,hardware.input,snap);else if(!key)renderObservation();}
+  viewerInfo();if(integrating()&&hasLoadingDirector(view.domain))refreshLoadingPlayer(document,hardware,snap,replayMotion());if(commissioning())refreshCommissioning(document,hardware,snap);else if(!integrating()){if(showLaunchDirector(view))refreshLaunchGuide(document,hardware.input,snap);else if(!key)renderObservation();}
   if($('live-met'))$('live-met').textContent=time(t);const slider=$('flight-cursor');if(slider&&document.activeElement!==slider){const [start,finish]=flightRange();slider.value=10000*clamp((t-start)/(finish-start||1),0,1);slider.style.setProperty('--pct',slider.value/100+'%')}
   if(p==='C'&&analysisDue)renderTrade(false);
   if(p==='F'&&analysisDue)renderDisposal();
@@ -1264,7 +1353,7 @@ function scheduleClock(){
 }
 function tick(ms){
  clockFrame=null;
- if(!playing||referencePage)return;
+ if(!playing||referencePage){scene?.setSignalPlayback?.(false);return}
  if(ms-lastTick>=(view.phase==='B'?180:40))advanceFlight(ms);
  scheduleClock();
 }

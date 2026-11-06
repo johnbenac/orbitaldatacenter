@@ -1,9 +1,17 @@
-import {defaults, sizeDesign} from './dist/design.js';
+import {defaults, missionStarter, sizeDesign} from './dist/design.js';
+import {siteApproach} from './dist/launch-director.js';
 import {createSimulation} from './dist/model.js';
 import {DAY, DEG, geometry} from './dist/orbit.js';
 
 const sun=geometry(defaults,0).sunECI;
 const terminatorNode=(360+Math.atan2(sun[0],-sun[1])/DEG)%360;
+
+// A site-aligned, launchable vehicle with a complete directly integrated
+// campaign, including maintenance, desaturation and a targeted disposal burn.
+export function nominalCheckoutDesign(){
+ const d=missionStarter('text');
+ return {...d,...siteApproach(d).angles,missionYears:14/365.25};
+}
 
 export const scenarios=[
  {id:'compute-burst',label:'Compute burst',note:'Sixteen trays draw 32 kW during a 22% duty cycle. Inspect the cold plate during the second burst, then advance into cooldown.',design:{...defaults,trayCount:16,solarM2:240,radiatorM2:82,duty:.22},instant:8470,camera:'core',eventType:'burst'},

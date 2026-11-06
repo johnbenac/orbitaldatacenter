@@ -1,6 +1,7 @@
 // Ground handling is displayed in two adjacent work zones. Dimensions of the
 // facility, slings and transfer hardware are visualization assumptions in metres.
 import * as T from './vendor/three.module.js';
+import {cargoBay,starshipCargoFit} from './starship-cargo.js';
 const V=(x=0,y=0,z=0)=>new T.Vector3(x,y,z);
 const u01=x=>Math.max(0,Math.min(1,x));
 const interval=(t,a,b)=>{const q=u01((t-a)/(b-a));return q*q*(3-2*q)};
@@ -10,13 +11,25 @@ export function integrationLayout(h,record,stage2,capH){
  const star=record.family==='starship',horizontal=record.kind==='horizontal',receiverX=space*(horizontal?1.85:1.75);
  const floor=-Math.max(.82,Math.min(1.45,radius*.38)),portY=horizontal?floor+radius+2:floor+stage2+3.7;
  const height=Math.max(portY+capH+7,h.stowedLengthM+capH+5,22);
- return {record,star,wholeCap:star||record.family==='ariane',horizontal,ringX,receiverX,floor,portY,capH,radius,space,height,stage2,
+ return {record,star,wholeCap:record.family==='ariane',horizontal,ringX,receiverX,floor,portY,capH,radius,space,height,stage2,
   craneY:height+2,roomHalfX:Math.max(space*2.7,receiverX+(horizontal?stage2+5:radius*2)),
   roomHalfZ:Math.max(space*1.82,14)};
 }
 
 export function bayHandlingPose(h,g,state){
  const {space,ringX,receiverX,portY,radius:r,star,horizontal}=g;
+ if(star){
+  const allowed=h.payloadInterface.passes&&h.fairing.fit&&(h.fairing.cargoAccess??starshipCargoFit(h.fairing.stack,h.input)).fits;
+  const {seat,close,lift,transfer,mate}=allowed?state:{seat:0,close:0,lift:0,transfer:0,mate:0};
+  const opening=seat*(1-mate),carriageM=cargoBay.strokeM*close*(1-transfer);
+  const shell=V(receiverX,portY,0),assembly=V(receiverX-carriageM,portY+cargoBay.deckM,0);
+  // Lift at the checkout stand and cross the aisle above the outboard berth.
+  // Lower onto the exposed fitting. No sling or bridge goes inside the hatch.
+  const hoisted=portY+cargoBay.deckM+1.1;
+  const article=lift>=1?assembly.clone():V((receiverX-cargoBay.strokeM)*interval(close,.48,1),
+   hoisted*interval(close,0,.48)-1.1*lift,0);
+  return {article,assembly,shell,angle:0,seat,close,lift,transfer,mate,opening,carriageM};
+ }
  const {seat}=state,close=h.fairing.fit?state.close:0,lift=h.fairing.fit?state.lift:0,
   transfer=h.fairing.fit?state.transfer:0,mate=h.fairing.fit?state.mate:0;
  const angle=horizontal?Math.PI/2*interval(lift,.35,1):0,clearY=horizontal?portY:portY+Math.max(r,2);
@@ -132,6 +145,29 @@ export function buildIntegrationRig(ctx){
   const upper=portY-.24;
   box(rack,sideX,upper,iz+2.15,2,.21,3,steel);
  }
+ if(star){
+  // At one g the outboard pallet lands on a ground-supported dock. The
+  // long guide beams align it; the high-bay truss takes the hoist handoff.
+  const dock=attach('Ground support · carriage load bridge'),outerX=x-cargoBay.strokeM,innerX=x-r-.65;
+  const top=portY+cargoBay.deckM-.15,w=1.18,levels=Math.ceil((top-floor)/4.5);
+  for(const xx of [outerX-.75,innerX])for(const zz of [-w,w]){
+   box(dock,xx,(top+floor)/2-.12,zz,.24,top-floor-.24,.24,beam);
+   box(dock,xx,floor+.06,zz,.64,.12,.64,steel);
+  }
+  for(const sign of [-1,1]){
+   const lo=outerX-.75,z=sign*w;
+   box(dock,(lo+innerX)/2,top-.16,z,innerX-lo+.3,.21,.15,steel);
+   for(const xx of [outerX-.68,outerX+.68,innerX-.12]){
+    const roller=cylinder(dock,xx,top-.075,z,.075,.075,.13,warning,'pad',16);roller.rotation.x=Math.PI/2;roller.name='Ground load bridge roller';
+   }
+   for(let k=0;k<levels;k++){
+    const y0=floor+(top-.25-floor)*k/levels,y1=floor+(top-.25-floor)*(k+1)/levels;
+    tube(dock,V(k%2?lo:innerX,y0,z),V(k%2?innerX:lo,y1,z),.087,steel);
+    tube(dock,V(lo,y1,z),V(innerX,y1,z),.078,beam);
+    tube(dock,V(k%2?lo:innerX,y1,-w),V(k%2?lo:innerX,y1,w),.075,steel);
+   }
+  }
+ }
  const receiverAnchor=new T.Object3D();receiverAnchor.position.set(x,horizontal?portY:portY-g.stage2*.46,0);facility.add(receiverAnchor);
  const moving=attach('Encapsulated payload transfer support');
  if(horizontal){
@@ -158,8 +194,22 @@ export function buildIntegrationRig(ctx){
  }
  const handlingAnchor=new T.Object3D();rig.add(handlingAnchor);
  function update(s,p){
-  const capped=s.close>0&&h.fairing.fit,pickCap=g.wholeCap&&capped&&s.close<1;
+  const capped=!star&&s.close>0&&h.fairing.fit,pickCap=g.wholeCap&&capped&&s.close<1;
   const active=!(horizontal&&p.lift>.999)&&p.mate<1;
+  if(star){
+   const attached=p.seat>=1&&p.lift<1;
+   const cx=p.lift>=1?x-cargoBay.strokeM:p.article.x;
+   const pick=V(cx,p.article.y+h.stowedLengthM,0),top=pick.y+1.15;
+   moving.visible=false;fixture.visible=attached;fixture.position.copy(p.article);
+   bridge.position.z=0;traveler.position.x=cx;yoke.visible=attached;yoke.position.set(cx,top,0);yoke.rotation.y=Math.PI/2;beamHead.scale.x=outer*2.2;
+   for(let i=0;i<2;i++){
+    const zz=(i?1:-1)*outer,q=V(cx,top,zz);
+    cable(ropes[i],V(cx,craneY+.29,zz*.14),q);cable(ropes[i+2],q,V(cx,pick.y,zz));
+    ropes[i].visible=ropes[i+2].visible=attached;
+   }
+   handlingAnchor.position.copy(pick);return;
+  }
+
   moving.visible=horizontal?p.lift>=.999:!star&&p.lift>=.999;
   moving.position.x=horizontal?p.assembly.x:ringX+(x-space-ringX)*p.transfer;
   let root=p.article,top=h.stowedLengthM,arm=outer,rot=0;

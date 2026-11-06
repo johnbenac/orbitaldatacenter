@@ -28,9 +28,11 @@ function finish(kind){
  return new T.MeshStandardMaterial({color:0xffffff,map:tex,metalness:kind==='steel'?.34:.05,roughness:kind==='steel'?.46:.89});
 }
 // All bays use the same external mold line, regardless of edits to the payload keep-in.
-export const shipNose=[[4.5,0],[4.5,6.6],[4.46,8.5],[4.30,10.8],[4.00,13],[3.55,15.3],[2.9,17.6],[2.10,19.6],[1.18,21.4],[.45,22.47],[.09,22.75],[.022,22.77]];
+import {cargoBay,shipNose,noseRadius} from './starship-cargo.js';
+export {shipNose};
 function skin(parent,stations,start,sweep,m,ymap=0){
  const g=new T.LatheGeometry(stations.map(([r,y])=>new T.Vector2(r,y)),Math.max(6,Math.ceil(80*sweep/TAU)),start,sweep);
+ g.normalizeNormals();
  const uv=g.attributes.uv,pos=g.attributes.position;for(let i=0;i<uv.count;i++)uv.setXY(i,(start+sweep*uv.getX(i))/TAU,(pos.getY(i)+ymap)/72);
  return add(parent,g,m);
 }
@@ -72,7 +74,7 @@ export function buildStarship({lower,upper,shell,baseY,stage1,stage2,patch}){
   const fin=node(p,'Grid fin lattice');fin.position.z=r+1.83;fin.rotation.x=Math.PI/2;lattice(fin,3.17,3.45,.42,dark,8,8);
   rod(p,V(0,0,r-.17),V(0,0,r+.47),.33,edge);
  }
- const windAngle=-.48,thermalSpan=Math.PI*.91,first=windAngle-thermalSpan/2,last=first+thermalSpan;
+ const windAngle=Math.PI/2,thermalSpan=Math.PI*.91,first=windAngle-thermalSpan/2,last=first+thermalSpan;
  const barrel=[[r,-stage2],[r,0]];
  skin(upper,barrel,first,thermalSpan,tile,stage2);skin(upper,barrel,last,TAU-thermalSpan,steel,stage2);
  // The upper tank's closed dome sits below the forward-section mating ring.
@@ -82,31 +84,78 @@ export function buildStarship({lower,upper,shell,baseY,stage1,stage2,patch}){
  // A retained, side-opening large-cargo door is an ODC integration assumption.
  // The flown V3 satellite dispenser has a different opening. A fixed shell
  // preserves the windward heat shield and no flight phase jettisons the nose.
- const a0=last,a1=2.86,breakAt=6,doorProfile=shipNose.slice(0,breakAt+1);
- shell.userData.sideOutline={role:'shell',xyz:shipNose.map(([r,y])=>[-r,y,0])};
- const noseOutline=node(shell,'Leeward nose outline');noseOutline.userData.sideOutline={role:'shell',xyz:shipNose.slice(breakAt).map(([r,y])=>[r,y,0])};
- // Lower panels can be ghosted independently while crown, hinges and flaps
- // preserve the full integrated ship's silhouette in the facility cutaway.
- for(const [angle,span,finish] of [[first,thermalSpan,tile],[a1,first+TAU-a1,steel]]){
-  skin(shell,doorProfile,angle,span,finish,stage2).userData.cargoWall=true;
-  skin(shell,shipNose.slice(breakAt),angle,span,finish,stage2);
+ const {sillM,headerM,angleRad,hingeX,hingeZ}=cargoBay,center=1.5*Math.PI,a0=center-angleRad,a1=center+angleRad;
+ const liner=mat('#657480',.29,.66),rail=mat('#bd9456',.41);
+ const between=(a,b)=>[[noseRadius(a),a],...shipNose.filter(([,y])=>y>a&&y<b),[noseRadius(b),b]];
+ const mid=between(sillM,headerM),crown=between(headerM,shipNose.at(-1)[1]),base=between(0,sillM),inset=.065;
+ shell.userData.sideOutline={role:'shell',xyz:shipNose.map(([r,y])=>[r,y,0])};
+ const noseOutline=node(shell,'Leeward nose outline');noseOutline.userData.sideOutline={role:'shell',xyz:crown.map(([r,y])=>[-r,y,0])};
+ // A separate opaque liner faces the bay. Section faces close the exposed cut
+ // edges so a grazing view sees the jamb thickness as well as the inner skin.
+ function wall(p,profile,a,b,finish,name){
+  const inner=profile.map(([r,y])=>[Math.max(.008,r-inset),y]),span=b-a;
+  const outside=skin(p,profile,a,span,finish,stage2);outside.name=name;
+  skin(p,inner.slice().reverse(),a,span,liner,stage2).name=name+' liner';
+  return outside;
  }
- skin(shell,shipNose.slice(breakAt),a0,a1-a0,steel,stage2);
- const door=node(shell,'Retained cargo door'),px=Math.sin(a1)*r,pz=Math.cos(a1)*r;door.position.set(px,0,pz);
- const leaf=node(door,'Cargo door skin');leaf.position.set(-px,0,-pz);
- leaf.userData.sideOutline={role:'shell',xyz:doorProfile.map(([r,y])=>[r,y,0])};
- const doorSkin=skin(leaf,doorProfile,a0,a1-a0,steel,stage2);doorSkin.userData.cargoWall=true;
- if(patch)mountMissionPatch(doorSkin,doorProfile,2.04,7.1,6.25,patch);
- skin(leaf,doorProfile.map(([r,y])=>[r-.05,y]).reverse(),a0,a1-a0,edge,stage2).userData.cargoWall=true;
- for(const y of [1.4,3.4,5.6]){const p=node(shell,'Cargo hinge');p.position.set(px,y,pz);rod(p,V(0,-.31,0),V(0,.31,0),.09,dark);}
+ function jamb(p,profile,angle,sign){
+  const coords=[],tri=[],sn=Math.sin(angle),cs=Math.cos(angle);
+  for(const [r,y] of profile){coords.push(r*sn,y,r*cs,(r-inset)*sn,y,(r-inset)*cs);}
+  for(let i=0;i<profile.length-1;i++){const j=i*2;tri.push(...(sign<0?[j,j+2,j+1,j+1,j+2,j+3]:[j,j+1,j+2,j+1,j+3,j+2]));}
+  const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(coords,3));g.setIndex(tri);g.computeVertexNormals();add(p,g,edge);
+ }
+ for(const [a,b,finish] of [[first,last,tile],[last,a0,steel],[a1,first+TAU,steel]]){
+  wall(shell,shipNose,a,b,finish,'Fixed cargo shell');
+ }
+ wall(shell,base,a0,a1,steel,'Sill structure');wall(shell,crown,a0,a1,steel,'Fixed nose crown');
+ for(const [y,fromInside] of [[sillM,false],[headerM,true]]){
+  const r=noseRadius(y),prof=[[r,y],[r-inset,y]];skin(shell,fromInside?prof.reverse():prof,a0,a1,edge,stage2);
+ }
+ jamb(shell,mid,a0,1);jamb(shell,mid,a1,-1);
+ for(const phi of [a0,a1])for(let j=1;j<mid.length;j++){
+  const point=([r,y])=>V((r-inset)*Math.sin(phi),y,(r-inset)*Math.cos(phi));
+  rod(shell,point(mid[j-1]),point(mid[j]),.075,nickel).name='Fixed longitudinal door jamb';
+ }
+ for(const y of [sillM-.07,headerM+.08])skin(shell,[[noseRadius(y)-.13,y-.075],[noseRadius(y)-.13,y+.075]],0,TAU,edge);
+ add(shell,new T.CylinderGeometry(.020,.022,.025,32),steel,0,shipNose.at(-1)[1]+.0125,0).name='Fixed nose tip cap';
+ const door=node(shell,'Retained cargo door');door.position.set(hingeX,0,hingeZ);
+ const leaf=node(door,'Cargo door skin');leaf.position.set(-hingeX,0,-hingeZ);
+ leaf.userData.sideOutline={role:'shell',xyz:mid.map(([r,y])=>[-r,y,0])};
+ const doorSkin=wall(leaf,mid,a0,a1,steel,'Leeward plug door');doorSkin.userData.cargoWall=true;
+ jamb(leaf,mid,a0,-1);jamb(leaf,mid,a1,1);
+ for(const [y,top] of [[sillM,false],[headerM,true]]){
+  const r=noseRadius(y),prof=[[r,y],[r-inset,y]];skin(leaf,top?prof:prof.reverse(),a0,a1,edge,stage2);
+ }
+ if(patch)mountMissionPatch(doorSkin,mid,center,(headerM+sillM)*.5,4.85,patch);
+ for(const y of [1.35,5.3,9.3,13.85]){
+  const bearing=node(shell,'Side hatch hinge');bearing.position.set(hingeX,y,hingeZ);rod(bearing,V(0,-.25,0),V(0,.25,0),.095,dark);
+  const rr=noseRadius(y);rod(leaf,V(hingeX,y,hingeZ),V((rr-.13)*Math.sin(a0+.06),y,(rr-.13)*Math.cos(a0+.06)),.07,nickel);
+  const ribR=rr-inset-.05;skin(leaf,[[ribR,y-.05],[ribR,y+.05]],a0+.06,a1-a0-.12,edge);
+  const latch=node(shell,'Hatch latch socket');latch.position.set(rr*Math.sin(a1),y,rr*Math.cos(a1));block(latch,0,0,0,.17,.22,.15,nickel);
+ }
+ add(shell,new T.CylinderGeometry(4.42,4.42,.13,80),liner,0,.12,0).name='Closed cargo deck';
+ // Four nested box sections overlap even at maximum travel. The crosshead
+ // supports the flight adapter; the two outer guides are fixed to the deck.
+ const slides=[],g=cargoBay;
+ for(let i=0;i<=3;i++){
+  const slide=node(shell,i?'Telescoping retained guide':'Fixed cargo tracks');slides.push(slide);
+  for(const z of [-.91,.91])block(slide,-.20,.56,z,3.8,.21-i*.025,.25-i*.035,i===0?dark:i===3?rail:nickel);
+ }
+ const car=node(shell,'Retained cargo carriage');
+ block(car,0,g.deckM-.075,0,2.85,.15,2.55,rail);
+ for(const z of [-.91,.91])block(car,0,.66,z,2.75,.12,.19,dark);
+ for(const x of [-1.20,1.20])block(car,x,g.deckM+.015,0,.075,.03,2.40,nickel);
  // Forward flaps sit aft of the nose tip and aft flaps hinge at the ship skirt.
  // Windward coatings occupy the forward-facing side of each opposed flap.
  for(const s of [-1,1]){
   const aftAngle=windAngle+s*1.57,forwardAngle=windAngle+s*1.97;
   flap(upper,aftAngle,-stage2+.28,r-.14,[[0,0],[3.55,-.12],[3.55,3.4],[2.9,6.5],[.55,12.8],[0,13.4]],.28,edge,tile);
-  flap(shell,forwardAngle,12.4,4.00,[[0,-.15],[2.12,-.32],[2.14,.9],[1.80,3.7],[.22,6.65],[0,6.9]],.19,steel,tile);
+  flap(shell,forwardAngle,16.4,4.00,[[0,-.15],[2.12,-.32],[2.14,.9],[1.80,3.7],[.22,6.65],[0,6.9]],.19,steel,tile);
  }
- return {door,openDoor(fraction){door.rotation.y=fraction*1.87;}};
+ return {door,car,openDoor(fraction,travelM=0){
+  door.rotation.y=-fraction*cargoBay.travelRad;car.position.x=-travelM;
+  slides.forEach((slide,i)=>slide.position.x=-travelM*i/3);
+ }};
 }
 
 export function falconRecovery(parent,r,base,height){

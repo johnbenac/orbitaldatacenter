@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import * as T from './dist/vendor/three.module.js';
 import {sizeDesign,missionStarter} from './dist/design.js';
+import {makeCraft} from './dist/craft.js';
 import {makeLaunch} from './dist/launch-scene.js';
 import {bayStationFor} from './dist/bay-lessons.js';
 
@@ -49,11 +50,29 @@ for(const purpose of ['text','pretrain']){
     assert.ok(v.z>Math.max(hw.bodyHeightM*.5,adapterR)+.06,'Ground pigtail entered deck/propulsion corridor');}}
   }
   const active=bay.station.children.find(o=>o.visible);
-  if(['launch','mechanical','comm'].includes(domain)){
-   const axis=active.getObjectByProperty('name',domain==='comm'?'Radio horn pointing axis':domain==='launch'?'Survey head pointing axis':'Telescope pointing axis');
+  if(['launch','mechanical'].includes(domain)){
+   const axis=active.getObjectByProperty('name',domain==='launch'?'Survey head pointing axis':'Telescope pointing axis');
    const sight=bay.vehicleAnchor.getWorldPosition(V()).sub(axis.getWorldPosition(V())).normalize();
    near(sight.dot(V(0,1,0).applyQuaternion(axis.getWorldQuaternion(new T.Quaternion()))),1);
   }
+ }
+ // Every bench uses the flight article as its geometric reference. The
+ // test hats and shrouds get disconnected before the spacecraft is lifted.
+ const hw=sizeDesign(missionStarter(purpose)),craft=makeCraft(hw);
+ for(const [bench,fixture,lead] of [['sband','Shielded S-band test hat','Shielded RF test coax'],['ka','Ka conducted RF test port','Shielded RF test coax'],['optical','Enclosed optical test head','Optical bench tether']]){
+  const config={phase:'D',domain:'comm',commBench:bench},run=t=>launch.update({flightPhase:'integration',t,altitudeKm:0},'integration',config);
+  run(-3599);launch.root.updateMatrixWorld(true);
+  const active=bay.station.children.find(x=>x.visible),hook=active.getObjectByName('Removable checkout hookup');
+  assert.equal(bay.station.children.filter(x=>x.visible).length,1);assert.ok(hook.visible);
+  assert.ok(active.getObjectByName(fixture));const coax=hook.getObjectByName(lead);assert.ok(coax);
+  assert.equal(active.getObjectByName('Radio horn pointing axis'),undefined);
+  if(bench!=='ka'){
+   const mouth=(bench==='sband'?craft.apertures.patches[1]:craft.apertures.Optical).getWorldPosition(V());
+   const target=parts.liveMount.localToWorld(mouth);near(bay.portAnchor.getWorldPosition(V()).distanceTo(target),0,.001);
+  }
+  const vertices=coax.geometry.attributes.position;
+  for(let i=0;i<vertices.count;i++)assert.ok(coax.localToWorld(V().fromBufferAttribute(vertices,i)).y>=bay.floorY-.002);
+  run(-2600);assert.equal(hook.visible,false,bench+' test hookup retained on pickup');
  }
  const camera=new T.PerspectiveCamera();
  for(const [eye,hidden,shown] of [
@@ -67,4 +86,4 @@ for(const purpose of ['text','pretrain']){
  step('pad',-5,'power');assert.equal(parts.facility.visible,false);assert.equal(bay.station.visible,false);
  step('ascent',4,'comm');assert.equal(parts.facility.visible,false);assert.equal(bay.station.visible,false);
 }
-console.log('All 16 bay domains: tool selection, grounded casters and leads, connector contact, three sighted instruments, opaque room cutaways and ground-hardware isolation passed.');
+console.log('All 17 bay domains: tool selection, grounded casters and leads, connector contact, sighted instruments, three removable communications fixtures, aperture registration, opaque room cutaways and ground-hardware isolation passed.');

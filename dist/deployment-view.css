@@ -5,3 +5,5 @@
 .dep-joint{padding:7px 9px;color:#c9d7cd;background:#19282c;border-left:2px solid #83b6a7;font:11px/1.5 var(--mono)}
 .dep-guide .dep-warning{color:#eac18e;border-left:2px solid #c89b68;padding-left:7px;font-size:11px}
 .concept-deploy{margin:0 14px 12px}
+
+.dep-transport{flex-wrap:wrap}

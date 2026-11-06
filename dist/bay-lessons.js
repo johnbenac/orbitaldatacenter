@@ -11,6 +11,7 @@ import {componentCentroid} from './component-stations.js';
 import {DEPLOY_END_S} from './commissioning-clock.js';
 import {MU,R,TAU} from './orbit.js';
 import {launchFleet} from './launch-fleet.js';
+import {terminalPattern} from './terminal-activity.js';
 
 const ref=(title,url)=>({title,url});
 const resources={
@@ -19,6 +20,8 @@ const resources={
  hardware:ref('NASA · electrical checkout of Orion','https://www.nasa.gov/reference/testing/'),
  clean:ref('NASA · how cleanrooms monitor particles','https://www.nasa.gov/organizations/osi/setmo/cleanroom-tech-key-to-success-in-space/'),
  orbit:ref('NASA · simulation with flight hardware','https://www.nasa.gov/reference/jsc-simulation-modeling/'),
+ hat:ref('NASA · EO-1 antenna test hat in a cleanroom','https://ntrs.nasa.gov/api/citations/20030093738/downloads/20030093738.pdf'),
+ optical:ref('MIT Lincoln Laboratory · TBIRD optical pointing tests','https://ntrs.nasa.gov/citations/20210026049'),
  radio:ref('NASA · radio and ground-station compatibility testing','https://www.nasa.gov/smallsat-institute/sst-soa/ground-data-systems-and-mission-operations/'),
  power:ref('NASA · ground testing spacecraft power systems','https://www.nasa.gov/reference/jsc-power-subsystems/'),
  coolant:ref('NASA · Orion ground cooling system, §3.2.8','https://www.nasa.gov/wp-content/uploads/2016/08/contract_80ksc019c0013.pdf'),
@@ -29,6 +32,11 @@ const resources={
  mating:ref('NASA · fitting PACE to its launch adapter','https://science.nasa.gov/blogs/pace/2024/01/29/nasas-pace-spacecraft-mated-to-payload-adapter/'),
  inference:ref('MLCommons · inference performance and quality','https://mlcommons.org/benchmarks/inference-datacenter/'),
  training:ref('MLCommons · training time to target quality','https://mlcommons.org/benchmarks/training/')
+};
+export const commFixtures={
+ sband:{name:'Command and telemetry rack',label:'S-BAND CHECKOUT',point:'Shielded patch test hat',color:'#60b6ad'},
+ ka:{name:'Ka receiver and bit comparator',label:'KA RECEIVER',point:'Conducted RF test port',color:'#d2a564'},
+ optical:{name:'Optical alignment bench',label:'OPTICAL ALIGNMENT',point:'Shrouded optical test head',color:'#aaa1d5'}
 };
 const stationNames={
  checkout:'Checkout console',compute:'Payload test rack',environment:'Cleanroom monitor',orbit:'Orbit simulator',
@@ -53,9 +61,9 @@ const guides={
  data:wording('Follow a file all the way back','How can you tell that every byte survived the trip?',
   'The test set writes a known file to the spacecraft recorder and reads it back. A checksum lets the team catch a single changed bit even when the two files have exactly the same length.',
   'Write a test file, interrupt the transfer, then resume it and compare the returned file with the original. Repeat with the recorder near its allocated limit.',['hardware','rehearsal']),
- comm:wording('Make the first radio contact','Can the ground receiver understand what the spacecraft sends?',
-  'The horn faces a small, flat antenna on the spacecraft wall. Through that patch, the crew can send a command and hear the reply while both the dish and the laser terminal stay stowed.',
-  'Send a known command through the S-band patch and decode the returned status. Check the Ka-band dish and the optical terminal separately with equipment suited to their beams.',['radio','gevs']),
+ comm:wording('Close the command loop','How do you talk to a spacecraft that is still inside the building?',
+  'A shielded test hat fits over the starboard patch. It couples the radio to a ground rack by coax. The rack can act like a ground station while the spacecraft sits on its stand.',
+  'Send a harmless command and listen for the flight computer’s acknowledgement in the returned telemetry. A carrier lock alone cannot show that the command reached the computer.',['radio','hat','gevs']),
  power:wording('Rehearse the loss of sunlight','What keeps the computer alive when the solar wings go dark?',
   'A ground power cart supplies the spacecraft while its wings are folded. Engineers can reduce the simulated solar supply and watch the battery take the load, then restore illumination and check the recharge.',
   'Run a scripted loss and return of solar input. Record bus voltage and pack current at the handover and compare the energy used with the planned battery operating range.',['power','rehearsal']),
@@ -152,8 +160,8 @@ function readings(domain,h) {
    'The planned allocations fit the recorder. Sending a test file checks whether the right bytes can be recovered after an interruption.',fitFlag(ai.storageMarginGB>=0));
   case 'comm':return result([
    fact('Command traffic',d.commandKbps,'kbit/s','Design demand on the S-band command channel.'),
-   fact('Ground command buffer',d.uplinkBufferMB,'MB','Space allocated on the ground for commands awaiting an uplink.'),
-   fact('Ka-band dish diameter',d.kaDishM,'m','Installed directional reflector for bulk data. Its pointing checkout is a separate operation.')
+   fact('Health packet',h.cdh.packetBytes,'bytes','Flight computer housekeeping packet size, before radio framing and coding.',0),
+   fact('Health sample interval',d.hkPeriodS,'s','Configured interval between flight housekeeping packets.')
   ],'A decoded test message checks the radio chain. Deliverable bytes on orbit also depend on pointing, station visibility and how long the pass lasts.');
   case 'power':{
    const usable=h.batteryKWh*(d.socMax-d.socMin),initial=h.batteryKWh*d.socInitial;
@@ -215,13 +223,30 @@ function readings(domain,h) {
   }
  }
 }
-export function bayLesson(domain,hardware){
+export function bayLesson(domain,hardware,bench='sband'){
  const key=Object.hasOwn(stations,domain)?domain:'conops',station=bayStationFor(key);
  const lesson={domain:key,station,stationName:stationNames[station],...guides[key],...readings(key,hardware)};
+ if(key==='comm'){
+  const d=hardware.input,selected=Object.hasOwn(commFixtures,bench)?bench:'sband';
+  lesson.stationName=commFixtures[selected].name;
+  if(selected==='ka')Object.assign(lesson,wording('Receive a known bit sequence','Can the station recover the exact bits the Ka transmitter sent?',
+   'The bench taps the transmitter through a test port. A calibrated attenuator reduces the signal before the station receiver compares the decoded bits with the known sequence.',
+   'Try raising the path loss on the bench. A completed receiver comparison exercises the modem and data path. Engineers measure the reflector pattern separately on an antenna range.',['radio','gevs']),
+   result([fact('Reflector diameter',d.kaDishM,'m','Installed flight reflector. The conducted test taps the feed upstream of this aperture.'),
+    fact('Flight beamwidth',terminalPattern(d,'Ka').fullWidthRad*180/Math.PI,'°','Calculated full half-power beamwidth at 26 GHz. A range or chamber characterizes this angle.',2)],
+   'A strong conducted result establishes receiver compatibility for the tested conditions. An antenna-pattern measurement is separate evidence.'));
+  else if(selected==='optical')Object.assign(lesson,wording('Find the optical boresight','Where does the returning spot fall when the beacon is centered?',
+   'A light-tight boot encloses the flight aperture and a small collimator. The bench presents a distant-looking beacon and observes the downlink direction on a focal-plane sensor.',
+   'Introduce a pointing offset and compare the returned spot with the target center. Spacecraft motion and atmospheric fading require additional testing.',['optical']),
+   result([mm('Flight aperture',d.opticalApertureM,'Clear optical diameter used by this mission’s diffraction estimate.'),
+    fact('Reference half-angle',terminalPattern(d,'Optical').fullWidthRad*5e5,'µrad','Diffraction angle for the installed aperture at the modeled 1,550 nm wavelength.',1),
+    fact('Flight jitter assumption',d.opticalJitterUrad,'µrad','Study fine-pointing residual, separate from the adjustable static test offset.')],
+   'A small bias uses part of the available pointing budget before jitter, thermal drift or on-orbit motion are added.'));
+ }
  if(key==='launch'&&hardware.input.launcher==='starship'){
   lesson.question='How much room does the data center have inside Starship?';
-  lesson.explanation='The stowed spacecraft must fit inside the tapering cargo volume. A clearance check compares the installed vehicle at each height with the adopted envelope of the proposed large-cargo nose.';
-  lesson.procedure='Survey the closest feature before closing the forward assembly. The retained door also needs a clear deployment path once the ship reaches orbit.';
+  lesson.explanation='The stowed spacecraft must fit inside the tapering cargo volume. A clearance check compares the installed vehicle at each height with the adopted envelope inside the intact ship. The side hatch also has its own width, height and extraction limits.';
+  lesson.procedure='Survey the limiting feature, the sill and the frame above the hatch. Confirm the carriage can carry the full stowed load through the opening before release.';
   lesson.stationName='Cargo-envelope clearance gauge';
   lesson.sources=[{title:'SpaceX · Starship Users Guide, Figure 4',url:'https://www.spacex.com/media/starship_users_guide_v1.pdf#page=3'},resources.gevs];
  }

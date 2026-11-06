@@ -23,6 +23,10 @@ for(const purpose of Object.keys(aiPurposes)){
 assert.equal(units.size,15);
 assert.equal(missions.size,6);
 const basic=missionStarter('text'),h=sizeDesign(basic);
+const fixtures=['sband','ka','optical'].map(k=>bayLesson('comm',h,k));
+assert.equal(new Set(fixtures.map(c=>c.stationName)).size,3);
+assert.match(fixtures[0].procedure,/acknowledgement/);assert.match(fixtures[1].procedure,/range/);assert.match(fixtures[2].procedure,/spot/);
+assert.equal(fixtures[1].facts[0].value,h.input.kaDishM);assert.equal(fixtures[2].facts[0].value,h.input.opticalApertureM*1000);
 const fits=bayLesson('launch',h);
 assert.equal(fits.facts[0].value,h.fairing.radialClearanceM*1000);
 assert.equal(fits.facts[1].value,h.fairing.axialClearanceM*1000);

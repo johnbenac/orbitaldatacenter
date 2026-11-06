@@ -1,6 +1,6 @@
+import {flightButtons} from './flight-transport.js';
 import {DEPLOYMENT_STAGES,deploymentGuides,deploymentSchedule,deploymentLayout,mechanismPose} from './deployment.js';
 import {DEPLOY_START_S,DEPLOY_DURATION_S,deploymentMET} from './commissioning-clock.js';
-import {icon} from './icons.js';
 const format=(x,d=1)=>Number.isFinite(x)?x.toLocaleString('en-US',{maximumFractionDigits:d}):'—';
 const clock=s=>Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0');
 const major={hold:'Stowed',rollout:'Solar wings','upper-root':'First radiator','lower-root':'Second radiator',tracking:'Sun acquisition',deployed:'Locked'};
@@ -11,7 +11,7 @@ export function commissioningGuide(h,s,v,playing){
  <div><dt>Solar blanket paid out</dt><dd id="dep-length">${format(k.pv*h.wingLengthM)} / ${format(h.wingLengthM)} m</dd></div><div><dt>Solar generation</dt><dd id="dep-power">${format(s.solarKW)} kW${s.eclipse?' · eclipse':''}</dd></div><div><dt>Radiator heat rejection</dt><dd id="dep-heat">${format(s.netRejectionKW)} kW</dd></div><div><dt>Stored battery energy</dt><dd id="dep-energy">${format(s.batteryKWh)} kWh</dd></div></dl>
  <div id="dep-joint" class="dep-joint">${jointReading(h,s,k)}</div>
  <div class="dep-lenses" data-choice-group="deployment-lenses" role="group" aria-label="Deployment camera detail">${[['vehicle','Whole vehicle'],['wing','Tip drum'],['hinge','Radiator joint']].map(([id,label])=>`<button class="chip" data-deployment-lens="${id}" aria-pressed="${v.deploymentLens===id&&v.camera==='spacecraft'}">${label}</button>`).join('')}</div>
- <div class="dep-transport"><button class="btn export" data-action="flightplay" id="dep-play">${icon(playing?'pause':'play',14)} ${playing?'Pause':s.deployment>=1?'Replay':'Play deployment'}</button><select aria-label="Deployment playback speed" id="flight-rate">${[1,10,30,120,600].map(n=>`<option value="${n}" ${v.speed===n?'selected':''}>${n}×</option>`).join('')}</select></div>
+ <div class="dep-transport">${flightButtons(playing,s.deployment>=1?'Replay':'Play deployment',{primary:'btn export',id:'dep-play'})}<select aria-label="Deployment playback speed" id="flight-rate">${[1,10,30,120,600].map(n=>`<option value="${n}" ${v.speed===n?'selected':''}>${n}×</option>`).join('')}</select></div>
  ${!h.launchScreenFeasible?'<p class="dep-warning">Mechanism study. This build exceeds its selected launch mass or fairing envelope.</p>':''}<small>One mission clock · ${clock(DEPLOY_DURATION_S)} modeled duration</small></aside>`;
 }
 function jointReading(h,s,k){

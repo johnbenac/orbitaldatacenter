@@ -1,36 +1,36 @@
 {
   "release": "site",
-  "source_commit": "67ece18377ba8b74ead7be4aae7a6c6ff1b10d36",
-  "index_sha256": "f86b5e77819d6347b18c4989ef50d73db41e8aef041d6c3e10b1904d5cbb2009",
+  "source_commit": "0acb5c5cea5d7b86d17cd6b7e74abd7bc14c3880",
+  "index_sha256": "aa8e7ae9c3e411c30f78816e188253b44aa0fca0e86e8423ab02c0021fd91379",
   "project": "orbitaldatacenter",
   "deployment": {
-    "id": "2a98d99d-4522-4602-8fb0-2ffbddcc6095",
-    "short_id": "2a98d99d",
+    "id": "dfda9ee3-cf94-4411-adf0-828dd44c29a1",
+    "short_id": "dfda9ee3",
     "project_id": "8cfed813-a5e3-48d5-9451-47e81b01d88f",
     "project_name": "orbitaldatacenter",
     "environment": "production",
-    "url": "https://2a98d99d.orbitaldatacenter-2o2.pages.dev",
-    "created_on": "2026-11-06T21:39:08.05304Z",
-    "modified_on": "2026-11-06T21:39:09.512749Z",
+    "url": "https://dfda9ee3.orbitaldatacenter-2o2.pages.dev",
+    "created_on": "2026-11-06T21:54:07.052987Z",
+    "modified_on": "2026-11-06T21:54:08.480017Z",
     "latest_stage": {
       "name": "deploy",
       "started_on": null,
-      "ended_on": "2026-11-06T21:39:09.512749Z",
+      "ended_on": "2026-11-06T21:54:08.480017Z",
       "status": "success"
     },
     "deployment_trigger": {
       "type": "ad_hoc",
       "metadata": {
         "branch": "main",
-        "commit_hash": "67ece18377ba8b74ead7be4aae7a6c6ff1b10d36",
-        "commit_message": "feat(release): import upstream v36\r\n\r\nImport the supplied Downloads ZIP and preserve the license and local site extensions.\r\nRetain upstream validation documents and screenshots under upstream-docs.\r\n\r\nVerify assembly, assets, syntax and desktop/mobile browser behavior. Record the\r\nupstream interface assertion in a memo copied to Boiler without patching the app.",
+        "commit_hash": "0acb5c5cea5d7b86d17cd6b7e74abd7bc14c3880",
+        "commit_message": "feat(social): use Blender artwork in sharing previews\r\n\r\nCompose the orbital render into a 1200x630 social card with the approved feasibility copy.\r\nRetain artwork, font licenses and credits outside the upstream distribution.\r\n\r\nUpdate Open Graph, Twitter and structured-data imagery and improve the description.\r\nVersion the image URL so sharing services can fetch the updated previe\n\n[commit_message truncated]",
         "commit_dirty": true
       }
     },
     "stages": [
       {
         "name": "queued",
-        "started_on": "2026-11-06T21:39:08.05304Z",
+        "started_on": "2026-11-06T21:54:07.052987Z",
         "ended_on": null,
         "status": "active"
       },
@@ -55,7 +55,7 @@
       {
         "name": "deploy",
         "started_on": null,
-        "ended_on": "2026-11-06T21:39:09.512749Z",
+        "ended_on": "2026-11-06T21:54:08.480017Z",
         "status": "success"
       }
     ],

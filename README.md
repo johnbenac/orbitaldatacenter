@@ -1,5 +1,11 @@
 # Orbital Data Center
 
+## License
+
+This project is licensed under the GNU Affero General Public License version 3.0
+(AGPL-3.0-only). See [LICENSE](LICENSE) for the full terms. Third-party libraries
+and assets retain their respective licenses and notices.
+
 Orbital Data Center is a static Three.js engineering workbench. The spacecraft, subsystem diagrams, event playback and exported results use one client-side numerical model. The distribution includes the renderer, its assets and the mission-integration worker.
 
 To preview the complete website, assemble the developer app with the locally

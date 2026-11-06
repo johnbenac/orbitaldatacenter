@@ -1,23 +1,23 @@
 # Public GitHub repository
 
-The intended public source repository is
+The public source repository is
 https://github.com/johnbenac/orbitaldatacenter. GitLab remains the private internal
-remote; it is not a public source link. Adding the GitHub remote alone does not
-create or publish the repository.
+remote; it is not a public source link. The public repository was created and its
+history pushed on 2026-11-05 using the existing GitHub CLI authentication.
 
 ## Local remotes
 
 | Remote | URL | Purpose |
 | --- | --- | --- |
 | `origin` | `https://gitlab.benac.dev/johnb/orbitaldatacenter.git` | Private internal repository; `main` tracks `origin/main` |
-| `github` | `https://github.com/johnbenac/orbitaldatacenter.git` | Public source and collaboration, once published |
+| `github` | `https://github.com/johnbenac/orbitaldatacenter.git` | Public source and collaboration |
 
 This checkout overrides the global GitHub SSH rewrite for `johnbenac` URLs so
 the GitHub remote also uses HTTPS. Its credential helper uses the active GitHub
 CLI configuration; no credentials are embedded in the remote URL. On this host,
 `GH_CONFIG_DIR` normally selects `/home/johnb/.config/gh`.
 
-## Initial publication
+## Authentication and verification
 
 Run from `/root/orbitaldatacenter/site`. First verify GitHub CLI authentication:
 
@@ -32,31 +32,22 @@ Characters using ordinary `gh repo create` commands, and a November 2 auth check
 identifies `/home/johnb/.config/gh/hosts.yml` as the working credential store.
 The separately stored root credential is older and returns HTTP 401.
 
-In the restricted November 5 agent session, John's configuration was unreadable.
-Switching to `/root/.config/gh` did not solve authentication, and the documented
-refresh failed. Publication requires a permitted execution context that can use
-John's existing CLI configuration. Do not assume the account needs another login
-merely because a restricted session cannot read its configuration.
+John's existing configuration works when the execution environment permits
+reading it. Do not substitute the stale root configuration or assume another
+login is needed because a restricted session cannot read the active configuration.
 
-Check whether the repository already exists. Only create it if GitHub reports
-that it is absent; an authentication or network failure is not proof of absence.
+The repository already exists; inspect its state with:
 
 ```sh
 gh repo view johnbenac/orbitaldatacenter
-gh repo create johnbenac/orbitaldatacenter --public --description 'Orbital Data Center: a browser-based spacecraft engineering workbench' --homepage https://orbitaldatacenter.design
-git push github main
 gh repo view johnbenac/orbitaldatacenter --json url,visibility,defaultBranchRef
 git ls-remote github refs/heads/main
 ```
 
-After verifying that the repository is publicly accessible, set
-`github_published` to `true` in `publication.json`. Assembly then enables the
-public GitHub links in the workbench footer and About page. Before publication,
-the site links to its own source-information section instead of a missing
-repository. Commit that setting, run the assembly tests, push both remotes, and
-redeploy to publish the source links.
+`github_published` is `true` in `publication.json` after verification of public
+access. Assembly enables public GitHub links in the workbench footer and About
+page. If publication is withdrawn, disable that setting and redeploy.
 
-Create an empty repository: do not initialize another README or unrelated history.
 Preserve the existing commit history. A project-wide license has not been chosen;
 retain all bundled third-party license notices.
 

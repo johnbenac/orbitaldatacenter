@@ -1,36 +1,36 @@
 {
   "release": "site",
-  "source_commit": "77523d4bc407a6c37fb25fb7d2493d9143d05b3b",
-  "index_sha256": "94df33c8444f2f82e874b0e620f268911d24194ae64a92f0747fe60e976c44cd",
+  "source_commit": "67ece18377ba8b74ead7be4aae7a6c6ff1b10d36",
+  "index_sha256": "f86b5e77819d6347b18c4989ef50d73db41e8aef041d6c3e10b1904d5cbb2009",
   "project": "orbitaldatacenter",
   "deployment": {
-    "id": "12298e5d-17b2-465d-8c32-e69633ec0e59",
-    "short_id": "12298e5d",
+    "id": "2a98d99d-4522-4602-8fb0-2ffbddcc6095",
+    "short_id": "2a98d99d",
     "project_id": "8cfed813-a5e3-48d5-9451-47e81b01d88f",
     "project_name": "orbitaldatacenter",
     "environment": "production",
-    "url": "https://12298e5d.orbitaldatacenter-2o2.pages.dev",
-    "created_on": "2026-11-06T08:28:19.74442Z",
-    "modified_on": "2026-11-06T08:28:21.131408Z",
+    "url": "https://2a98d99d.orbitaldatacenter-2o2.pages.dev",
+    "created_on": "2026-11-06T21:39:08.05304Z",
+    "modified_on": "2026-11-06T21:39:09.512749Z",
     "latest_stage": {
       "name": "deploy",
       "started_on": null,
-      "ended_on": "2026-11-06T08:28:21.131408Z",
+      "ended_on": "2026-11-06T21:39:09.512749Z",
       "status": "success"
     },
     "deployment_trigger": {
       "type": "ad_hoc",
       "metadata": {
         "branch": "main",
-        "commit_hash": "77523d4bc407a6c37fb25fb7d2493d9143d05b3b",
-        "commit_message": "feat(release): import upstream v31\r\n\r\nImport the supplied Boiler ZIP while preserving AGPLv3 and local site extensions.\r\nRecord verified assets, syntax, integration and browser checks.\r\n\r\nHand the upstream engine assertion and slow validation runs back to the developer\r\nteam in a memo copied to Boiler. Deploy without local application or test patches.",
+        "commit_hash": "67ece18377ba8b74ead7be4aae7a6c6ff1b10d36",
+        "commit_message": "feat(release): import upstream v36\r\n\r\nImport the supplied Downloads ZIP and preserve the license and local site extensions.\r\nRetain upstream validation documents and screenshots under upstream-docs.\r\n\r\nVerify assembly, assets, syntax and desktop/mobile browser behavior. Record the\r\nupstream interface assertion in a memo copied to Boiler without patching the app.",
         "commit_dirty": true
       }
     },
     "stages": [
       {
         "name": "queued",
-        "started_on": "2026-11-06T08:28:19.74442Z",
+        "started_on": "2026-11-06T21:39:08.05304Z",
         "ended_on": null,
         "status": "active"
       },
@@ -55,7 +55,7 @@
       {
         "name": "deploy",
         "started_on": null,
-        "ended_on": "2026-11-06T08:28:21.131408Z",
+        "ended_on": "2026-11-06T21:39:09.512749Z",
         "status": "success"
       }
     ],

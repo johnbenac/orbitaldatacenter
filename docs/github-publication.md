@@ -13,34 +13,39 @@ create or publish the repository.
 | `github` | `https://github.com/johnbenac/orbitaldatacenter.git` | Public source and collaboration, once published |
 
 This checkout overrides the global GitHub SSH rewrite for `johnbenac` URLs so
-the GitHub remote also uses HTTPS. Its credential helper uses the root GitHub CLI
-configuration; no credentials are embedded in the remote URL.
+the GitHub remote also uses HTTPS. Its credential helper uses the active GitHub
+CLI configuration; no credentials are embedded in the remote URL. On this host,
+`GH_CONFIG_DIR` normally selects `/home/johnb/.config/gh`.
 
 ## Initial publication
 
 Run from `/root/orbitaldatacenter/site`. First verify GitHub CLI authentication:
 
 ```sh
-GH_CONFIG_DIR=/root/.config/gh gh auth status
-GH_CONFIG_DIR=/root/.config/gh gh api user --jq .login
+gh auth status
+gh api user --jq .login
 ```
 
-The account must be `johnbenac` with repository-creation and push access. The
-credential checked on 2026-11-05 was invalid. Refresh authentication before
-attempting publication:
+The account must be `johnbenac` with repository-creation and push access. Local
+Claude histories confirm successful repository creation for AudioBoard and
+Characters using ordinary `gh repo create` commands, and a November 2 auth check
+identifies `/home/johnb/.config/gh/hosts.yml` as the working credential store.
+The separately stored root credential is older and returns HTTP 401.
 
-```sh
-GH_CONFIG_DIR=/root/.config/gh gh auth login --hostname github.com --git-protocol https --web
-```
+In the restricted November 5 agent session, John's configuration was unreadable.
+Switching to `/root/.config/gh` did not solve authentication, and the documented
+refresh failed. Publication requires a permitted execution context that can use
+John's existing CLI configuration. Do not assume the account needs another login
+merely because a restricted session cannot read its configuration.
 
 Check whether the repository already exists. Only create it if GitHub reports
 that it is absent; an authentication or network failure is not proof of absence.
 
 ```sh
-GH_CONFIG_DIR=/root/.config/gh gh repo view johnbenac/orbitaldatacenter
-GH_CONFIG_DIR=/root/.config/gh gh repo create johnbenac/orbitaldatacenter --public --description 'Orbital Data Center: a browser-based spacecraft engineering workbench' --homepage https://orbitaldatacenter.design
+gh repo view johnbenac/orbitaldatacenter
+gh repo create johnbenac/orbitaldatacenter --public --description 'Orbital Data Center: a browser-based spacecraft engineering workbench' --homepage https://orbitaldatacenter.design
 git push github main
-GH_CONFIG_DIR=/root/.config/gh gh repo view johnbenac/orbitaldatacenter --json url,visibility,defaultBranchRef
+gh repo view johnbenac/orbitaldatacenter --json url,visibility,defaultBranchRef
 git ls-remote github refs/heads/main
 ```
 

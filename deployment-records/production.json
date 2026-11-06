@@ -1,35 +1,36 @@
 {
-  "release": "orbital-data-center-v21",
-  "index_sha256": "4bf5e4097fd529fc025d90111b2b9efe6092ebbbd92058937b7992fd0e405e90",
+  "release": "site",
+  "source_commit": "d254e11eaacd217e399540725ab8585d376518ea",
+  "index_sha256": "906a847670289905bb95eb7ad97d52de4046e3f734470852994470e43a7f423c",
   "project": "orbitaldatacenter",
   "deployment": {
-    "id": "23651d15-fe3a-494e-a885-4fd3ed254473",
-    "short_id": "23651d15",
+    "id": "c17a0cfa-e877-4c1c-92a9-43f1c67a68ac",
+    "short_id": "c17a0cfa",
     "project_id": "8cfed813-a5e3-48d5-9451-47e81b01d88f",
     "project_name": "orbitaldatacenter",
     "environment": "production",
-    "url": "https://23651d15.orbitaldatacenter-2o2.pages.dev",
-    "created_on": "2026-11-05T23:00:13.854872Z",
-    "modified_on": "2026-11-05T23:00:16.090052Z",
+    "url": "https://c17a0cfa.orbitaldatacenter-2o2.pages.dev",
+    "created_on": "2026-11-06T00:09:17.651221Z",
+    "modified_on": "2026-11-06T00:09:18.974112Z",
     "latest_stage": {
       "name": "deploy",
       "started_on": null,
-      "ended_on": "2026-11-05T23:00:16.090052Z",
+      "ended_on": "2026-11-06T00:09:18.974112Z",
       "status": "success"
     },
     "deployment_trigger": {
       "type": "ad_hoc",
       "metadata": {
         "branch": "main",
-        "commit_hash": "",
-        "commit_message": "",
+        "commit_hash": "d254e11eaacd217e399540725ab8585d376518ea",
+        "commit_message": "feat(site): add author pages and search metadata outside ZIP releases\r\n\r\nAssemble project information and social previews without changing developer files.\r\nAdd a checked ZIP import workflow and test preservation of local site features.",
         "commit_dirty": true
       }
     },
     "stages": [
       {
         "name": "queued",
-        "started_on": "2026-11-05T23:00:13.854872Z",
+        "started_on": "2026-11-06T00:09:17.651221Z",
         "ended_on": null,
         "status": "active"
       },
@@ -54,7 +55,7 @@
       {
         "name": "deploy",
         "started_on": null,
-        "ended_on": "2026-11-05T23:00:16.090052Z",
+        "ended_on": "2026-11-06T00:09:18.974112Z",
         "status": "success"
       }
     ],
@@ -71,7 +72,9 @@
     "compatibility_flags": [],
     "build_image_major_version": 3,
     "usage_model": null,
-    "aliases": null,
+    "aliases": [
+      "https://orbitaldatacenter.design"
+    ],
     "is_skipped": false,
     "production_branch": "main",
     "uses_functions": false
@@ -81,28 +84,17 @@
       "id": "1fa1da69-3cf0-46b5-803b-5aef52105bf7",
       "domain_id": "1fa1da69-3cf0-46b5-803b-5aef52105bf7",
       "name": "orbitaldatacenter.design",
-      "status": "pending",
+      "status": "active",
       "verification_data": {
         "status": "active"
       },
       "validation_data": {
-        "status": "pending",
+        "status": "active",
         "method": "http"
       },
       "certificate_authority": "google",
       "zone_tag": "8bb638583199402382cb9c0611fc3f78",
       "created_on": "2026-11-05T23:00:19.137074Z"
     }
-  ],
-  "public_url": "https://orbitaldatacenter.design/",
-  "verified_assets": [
-    "index.html",
-    "bootstrap.js",
-    "app.js",
-    "mission-worker.js",
-    "ai-service-worker.js",
-    "vendor/three.module.js",
-    "vendor/earth-atmos.jpg",
-    "assets.json"
   ]
 }

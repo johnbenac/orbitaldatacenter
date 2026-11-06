@@ -1,5 +1,6 @@
 # Provider tooling, dependencies and local credentials
 .deploy-state/
+.build/
 .wrangler/
 node_modules/
 .env

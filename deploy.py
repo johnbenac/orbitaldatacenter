@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import urllib.error
 import urllib.request
 
@@ -22,9 +23,11 @@ def main():
                         help='Release directory containing dist/ (default: this checkout)')
     args = parser.parse_args()
     release = args.release.resolve()
-    dist = release / 'dist'
-    if not (dist / 'index.html').is_file():
+    if not (release / 'dist/index.html').is_file():
         parser.error('Release must contain dist/index.html')
+    subprocess.run([sys.executable, str(ROOT / 'scripts/build-site.py'),
+                    '--source', str(release)], check=True)
+    dist = ROOT / '.build/public'
     token = Path('/root/.config/orbitaldatacenter/cloudflare-api-token').read_text().strip()
 
     def api(path, method='GET', body=None, missing_ok=False):
@@ -84,6 +87,8 @@ def main():
     project = api(base)
     snapshot = {
         'release': release.name,
+        'source_commit': subprocess.check_output(
+            ['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
         'index_sha256': hashlib.sha256((dist / 'index.html').read_bytes()).hexdigest(),
         'project': PROJECT,
         'deployment': project.get('canonical_deployment'),

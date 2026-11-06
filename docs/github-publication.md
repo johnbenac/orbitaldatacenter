@@ -44,6 +44,13 @@ GH_CONFIG_DIR=/root/.config/gh gh repo view johnbenac/orbitaldatacenter --json u
 git ls-remote github refs/heads/main
 ```
 
+After verifying that the repository is publicly accessible, set
+`github_published` to `true` in `publication.json`. Assembly then enables the
+public GitHub links in the workbench footer and About page. Before publication,
+the site links to its own source-information section instead of a missing
+repository. Commit that setting, run the assembly tests, push both remotes, and
+redeploy to publish the source links.
+
 Create an empty repository: do not initialize another README or unrelated history.
 Preserve the existing commit history. A project-wide license has not been chosen;
 retain all bundled third-party license notices.

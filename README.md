@@ -2,13 +2,22 @@
 
 Orbital Data Center is a static Three.js engineering workbench. The spacecraft, subsystem diagrams, event playback and exported results use one client-side numerical model. The distribution includes the renderer, its assets and the mission-integration worker.
 
-To run the checkout locally, start a static server from the project directory and open http://localhost:8000.
+To preview the complete website, assemble the developer app with the locally
+maintained author page, links, and search/social metadata. Then start a static
+server from the project directory and open http://localhost:8000.
 
 ```sh
-python3 -m http.server 8000 --directory dist
+python3 scripts/build-site.py
+python3 -m http.server 8000 --directory .build/public
 ```
 
-To deploy, upload the contents of `dist/` to an HTTP(S) static host, preserving the relative paths. Scenario links restore a configuration from the URL fragment on that host.
+`dist/` remains the unmodified developer app. `extensions/` contains local
+features, and `.build/public/` is the assembled output; do not edit that output.
+Scenario links restore a configuration from the URL fragment on the host.
+See [ZIP imports](docs/zip-imports.md) for importing later developer releases.
+
+Run `python3 -m unittest discover -s tests -v` to verify assembly and ZIP import
+behavior. Developer regression suites still run against `dist/` as documented below.
 
 ## Production hosting and repository
 
@@ -33,7 +42,7 @@ The current host is the Cloudflare Pages project `orbitaldatacenter` in account
 `orbitaldatacenter-2o2.pages.dev`. The inherited `.openai/hosting.json` records the
 original export's hosting identity and is not used by this deployment script.
 
-From this checkout, publish the current `dist/` with:
+From this checkout, assemble and publish the current website with:
 
 ```sh
 python3 deploy.py

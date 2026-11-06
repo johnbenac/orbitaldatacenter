@@ -1,0 +1,44 @@
+/* Locally maintained project information; independent of developer ZIP drops. */
+.odc-project-footer{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px 24px;padding:20px 0 8px;margin-top:24px;border-top:1px solid #303944;color:#a2adba;font:12px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif}
+.odc-footer-credit{display:flex;align-items:baseline;gap:8px}
+.odc-footer-label{color:#a2adba;font-size:11px}
+.odc-project-footer a{color:#cbd6df;text-decoration:none;text-underline-offset:4px}
+.odc-footer-credit>a{color:#f6ac59;font-weight:600}
+.odc-footer-links{display:flex;flex-wrap:wrap;gap:8px 22px}
+.odc-project-footer a:hover{text-decoration:underline;color:#f6ac59}
+.odc-project-footer a:focus-visible{outline:2px solid #f6ac59;outline-offset:5px;border-radius:2px}
+.odc-about{margin:0;background:#10141a;color:#edf1f4;font:16px/1.7 -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;color-scheme:dark}
+.odc-about *{box-sizing:border-box}
+.odc-about a{color:#8ad7da;text-decoration-thickness:1px;text-underline-offset:4px}
+.odc-about a:hover{color:#f6ac59}
+.odc-about a:focus-visible{outline:2px solid #f6ac59;outline-offset:5px;border-radius:2px}
+.odc-about p{margin:0 0 18px;color:#b5c1cc;max-width:66ch}
+.odc-about h1,.odc-about h2{margin:0;color:#edf1f4;line-height:1.15;letter-spacing:-.035em}
+.odc-about h1{font-size:clamp(34px,5vw,62px);font-weight:580;margin:18px 0 22px}
+.odc-about h2{font-size:clamp(25px,3vw,34px);font-weight:560;margin-bottom:20px}
+.odc-skip{position:absolute;left:-10000px;top:12px;padding:10px;background:#edf1f4;color:#10141a!important;z-index:2}
+.odc-skip:focus{left:12px}
+.odc-header{display:flex;align-items:center;justify-content:space-between;gap:20px;max-width:1192px;margin:auto;padding:27px 36px;border-bottom:1px solid #2d3742}
+.odc-brand{display:flex;align-items:center;gap:11px;text-decoration:none;color:#edf1f4!important}
+.odc-brand span{font-size:17px;font-weight:720;letter-spacing:2.5px;line-height:1.1}
+.odc-brand small{display:block;font:8px/1.5 "SFMono-Regular",Consolas,"Liberation Mono",monospace;letter-spacing:3px;margin-top:3px;color:#b5c1cc}
+.odc-return{font-size:13px;text-decoration:none;white-space:nowrap}
+.odc-about-main{max-width:1120px;margin:auto;padding:68px 36px 24px}
+.odc-eyebrow{color:#f6ac59;font:11px/1.5 "SFMono-Regular",Consolas,"Liberation Mono",monospace;text-transform:uppercase;letter-spacing:1.8px}
+.odc-about .odc-lead{font-size:20px;line-height:1.6;max-width:49ch;margin-bottom:46px;color:#c8d2dc}
+.odc-project-summary{display:grid;grid-template-columns:minmax(0,1fr) 260px;align-items:center;gap:32px;padding:36px;background:#171e26;border:1px solid #303c47;border-radius:9px}
+.odc-project-summary h2{font-size:26px}
+.odc-project-summary p:last-child{margin-bottom:0}
+.odc-orbit-art svg{display:block;width:100%;height:auto}
+.odc-orbit-art>span{display:block;text-align:center;color:#99adb9;font:8px/1.5 "SFMono-Regular",Consolas,"Liberation Mono",monospace;letter-spacing:1px}
+.odc-author,.odc-source{padding:48px 0;border-bottom:1px solid #2d3742}
+.odc-author .odc-eyebrow,.odc-source .odc-eyebrow{margin-bottom:12px}
+.odc-author p,.odc-source p{max-width:72ch}
+.odc-links{display:flex;align-items:center;flex-wrap:wrap;gap:18px 28px;margin-top:25px}
+.odc-links a{text-decoration:none;font-size:14px}
+.odc-links .odc-primary-link{display:inline-flex;align-items:center;gap:20px;padding:10px 16px;border:1px solid #b77d3e;border-radius:5px;background:#30271e;color:#ffd09b}
+.odc-links .odc-primary-link:hover{border-color:#f6ac59;background:#3b2e20}
+.odc-source code{font-size:13px;overflow-wrap:anywhere}
+.odc-about-footer{max-width:1120px;margin:auto;padding:12px 36px 40px;display:flex;flex-wrap:wrap;justify-content:space-between;gap:14px;color:#9daeba;font-size:12px}
+.odc-about-footer>a{color:#cbd6df;text-decoration:none}
+@media(max-width:720px){.odc-header{padding:20px}.odc-brand span{font-size:14px}.odc-brand small{font-size:7px}.odc-brand img{width:32px;height:32px}.odc-return{font-size:11px}.odc-about-main{padding:42px 20px 12px}.odc-about h1 br{display:none}.odc-about .odc-lead{font-size:18px;margin-bottom:28px}.odc-project-summary{grid-template-columns:1fr;padding:24px;gap:20px}.odc-orbit-art{max-width:230px;width:100%;margin:0 auto}.odc-author,.odc-source{padding:34px 0}.odc-about-footer{padding:12px 20px 28px}.odc-footer-links{gap:10px 20px}.odc-project-footer{align-items:flex-start;flex-direction:column;padding-top:18px}.odc-project-footer a{min-height:28px;display:inline-flex;align-items:center}}

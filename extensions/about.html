@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#10141a">
+  <link rel="icon" href="/mark.svg">
+  <link rel="stylesheet" href="/_site/site.css">
+  {{HEAD}}
+</head>
+<body class="odc-about">
+  <a class="odc-skip" href="#content">Skip to content</a>
+  <header class="odc-header">
+    <a class="odc-brand" href="/" aria-label="Orbital Data Center workbench">
+      <img src="/mark.svg" width="38" height="38" alt="">
+      <span>ORBITAL<small>DATA CENTER</small></span>
+    </a>
+    <a class="odc-return" href="/">Open the workbench <span aria-hidden="true">↗</span></a>
+  </header>
+  <main class="odc-about-main" id="content">
+    <div class="odc-eyebrow">About this project</div>
+    <h1>Explore the engineering<br>of a data center in orbit.</h1>
+    <p class="odc-lead">Orbital Data Center is an interactive mission workbench for studying how spacecraft hardware, computing workloads, and orbital operations fit together.</p>
+
+    <section class="odc-project-summary" aria-labelledby="workbench-title">
+      <div>
+        <h2 id="workbench-title">One spacecraft. Connected decisions.</h2>
+        <p>Size a spacecraft, inspect its equipment in 3D, and follow its mission from launch to retirement. Change a workload or a hardware assumption and explore the consequences for power, heat, mass, communications, and operations.</p>
+        <p>The workbench runs its model in your browser. It is a place to explore assumptions and tradeoffs, inspect the modeled results, and learn how the subsystems affect one another.</p>
+      </div>
+      <div class="odc-orbit-art" aria-hidden="true">
+        <svg viewBox="0 0 300 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="150" cy="120" r="62" fill="#172d38" stroke="#72cbd0" stroke-width="1.5"/>
+          <ellipse cx="150" cy="120" rx="27" ry="62" stroke="#72cbd0" opacity=".35"/>
+          <ellipse cx="150" cy="120" rx="62" ry="22" stroke="#72cbd0" opacity=".35"/>
+          <path d="M88 120h124M150 58v124" stroke="#72cbd0" opacity=".35"/>
+          <ellipse cx="150" cy="120" rx="131" ry="47" transform="rotate(-30 150 120)" stroke="#f6ac59" stroke-width="1.5"/>
+          <circle cx="251" cy="61" r="6" fill="#f6ac59"/>
+          <path d="M251 41v10m0 20v10m-20-20h10m20 0h10" stroke="#f6ac59" opacity=".55"/>
+        </svg>
+        <span>MISSION ENGINEERING WORKBENCH</span>
+      </div>
+    </section>
+
+    <section class="odc-author" aria-labelledby="author-title">
+      <div class="odc-eyebrow">A project by</div>
+      <h2 id="author-title">John Benac</h2>
+      <p>I’m a systems engineer with a background spanning aerospace, engineering design, software, and hands-on prototyping. I build tools that make ideas practical and systems people can explore and understand.</p>
+      <p>Orbital Data Center brings those interests together in a spacecraft engineering workbench. You can find my other projects and more about my work at <a href="https://johnbenac.com/">johnbenac.com</a>.</p>
+      <div class="odc-links">
+        <a class="odc-primary-link" href="https://www.linkedin.com/in/johnbenac/">Connect on LinkedIn <span aria-hidden="true">↗</span></a>
+        <a href="https://johnbenac.com/about/">More about John <span aria-hidden="true">↗</span></a>
+      </div>
+    </section>
+
+    <section class="odc-source" id="source" aria-labelledby="source-title">
+      <div class="odc-eyebrow">Explore the implementation</div>
+      <h2 id="source-title">Source code</h2>
+      {{SOURCE}}
+    </section>
+  </main>
+  <footer class="odc-about-footer">
+    <a href="/">Orbital Data Center</a>
+    <span>A project by <a href="https://johnbenac.com/">John Benac</a></span>
+  </footer>
+</body>
+</html>

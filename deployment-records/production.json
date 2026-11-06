@@ -1,36 +1,36 @@
 {
   "release": "site",
-  "source_commit": "d254e11eaacd217e399540725ab8585d376518ea",
-  "index_sha256": "906a847670289905bb95eb7ad97d52de4046e3f734470852994470e43a7f423c",
+  "source_commit": "ac622463f54baef59a78c9cdfe84cc569a980c76",
+  "index_sha256": "4ff4509a3e97444ac03447a2bfb38f2324aeecd99c08e80003242703b0e5b572",
   "project": "orbitaldatacenter",
   "deployment": {
-    "id": "c17a0cfa-e877-4c1c-92a9-43f1c67a68ac",
-    "short_id": "c17a0cfa",
+    "id": "0c1f9f66-44ea-4bb9-9b7a-f749d8f3250a",
+    "short_id": "0c1f9f66",
     "project_id": "8cfed813-a5e3-48d5-9451-47e81b01d88f",
     "project_name": "orbitaldatacenter",
     "environment": "production",
-    "url": "https://c17a0cfa.orbitaldatacenter-2o2.pages.dev",
-    "created_on": "2026-11-06T00:09:17.651221Z",
-    "modified_on": "2026-11-06T00:09:18.974112Z",
+    "url": "https://0c1f9f66.orbitaldatacenter-2o2.pages.dev",
+    "created_on": "2026-11-06T00:13:00.75166Z",
+    "modified_on": "2026-11-06T00:13:02.264693Z",
     "latest_stage": {
       "name": "deploy",
       "started_on": null,
-      "ended_on": "2026-11-06T00:09:18.974112Z",
+      "ended_on": "2026-11-06T00:13:02.264693Z",
       "status": "success"
     },
     "deployment_trigger": {
       "type": "ad_hoc",
       "metadata": {
         "branch": "main",
-        "commit_hash": "d254e11eaacd217e399540725ab8585d376518ea",
-        "commit_message": "feat(site): add author pages and search metadata outside ZIP releases\r\n\r\nAssemble project information and social previews without changing developer files.\r\nAdd a checked ZIP import workflow and test preservation of local site features.",
+        "commit_hash": "ac622463f54baef59a78c9cdfe84cc569a980c76",
+        "commit_message": "feat(site): enable verified public GitHub source links\r\n\r\nPublish the repository on GitHub and activate source links in the assembled site.\r\nDocument the working CLI authentication and retain the private GitLab remote.",
         "commit_dirty": true
       }
     },
     "stages": [
       {
         "name": "queued",
-        "started_on": "2026-11-06T00:09:17.651221Z",
+        "started_on": "2026-11-06T00:13:00.75166Z",
         "ended_on": null,
         "status": "active"
       },
@@ -55,7 +55,7 @@
       {
         "name": "deploy",
         "started_on": null,
-        "ended_on": "2026-11-06T00:09:18.974112Z",
+        "ended_on": "2026-11-06T00:13:02.264693Z",
         "status": "success"
       }
     ],

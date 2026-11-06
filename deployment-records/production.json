@@ -1,36 +1,36 @@
 {
   "release": "site",
-  "source_commit": "ac622463f54baef59a78c9cdfe84cc569a980c76",
+  "source_commit": "17bdaae3022d602efd7cb77e41865046d3f188c0",
   "index_sha256": "4ff4509a3e97444ac03447a2bfb38f2324aeecd99c08e80003242703b0e5b572",
   "project": "orbitaldatacenter",
   "deployment": {
-    "id": "0c1f9f66-44ea-4bb9-9b7a-f749d8f3250a",
-    "short_id": "0c1f9f66",
+    "id": "58ecf323-bea8-4804-a18e-1fcca7ddb52b",
+    "short_id": "58ecf323",
     "project_id": "8cfed813-a5e3-48d5-9451-47e81b01d88f",
     "project_name": "orbitaldatacenter",
     "environment": "production",
-    "url": "https://0c1f9f66.orbitaldatacenter-2o2.pages.dev",
-    "created_on": "2026-11-06T00:13:00.75166Z",
-    "modified_on": "2026-11-06T00:13:02.264693Z",
+    "url": "https://58ecf323.orbitaldatacenter-2o2.pages.dev",
+    "created_on": "2026-11-06T00:24:15.509481Z",
+    "modified_on": "2026-11-06T00:24:16.819801Z",
     "latest_stage": {
       "name": "deploy",
       "started_on": null,
-      "ended_on": "2026-11-06T00:13:02.264693Z",
+      "ended_on": "2026-11-06T00:24:16.819801Z",
       "status": "success"
     },
     "deployment_trigger": {
       "type": "ad_hoc",
       "metadata": {
         "branch": "main",
-        "commit_hash": "ac622463f54baef59a78c9cdfe84cc569a980c76",
-        "commit_message": "feat(site): enable verified public GitHub source links\r\n\r\nPublish the repository on GitHub and activate source links in the assembled site.\r\nDocument the working CLI authentication and retain the private GitLab remote.",
+        "commit_hash": "17bdaae3022d602efd7cb77e41865046d3f188c0",
+        "commit_message": "fix(site): keep project links visible in a floating footer\r\n\r\nPin the project links above the viewport edge with a compact mobile layout.\r\nReserve scroll space so the last workbench content remains reachable.",
         "commit_dirty": true
       }
     },
     "stages": [
       {
         "name": "queued",
-        "started_on": "2026-11-06T00:13:00.75166Z",
+        "started_on": "2026-11-06T00:24:15.509481Z",
         "ended_on": null,
         "status": "active"
       },
@@ -55,7 +55,7 @@
       {
         "name": "deploy",
         "started_on": null,
-        "ended_on": "2026-11-06T00:13:02.264693Z",
+        "ended_on": "2026-11-06T00:24:16.819801Z",
         "status": "success"
       }
     ],

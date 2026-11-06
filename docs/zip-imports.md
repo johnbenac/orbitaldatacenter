@@ -33,6 +33,8 @@ Developer `README.md` and `.openai/hosting.json` are imported as
 `upstream-docs/README.md` and `upstream-docs/hosting.json`; our root README and
 production deployment configuration are preserved. Bundled `history.bundle`
 files are skipped: a new drop never replaces this repository's Git history.
+The reviewed `tools/build-identity.py` generator is also upstream-owned; its
+generated artwork ships in `dist/` and does not need rebuilding for deployment.
 All other incoming root paths must be recognized developer files. Unexpected
 layouts require reviewing the ownership rules before import. The assembled
 `/_site/` and `/about/` namespaces are reserved for local features.
@@ -51,7 +53,7 @@ python3 scripts/build-site.py
 Run additional suites for changed subsystems. Check the assembled app's startup,
 3D view, author links, social metadata, and mobile layout, then commit the import
 and its ownership manifest together. Record checks for the new release; previous
-`release.json` checks describe v21 and are not evidence for a later drop.
+`release.json` checks must describe the imported drop rather than a previous release.
 
 After review, merge into `main`, push each configured remote, and run
 `python3 deploy.py`. Deployment remains a separate explicit operation.

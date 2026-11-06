@@ -1,7 +1,6 @@
-import {controls,defaults,inverseSolve,presets,validateDesign} from './design.js';
+import {controls,defaults,inverseSolve,presets,validateDesign,sizingLabel,meetsSizingRequirement} from './design.js';
 
 const fields=Object.fromEntries(controls.map(c=>[c.key,c]));
-const rateNames={solar:'Solar generation',battery:'Eclipse energy',thermal:'Heat rejection',storage:'Storage capacity',downlink:'Link capacity',compute:'Compute service',propellant:'Propellant supply',diskLife:'Storage endurance',launcherReference:'Vehicle reference capacity',mass:'Launch allowance',fairing:'Stowed fit'};
 const dependencies={
  hkPeriodS:['Command & Data Handling','Electrical Power'],hkRecorderMB:['Command & Data Handling','Mechanical Design'],
  commandKbps:['Communications','Command & Data Handling'],cmgMomentumNms:['Attitude Determination & Control','Mechanical Design','Electrical Power','Mass Budget'],cmgTorqueNm:['Attitude Determination & Control','Propulsion','Electrical Power'],
@@ -52,8 +51,8 @@ export function impactOfChange(before,after,mode='installed',nextMode=mode,curre
  if(errors.length)return {changes,domains,errors,deltas:[],margins:[],newFailures:[],review:true};
  const retained=[...new Map(keys.flatMap(k=>validationLinks[k]||[]).filter(([key])=>Object.hasOwn(after,key)&&!keys.includes(key)).map(([key,note])=>[key,{key,label:fields[key]?.label||key,value:after[key],unit:fields[key]?.unit||'',note}])).values()];
  const proposed=inverseSolve(after,nextMode),deltas=metrics.map(([label,unit,f])=>({label,unit,before:f(current),after:f(proposed)})).filter(r=>Number.isFinite(r.before)&&Number.isFinite(r.after)&&unequal(r.before,r.after));
- const margins=Object.keys(rateNames).map(k=>({key:k,label:rateNames[k],before:current.envelope.rates[k],after:proposed.envelope.rates[k]})).filter(r=>Number.isFinite(r.before)&&Number.isFinite(r.after));
- const newFailures=margins.filter(r=>r.after<1-1e-7&&r.before>=1-1e-7);
+ const margins=Object.entries(proposed.envelope.rates).map(([key,after])=>({key,label:sizingLabel(key),before:current.envelope.rates[key],after}));
+ const newFailures=margins.filter(r=>!meetsSizingRequirement(r.after)&&(r.before===undefined||meetsSizingRequirement(r.before)));
  const review=mode!==nextMode||keys.some(k=>fields[k]?.options)||newFailures.length>0||current.feasible&&!proposed.feasible;
  return {changes,domains,errors,deltas,margins,newFailures,retained,review,proposed};
 }

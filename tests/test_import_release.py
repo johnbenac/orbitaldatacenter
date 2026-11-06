@@ -93,6 +93,14 @@ class ImportTests(unittest.TestCase):
             IMPORTER.plan_import(archive, self.repo)
         self.assertEqual(before, self.snapshot())
 
+    def test_reviewed_identity_tool_is_owned_without_allowing_other_tools(self):
+        archive = self.archive({'tools/build-identity.py': b'# upstream artwork generator'})
+        IMPORTER.apply_plan(IMPORTER.plan_import(archive, self.repo))
+        self.assertEqual('# upstream artwork generator',
+                         (self.repo / 'tools/build-identity.py').read_text())
+        with self.assertRaisesRegex(ValueError, 'Unexpected developer file'):
+            IMPORTER.plan_import(self.archive({'tools/unreviewed.py': b'unknown'}), self.repo)
+
     def test_existing_unowned_file_collision(self):
         (self.repo / 'dist/new.js').write_text('a local addition')
         with self.assertRaisesRegex(ValueError, 'outside upstream ownership'):

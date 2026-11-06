@@ -19,6 +19,7 @@ export const G0=9.80665, SIGMA=5.670374419e-8, SOLAR=1361, YEAR=31557600;
 const clamp=(x,lo,hi)=>Math.min(hi,Math.max(lo,x));
 const rad=x=>x*Math.PI/180;
 export const sources=[
+ ['NASA Scientific Visualization Studio · Deep Star Maps 2020','https://svs.gsfc.nasa.gov/4851/','The orbital sky uses the celestial-coordinate survey map. Right ascension and declination fix the Milky Way and stars in inertial space. The simulator places the Sun separately from its orbital ephemeris.'],
  ...propulsionSources,
  ['NASA · iROSA deployed in orbit','https://www.nasa.gov/blogs/spacestation/2021/06/20/spacewalkers-successfully-deploy-solar-arrays/','Approximately 18 m of roll-out solar array deployed in six minutes on June 20, 2021. The ODC model uses four smaller/equivalently scaled blanket wings and a selected timeline.'],
  ['NASA · iROSA second deployment','https://www.nasa.gov/blogs/spacestation/2021/06/25/second-of-the-new-solar-arrays-successfully-deployed/','The second ISS installation rolled out in about ten minutes. Its deployment mechanism supplies the precedent for elastic boom drive.'],
@@ -200,6 +201,21 @@ function deployedIncidence(h,period){
  }
  const summary={pv:count?pv/count:0,radHot};designIllumination.set(h,summary);return summary;
 }
+const sizingLabels={
+ solar:'Solar generation',battery:'Eclipse energy',thermal:'Heat rejection',storage:'Recorder capacity',downlink:'Earth return-link capacity',
+ decodeThroughput:'Active onboard decode throughput',onboardLatency:'Onboard time to first token',compute:'Workload processing rate',
+ residentMemory:'Accelerator memory',serviceStorage:'Workload storage',inputLink:'Earth input uplink',artifact:'Earth artifact compatibility',
+ chemicalBurnClearance:'Engine clearance and thrust alignment',propellant:'Station-keeping supply',diskLife:'Recorder endurance',
+ mass:'Mission launch allowance',launcherReference:'Launch vehicle mass capacity',fairing:'Stowed fairing envelope',launchInterface:'Payload adapter interface'
+};
+export const sizingLabel=key=>sizingLabels[key]??key;
+export const meetsSizingRequirement=ratio=>ratio>=1-1e-9;
+export function sizingMargin(key,ratio){
+ if(ratio==null)return '—';
+ if(key==='chemicalBurnClearance'||key==='artifact')return meetsSizingRequirement(ratio)?'Pass':'Fails check';
+ if(ratio===Infinity)return 'No limiting demand';
+ return Number.isFinite(ratio)?(100*(ratio-1)).toLocaleString('en-US',{maximumFractionDigits:2})+'%':'—';
+}
 export function sizingEnvelope(h,years=h.input.missionYears){
  const d=h.input,R=6378.137,a=R+d.altitudeKm,period=2*Math.PI*Math.sqrt(a**3/398600.4418),sunFraction=1-Math.asin(R/a)/Math.PI,shadowHours=(1-sunFraction)*period/3600;
  const aging=ageProperties(d,years),angles=deployedIncidence(h,period),incidence=angles.pv,actuatorKw=h.cmg.maneuverW/1000+.12+.012,terminalKw=.24,peakBus=h.itKw+h.hotelKw+actuatorKw+terminalKw;
@@ -236,14 +252,17 @@ export function sizingEnvelope(h,years=h.input.missionYears){
  const meanInputMbps=ai.training?Math.max(0,ai.corpusGB-ai.preloadedGB)*8000/(d.trainingBudgetDays*86400):d.serviceOffersPerHour/3600*ai.inputBytesPerUnit*8/1e6;
  const meanUpMbps=directDuty*Math.min(d.customerUplinkMbps,Math.max(0,2*d.codingEff-.016))+relayAccess*d.relayUpMbps;
  const propulsionClear=propulsionReview(h).clear&&propulsionReview(h,h.propellantKg*d.residualFraction).clear;
- const rates={chemicalBurnClearance:propulsionClear?Infinity:0,solar:h.solarM2/solarNeeded,battery:h.batteryKWh/batteryNeeded,thermal:Math.min(h.radiatorM2/radiatorNeeded,d.junctionLimitK/thermalK),storage:h.storageTB/storageNeeded,downlink:linkGoodput/goodputNeeded,compute:d.aiPurpose==='text'?(h.replicas?Math.max(.001,d.latencyTargetS/h.ttfSeconds):0):ai.activeUnitsPerSec*d.duty/Math.max(1e-12,ai.requiredRate),residentMemory:h.memoryGB/ai.modelMemoryGB,serviceStorage:h.usableTB*1000/Math.max(.001,ai.requiredStorageGB),inputLink:meanInputMbps>0?meanUpMbps/meanInputMbps:Infinity,artifact:ai.training&&!ai.deployableArtifact?0:Infinity,propellant:years>0?supplyYears/years:(h.propellantKg*(1-unusableFrac)>=trimKg+otherKg?Infinity:0),diskLife:years>0?endurYears/years:Infinity,mass:d.launchAllowanceKg/h.launchKg,launcherReference:d.referenceKg/h.launchKg,fairing:h.fairing.ratio,launchInterface:h.payloadInterface.ratio};
- const binding=Object.keys(rates).reduce((a,b)=>rates[a]<rates[b]?a:b), feasible=(rates[binding]>=1-1e-9)&&!h.errors.length;
+ const rates={chemicalBurnClearance:propulsionClear?Infinity:0,solar:h.solarM2/solarNeeded,battery:h.batteryKWh/batteryNeeded,thermal:Math.min(h.radiatorM2/radiatorNeeded,d.junctionLimitK/thermalK),storage:h.storageTB/storageNeeded,downlink:linkGoodput/goodputNeeded,...(d.aiPurpose==='text'?{decodeThroughput:h.tokensPerSec/d.requiredTps,onboardLatency:h.replicas?d.latencyTargetS/h.ttfSeconds:0}:{compute:ai.activeUnitsPerSec*d.duty/Math.max(1e-12,ai.requiredRate)}),residentMemory:h.memoryGB/ai.modelMemoryGB,serviceStorage:h.usableTB*1000/Math.max(.001,ai.requiredStorageGB),inputLink:meanInputMbps>0?meanUpMbps/meanInputMbps:Infinity,artifact:ai.training&&!ai.deployableArtifact?0:Infinity,propellant:years>0?supplyYears/years:(h.propellantKg*(1-unusableFrac)>=trimKg+otherKg?Infinity:0),diskLife:years>0?endurYears/years:Infinity,mass:d.launchAllowanceKg/h.launchKg,launcherReference:d.referenceKg/h.launchKg,fairing:h.fairing.ratio,launchInterface:h.payloadInterface.ratio};
+ const binding=Object.keys(rates).reduce((a,b)=>rates[a]<rates[b]?a:b), feasible=meetsSizingRequirement(rates[binding])&&!h.errors.length;
  return {meanInputMbps,meanUpMbps,period,sunFraction,shadowHours,solarNeeded,batteryNeeded,radiatorNeeded,thermalK,equilibriumK,transportRiseK,enclosureDesignLeakKw,storageNeeded,goodputNeeded,traffic,linkGoodput,meanBus,peakBus,propForCoverage,propAnnual,trimKg,otherKg,disposalBudgetDv,unusableFrac,supplyYears,yearlyImpulse,ram,rho,endurYears,rates,binding,feasible};
 }
 export function estimateLife(h,horizon=30,audit=null){
  if(audit?.thermal){
   const initial=h.errors.length?h.errors[0]:!h.fit?'Stowed fairing fit':h.launchKg>h.input.launchAllowanceKg?'Launch mass allowance':h.launchReferenceMarginKg<0?'Published launcher reference screen':h.ai.memoryMarginGB<0?'Required resident accelerator state':h.ai.storageMarginGB<0?'Required local model, corpus and checkpoint storage':!h.replicas?'Operating model fit':null;
-  if(initial)return {years:0,binding:initial,lowerBound:false,method:'Installed hardware at launch',ratios:sizingEnvelope(h,0).rates};
+  const start=sizingEnvelope(h,0);
+  // Time-invariant payload and installation limits apply before chronological aging starts.
+  const unmet=['launchInterface','artifact','decodeThroughput','onboardLatency','compute'].find(k=>Object.hasOwn(start.rates,k)&&!meetsSizingRequirement(start.rates[k]));
+  if(initial||unmet)return {years:0,binding:initial||unmet,lowerBound:false,method:'Installed hardware at launch',ratios:start.rates};
   const yearLimit=horizon*YEAR,observed=Math.min(audit.physicalLifetimeSeconds,yearLimit),cross=audit.firstCrossing&&audit.firstCrossing.time<=yearLimit;
   return {years:observed/YEAR,binding:cross?audit.firstCrossing.limit:'Audited horizon',lowerBound:!cross,method:'Chronological mission integration',ratios:sizingEnvelope(h,observed/YEAR).rates};
  }
@@ -277,12 +296,21 @@ export function inverseSolve(input={},mode='installed'){
  }else if(mode==='launch'){
   const minimumTrays=h.ai.minimumTrays;
   let best=null,lo=minimumTrays,hi=2000,nextLimit='Tray-count bound';
-  while(lo<=hi){const mid=Math.floor((lo+hi)/2),candidate=closeSupport({...d,trayCount:mid}),env=sizingEnvelope(candidate);if(env.feasible){best=candidate;lo=mid+1}else{nextLimit=env.binding;hi=mid-1}}
-  const fitted=best??closeSupport({...d,trayCount:minimumTrays});setHardware(fitted.input);achieved=best?(d.aiPurpose==='text'?h.sustainedTps:h.ai.activeUnitsPerSec*d.duty):0;target=d.aiPurpose==='text'?d.requiredTps*d.duty:h.ai.requiredRate;unit=d.aiPurpose==='text'?'tok/s duty-average':h.ai.unit+'/s duty-average';margin=h.launchScreenMarginKg;feasible=!!best;binding=nextLimit;
+  const outputGoal=d.aiPurpose==='text'?'decodeThroughput':'compute';
+  while(lo<=hi){
+   const mid=Math.floor((lo+hi)/2),candidate=closeSupport({...d,trayCount:mid}),env=sizingEnvelope(candidate);
+   // The requested output is compared with the maximum after the physical launch envelope is closed.
+   const limiting=Object.keys(env.rates).filter(k=>k!==outputGoal).reduce((a,b)=>env.rates[a]<env.rates[b]?a:b);
+   if(!candidate.errors.length&&meetsSizingRequirement(env.rates[limiting])){best=candidate;lo=mid+1}else{nextLimit=limiting;hi=mid-1}
+  }
+  const fitted=best??closeSupport({...d,trayCount:minimumTrays});setHardware(fitted.input);
+  achieved=best?(d.aiPurpose==='text'?h.sustainedTps:h.ai.activeUnitsPerSec*d.duty):0;
+  target=d.aiPurpose==='text'?d.requiredTps*d.duty:h.ai.requiredRate;unit=d.aiPurpose==='text'?'tok/s duty-average':h.ai.unit+'/s duty-average';
+  margin=h.launchScreenMarginKg;feasible=!!best&&e.feasible;binding=best&&!e.feasible?e.binding:nextLimit;
  }else if(mode==='lifetime'){const result=estimateLife(h);achieved=result.years;target=d.missionYears;unit='yr';binding=result.binding;lowerBound=result.lowerBound;margin=achieved-target;feasible=achieved>0;if(achieved>=.003)setHardware({missionYears:achieved});
  }else if(mode==='supply'){achieved=e.supplyYears;target=d.yearsSupply;unit='yr';binding='Available propellant after protected allocations';margin=achieved-target;setHardware({yearsSupply:Math.min(30,achieved)});
  }else if(mode==='link'){achieved=e.goodputNeeded;target=d.requiredLineMbps;unit='Mbit/s';margin=e.linkGoodput-achieved;binding='Mean traffic divided by assumed contact fraction';feasible=margin>=0;setHardware({requiredLineMbps:clamp(achieved,.01,200000)});
- }else if(mode==='throughput'){achieved=d.aiPurpose==='text'?h.tokensPerSec:h.ai.activeUnitsPerSec;target=d.aiPurpose==='text'?d.requiredTps:h.ai.requiredRate;unit=d.aiPurpose==='text'?'tok/s':h.ai.unit+'/s';margin=achieved-target;binding=h.ai.training?'Resident state, collective fabric and dataset I/O':'Mixed prefill + bandwidth-limited decode';feasible=margin>=0&&e.feasible;
+ }else if(mode==='throughput'){achieved=d.aiPurpose==='text'?h.tokensPerSec:h.ai.activeUnitsPerSec;target=d.aiPurpose==='text'?d.requiredTps:h.ai.requiredRate/Math.max(1e-9,d.duty);unit=d.aiPurpose==='text'?'tok/s':h.ai.unit+'/s';margin=achieved-target;binding=!e.feasible?e.binding:h.ai.training?'Resident state, collective fabric and dataset I/O':'Mixed prefill + bandwidth-limited decode';feasible=margin>=0&&e.feasible;
  }else{const row={solar:['solarM2','solarNeeded','m²'],radiator:['radiatorM2','radiatorNeeded','m²'],battery:['batteryKWh','batteryNeeded','kWh'],propellant:['propellantKg','propForCoverage','kg'],storage:['storageTB','storageNeeded','TB']}[mode];if(!row)throw Error('Unknown sizing target: '+mode);const [key,req,units]=row;unit=units;const bound=controls.find(c=>c.key===key);for(let i=0;i<(mode==='propellant'?6:1);i++){const val=e[req];setHardware({[key]:clamp(mode==='storage'?Math.ceil(val/d.diskModuleTB)*d.diskModuleTB:Math.ceil(val*100)/100,bound.min,bound.max)})}achieved=d[key];target=e[req];margin=achieved-target;binding=mode+' sizing envelope';feasible=margin>=-.01&&h.errors.length===0;}
  return {mode,input:d,hardware:h,achieved,target,unit,margin,binding,feasible,lowerBound,envelope:e};
 }

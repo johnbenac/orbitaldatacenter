@@ -10,11 +10,15 @@
 
 /* This screen is in the initial HTML so it can paint before the simulation runs. */
 body[data-starting] > :not(#startup){display:none!important}
-#startup{box-sizing:border-box;min-height:100vh;max-width:38rem;padding:clamp(70px,21vh,200px) 24px 42px;margin:0 auto;color:var(--text)}
-#startup img{display:block;margin-bottom:18px}
-#startup h1{font-size:clamp(24px,4vw,34px);font-weight:550;line-height:1.18;letter-spacing:-.03em;margin:6px 0 10px}
-#startup p{color:var(--soft)}
-#startup-actions{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-top:18px}
+#startup{min-height:100vh;min-height:100svh;display:grid;align-content:center;justify-items:center;box-sizing:border-box;background:#10232e;color:#f5ecd9}
+#startup[hidden]{display:none}
+.startup-art{display:block;width:min(100%,1050px);line-height:0}
+.startup-art img{display:block;width:100%;height:auto;max-height:67svh;object-fit:contain}
+.startup-copy{text-align:center;padding:18px 20px 28px}
+#startup h1{font:550 clamp(16px,2vw,21px)/1.3 system-ui,sans-serif;margin:0 0 5px}
+#startup p{color:#b8c6c9;margin:0}
+#startup-actions{display:flex;align-items:center;justify-content:center;gap:16px;flex-wrap:wrap;margin-top:14px}
+#startup-actions a{color:#b5dad2}
 #scene-loading{position:absolute;inset:0;z-index:2;display:grid;place-content:center;justify-items:center;gap:10px;padding:24px;text-align:center;background:var(--panel);color:var(--soft)}
 
 .orbit-lighting{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;padding:6px 12px;border-bottom:1px solid #34434c;background:#182129;color:#ccd7d9;font-size:12px}
@@ -30,3 +34,21 @@ body[data-starting] > :not(#startup){display:none!important}
 .exposure-control{display:inline-flex;align-items:center;gap:6px;color:#b8c6cb;font-size:11px}
 .exposure-control select{border:1px solid #46545e;border-radius:5px;color:#d2dfe2;background:#18232c;font:inherit;padding:4px 5px;cursor:pointer}
 .exposure-control select:focus-visible{outline:2px solid #d4eee7;outline-offset:1px}@media(max-width:560px){.orbit-lighting{gap:4px 8px;padding:5px 8px}.light-environment{margin-left:0}}
+
+.flight-vectors{display:flex;align-items:center;flex-wrap:wrap;gap:6px 14px;min-height:34px;padding:4px 12px;box-sizing:border-box;border-top:1px solid #35444c;background:#172027;color:#c6d0d6}
+.flight-vectors[hidden],.flight-vector-key[hidden],.vector-reading[hidden]{display:none}
+.vector-switch{display:inline-flex;align-items:center;gap:7px;padding:4px 2px;border:0;background:transparent;color:#dce7e8;font:600 12px/1.4 system-ui,sans-serif;white-space:nowrap;cursor:pointer}
+.vector-track{display:inline-flex;align-items:center;width:24px;height:14px;box-sizing:border-box;border:1px solid #697b84;border-radius:9px;background:#303c45}
+.vector-track i{width:8px;height:8px;margin-left:2px;border-radius:100%;background:#a1acb2}
+.vector-switch[aria-pressed=true] .vector-track{border-color:#71b3a7;background:#325650}.vector-switch[aria-pressed=true] i{margin-left:12px;background:#b2e6d4}
+.vector-switch:focus-visible{outline:2px solid #a9d9ce;outline-offset:2px;border-radius:3px}
+.flight-vector-key{display:flex;align-items:center;flex-wrap:wrap;gap:3px 12px}.vector-reading{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;font-size:11px;line-height:1.6}.vector-reading b{font-weight:600;color:#d5e0e3}.vector-reading>span{font-variant-numeric:tabular-nums;color:#acbcc3}
+@media(max-width:610px){.flight-vectors{gap:4px 8px}.flight-vector-key{gap:2px 8px}.vector-reading{font-size:10px}}@media(pointer:coarse){.vector-switch{min-height:36px}}
+
+#rail .brand img{border-radius:0;object-fit:contain}.pagefoot .patch-link{display:inline-flex;align-items:center;gap:7px;background:transparent;border:0;color:inherit;font:inherit;cursor:pointer}.pagefoot .patch-link img{width:24px;height:24px;border-radius:0}.patch-link:hover,.patch-link:focus-visible{color:#edc181}
+.patch-identity{padding:5px 0 8px;display:grid;justify-items:center;gap:12px}.patch-identity img{width:min(70%,255px);height:auto;display:block}.patch-identity p{line-height:1.55;text-align:center;max-width:48ch;margin:0;color:#c1cdd0}.patch-downloads{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}.patch-downloads a{text-decoration:none}
+
+.gesture .trackball-instruction,#scene[data-free-orbit="true"]~.gesture .turntable-instruction{display:none}
+#scene[data-free-orbit="true"]~.gesture .trackball-instruction{display:inline}
+.orbit-rotation-ring{box-sizing:border-box;position:absolute;z-index:1;pointer-events:none;left:50%;top:50%;transform:translate(-50%,-50%);border:1px dashed #aad8d185;border-radius:50%;text-align:center;color:#e1f7f3;text-shadow:0 1px 4px #07121d;font:10px/2 var(--mono);letter-spacing:.06em}
+.orbit-rotation-ring[data-motion="roll"]{border-style:solid}

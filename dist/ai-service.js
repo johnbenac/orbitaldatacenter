@@ -1,3 +1,4 @@
+import {acceptsArtifact} from './ai-purpose.js';
 import {DEPLOY_END_S} from './commissioning-clock.js';
 // Customer work is admitted at Earth, then replayed against the selected vehicle's
 // acquisition-, power- and activity-limited service opportunities. Resources are
@@ -76,7 +77,7 @@ export function artifactBudget(design){
  const kind=d.artifactKind,bits=d.artifactBits??16,fraction=d.trainableFraction??.001;
  const fullGB=params*bits/8e9,adapterGB=params*fraction*2/1e9,restartGB=params*d.checkpointBytesPerParam/1e9;
  const corpusGB=(pre?(d.trainingTokensB||0):(d.fineTuneTokensM||0)/1000)*d.corpusTokenBytes;
- return {kind,parameters:params,precisionBits:bits,fullGB,adapterGB,restartGB,bf16GB:params*2/1e9,fourBitGB:params*.5/1e9,bytesGB:kind==='adapter'?adapterGB:kind==='restart'?restartGB:fullGB,corpusGB,requiredCorpusGB:d.datasetGB>0?d.datasetGB:corpusGB,compatible:kind==='full'||(pre?kind==='restart':d.baseCompatible==='yes')};
+ return {kind,parameters:params,precisionBits:bits,fullGB,adapterGB,restartGB,bf16GB:params*2/1e9,fourBitGB:params*.5/1e9,bytesGB:kind==='adapter'?adapterGB:kind==='restart'?restartGB:fullGB,corpusGB,requiredCorpusGB:d.datasetGB>0?d.datasetGB:corpusGB,compatible:acceptsArtifact(d)};
 }
 
 function inference(d,h,a,rows,start,end){
@@ -301,7 +302,7 @@ export function evaluateService(sim,start=0,span=DAY){
  if(m.size>=6)m.delete(m.keys().next().value);m.set(key,r);return r;
 }
 export const evaluateServiceWindow=evaluateService;
-export function evaluateServiceAsync(design,start=0,span=DAY,{signal,onProgress=()=>{},initialSeed,seedProvenance,firstDay=false}={}){
+export function evaluateServiceAsync(design,start=0,span=DAY,{signal,onProgress=()=>{},initialSeed,seedProvenance,firstDay=false,acceptedWindow}={}){
  return new Promise((resolve,reject)=>{
   if(signal?.aborted){reject(new DOMException('Service study cancelled','AbortError'));return}
   const worker=new Worker(new URL('./ai-service-worker.js',import.meta.url),{type:'module'});
@@ -310,6 +311,6 @@ export function evaluateServiceAsync(design,start=0,span=DAY,{signal,onProgress=
   signal?.addEventListener('abort',cancel,{once:true});
   worker.onmessage=({data})=>{if(data.progress){onProgress(data.progress);return}close();if(data.error)reject(new Error(data.error));else resolve(data.result)};
   worker.onerror=e=>{close();reject(new Error(e.message||'Service worker failed'))};
-  worker.postMessage({design:design.input||design,start,span,initialSeed,seedProvenance,firstDay});
+  worker.postMessage({design:design.input||design,start,span,initialSeed,seedProvenance,firstDay,acceptedWindow});
  });
 }

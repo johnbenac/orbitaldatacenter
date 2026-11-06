@@ -1,3 +1,4 @@
+import {launchClockFor,INSERTION_MET} from './launch-effects-state.js';
 import {ascentTrack,launchPath} from './launch-path.js';
 import {DEPLOY_START_S,DEPLOY_END_S,deploymentProgress,deploymentMET,deploymentPowerKW} from './commissioning-clock.js';
 import {DEPLOYMENT_STAGES,deploymentSchedule} from './deployment.js';
@@ -37,10 +38,11 @@ export function createSimulation(design){
  const ai=h.ai,relay=d.serviceRoute!=='direct',hybrid=d.serviceRoute==='hybrid',trainEnd=DEPLOY_END_S+d.trainingBudgetDays*DAY,outputCapacityGB=Math.max(0,(h.usableTB-h.weightsTB)*1000-d.retainedGB-ai.reservedStorageGB);
  const heatSlope=d.thermalResistanceKPerKw/Math.max(1,h.trays);
  const commandKbps=d.commandKbps??16,uplinkBufferGB=(d.uplinkBufferMB??128)/1000;
+ const carrier=launchClockFor(d.launcher);
  const period=TAU*Math.sqrt((R+d.altitudeKm)**3/MU),burnTime=43200,mainDays=new Map(),blockSeeds=new Map(),eventCache=new Map();
  const ignition=disposalIgnition(d,duration,h.wetKg-.35*h.propellantKg),terminalDay=Math.floor(ignition/DAY),targetPerigee=d.disposalTargetPerigeeKm??80,trapped=h.propellantKg*d.residualFraction;
  const nominalDisposalDv=disposalRequirement(d),protectedKg=burnMass(h.wetKg,d.isp,Math.max(nominalDisposalDv,d.disposalDv)),maintenanceFloor=reserve+protectedKg+burnMass(h.wetKg,d.isp,d.maneuverDv);
- const phase=(t,s)=>t<-600?'integration':t<0?'pad':t<540?'ascent':t<DEPLOY_START_S?'insertion':t<DEPLOY_END_S?'commissioning':!s.plan?'operations':!s.plan.feasible?'infeasible':s.plan.entry!=null&&t>=s.plan.entry?'entry':'deorbit';
+ const phase=(t,s)=>t<-600?'integration':t<0?'pad':t<INSERTION_MET?'ascent':t<DEPLOY_START_S?'insertion':t<DEPLOY_END_S?'commissioning':!s.plan?'operations':!s.plan.feasible?'infeasible':s.plan.entry!=null&&t>=s.plan.entry?'entry':'deorbit';
  const finished=(t,s)=>s.plan&&t>=s.plan.end-1e-7;
  const hardwareEnd=plan=>plan?.entry??plan?.end??Infinity;
  const hardwareStopped=(t,s)=>!!s.plan&&t>=hardwareEnd(s.plan)-1e-7;
@@ -50,12 +52,12 @@ export function createSimulation(design){
  let insertionState=null;
  const geo=(t,s)=>{
   const wet=h.dryKg+h.pressurantKg+s.prop,circular=Math.sqrt(MU/(R+d.altitudeKm))*1000,
-   deficit=(t>=540?Math.max(0,d.trimDv-s.trimPaid):d.trimDv)+s.pendingImpulse/Math.max(1,wet);
+   deficit=(t>=carrier.release?Math.max(0,d.trimDv-s.trimPaid):d.trimDv)+s.pendingImpulse/Math.max(1,wet);
   const delta=-2*(R+d.altitudeKm)*deficit/circular,minA=(R+120)/(1-d.ecc),low=R+d.altitudeKm+delta<minA;
   const offset=Math.max(delta,minA-R-d.altitudeKm);let track=null;
-  if(t<540){insertionState??=launchPath(d,offset);track=ascentTrack(insertionState,t);}
+  if(t<INSERTION_MET){insertionState??=launchPath(d,offset);track=ascentTrack(insertionState,t);}
   else if(s.plan?.samples?.length)track=trajectoryAt(s.plan,t);
-  const atTime=finished(t,s)?s.plan.end:t,g=geometry(d,atTime,offset,track);g.t=t;g.windowAgeYears=Math.max(0,atTime/YEAR);g.flightPhase=phase(t,s);g.orbitLost=t>=540&&low&&!s.plan?.feasible;if(g.orbitLost||s.plan||t<540){g.station=null;g.stationECI=null;}return g;
+  const atTime=finished(t,s)?s.plan.end:t,g=geometry(d,atTime,offset,track);g.t=t;g.windowAgeYears=Math.max(0,atTime/YEAR);g.flightPhase=phase(t,s);g.carrierAttached=t<carrier.release;g.orbitLost=t>=INSERTION_MET&&low&&!s.plan?.feasible;if(g.orbitLost||s.plan||g.carrierAttached){g.station=null;g.stationECI=null;}return g;
  };
  const first=inventory(h),limits=attitudeLimits(h);
  // Budget the retrograde flip at the 65% unloading threshold. Use an
@@ -101,8 +103,8 @@ export function createSimulation(design){
  first.attitudeState=flightGuidance(first,0,geo(0,first)).attitudeState;
 
  const packMassKg=h.batteryKWh*1000/d.packWhKg,packThermalCapacity=packMassKg*d.packHeatKJkgK,packConductance=packMassKg*d.packCouplingWKkg/1000;
- function outerBoundary(t,temp,f){if(t<540)return {outerK:d.launchBoundaryK,...enclosureHeat(h.enclosure,temp,d.launchBoundaryK)};return solveOuter(h.enclosure,temp,f.enclosureSolarWm2,f.enclosureIRWm2);}
- function mask(t,b){return thermalActivityMask(t,b.itKW,b.pumpKW*b.poweredSupport,b.f.radiatorDeployment,b.p.charge,b.p.discharge);}
+ function outerBoundary(t,temp,f){if(t<carrier.release)return {outerK:d.launchBoundaryK,...enclosureHeat(h.enclosure,temp,d.launchBoundaryK)};return solveOuter(h.enclosure,temp,f.enclosureSolarWm2,f.enclosureIRWm2);}
+ function mask(t,b){return thermalActivityMask(t,b.itKW,b.pumpKW*b.poweredSupport,b.f.radiatorDeployment,b.p.charge,b.p.discharge,t>=carrier.release);}
 
  // Screen both ends of the depletion interval. At fixed mixture ratio each
  // centroid component is fractional-linear in remaining mass, so the largest
@@ -159,7 +161,7 @@ export function createSimulation(design){
  function nextPolicyEdge(t){let next=ai.training&&trainEnd>t+1e-7?trainEnd:Infinity;
   if(relay&&d.relayHandoverS<d.relayCycleS*d.relayAvailability){const base=Math.floor(t/d.relayCycleS)*d.relayCycleS;for(const off of [d.relayHandoverS,d.relayCycleS*d.relayAvailability,...(hybrid?[5,20,35].map(s=>(d.relayCycleS*d.relayAvailability+s)%d.relayCycleS):[])]){const edge=base+off;next=Math.min(next,edge>t+1e-7?edge:edge+d.relayCycleS);}}
   if(t<DEPLOY_END_S)for(const x of deploymentEdges)if(x>t+1e-7){next=Math.min(next,x);break;}
-  for(const x of [540,600,ignition-disposalLeadS,ignition-180,ignition])if(x>t+1e-7)next=Math.min(next,x);
+  for(const x of [INSERTION_MET,carrier.release,carrier.releaseClear,ignition-disposalLeadS,ignition-180,ignition])if(x>t+1e-7)next=Math.min(next,x);
   const day=Math.floor(t/DAY),b=day*DAY+burnTime;next=Math.min(next,b>t+1e-7?b:b+DAY);const prepare=b-limits.prepointS;next=Math.min(next,prepare>t+1e-7?prepare:prepare+DAY>t+1e-7?prepare+DAY:Infinity);
   if(d.duty<=0||d.duty>=1)return next;
   const elapsed=Math.max(0,t-DEPLOY_END_S),orbit=Math.floor(elapsed/period),start=DEPLOY_END_S+orbit*period,finish=start+period*d.duty;
@@ -171,15 +173,15 @@ export function createSimulation(design){
   const floor=s.burnKind==='disposal'?trapped:s.burnKind==='reboost'?maintenanceFloor:reserve,burn=deploy>=1&&t<s.burnEnd&&s.prop>floor;
   const burnDirection=burn?(s.burnKind==='disposal'&&d.disposalMethod==='reentry'?-1:1):0;
   const att=flightGuidance(s,t,g),thrustCheck=burn?propulsionReview(h,s.prop,att):null;
-  const f=surfaces(h,g,deploy,false,burnDirection,att),atm=atmosphere(d,g),dragN=t>=540&&!g.orbitLost&&!s.plan?drag(atm.densityKgM3,g.relativeSpeedMs,d.cd,f.ramAreaM2):0;
+  const f=surfaces(h,g,deploy,false,burnDirection,att),atm=atmosphere(d,g),dragN=t>=carrier.release&&!g.orbitLost&&!s.plan?drag(atm.densityKgM3,g.relativeSpeedMs,d.cd,f.ramAreaM2):0;
   // r_CP = +Y times the configured offset; drag and photon force point away
   // from the incident ram and Sun. Resolve r × F in the achieved body frame.
-  const dragArm=dragN*d.cpOffsetM,lightArm=t<540||g.eclipse?0:4.56e-6*f.solarIncidenceCos*h.solarM2*f.pvDeployment*d.cpOffsetM*.25;
+  const dragArm=dragN*d.cpOffsetM,lightArm=t<carrier.release||g.eclipse?0:4.56e-6*f.solarIncidenceCos*h.solarM2*f.pvDeployment*d.cpOffsetM*.25;
   const dragX=-dragArm*f.ramBody[2],dragZ=dragArm*f.ramBody[0];
   const lightX=-lightArm*dot(g.sunECI,f.bodyZECI),lightZ=lightArm*dot(g.sunECI,f.bodyXECI);
   const dragTorque=Math.hypot(dragX,dragZ),lightTorque=Math.hypot(lightX,lightZ);
   const radialBody=[dot(g.radial,f.bodyXECI),dot(g.radial,f.bodyUpECI),dot(g.radial,f.bodyZECI)];
-  const [nx,ny,nz]=radialBody,gg=t<540?0:3*MU/(R+g.altitudeKm)**3*(h.dryKg+h.pressurantKg+s.prop)/12;
+  const [nx,ny,nz]=radialBody,gg=t<carrier.release?0:3*MU/(R+g.altitudeKm)**3*(h.dryKg+h.pressurantKg+s.prop)/12;
   // Rigid rectangular bus estimate for r̂ × I r̂, resolved in body axes.
   const gravX=gg*ny*nz*(h.bodyHeightM**2-h.bodyLengthM**2),gravY=gg*nz*nx*(h.bodyLengthM**2-h.bodyWidthM**2),gravZ=gg*nx*ny*(h.bodyWidthM**2-h.bodyHeightM**2),gravityTorque=Math.hypot(gravX,gravY,gravZ);
   const armY=thrustCheck?h.propulsion.engines[0].y-thrustCheck.cm[1]:0,armX=thrustCheck?(h.propulsion.engines[0].x+h.propulsion.engines[1].x)/2-thrustCheck.cm[0]:0;
@@ -201,7 +203,7 @@ export function createSimulation(design){
   const slewFraction=steerable?1-clip(residual/(Math.max(1e-8,slewAngle/DEG)),0,1):0,slewMomentum=4*(d.kaDishM||.6)**2*antennaRate*DEG;
   const slewTorque=4*(d.kaDishM||.6)**2*(t>s.t+1e-6?(antennaRate-(s.antennaRateDegS||0))/(t-s.t):s.antennaAccelDegS2||0)*DEG;
   const cmgDuty=clip(Math.abs(att.bodyRateDegS||0)/Math.max(.01,limits.bodyRateDegS)*.65+antennaRate*.12+(g.station&&commission?.12:0)+disturbance/Math.max(.1,d.cmgTorqueNm),0,1);
-  const cmgKW=t>=540?(h.cmg.idleW+cmgDuty*(h.cmg.maneuverW-h.cmg.idleW))/1000:.005;
+  const cmgKW=t>=carrier.release?(h.cmg.idleW+cmgDuty*(h.cmg.maneuverW-h.cmg.idleW))/1000:.005;
   const coilKW=.12*rods.driveFraction**2,trackingDriveKW=deploy===1?(.012+.024*Math.min(2,driveRate)):0,jointKW=deploy===1?trackingDriveKW:deploymentPowerKW(f.deploymentStep);
   const computePowered=commission&&(burst||d.idleComputePolicy!=='off'),pumpRequested=(deploy>0&&deploy<1&&f.radiatorDeployment>0)||commission&&(d.pumpStandbyPolicy!=='follow'||computePowered||d.thermalMode==='applied'&&d.appliedHeatKw>0);
   const relayOn=relay&&commission&&relayGate(t,d),directSelected=!relay||(hybrid&&!relayOn);
@@ -223,7 +225,7 @@ export function createSimulation(design){
   // fractional support near an empty battery cannot sustain an optical or RF carrier.
   const terminalPowered=poweredSupport>=1-1e-6,acquired=geometryLocked&&terminalPowered;
   const directCapacity=acquired?netCapacityMbps:0,terminalRate=!terminalPowered?0:relayOn?Math.min(d.relayDownMbps,d.linkCapMbps)*poweredSupport:directSelected&&fallbackAge>=link.acquisitionSec?directCapacity:0;
-  const uplinkDemand=t>=540&&!s.plan?commandKbps*dt/8e6:0,uplinkCapacity=terminalPowered&&g.station&&contactAge>=5?link.uplinkMbps*d.codingEff*poweredSupport*dt/8000:0,uploaded=Math.min(s.uplinkQueue+uplinkDemand,uplinkCapacity),uplinkQueue=clip(s.uplinkQueue+uplinkDemand-uploaded,0,uplinkBufferGB),uplinkDropped=Math.max(0,s.uplinkQueue+uplinkDemand-uploaded-uplinkQueue);
+  const uplinkDemand=t>=carrier.release&&!s.plan?commandKbps*dt/8e6:0,uplinkCapacity=terminalPowered&&g.station&&contactAge>=5?link.uplinkMbps*d.codingEff*poweredSupport*dt/8000:0,uploaded=Math.min(s.uplinkQueue+uplinkDemand,uplinkCapacity),uplinkQueue=clip(s.uplinkQueue+uplinkDemand-uploaded,0,uplinkBufferGB),uplinkDropped=Math.max(0,s.uplinkQueue+uplinkDemand-uploaded-uplinkQueue);
   const directUp=commission?Math.min(d.customerUplinkMbps,Math.max(0,uplinkCapacity-uploaded)*8000/dt):0;
   const routeUp=!terminalPowered?0:relayOn?d.relayUpMbps*poweredSupport:directSelected?directUp:0;
   const earthOffer=commission&&!ai.training?d.serviceOffersPerHour/3600*ai.inputBytesPerUnit*dt/1e9:0,consumed=ai.training?0:work*ai.inputBytesPerUnit/1e9;
@@ -240,8 +242,8 @@ export function createSimulation(design){
   const pSent=Math.min(s.aiPQueue+Math.min(product,diskWrite),delivered),pQueue=clip(s.aiPQueue+Math.min(product,diskWrite)-pSent,0,queue),pDropped=Math.max(0,s.aiPQueue+product-pSent-pQueue);
   const textGenerated=ai.text?product:0,textDelivered=ai.text?pSent:0,textQueue=ai.text?pQueue:0,textDropped=ai.text?pDropped:0,productionMbps=generated*8000/dt;
   const batteryLoss=p.charge*(1-d.chargeEff)+p.discharge*(1/d.dischargeEff-1),signalExport=relayOn||g.station?.016*poweredSupport:0,applied=d.thermalMode==='applied';
-  const equipmentHeat=applied?d.appliedHeatKw:Math.max(0,loadKW-p.unmet-signalExport),capKJK=Math.max(100,h.radiatorM2*9+h.trays*15+h.enclosure.coupledCapacityKJK),k=t<540?0:f.emissionCoeff;
-  const shell=outerBoundary(t,s.heat,f),gross=k*s.heat**4,net=gross-(t<540?0:f.absorbedKW);
+  const equipmentHeat=applied?d.appliedHeatKw:Math.max(0,loadKW-p.unmet-signalExport),capKJK=Math.max(100,h.radiatorM2*9+h.trays*15+h.enclosure.coupledCapacityKJK),k=t<carrier.release?0:f.emissionCoeff;
+  const shell=outerBoundary(t,s.heat,f),gross=k*s.heat**4,net=gross-(t<carrier.release?0:f.absorbedKW);
   // Backward Euler exchange between the battery mass and the shared loop.
   // Only battery-to-loop conduction enters the main node. Electrical loss is
   // deposited directly in the pack; the two exchange flows cancel in the sum.
@@ -273,7 +275,7 @@ export function createSimulation(design){
    else edge.stationECI=null;
   }
   const momentumECI=s.momentumECI.map((v,i)=>v+(b.disturbanceECI[i]+b.rods.torque[i]*b.poweredSupport)*dt);
-  const endpoint=flightGuidance(s,tg,edge);return {lastUnpoweredAt:b.terminalPowered?s.lastUnpoweredAt:to,antennaRateDegS:endpoint.terminalAngularRateDegS,antennaAccelDegS2:(endpoint.terminalAngularRateDegS-(s.antennaRateDegS||0))/dt,attitudeState:endpoint.attitudeState,hkPoweredS:s.hkPoweredS+(t>=540?b.poweredSupport*dt:0),aiBuilt:s.aiBuilt||b.finishes,aiCompletionS:s.aiCompletionS??(b.finishes?to:null),aiDeliveryS:s.aiDeliveryS??(ai.training&&ai.artifactValid&&(s.aiBuilt||b.finishes)&&s.aiPDelivered+b.pSent>=ai.artifactGB-1e-10?to:null),aiBuffer:b.aiBuffer,aiEarth:b.aiEarth,aiOffered:s.aiOffered+b.earthOffer,aiUploaded:s.aiUploaded+b.incoming,aiConsumed:s.aiConsumed+b.consumed,aiUnits:b.finishes?ai.trainingGoalTokens:ai.training?Math.min(ai.trainingGoalTokens,s.aiUnits+b.work):s.aiUnits+b.work,aiActiveS:s.aiActiveS+b.ranS,aiPending:b.aiPending,aiPQueue:b.pQueue,aiPDelivered:s.aiPDelivered+b.pSent,aiPGenerated:s.aiPGenerated+b.product,aiPDropped:s.aiPDropped+b.pDropped,aiCheckpointGB:s.aiCheckpointGB+b.checkpointWritten,plan:s.plan,t:to,energy:p.energy,heat:b.heat,packK:b.packK,queue:b.queue,delivered:s.delivered+b.delivered,generated:s.generated+b.generated,dropped:s.dropped+b.dropped,uploaded:s.uploaded+b.uploaded,uplinkQueue:b.uplinkQueue,uplinkGenerated:s.uplinkGenerated+b.uplinkDemand,uplinkDropped:s.uplinkDropped+b.uplinkDropped,textQueue:b.textQueue,textGenerated:s.textGenerated+b.textGenerated,textDelivered:s.textDelivered+b.textDelivered,textDropped:s.textDropped+b.textDropped,tokens:s.tokens+b.tokensPerSec*dt,prop:s.prop-b.burnKg,dragImpulse:s.dragImpulse+imp,pendingImpulse:Math.max(0,s.pendingImpulse+imp-(s.burnKind==='reboost'?b.appliedImpulse:0)),usedImpulse:s.usedImpulse+b.appliedImpulse,trimPaid:s.trimPaid+(s.burnKind==='trim'?exhaust*Math.log((h.dryKg+h.pressurantKg+s.prop)/(h.dryKg+h.pressurantKg+s.prop-b.burnKg)):0),burnEnd:s.burnEnd,burnKind:s.burnKind,burnHold:s.burnHold||'',contactSince:g.station!==s.station?s.t:s.contactSince,station:g.station,momentum:Math.hypot(...momentumECI),momentumECI,controlLoadNm:b.disturbance+Math.abs(b.slewTorque),unloading:b.unloadRequested,unmetEnergy:s.unmetEnergy+p.unmet*dt/3600,throughputKWh:s.throughputKWh+(p.charge+p.discharge)*dt/3600,writeGB:s.writeGB+Math.max(0,b.generated-b.dropped)+b.incoming+b.checkpointWritten,chargeBusKWh:s.chargeBusKWh+p.charge*dt/3600,dischargeBusKWh:s.dischargeBusKWh+p.discharge*dt/3600};
+  const endpoint=flightGuidance(s,tg,edge);return {lastUnpoweredAt:b.terminalPowered?s.lastUnpoweredAt:to,antennaRateDegS:endpoint.terminalAngularRateDegS,antennaAccelDegS2:(endpoint.terminalAngularRateDegS-(s.antennaRateDegS||0))/dt,attitudeState:endpoint.attitudeState,hkPoweredS:s.hkPoweredS+(t>=carrier.release?b.poweredSupport*dt:0),aiBuilt:s.aiBuilt||b.finishes,aiCompletionS:s.aiCompletionS??(b.finishes?to:null),aiDeliveryS:s.aiDeliveryS??(ai.training&&ai.artifactValid&&(s.aiBuilt||b.finishes)&&s.aiPDelivered+b.pSent>=ai.artifactGB-1e-10?to:null),aiBuffer:b.aiBuffer,aiEarth:b.aiEarth,aiOffered:s.aiOffered+b.earthOffer,aiUploaded:s.aiUploaded+b.incoming,aiConsumed:s.aiConsumed+b.consumed,aiUnits:b.finishes?ai.trainingGoalTokens:ai.training?Math.min(ai.trainingGoalTokens,s.aiUnits+b.work):s.aiUnits+b.work,aiActiveS:s.aiActiveS+b.ranS,aiPending:b.aiPending,aiPQueue:b.pQueue,aiPDelivered:s.aiPDelivered+b.pSent,aiPGenerated:s.aiPGenerated+b.product,aiPDropped:s.aiPDropped+b.pDropped,aiCheckpointGB:s.aiCheckpointGB+b.checkpointWritten,plan:s.plan,t:to,energy:p.energy,heat:b.heat,packK:b.packK,queue:b.queue,delivered:s.delivered+b.delivered,generated:s.generated+b.generated,dropped:s.dropped+b.dropped,uploaded:s.uploaded+b.uploaded,uplinkQueue:b.uplinkQueue,uplinkGenerated:s.uplinkGenerated+b.uplinkDemand,uplinkDropped:s.uplinkDropped+b.uplinkDropped,textQueue:b.textQueue,textGenerated:s.textGenerated+b.textGenerated,textDelivered:s.textDelivered+b.textDelivered,textDropped:s.textDropped+b.textDropped,tokens:s.tokens+b.tokensPerSec*dt,prop:s.prop-b.burnKg,dragImpulse:s.dragImpulse+imp,pendingImpulse:Math.max(0,s.pendingImpulse+imp-(s.burnKind==='reboost'?b.appliedImpulse:0)),usedImpulse:s.usedImpulse+b.appliedImpulse,trimPaid:s.trimPaid+(s.burnKind==='trim'?exhaust*Math.log((h.dryKg+h.pressurantKg+s.prop)/(h.dryKg+h.pressurantKg+s.prop-b.burnKg)):0),burnEnd:s.burnEnd,burnKind:s.burnKind,burnHold:s.burnHold||'',contactSince:g.station!==s.station?s.t:s.contactSince,station:g.station,momentum:Math.hypot(...momentumECI),momentumECI,controlLoadNm:b.disturbance+Math.abs(b.slewTorque),unloading:b.unloadRequested,unmetEnergy:s.unmetEnergy+p.unmet*dt/3600,throughputKWh:s.throughputKWh+(p.charge+p.discharge)*dt/3600,writeGB:s.writeGB+Math.max(0,b.generated-b.dropped)+b.incoming+b.checkpointWritten,chargeBusKWh:s.chargeBusKWh+p.charge*dt/3600,dischargeBusKWh:s.dischargeBusKWh+p.discharge*dt/3600};
  }
  function read(s){const g=geo(s.t,s),spacecraftTime=Math.min(s.t,hardwareEnd(s.plan)),hardwareGeometry=spacecraftTime===s.t?g:geo(spacecraftTime,s),b=channels(s,spacecraftTime,hardwareGeometry,.25),f=b.f,link=b.link;const socPct=100*s.energy/Math.max(.001,b.availableKWh),fuelKg=s.prop/(1+d.mixtureRatio),oxidizerKg=s.prop-fuelKg;
   const plan=s.plan,used=plan?.feasible||plan?.usedKg>0?Math.max(0,plan.initialWet-(h.dryKg+h.pressurantKg+s.prop)):0;
@@ -286,7 +288,7 @@ export function createSimulation(design){
   const logBytes=Math.floor((s.hkPoweredS+1e-8)/d.hkPeriodS)*h.cdh.packetBytes,capacityBytes=Math.floor(d.hkRecorderMB*1e6/h.cdh.packetBytes)*h.cdh.packetBytes;
   const electronicsOn=!(snapshot.referenceBody||hardwareStopped(s.t,s));
   snapshot.cdhKW=electronicsOn?b.cdhKW:0;snapshot.cdhServedKW=snapshot.cdhKW*b.poweredSupport;
-  snapshot.hkRateKbps=electronicsOn&&s.t>=540?8*h.cdh.packetBytes/d.hkPeriodS*b.poweredSupport/1000:0;
+  snapshot.hkRateKbps=electronicsOn&&s.t>=carrier.release?8*h.cdh.packetBytes/d.hkPeriodS*b.poweredSupport/1000:0;
   snapshot.hkStoredMB=Math.min(logBytes,capacityBytes)/1e6;snapshot.hkOverwrittenMB=Math.max(0,logBytes-capacityBytes)/1e6;
   const coupled=snapshot.upperRadiatorFlow+snapshot.lowerRadiatorFlow;
   const bankNet=(flow,abs)=>coupled>0?snapshot.grossEmissionKW*flow/coupled-abs:0;
@@ -315,18 +317,51 @@ export function createSimulation(design){
  // not bridge a discontinuity in applied heat or external illumination.
  function thermalFrame(out,s,b,g){
   out[0]=s.heat+b.rRise;out[1]=s.heat+.65*b.rRise;out[2]=s.heat+.35*b.rRise;out[3]=s.heat;out[4]=s.packK;
-  if(b.g.t<540)out[5]=d.launchBoundaryK;else{const shadow=g.eclipse;g.eclipse=b.g.eclipse;const f=surfaces(h,g,b.deploy,true,b.f.burnDirection,flightGuidance(s,g.t,g));g.eclipse=shadow;out[5]=outerBoundary(540,s.heat,f).outerK;}
+  if(b.g.t<carrier.release)out[5]=d.launchBoundaryK;else{const shadow=g.eclipse;g.eclipse=b.g.eclipse;const f=surfaces(h,g,b.deploy,true,b.f.burnDirection,flightGuidance(s,g.t,g));g.eclipse=shadow;out[5]=outerBoundary(carrier.release,s.heat,f).outerK;}
  }
  function newEnergy(){return {radiatorDirectSolar:0,radiatorAlbedo:0,radiatorEarthIR:0,trackingDrives:0,solar:0,requestedLoad:0,served:0,it:0,pump:0,storage:0,auxiliary:0,joints:0,cmg:0,coils:0,terminal:0,charge:0,discharge:0,curtailed:0,unserved:0,batteryLoss:0,packToLoop:0,enclosureOutward:0,heatInput:0,absorbed:0,radiatorEmission:0};}
  function addEnergyAndMode(en,modes,b,dt){
   const eh=dt/3600;en.solar+=b.f.solarKW*eh;en.trackingDrives+=b.trackingDriveKW*eh;en.radiatorDirectSolar+=b.f.radiatorDirectSolarKW*eh;en.radiatorAlbedo+=b.f.radiatorAlbedoKW*eh;en.radiatorEarthIR+=b.f.radiatorEarthIRKW*eh;const mode=b.f.attitudeMode;modes[mode]=(modes[mode]||0)+dt;en.requestedLoad+=b.loadKW*eh;en.served+=(b.loadKW-b.p.unmet)*eh;en.it+=b.itKW*eh;en.pump+=b.pumpKW*eh;en.storage+=b.storageKW*eh;en.auxiliary+=b.auxKW*eh;en.joints+=b.jointKW*eh;en.cmg+=b.cmgKW*eh;en.coils+=b.coilKW*eh;en.terminal+=b.link.terminalKW*eh;en.charge+=b.p.charge*eh;en.discharge+=b.p.discharge*eh;en.curtailed+=b.p.curtailed*eh;en.unserved+=b.p.unmet*eh;en.batteryLoss+=b.batteryLoss*eh;en.heatInput+=b.heatInput*eh;en.packToLoop+=b.packToLoop*eh;en.enclosureOutward+=b.shell.outwardKW*eh;en.absorbed+=b.f.absorbedKW*eh;en.radiatorEmission+=b.gross*eh;
  }
+ function newWindowStats(seed){
+  const initial=read(seed),t=seed.t;
+  return {integratedDisturbance:0,environmentImpulseECI:[0,0,0],integratedAuthority:0,payloadServiceSeconds:0,activeComputeSeconds:0,
+   minSocPct:initial.socPct,minSocTime:t,maxSocPct:initial.socPct,maxJunctionK:initial.junctionK,maxJunctionTime:t,maxLoadKW:initial.loadKW,
+   peakQueueGB:seed.queue,peakQueueTime:t,peakMomentumNms:seed.momentum,peakMomentumTime:t,peakControlTorqueNm:0,minMomentumMarginNms:Infinity,
+   shadowSeconds:0,contactSeconds:0,contactCount:0,eclipseCount:0,attitudeModeSeconds:{},energyKWh:newEnergy()};
+ }
+ // Installed loads/torques are held on the accepted integration interval. Clip its
+ // duration and endpoint inventories when a user window cuts through that interval.
+ function addWindowInterval(stats,old,s,b){
+  const dt=s.t-old.t,t=old.t+.5*dt,g=b.g;
+  if(!stats.firstCrossing){const limit=g.orbitLost?'Perigee reached 120 km':old.burnHold||(old.burnKind==='trim'&&t>=old.burnEnd&&d.trimDv-old.trimPaid>.001&&s.prop<=reserve+.000001?'Insertion trim propellant':b.p.unmet>.001?'Unserved electrical demand':b.dropped>.000001?'Recorder capacity or write rate':s.momentum>d.cmgMomentumNms?'CMG momentum':b.unloading&&b.disturbance>b.authority&&s.momentum>.99*d.cmgMomentumNms?'Magnetic unloading authority':t>=burnTime&&!s.plan&&s.prop<=maintenanceFloor+.000001&&s.pendingImpulse>1?'Station-keeping propellant':null);if(limit)stats.firstCrossing={limit,time:limit==='Insertion trim propellant'?old.burnEnd:t,socPct:100*s.energy/b.availableKWh,thermalMarginK:d.junctionLimitK-b.chipT,unservedKW:b.p.unmet,droppedGB:b.dropped,cmgMarginNms:d.cmgMomentumNms-s.momentum,propellantMarginKg:s.prop-reserve};}
+  if(b.commission)stats.payloadServiceSeconds+=dt;
+  if(b.scale>0)stats.activeComputeSeconds+=dt;
+  addEnergyAndMode(stats.energyKWh,stats.attitudeModeSeconds,b,dt);
+  if(s.queue>stats.peakQueueGB){stats.peakQueueGB=s.queue;stats.peakQueueTime=s.t;}
+  const stored=Math.max(old.momentum,s.momentum)+b.slewMomentum+b.f.bodySlewMomentumNms;
+  if(stored>stats.peakMomentumNms){stats.peakMomentumNms=stored;stats.peakMomentumTime=s.t;}
+  stats.minMomentumMarginNms=Math.min(stats.minMomentumMarginNms,d.cmgMomentumNms-stored);
+  stats.peakControlTorqueNm=Math.max(stats.peakControlTorqueNm,b.disturbance+Math.abs(b.slewTorque));
+  stats.integratedDisturbance+=b.disturbance*dt;stats.integratedAuthority+=(b.unloadInhibit?0:b.authority)*dt;
+  for(let k=0;k<3;k++)stats.environmentImpulseECI[k]+=b.disturbanceECI[k]*dt;
+  const soc=100*s.energy/(h.batteryKWh*fraction(d.batteryRetention,s.t/YEAR));
+  stats.maxSocPct=Math.max(soc,stats.maxSocPct);if(soc<stats.minSocPct){stats.minSocPct=soc;stats.minSocTime=s.t;}
+  const peak=Math.max(old.heat,s.heat)+b.rRise;
+  if(peak>stats.maxJunctionK){stats.maxJunctionK=peak;stats.maxJunctionTime=old.heat>s.heat?old.t:s.t;stats.peakThermalInterval=[old.t,s.t];stats.peakThermalSide=old.heat>s.heat?'right':'left';}
+  stats.maxLoadKW=Math.max(stats.maxLoadKW,b.loadKW);
+  if(g.eclipse&&t>=INSERTION_MET)stats.shadowSeconds+=dt;
+  if(g.station)stats.contactSeconds+=dt;
+ }
+ function windowTotals(seed,s){
+  return {...classTotals(seed,s),generatedGB:s.generated-seed.generated,deliveredGB:s.delivered-seed.delivered,uploadedGB:s.uploaded-seed.uploaded,
+   unmetKWh:s.unmetEnergy-seed.unmetEnergy,propellantUsedKg:seed.prop-s.prop,droppedGB:s.dropped-seed.dropped};
+ }
  function makeDay(seed,{step=SEC,record=true,span=DAY,qualification=false,segments=null}={}){
-  const start=seed.t,end=start+span;let s={...seed},g0=geo(start+.0001,s),states=record?[s]:[],events=[],open={},stats={integratedDisturbance:0,environmentImpulseECI:[0,0,0],integratedAuthority:0,maxSocPct:0,minSocPct:Infinity,minSocTime:start,maxJunctionK:-Infinity,maxJunctionTime:start,maxLoadKW:0,peakQueueGB:s.queue,shadowSeconds:0,contactSeconds:0,contactCount:0,eclipseCount:0,minMomentumMarginNms:Infinity};
+  const start=seed.t,end=start+span;let s={...seed},g0=geo(start+.0001,s),states=record?[s]:[],events=[],open={},stats=newWindowStats(seed);
   const thermal=qualification?newThermalSummary(d,start,end,'Chronological mission integration'):null;
   const frameA=qualification?new Float64Array(6):null,frameB=qualification?new Float64Array(6):null;
-  if(thermal)stats.thermal=thermal;stats.payloadServiceSeconds=0;stats.activeComputeSeconds=0;
-  const initial=read(seed);Object.assign(stats,{minSocPct:initial.socPct,maxSocPct:initial.socPct,maxJunctionK:initial.junctionK,maxLoadKW:initial.loadKW,peakQueueTime:start,peakMomentumNms:seed.momentum,peakControlTorqueNm:0,peakMomentumTime:start,attitudeModeSeconds:{},energyKWh:newEnergy()});
+  if(thermal)stats.thermal=thermal;
   function mark(kind,label,when,station){const active=open[kind];if(active?.label===label)return;if(active){active.end=when;if(active.end>active.start)events.push(active);delete open[kind]};if(label){open[kind]={id:kind+'-'+Math.round(when*10)+'-'+(station||''),type:kind,label,start:when,end:when,station:station||null};}}
   while(s.t<end-1e-7){boundary(s);
    if(hardwareStopped(s.t,s)){if(!s.plan.feasible&&!stats.firstCrossing)stats.firstCrossing={limit:'Disposal infeasible',time:s.plan.start,reason:s.plan.reason,availableKg:s.prop-trapped,requiredDv:s.plan.requiredDv};
@@ -354,16 +389,10 @@ export function createSimulation(design){
    const old=s;s=advance(s,to,g,b);
    if(segments)segments.push(serviceSegment(old.t,to,b));
    if(thermal){thermalFrame(frameA,old,b,g0);thermalFrame(frameB,s,b,gEnd);accumulateThermal(thermal,old.t,to,mask(t,b),frameA,frameB);}
-   if(!stats.firstCrossing){const limit=g.orbitLost?'Perigee reached 120 km':old.burnHold|| (old.burnKind==='trim'&&t>=old.burnEnd&&d.trimDv-old.trimPaid>.001&&s.prop<=reserve+.000001?'Insertion trim propellant':b.p.unmet>.001?'Unserved electrical demand':b.dropped>.000001?'Recorder capacity or write rate':s.momentum>d.cmgMomentumNms?'CMG momentum':b.unloading&&b.disturbance>b.authority&&s.momentum>.99*d.cmgMomentumNms?'Magnetic unloading authority':t>=burnTime&&!s.plan&&s.prop<=maintenanceFloor+.000001&&s.pendingImpulse>1?'Station-keeping propellant':null);if(limit)stats.firstCrossing={limit,time:limit==='Insertion trim propellant'?old.burnEnd:t,socPct:100*s.energy/b.availableKWh,thermalMarginK:d.junctionLimitK-b.chipT,unservedKW:b.p.unmet,droppedGB:b.dropped,cmgMarginNms:d.cmgMomentumNms-s.momentum,propellantMarginKg:s.prop-reserve};}
+   addWindowInterval(stats,old,s,b);
    if(thermal?.firstViolation&&(!stats.firstCrossing||thermal.firstViolation.time<stats.firstCrossing.time)){const v=thermal.firstViolation;stats.firstCrossing={...v,limit:'Thermal · '+v.label+' · '+v.state+' '+v.side,thermalMarginK:v.side==='low'?v.temperatureK-v.limitK:v.limitK-v.temperatureK};}
-   if(b.commission)stats.payloadServiceSeconds+=dt;if(b.scale>0)stats.activeComputeSeconds+=dt;
-   addEnergyAndMode(stats.energyKWh,stats.attitudeModeSeconds,b,dt);
-   if(s.queue>stats.peakQueueGB)stats.peakQueueTime=to;const storedWithSlew=Math.max(old.momentum,s.momentum)+b.slewMomentum+b.f.bodySlewMomentumNms;if(storedWithSlew>stats.peakMomentumNms){stats.peakMomentumNms=storedWithSlew;stats.peakMomentumTime=to;}stats.peakControlTorqueNm=Math.max(stats.peakControlTorqueNm,b.disturbance+Math.abs(b.slewTorque));
    if(record)states.push(s);
-   stats.integratedDisturbance+=b.disturbance*dt;stats.integratedAuthority+=(b.unloadInhibit?0:b.authority)*dt;for(let k=0;k<3;k++)stats.environmentImpulseECI[k]+=b.disturbanceECI[k]*dt;const soc=100*s.energy/(h.batteryKWh*fraction(d.batteryRetention,to/YEAR));stats.maxSocPct=Math.max(soc,stats.maxSocPct);if(soc<stats.minSocPct){stats.minSocPct=soc;stats.minSocTime=to;} const peak=Math.max(old.heat,s.heat)+b.rRise;if(peak>stats.maxJunctionK){stats.maxJunctionK=peak;stats.maxJunctionTime=old.heat>s.heat?old.t:to;stats.peakThermalInterval=[old.t,to];stats.peakThermalSide=old.heat>s.heat?'right':'left';}
-   stats.maxLoadKW=Math.max(stats.maxLoadKW,b.loadKW);stats.peakQueueGB=Math.max(stats.peakQueueGB,s.queue);stats.minMomentumMarginNms=Math.min(stats.minMomentumMarginNms,d.cmgMomentumNms-storedWithSlew);
-   if(g.eclipse&&t>=540)stats.shadowSeconds+=dt;if(g.station)stats.contactSeconds+=dt;
-   mark('contact',g.station?g.station+' ground pass':null,old.t,g.station);mark('eclipse',g.eclipse&&t>=540?'Earth eclipse':null,old.t);mark('burst',b.burst?'Compute burst':null,old.t);mark('desat',b.unloading?'Magnetic desaturation':null,old.t);mark('disposal',b.burn&&old.burnKind==='disposal'?(activeBurn(old.plan,t)?.role||'Disposal burn'):null,old.t);mark('coast',old.plan?.feasible&&!b.burn?(old.plan.method==='graveyard'?'Coast to raised apogee':'Ballistic coast to interface'):null,old.t);mark('reboost',b.burn&&old.burnKind==='reboost'?'Chemical reboost':null,old.t);mark('trim',b.burn&&old.burnKind==='trim'?'Post-deployment insertion trim':null,old.t);g0=geo(to+.025,s);
+   mark('contact',g.station?g.station+' ground pass':null,old.t,g.station);mark('eclipse',g.eclipse&&t>=INSERTION_MET?'Earth eclipse':null,old.t);mark('burst',b.burst?'Compute burst':null,old.t);mark('desat',b.unloading?'Magnetic desaturation':null,old.t);mark('disposal',b.burn&&old.burnKind==='disposal'?(activeBurn(old.plan,t)?.role||'Disposal burn'):null,old.t);mark('coast',old.plan?.feasible&&!b.burn?(old.plan.method==='graveyard'?'Coast to raised apogee':'Ballistic coast to interface'):null,old.t);mark('reboost',b.burn&&old.burnKind==='reboost'?'Chemical reboost':null,old.t);mark('trim',b.burn&&old.burnKind==='trim'?'Post-deployment insertion trim':null,old.t);g0=geo(to+.025,s);
   }
   for(const k of Object.keys(open))mark(k,null,end);
   if(s.plan&&s.plan.start>=start&&s.plan.start<end&&!s.plan.feasible)events.push({id:'infeasible-'+Math.round(s.plan.start*10)+'-',type:'infeasible',label:'Disposal inhibited',start:s.plan.start,end:s.plan.start+.001,station:null});
@@ -373,7 +402,7 @@ export function createSimulation(design){
   if(s.plan?.feasible&&s.plan.end>=start&&s.plan.end<end){const type=s.plan.method==='graveyard'?'graveyard':'impact';events.push({id:type+'-'+Math.round(s.plan.end*10)+'-',type,label:type==='impact'?'Reference-body surface intersection':'Raised circular orbit acquired',start:s.plan.end,end:s.plan.end+.001,station:null});}
   if(start===0)events.push(...[['launch','Launch ascent',0,540],['insertion','Orbital insertion and separation',540,DEPLOY_START_S],['deployment','Appendage commissioning and Sun acquisition',DEPLOY_START_S,DEPLOY_END_S]].map(([type,label,start,end])=>({type,label,start,end,id:type+'-'+start,station:null})));
   events.sort((a,b)=>a.start-b.start);stats.contactCount=events.filter(e=>e.type==='contact').length;stats.eclipseCount=events.filter(e=>e.type==='eclipse').length;
-  Object.assign(stats,{...classTotals(seed,s),generatedGB:s.generated-seed.generated,deliveredGB:s.delivered-seed.delivered,uploadedGB:s.uploaded-seed.uploaded,unmetKWh:s.unmetEnergy-seed.unmetEnergy,propellantUsedKg:seed.prop-s.prop,droppedGB:s.dropped-seed.dropped});return {seed,end:s,states,events,stats};
+  Object.assign(stats,windowTotals(seed,s));return {seed,end:s,states,events,stats};
  }
  // Long-horizon quadrature: propagate endpoint inventories and accumulated extensive quantities with a repeated representative day. Short daily history always starts at a deterministic checkpoint.
  let audited=null,focusDay=-1;const focused=new Map();
@@ -437,19 +466,27 @@ export function createSimulation(design){
  const at=t=>read(stateAt(t));
  function window(start=0,span=DAY,count=180){count=clip(Math.floor(count),2,10000);return Array.from({length:count},(_,i)=>at(start+span*i/(count-1)));}
  function events(start=0,span=DAY){const end=Math.min(duration,start+span),key=start+'|'+span;if(eventCache.has(key))return eventCache.get(key);const list=[{type:'integration',label:'Payload integration',id:'integration--3600',start:-3600,end:-600,station:null},{type:'pad',label:'Launch pad',id:'pad--600',start:-600,end:0,station:null}].filter(e=>e.end>start&&e.start<end);for(let n=Math.max(0,Math.floor(start/DAY));n<=Math.floor((end-.000001)/DAY);n++)for(const ev of day(n).events)if(ev.end>start&&ev.start<end){const prev=list.findLast(x=>x.type===ev.type);if(prev&&prev.label===ev.label&&Math.abs(prev.end-ev.start)<.025)prev.end=ev.end;else list.push({...ev});}list.sort((a,b)=>a.start-b.start);if(eventCache.size>8)eventCache.clear();eventCache.set(key,list);return list;}
- function daySummary(start=0){focusWindow(start);if(Math.abs(start%DAY)<1e-8)return {...day(Math.floor(start/DAY)).stats};const end=start+DAY,initial=stateAt(start),final=stateAt(end);const ss=[read(initial),read(final)];for(let n=Math.floor(start/DAY);n<=Math.floor(end/DAY);n++)for(const s of day(n).states)if(s.t>start&&s.t<end)ss.push(read(s));
-  const energyKWh=newEnergy(),attitudeModeSeconds={};
-  for(let n=Math.max(0,Math.floor(start/DAY));n*DAY<Math.min(end,duration);n++){
-   const states=day(n).states;
+ function daySummary(start=0){
+  start=clip(start,0,duration);focusWindow(start);
+  const end=Math.min(duration,start+DAY);
+  if(start%DAY===0&&end-start===DAY)return {...day(start/DAY).stats};
+  const initial=stateAt(start),final=stateAt(end),stats=newWindowStats(initial);
+  for(let n=Math.floor(start/DAY);n*DAY<end;n++){
+   const dayRecord=day(n),states=dayRecord.states;
    for(let j=1;j<states.length;j++){
-    const a=states[j-1],z=states[j],left=Math.max(start,a.t),right=Math.min(end,z.t,duration,hardwareEnd(a.plan));
+    const a=states[j-1],z=states[j],left=Math.max(start,a.t),right=Math.min(end,z.t,hardwareEnd(a.plan));
     if(right<=left||hardwareStopped(a.t,a))continue;
-    const dt=z.t-a.t,t=a.t+.5*dt,b=channels(a,t,geo(t,a),dt);
-    addEnergyAndMode(energyKWh,attitudeModeSeconds,b,right-left);
+    const dt=z.t-a.t,mid=a.t+.5*dt,b=channels(a,mid,geo(mid,a),dt);
+    addWindowInterval(stats,left===a.t?a:initial,right===z.t?z:stateAt(right),b);
    }
+   const crossing=dayRecord.stats.firstCrossing;
+   if(crossing&&crossing.time>=start&&crossing.time<end&&(!stats.firstCrossing||crossing.time<stats.firstCrossing.time))stats.firstCrossing=crossing;
   }
-  const ev=events(start,DAY),within=e=>Math.max(0,Math.min(e.end,end)-Math.max(e.start,start)),over=type=>ev.filter(x=>x.type===type),min=ss.reduce((a,b)=>a.socPct<b.socPct?a:b),max=ss.reduce((a,b)=>a.junctionK>b.junctionK?a:b);
-  return {energyKWh,attitudeModeSeconds,...classTotals(initial,final),minSocPct:min.socPct,minSocTime:min.t,maxJunctionK:max.junctionK,maxJunctionTime:max.t,maxLoadKW:Math.max(...ss.map(s=>s.loadKW)),peakQueueGB:Math.max(...ss.map(s=>s.queueGB)),shadowSeconds:over('eclipse').reduce((v,e)=>v+within(e),0),contactSeconds:over('contact').reduce((v,e)=>v+within(e),0),eclipseCount:over('eclipse').length,contactCount:over('contact').length,generatedGB:final.generated-initial.generated,deliveredGB:final.delivered-initial.delivered,uploadedGB:final.uploaded-initial.uploaded,unmetKWh:final.unmetEnergy-initial.unmetEnergy,propellantUsedKg:initial.prop-final.prop,droppedGB:final.dropped-initial.dropped};}
+  const visible=events(start,end-start);
+  stats.contactCount=visible.filter(e=>e.type==='contact').length;
+  stats.eclipseCount=visible.filter(e=>e.type==='eclipse').length;
+  return Object.assign(stats,windowTotals(initial,final));
+ }
  function mission(count=90){count=clip(Math.floor(count),2,361);const out=[];for(let i=0;i<count;i++){const t=duration*i/(count-1),n=Math.floor(t/DAY),s=stateAt(t),stats=audited?.dayStats[Math.min(n,audited.dayStats.length-1)]||day(n).stats;
   const fields={...stats};for(const k of ['aiUnitsComputed','aiTrainingTokens','aiInputUploadedGB','aiInputConsumedGB','aiProductGeneratedGB','aiProductDeliveredGB','aiProductDroppedGB','aiCheckpointWriteGB','generatedGB','deliveredGB','uploadedGB','propellantUsedKg','unmetKWh','droppedGB','textGeneratedGB','textDeliveredGB','textDroppedGB','bulkDeliveredGB','tokensDelivered','commandDroppedMB']){fields['day'+k[0].toUpperCase()+k.slice(1)]=fields[k];delete fields[k];}out.push({...read(s),...fields,projected:n>=earlyDays&&!audited});}return out;}
  const chapters=new Map(),chapterIds=['integration','pad','ascent','insertion','commissioning','operations','contact','reboost','desat','deorbit'];
@@ -499,11 +536,16 @@ export function createSimulation(design){
   };
  }
  function serviceDay(seed,span=DAY){const segments=[],r=makeDay(seed??first,{record:false,span,segments});return {end:r.end,segments};}
- function serviceTimeline(start=0,span=DAY){
+ function serviceTimeline(start=0,span=DAY,{flightRecord=false}={}){
   start=clip(start,0,duration);const end=clip(start+span,start,duration);if(end-start>31*DAY)throw Error('Service timeline supports 31-day windows; use the chronological service worker for longer orders.');
-  focusWindow(start);const segments=[];for(let n=Math.floor(start/DAY);n*DAY<end;n++){const states=day(n).states;
+  // A launch record reads the accepted early checkpoints without changing the visitor’s focused analysis window.
+  if(!flightRecord)focusWindow(start);
+  const segments=[];for(let n=Math.floor(start/DAY);n*DAY<end;n++){const states=day(n).states;
    for(let i=1;i<states.length;i++){const a=states[i-1],z=states[i],left=Math.max(start,a.t),right=Math.min(end,z.t);if(right<=left||hardwareStopped(a.t,a))continue;const dt=z.t-a.t,t=a.t+dt/2,b=channels(a,t,geo(t,a),dt),seg=serviceSegment(left,right,b),fraction=(right-left)/dt;
-    for(const key of ['aiInputUploadedGB','aiInputConsumedGB','aiProductGeneratedGB','aiProductDeliveredGB'])seg[key]*=fraction;segments.push(seg);}
+    for(const key of ['aiInputUploadedGB','aiInputConsumedGB','aiProductGeneratedGB','aiProductDeliveredGB'])seg[key]*=fraction;
+    if(flightRecord)Object.assign(seg,{attitudeMode:b.f.attitudeMode,orbitLost:b.g.orbitLost,commandReceivedGB:b.uploaded*fraction,
+     directPayloadLock:!!b.acquired&&(!relay||hybrid&&!b.relayOn),directDeliveredGB:b.g.station&&!b.relayOn?b.delivered*fraction:0,relayDeliveredGB:b.relayOn?b.delivered*fraction:0});
+    segments.push(seg);}
   }return segments;
  }
  function auditStep(seed=first,span=DAY){const r=makeDay(seed,{record:false,span,qualification:true}), counts={};for(const e of r.events){let key=e.type+'Count';counts[key]=(counts[key]||0)+1;}

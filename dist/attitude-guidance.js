@@ -1,3 +1,4 @@
+import {launchClockFor,INSERTION_MET} from './launch-effects-state.js';
 // Quaternions [x,y,z,w] actively rotate body vectors into Earth-centred inertial axes.
 // Guided rigid-body kinematics. Drives and body pointing are advanced from the previous
 // inventory checkpoint so scrubbing, replay and integration follow the same trajectory.
@@ -89,8 +90,8 @@ export const attitudeModes=modes;
 // First matching guard wins. The flight console presents this same ordered table.
 export const modeRules=[
  {id:'passive',label:'Retire actuators',guard:'Passivation commanded or entry interface reached.',test:(d,g,o)=>o.passivated||g.flightPhase==='entry'},
- {id:'launch',label:'Carrier control',guard:'Before insertion at 540 s mission elapsed time.',test:(d,g)=>g.t<540},
- {id:'insertion',label:'Separation hold',guard:'Insertion complete, before spacecraft handover at 900 s.',test:(d,g)=>g.t<900},
+ {id:'launch',label:'Carrier control',guard:'The payload is still attached to its carrier.',test:(d,g)=>g.carrierAttached??g.t<launchClockFor(d.launcher).release},
+ {id:'insertion',label:'Separation hold',guard:'The adapter has released. Keep the appendages stowed until commissioning.',test:(d,g)=>g.t<900},
  {id:'burn',label:'Active maneuver',guard:'A signed chemical burn is in progress.',test:(d,g,o)=>o.burnDirection,mode:(d,o)=>['trim','reboost'].includes(o.burnKind)?o.burnKind:'disposal'},
  {id:'deployment',label:'Commissioning hold',guard:'The deployment sequence is incomplete.',test:(d,g,o)=>o.deployment<1},
  {id:'prepoint',label:'Prepare for ignition',guard:'A maneuver falls inside the calculated lead time for this vehicle.',test:(d,g,o,l)=>o.plannedBurnDirection&&o.plannedBurnLeadS>=0&&o.plannedBurnLeadS<=(o.plannedBurnWindowS??l.prepointS)},
@@ -108,7 +109,7 @@ function reference(d,g,mode,o){
  let q=basisQuat(x,y,z);
  if(mode==='launch'){
   // An assumed upper-stage pitch-over connects the pad vertical to insertion.
-  const u=clip(g.t/540,0,1),a=(3-2*u)*u*u*Math.PI/2;
+  const u=clip(g.t/INSERTION_MET,0,1),a=(3-2*u)*u*u*Math.PI/2;
   const bz=unit(g.radial.map((v,i)=>v*Math.cos(a)+g.along[i]*Math.sin(a)));
   return basisQuat(x,cross(bz,x),bz);
  }

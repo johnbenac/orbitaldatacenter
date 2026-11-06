@@ -2,8 +2,8 @@
 // explicitly marked regional study point supplies the Earth-fixed origin.
 import {DEG,MU,R,clip,cross,dot,geometry,unit} from './orbit.js';
 import {launchSiteFor} from './launch-sites.js';
-import {launchRiseM} from './launch-effects-state.js';
-const END=540,spin=7.292115e-5,deg=x=>(x/DEG%360+360)%360;
+import {launchRiseM,INSERTION_MET} from './launch-effects-state.js';
+const END=INSERTION_MET,spin=7.292115e-5,deg=x=>(x/DEG%360+360)%360;
 export function insertionOffset(d){
  const a=R+d.altitudeKm,delta=-2*a*d.trimDv/(1000*Math.sqrt(MU/a));
  return Math.max(delta,(R+120)/(1-d.ecc)-a);

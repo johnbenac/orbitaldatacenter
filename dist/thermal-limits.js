@@ -25,9 +25,9 @@ export function validateThermalLimits(d){
  return errors;
 }
 const POWER_THRESHOLD=0.001; // kW, equivalent to 1 W
-export function thermalActivityMask(t,itKw,pumpKw,deploy,chargeKw,dischargeKw){
+export function thermalActivityMask(t,itKw,pumpKw,deploy,chargeKw,dischargeKw,exposed=t>=540){
  return (t>=0&&itKw>POWER_THRESHOLD?1:0)|(t>=0&&pumpKw>POWER_THRESHOLD?6:0)|
-  (t>=0&&deploy>1e-7?8:0)|(t>=0&&Math.max(chargeKw,dischargeKw)>POWER_THRESHOLD?16:0)|(t>=540?32:0);
+  (t>=0&&deploy>1e-7?8:0)|(t>=0&&Math.max(chargeKw,dischargeKw)>POWER_THRESHOLD?16:0)|(exposed?32:0);
 }
 function activity(n,s,op){
  switch(n.id){
@@ -40,7 +40,7 @@ function activity(n,s,op){
  }
 }
 export function qualifyNow(s,d){
- const mask=s.thermalActivityMask??thermalActivityMask(s.t,s.itKW,s.servedPumpKW,s.radiatorDeployment??s.deployment,s.chargeKW,s.dischargeKW);
+ const mask=s.thermalActivityMask??thermalActivityMask(s.t,s.itKW,s.servedPumpKW,s.radiatorDeployment??s.deployment,s.chargeKW,s.dischargeKW,s.carrierAttached===undefined?undefined:!s.carrierAttached);
  return thermalNodes.map(n=>{const op=!!(mask&(1<<n.index)),state=op?'operating':'survival',k=n.keys[state],minK=d[k.min],maxK=d[k.max],temperatureK=s[n.tempKey],observable=!s.referenceBody&&Number.isFinite(temperatureK)&&(s.terminatedAt==null||s.t<=s.terminatedAt+1e-7);
   return {id:n.id,label:n.label,tempKey:n.tempKey,temperatureK,state,activity:observable?activity(n,s,op):'Outside propagated mission',minK,maxK,marginK:observable?Math.min(temperatureK-minK,maxK-temperatureK):null,status:!observable?'unassessed':temperatureK<minK?'cold':temperatureK>maxK?'hot':'pass'};});
 }

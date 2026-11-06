@@ -25,8 +25,10 @@ export function sizeEnclosure(d,w,h,l,trays,mounts=[],rack=null){
   [frameMassBreakdown.hardpointsKg,feet.map(s=>s.foot)],
   [frameMassBreakdown.rackMountsKg,rack?rack.slots.map(s=>[s.x,s.y,s.z]):[[0,0,0]]]
  ];
+ const frameNames=['End fitting','Longeron','Transverse frame','Appendage hardpoint','Tray mount'];
+ const frameLabels=groups.flatMap(([,stations],g)=>stations.map((_,i)=>frameNames[g]+' '+(i+1)));
  const framePositions=groups.flatMap(([,stations])=>stations),frameShares=groups.flatMap(([kg,stations])=>stations.map(()=>kg/(stations.length*frameKg)));
- return {walls,frameMassBreakdown,framePositions,frameShares,grossAreaM2,coveredAreaM2:sum('coveredAreaM2'),penetrationM2:sum('penetrationM2'),skinKg,blanketKg:sum('blanketKg'),frameKg,shieldKg:sum('shieldKg'),coupledCapacityKJK:(skinKg+.25*frameKg)*.88,innerCoupledFractionFrame:.25,effectiveEmissivity:d.blanketEffectiveEpsilon,exteriorEmissivity:d.blanketOuterEpsilon,exteriorAbsorptivity:d.blanketOuterAlpha,penetrationConductanceWK:d.penetrationWK};
+ return {walls,frameMassBreakdown,frameLabels,framePositions,frameShares,grossAreaM2,coveredAreaM2:sum('coveredAreaM2'),penetrationM2:sum('penetrationM2'),skinKg,blanketKg:sum('blanketKg'),frameKg,shieldKg:sum('shieldKg'),coupledCapacityKJK:(skinKg+.25*frameKg)*.88,innerCoupledFractionFrame:.25,effectiveEmissivity:d.blanketEffectiveEpsilon,exteriorEmissivity:d.blanketOuterEpsilon,exteriorAbsorptivity:d.blanketOuterAlpha,penetrationConductanceWK:d.penetrationWK};
 }
 
 export function enclosureHeat(e,interiorK,outerK){

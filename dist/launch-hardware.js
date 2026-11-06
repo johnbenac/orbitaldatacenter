@@ -2,6 +2,7 @@
 // update, Starship vehicle page, Falcon User's Guide and mission imagery.
 // Local +Y is up. Surface detail and installation dimensions are visual estimates.
 import * as T from './vendor/three.module.js';
+import {mountMissionPatch} from './fairing-patch.js';
 const TAU=2*Math.PI,V=(...n)=>new T.Vector3(...n);
 const mat=(color,metalness=.2,roughness=.55)=>new T.MeshStandardMaterial({color,metalness,roughness});
 const add=(p,g,m,x=0,y=0,z=0)=>{const a=new T.Mesh(g,m);a.position.set(x,y,z);p.add(a);return a;};
@@ -48,7 +49,7 @@ function flap(p,theta,y,r,points,width,metal,black){
  for(let j=0;j<3;j++){const k=min+(max-min)*(j+.5)/3;rod(flap,V(0,k-.24,0),V(0,k+.24,0),width*.93,black);}
  return panel;
 }
-export function buildStarship({lower,upper,shell,baseY,stage1,stage2}){
+export function buildStarship({lower,upper,shell,baseY,stage1,stage2,patch}){
  const steel=finish('steel'),tile=finish('tile'),dark=mat('#344049',.35),nickel=mat('#b4bec2',.44),edge=mat('#697981',.39);
  const r=4.5,hot=baseY+stage1,skirt=.36,ventHeight=2.25;
  lower.name='Super Heavy V3';upper.name='Starship V3';shell.name='Integrated cargo bay';
@@ -94,7 +95,8 @@ export function buildStarship({lower,upper,shell,baseY,stage1,stage2}){
  const door=node(shell,'Retained cargo door'),px=Math.sin(a1)*r,pz=Math.cos(a1)*r;door.position.set(px,0,pz);
  const leaf=node(door,'Cargo door skin');leaf.position.set(-px,0,-pz);
  leaf.userData.sideOutline={role:'shell',xyz:doorProfile.map(([r,y])=>[r,y,0])};
- skin(leaf,doorProfile,a0,a1-a0,steel,stage2).userData.cargoWall=true;
+ const doorSkin=skin(leaf,doorProfile,a0,a1-a0,steel,stage2);doorSkin.userData.cargoWall=true;
+ if(patch)mountMissionPatch(doorSkin,doorProfile,2.04,7.1,6.25,patch);
  skin(leaf,doorProfile.map(([r,y])=>[r-.05,y]).reverse(),a0,a1-a0,edge,stage2).userData.cargoWall=true;
  for(const y of [1.4,3.4,5.6]){const p=node(shell,'Cargo hinge');p.position.set(px,y,pz);rod(p,V(0,-.31,0),V(0,.31,0),.09,dark);}
  // Forward flaps sit aft of the nose tip and aft flaps hinge at the ship skirt.

@@ -9,7 +9,7 @@ const number=(v,d=2)=>Number.isFinite(v)?v.toLocaleString('en-US',{maximumFracti
 export const domainIds=Object.keys(domains);
 export const isEditable=p=>['A','B','C'].includes(p);
 export function domainNav(v,ref=null){
- const baseline=[['architecture','Spacecraft architecture','box','Inspect the fixed spacecraft layout, internal tank frame and geometric checks.'],['equipment','Master equipment list','list-checks','Explore the installed hardware, mass, heritage and manufacturer references.']];
+ const baseline=[['architecture','Spacecraft architecture','box','Inspect the fixed spacecraft layout, internal tank frame and geometric checks.'],['equipment','Master equipment list','list-checks','Explore the installed hardware, mass, heritage and manufacturer references.'],['timeline','Master timeline','clock-3','Inspect ground processing, the countdown, ascent, insertion, deployment and the first complete operating pass.']];
  const links=baseline.map(([id,label,ic,tip])=>`<button class="navitem ${ref===id?'selected':''}" data-page="${id}" data-tip="${tip}" aria-label="${label}" aria-current="${ref===id?'page':'false'}">${icon(ic,16)}<span>${label}</span></button>`).join('');
  return '<div class="navgroup vehicle-baseline"><div class="navlabel">SPACECRAFT BASELINE</div>'+links+'</div><div class="navgroup"><div class="navlabel">MISSION DOMAINS</div>'+domainIds.map((id,i)=>{
  const d=domains[id],current=!ref&&v.domain===id;return `<button class="navitem ${current?'selected':''}" data-domain="${id}" data-tip="${esc(d.summary)} Open the ${esc(d.label)} view within Phase ${v.phase}." aria-current="${current?'page':'false'}">${icon(d.icon,16)}<span>${esc(d.label)}</span><i class="domain-index">${String(i+1).padStart(2,'0')}</i></button>`;

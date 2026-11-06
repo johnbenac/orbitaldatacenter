@@ -15,7 +15,7 @@ function nodeMaterial(){
 }
 export function thermalSkin(root){
  const entries=[],nodes=new Map(),grays=new Map(),lineGray=new T.LineBasicMaterial({color:0x515a62,transparent:true,opacity:.55});lineGray.userData.shared=true;
- root.traverse(o=>{if(o.isMesh||o.isLine){const original=o.material;if(!original||Array.isArray(original))return;
+ root.traverse(o=>{if((o.isMesh||o.isLine)&&!o.userData.missionPatch){const original=o.material;if(!original||Array.isArray(original))return;
   const id=o.userData.thermalNode;
   if(id&&!nodes.has(id))nodes.set(id,nodeMaterial());
   // Keep distinct silhouette, troughs and edges in uninstrumented hardware.

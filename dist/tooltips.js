@@ -118,7 +118,7 @@ if(d.metric)return explainMetric(d.metric,d.label,d.unit);
  if(el.matches('a.sourcecard'))return 'Open the cited engineering source in a new tab.';
  if(el.id==='home')return 'Return to the guided mission explorer.';return el.title||el.getAttribute('aria-label')||'';
  }
- function locate(e){return e.target.closest?.(selector)}
+ function locate(e){return e.target.closest?.('.mech-inspector')?null:e.target.closest?.(selector)}
  function hover(e){if(e.pointerType==='touch')return;const el=locate(e);if(!el){if(e.target.tagName!=='CANVAS')hide();return}show(el,e.clientX,e.clientY,message(el,e));}
  document.addEventListener('pointermove',hover);document.addEventListener('pointerout',e=>{if(!e.relatedTarget)hide()});
  document.addEventListener('focusin',e=>{const el=locate(e);if(el&&el.matches(':focus-visible')){const r=el.getBoundingClientRect();show(el,r.left,r.bottom,message(el,e))}});

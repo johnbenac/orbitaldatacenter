@@ -1,29 +1,13 @@
-import {DEPLOYMENT_STAGES,deploymentSchedule,deploymentLayout,mechanismPose} from './deployment.js';
+import {DEPLOYMENT_STAGES,deploymentGuides,deploymentSchedule,deploymentLayout,mechanismPose} from './deployment.js';
 import {DEPLOY_START_S,DEPLOY_DURATION_S,deploymentMET} from './commissioning-clock.js';
 import {icon} from './icons.js';
 const format=(x,d=1)=>Number.isFinite(x)?x.toLocaleString('en-US',{maximumFractionDigits:d}):'—';
 const clock=s=>Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0');
-const guides={
- hold:'The release fittings carry launch loads. Two end locks support each wound blanket against its ±X wall. Two distal locks and a pair of root bearings hold each folded radiator against its ±Y wall.',
- release:'The launch restraints release before any blanket pays out. The wing roots and radiator hinge brackets remain attached to the spacecraft.',
- rollout:'The two edge booms recover their tubular cross-section. They push the tip mandrel outward as the photovoltaic blanket unwinds between the booms.',
- tension:'The wing tips reach full extension and the blankets take tension. The root drives remain at their deployment angle.',
- 'upper-root':'The first radiator swings outward as a folded pair. Follow its inboard hinge on the +Y side of the primary structure.',
- 'upper-tip':'The outer panel opens around the knuckle at the end of the inner panel. The flexible feed and return lines follow the joint.',
- 'upper-latch':'The first bank reaches its stop and latches. Its flow path can now be admitted to the coolant loop.',
- 'upper-flow':'Coolant is admitted to the first bank. The other bank remains folded and isolated.',
- 'lower-root':'The second bank swings away from the −Y side wall with its outer panel still folded.',
- 'lower-tip':'The second outer panel opens around its own hinge. The first bank stays latched.',
- 'lower-latch':'The second bank reaches its stop and latches. Its coolant branch is ready to open.',
- 'lower-flow':'Both radiator banks are latched. The second branch joins the circulating loop.',
- tracking:'The four wing roots rotate the tensioned blankets toward the commanded operating tilt.',
- deployed:'The wings are tensioned and both radiator banks are latched. The spacecraft can proceed to its insertion-trim checks.'
-};
 const major={hold:'Stowed',rollout:'Solar wings','upper-root':'First radiator','lower-root':'Second radiator',tracking:'Sun acquisition',deployed:'Locked'};
 const formatHours=t=>clock(Math.max(0,Math.round(t-DEPLOY_START_S)));
 export function commissioningGuide(h,s,v,playing){
  const k=deploymentSchedule(s.deployment);
- return `<aside class="dep-guide"><div class="dep-kicker">COMMISSIONING &nbsp;/&nbsp; MECHANISMS</div><h2 id="dep-title">${k.title}</h2><p id="dep-copy">${guides[k.step]||''}</p><dl class="dep-gauges">
+ return `<aside class="dep-guide"><div class="dep-kicker">COMMISSIONING &nbsp;/&nbsp; MECHANISMS</div><h2 id="dep-title">${k.title}</h2><p id="dep-copy">${deploymentGuides[k.step]||''}</p><dl class="dep-gauges">
  <div><dt>Solar blanket paid out</dt><dd id="dep-length">${format(k.pv*h.wingLengthM)} / ${format(h.wingLengthM)} m</dd></div><div><dt>Solar generation</dt><dd id="dep-power">${format(s.solarKW)} kW${s.eclipse?' · eclipse':''}</dd></div><div><dt>Radiator heat rejection</dt><dd id="dep-heat">${format(s.netRejectionKW)} kW</dd></div><div><dt>Stored battery energy</dt><dd id="dep-energy">${format(s.batteryKWh)} kWh</dd></div></dl>
  <div id="dep-joint" class="dep-joint">${jointReading(h,s,k)}</div>
  <div class="dep-lenses" data-choice-group="deployment-lenses" role="group" aria-label="Deployment camera detail">${[['vehicle','Whole vehicle'],['wing','Tip drum'],['hinge','Radiator joint']].map(([id,label])=>`<button class="chip" data-deployment-lens="${id}" aria-pressed="${v.deploymentLens===id&&v.camera==='spacecraft'}">${label}</button>`).join('')}</div>
@@ -47,7 +31,7 @@ export function commissioningTimeline(h,s){
 }
 export function refreshCommissioning(host,h,s){
  const k=deploymentSchedule(s.deployment),find=id=>host.getElementById(id);
- const items={'dep-joint':jointReading(h,s,k),'dep-title':k.title,'dep-copy':guides[k.step]||'','dep-clock':formatHours(s.t)+' / '+clock(DEPLOY_DURATION_S),'dep-length':format(k.pv*h.wingLengthM)+' / '+format(h.wingLengthM)+' m','dep-power':format(s.solarKW)+' kW'+(s.eclipse?' · eclipse':''),'dep-heat':format(s.netRejectionKW)+' kW','dep-energy':format(s.batteryKWh)+' kWh'};
+ const items={'dep-joint':jointReading(h,s,k),'dep-title':k.title,'dep-copy':deploymentGuides[k.step]||'','dep-clock':formatHours(s.t)+' / '+clock(DEPLOY_DURATION_S),'dep-length':format(k.pv*h.wingLengthM)+' / '+format(h.wingLengthM)+' m','dep-power':format(s.solarKW)+' kW'+(s.eclipse?' · eclipse':''),'dep-heat':format(s.netRejectionKW)+' kW','dep-energy':format(s.batteryKWh)+' kWh'};
  for(const [id,v] of Object.entries(items)){const e=find(id);if(e&&e.textContent!==v)e.textContent=v}
  const slider=find('deploy-cursor');if(slider){slider.style.setProperty('--pct',s.deployment*100+'%');if(host.activeElement!==slider)slider.value=s.deployment*DEPLOY_DURATION_S;}
  const buttons=Array.from(host.querySelectorAll('[data-deploy-at]'));const current=buttons.filter(b=>Number(b.dataset.deployAt)<=s.deployment+.000001).at(-1);

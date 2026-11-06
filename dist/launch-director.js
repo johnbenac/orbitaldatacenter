@@ -1,7 +1,9 @@
 import {launchSitesFor,launchSiteFor,launchPropulsionFor} from './launch-sites.js';
 import {launchFleet} from './launch-fleet.js';
 import {launchPath} from './launch-path.js';
-import {launchEffectsAt} from './launch-effects-state.js';
+import {launchHold} from './master-launch-events.js';
+import {DEPLOY_START_S} from './commissioning-clock.js';
+import {launchEffectsAt,launchClockFor,INSERTION_MET} from './launch-effects-state.js';
 import {icon} from './icons.js';
 const esc=x=>String(x??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;');
 const number=(v,n=1)=>Number.isFinite(v)?v.toFixed(n):'—';
@@ -31,38 +33,58 @@ function pathMismatch(h,s,phase){
  const p=siteApproach(h.input);if(p.gapKm<.02||!['ascent','insertion'].includes(phase))return '';
  return `<small class="lp-mismatch">Independent orbit study · ${number(p.gapKm,0)} km from the site-derived handoff. <button class="textbutton" data-launch-align-review>Review in Phase C →</button></small>`;
 }
-function launchDescription(s){
- const live=['pad','ascent'].includes(s.flightPhase),insertion=s.flightPhase==='insertion';
- return live?(s.t<0?'The countdown, engine start and water systems share the mission clock.':s.t<35?'Watch engine exhaust reach the diverter and water vapor billow from the pad as the vehicle climbs.':'Follow the stages through engine cutoff, separation and approach to the modeled insertion state.'):insertion?'Inspect the upper stage and the released spacecraft.':'Inspect the stowed spacecraft inside the vehicle’s payload envelope.';
+export const launchSegment=t=>t<35?'pad':t<INSERTION_MET?'ascent':'insertion';
+function directorState(s,d){
+ const t=s.t,c=launchClockFor(d.launcher),band=launchSegment(t);
+ if(band==='pad')return [launchEffectsAt(t,d.launcher,d.launchSite).label,t<0?'The countdown, engine start and water systems share the mission clock.':'Watch the exhaust reach the diverter and the stack clear the tower.'];
+ if(band==='ascent'){
+  const coast=c.upperCutoff!==null&&t>=c.upperCutoff;
+  return [coast?'Coasting to insertion':launchEffectsAt(t,d.launcher,d.launchSite).label,'The carrier controls pointing and carries the folded spacecraft to the insertion orbit.'];
+ }
+ if(t<c.release)return ['In orbit · cargo door opening','Starship has reached insertion. The payload is still bolted to its fitting while the retained door swings clear.'];
+ if(t<c.releaseClear)return ['Payload separating','The flight computer has pointing authority. The adapter stays with the carrier as the stowed spacecraft drifts clear.'];
+ return ['Spacecraft clear of the carrier','The flight computer holds attitude. The wings and radiator banks stay folded until commissioning.'];
 }
 export function launchGuide(h,s,v,playing){
  const d=h.input,pad=launchSiteFor(d.launcher,d.launchSite),fleet=launchFleet[d.launcher],prop=launchPropulsionFor(d.launcher),fx=launchEffectsAt(s.t,d.launcher,pad.id);
- const phase=s.flightPhase,live=phase==='pad'||phase==='ascent',insertion=phase==='insertion';
- const title=live?fx.label:insertion?'Payload separation':'Payload integration';
+ const phase=s.flightPhase,band=launchSegment(s.t),live=band==='pad'||band==='ascent',c=launchClockFor(d.launcher);
+ const [title,description]=directorState(s,d),hold=launchHold(h);
+ const fact=(name,value)=>`<div><dt>${esc(name)}</dt><dd>${esc(value)}</dd></div>`;
+ const readouts=band==='pad'?fact('Core propellant',fuelName(d.launcher,prop.core))+fact('Exhaust routing',formatGround(pad)):
+  band==='ascent'?fact('Carrier',fleet.stages===1?'Direct-injection core':'Staged ascent')+fact('Target altitude',number(d.altitudeKm,0)+' km'):
+  fact('Payload release',clock(c.release))+fact('Commissioning starts',clock(DEPLOY_START_S));
 
- return `<aside class="lp-guide"><div class="lp-kicker">LAUNCH CONTROL &nbsp; / &nbsp; ${esc(pad.region)}</div><div class="lp-veh">${esc(names[d.launcher]||fleet.family)}</div><h2 id="lp-state">${esc(title||phase)}</h2><p id="lp-description">${esc(launchDescription(s))}</p><div class="lp-location"><b>${esc(pad.name)}</b><span>${esc(pad.range)}</span><small>${esc(pad.statusLabel)}</small></div>
- <dl><div><dt>Mission clock</dt><dd id="lp-clock">${clock(s.t)}</dd></div><div><dt>Core propellant</dt><dd>${fuelName(d.launcher,prop.core)}</dd></div>${prop.booster?`<div><dt>Boosters</dt><dd>${fuelName(d.launcher,prop.booster)}</dd></div>`:''}<div><dt>Exhaust routing</dt><dd>${esc(formatGround(pad))}</dd></div></dl>
- ${live?`<div id="lp-lenses"${s.t>=100?' hidden':''} class="lp-lenses" data-choice-group="launch-lenses" role="group" aria-label="Launch camera viewpoints">${[['wide','Full stack'],['pad','Pad works'],...(d.launcher==='starship'?[['ship','Ship & flaps']]:[]),...(['falconHeavy','starship'].includes(d.launcher)?[['base',d.launcher==='falconHeavy'?'Landing legs':'Super Heavy base']]:[])].map(([key,label])=>`<button class="chip" data-launch-lens="${key}"${key==='pad'&&s.t>=35?' hidden':''} aria-pressed="${v.camera==='launch'&&v.launchLens===key}">${label}</button>`).join('')}</div>`:''}
+ return `<aside class="lp-guide"><div class="lp-kicker">${band==='insertion'?'SPACECRAFT HANDOVER':'LAUNCH CONTROL'} &nbsp; / &nbsp; ${esc(pad.region)}</div><div class="lp-veh">${esc(names[d.launcher]||fleet.family)}</div><h2 id="lp-state">${esc(title||phase)}</h2><p id="lp-description">${esc(description)}</p><div class="lp-location"><b>${esc(pad.name)}</b><span>${esc(pad.range)}</span><small>${esc(pad.statusLabel)}</small></div>
+ ${hold?'<small class="lp-mismatch"><b>Launch authorization held · conditional replay</b><br>'+esc(hold)+'</small>':''}
+ <dl><div><dt>Mission clock</dt><dd id="lp-clock">${clock(s.t)}</dd></div>${readouts}</dl>
+ ${live?`<div id="lp-lenses"${s.t>=100?' hidden':''} class="lp-lenses" data-choice-group="launch-lenses" role="group" aria-label="Launch camera viewpoints">${[['wide','Full stack'],['fairing',d.launcher==='starship'?'Cargo door & patch':'Fairing & patch'],['pad','Pad works'],...(d.launcher==='starship'?[['ship','Ship & flaps']]:[]),...(['falconHeavy','starship'].includes(d.launcher)?[['base',d.launcher==='falconHeavy'?'Landing legs':'Super Heavy base']]:[])].map(([key,label])=>`<button class="chip" data-launch-lens="${key}"${key==='pad'&&s.t>=35?' hidden':''} aria-pressed="${v.camera==='launch'&&v.launchLens===key}">${label}</button>`).join('')}</div>`:''}
  ${pathMismatch(h,s,phase)}
- <div class="flight-transport"><button class="btn export" data-action="flightplay">${icon(playing?'pause':'play',14)} ${playing?'Pause':s.t>=539.999&&s.t<540&&siteApproach(h.input).gapKm>.02?'Open requested orbit':'Play launch'}</button><select id="flight-rate" aria-label="Launch playback speed">${[1,10,30,120,600].map(n=>`<option value="${n}" ${n===v.speed?'selected':''}>${n}×</option>`).join('')}</select></div></aside>`;
+ <div class="flight-transport"><button class="btn export" data-action="flightplay">${icon(playing?'pause':'play',14)} ${playing?'Pause':s.t>=539.999&&s.t<540&&siteApproach(h.input).gapKm>.02?'Open requested orbit':band==='insertion'?'Play handover':'Play launch'}</button><select id="flight-rate" aria-label="Launch playback speed">${[1,10,30,120,600].map(n=>`<option value="${n}" ${n===v.speed?'selected':''}>${n}×</option>`).join('')}</select></div></aside>`;
 }
-export function launchSequence(h,s){
- const d=h.input,path=siteApproach(d),site=path.site;
- const fx=launchEffectsAt(0,d.launcher,site.id);
- const keys=[[-20,'Countdown'],[fx.engineStart,fx.waterStart===fx.engineStart&&site.water!=='none'?'Water & engine start':'Engine start'],...(site.water==='none'||fx.waterStart===fx.engineStart?[]:[[fx.waterStart,'Water system']]),[0,'Liftoff'],[6,'Exhaust flow'],[14,'Tower clearance'],[35,'Climb']].sort((a,b)=>a[0]-b[0]);
- const current=keys.filter(([t])=>s.t>=t).at(-1)?.[0];
- return `<section class="lp-sequence panel"><header><div><span class="lp-kicker">PAD CAMERA &nbsp; / &nbsp; ${esc(site.name)}</span><h3>Watch the first minute</h3></div><button class="textbutton" data-page="launch-design">Choose launch vehicle →</button></header>
- <p class="choice-hint">Choose a moment to pause the launch there.</p>
- <div class="lp-stops" data-choice-group="launch-stops" role="group" aria-label="Launch milestones">${keys.map(([t,label])=>`<button data-launch-time="${t}" aria-current="${current===t?'step':'false'}" data-tip="Pause at ${clock(t)}. Engine and pad effects follow the selected launch system."><small>${clock(t)}</small><b>${label}</b></button>`).join('')}</div>
+export function launchSequence(h,s,timeline){
+ const d=h.input,path=siteApproach(d),site=path.site,band=launchSegment(s.t);
+ const fx=launchEffectsAt(0,d.launcher,site.id),c=launchClockFor(d.launcher);
+ const pad=[[-20,'Countdown'],[fx.engineStart,fx.waterStart===fx.engineStart&&site.water!=='none'?'Water & engine start':'Engine start'],...(site.water==='none'||fx.waterStart===fx.engineStart?[]:[[fx.waterStart,'Water system']]),[0,'Liftoff'],[6,'Exhaust flow'],[14,'Tower clearance'],[35,'Climb']].sort((a,b)=>a[0]-b[0]);
+ const ascent=[[35,'Climb'],...(timeline?.rows||[]).filter(r=>r.segment==='ascent'&&r.start>35&&r.id!=='launch-strap-cutoff').map(r=>[r.start,r.title]),[INSERTION_MET,'Orbital insertion']];
+ const insertion=[[INSERTION_MET,c.doorOpen!==null?'Open cargo door':'Insertion & release'],...(c.release>INSERTION_MET?[[c.release,'Release spacecraft']]:[]),[c.releaseClear,'Clear the carrier']];
+ const primary=band==='insertion'?insertion:band==='ascent'?ascent:pad;
+ const current=primary.filter(([t])=>s.t>=t).at(-1)?.[0];
+ const controls=(keys,active)=>keys.map(([t,label])=>`<button data-launch-time="${t}" aria-current="${active&&current===t?'step':'false'}" data-tip="Pause the launch clock at ${clock(t)}."><small>${clock(t)}</small><b>${esc(label)}</b></button>`).join('');
+ const next=band==='insertion'?(timeline?.rows||[]).filter(r=>r.id==='deploy-hold'||r.id.startsWith('ignition-trim-')||r.id==='trim-check'):[];
+ const actions=next.map(r=>`<button data-next-master-call="${esc(r.id)}" data-tip="${esc(r.description)}"><small>${clock(r.start)} · PHASE E</small><b>${esc(r.id==='deploy-hold'?'Begin commissioning':r.title)} →</b></button>`).join('');
+ const title=band==='insertion'?'From release to checkout':band==='ascent'?'Follow the ascent':'Watch the first minute';
+ return `<section class="lp-sequence panel" data-launch-sequence="${band}"><header><div><span class="lp-kicker">${band==='pad'?'PAD CAMERA':band==='ascent'?'STAGING':'HANDOVER'} &nbsp; / &nbsp; ${esc(site.name)}</span><h3>${title}</h3></div><button class="textbutton" data-page="launch-design">Choose launch vehicle →</button></header>
+ <p class="choice-hint">${band==='insertion'?'Select release, then follow the deployment and trim decisions recorded for this spacecraft.':'Choose a moment to pause the launch there.'}</p>
+ <div class="lp-stops" data-choice-group="launch-stops" role="group" aria-label="Launch milestones">${controls(primary,true)}${actions}</div>
+ ${band==='pad'?'':'<details class="lp-detail"><summary>Replay countdown and liftoff</summary><div class="lp-stops">'+controls(pad,false)+'</div></details>'}
  <details class="lp-detail"><summary>Site details and modeling assumptions</summary><div>${map(site)}<p>${esc(site.siteNote)}</p><p>Exhaust colors, deluge clouds and early climb are engineering illustrations. The workbench uses a nine-minute reference ascent. Published engine and staging cues are used where available.</p><p>${path.gapKm>.02?'The site-local ascent differs from the requested orbit by '+number(path.planeErrorDeg)+'° in plane and '+number(path.gapKm,0)+' km at handoff. The operating-orbit study begins at T+09:00. Use the site-derived angles in Phase C to join these states continuously.':'The site-local trajectory joins the selected insertion state at T+09:00.'}</p><p class="lp-sources">${links(site)}</p></div></details></section>`;
 }
-
 export function refreshLaunchGuide(host,d,s){
  const met=host.getElementById('lp-clock'),label=host.getElementById('lp-state');
  if(met)met.textContent=clock(s.t);
- if(label&&['pad','ascent'].includes(s.flightPhase)){
-  label.textContent=launchEffectsAt(s.t,d.launcher,d.launchSite).label;
-  const description=host.getElementById('lp-description'),copy=launchDescription(s);
+ if(label){
+  const [title,copy]=directorState(s,d),description=host.getElementById('lp-description');
+  if(label.textContent!==title)label.textContent=title;
   if(description&&description.textContent!==copy)description.textContent=copy;
   const lenses=host.getElementById('lp-lenses'),pad=lenses?.querySelector('[data-launch-lens="pad"]');
   if(lenses)lenses.hidden=s.t>=100;if(pad)pad.hidden=s.t>=35;

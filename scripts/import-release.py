@@ -10,6 +10,7 @@ from zipfile import BadZipFile, ZipFile
 
 MANIFEST = 'upstream-files.json'
 ROOT_DOCS = {'DESIGN.md', 'ENGINE.md', 'SCENE.md', 'requirements.txt', 'package.json'}
+UPSTREAM_TOOLS = {'tools/build-identity.py'}
 MAPPED = {'README.md': 'upstream-docs/README.md',
           '.openai/hosting.json': 'upstream-docs/hosting.json'}
 
@@ -28,6 +29,8 @@ def safe_name(name):
 
 
 def destination(name):
+    if name in UPSTREAM_TOOLS:
+        return name
     if name in MAPPED:
         return MAPPED[name]
     path = PurePosixPath(name)

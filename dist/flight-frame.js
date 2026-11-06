@@ -2,6 +2,7 @@
 // a separate perspective pass so orbit-scale distances retain depth precision.
 import * as T from './vendor/three.module.js';
 import {R} from './orbit.js';
+import {createCelestialSky} from './celestial-sky.js';
 const v=a=>new T.Vector3(...a);
 export const eciScene=(a,k=1)=>new T.Vector3(a[0]*k,a[2]*k,-a[1]*k);
 const orientation=(x,y,z)=>new T.Quaternion().setFromRotationMatrix(new T.Matrix4().makeBasis(eciScene(x),eciScene(y),eciScene(z)));
@@ -17,24 +18,24 @@ export function configureObserver(camera,foreground,frame,s,aspect,launchStack){
  if(camera.aspect!==aspect){camera.aspect=aspect;camera.updateProjectionMatrix();}
  camera.updateMatrixWorld();
 }
-export function createEarthBackdrop(planet,atmosphere){
- const scene=new T.Scene(),globe=planet.clone(),skyCam=new T.PerspectiveCamera(49,1,.0001,5);
- // Same projection, ephemeris, texture meridian and lights for both render paths.
- scene.add(globe,atmosphere.clone());
- // A fixed, illustrative star field supplies an inertial reference when a
- // body-following inspection camera turns away from Earth. It has no parallax.
- const positions=[];let seed=27183;
- const next=()=>((seed=(1664525*seed+1013904223)>>>0)/4294967296);
- for(let i=0;i<1900;i++){
-  const y=2*next()-1,r=Math.sqrt(1-y*y),a=2*Math.PI*next();
-  positions.push(4*r*Math.cos(a),4*y,4*r*Math.sin(a));
- }
- const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(positions,3));
- const stars=new T.Points(g,new T.PointsMaterial({color:0x94afc7,opacity:.47,transparent:true,size:1,sizeAttenuation:false,depthWrite:false}));stars.renderOrder=-1;scene.add(stars);
- const sun=new T.DirectionalLight(0xfff3e1,2.65),fill=new T.AmbientLight(0x91adc2,.19);scene.add(sun,fill);
- return {scene,camera:skyCam,dispose(){g.dispose();stars.material.dispose();},update(camera,frame,s,aspect,launchStack){
-  configureObserver(skyCam,camera,frame,s,aspect,launchStack);
-  stars.position.copy(skyCam.position);globe.rotation.y=s.earthRotationRad;sun.position.copy(eciScene(s.sunECI).normalize());
+export function createEarthBackdrop(planet,atmosphere,onReady){
+ const scene=new T.Scene(),globe=planet.clone(),air=atmosphere.clone(),skyCam=new T.PerspectiveCamera(49,1,.0001,30);
+ const sky=createCelestialSky(onReady);
+ const sun=new T.DirectionalLight(0xfff3e1,2.65),fill=new T.AmbientLight(0x91adc2,.19);
+ scene.add(sky.group,globe,air,sun,fill);
+ function updateSky(s,atVehicle){
+  globe.visible=air.visible=atVehicle;
+  globe.rotation.y=s.earthRotationRad;sun.position.copy(eciScene(s.sunECI).normalize());
+  sky.update(skyCam,sun.position,!atVehicle||!s.eclipse);
   scene.userData.lightState={sun:sun.position,ambient:.095,direct:1.13,rim:0};
+ }
+ return {scene,camera:skyCam,dispose:()=>sky.dispose(),update(camera,frame,s,aspect,launchStack){
+  configureObserver(skyCam,camera,frame,s,aspect,launchStack);updateSky(s,true);
+ },overview(camera,s,aspect){
+  // The foreground orthographic pass draws Earth and its locator. Its
+  // external camera can see the Sun while the spacecraft itself is eclipsed.
+  skyCam.position.set(0,0,0);skyCam.quaternion.copy(camera.quaternion);
+  if(skyCam.aspect!==aspect){skyCam.aspect=aspect;skyCam.updateProjectionMatrix();}
+  skyCam.updateMatrixWorld();updateSky(s,false);
  }};
 }

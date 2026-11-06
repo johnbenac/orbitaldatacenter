@@ -31,11 +31,12 @@ export function focusHardware(root){
  for(const material of [ghost,ghostLine,carrier]){material.userData.shared=true;material.userData.domainGhost=true;}
  root.traverse(o=>{if((o.isLine||o.isMesh)&&o.material&&!Array.isArray(o.material))items.push({o,original:o.material,part:hardwarePart(o)});});
  let last='';
- function clear(){if(!last)return;for(const {o,original}of items){o.material=original;}last='';}
+ function clear(){if(!last)return;for(const {o,original}of items){o.material=original;if(o.userData.missionPatch)o.visible=true;}last='';}
  return {apply(domain,selected='',exposeCargo=false){
   if(!domain||['conops','orbit'].includes(domain)||!domainSceneSpecs[domain]){clear();return;}const isolated=domain==='mass'?selected:'',signature=domain+'/'+isolated+'/'+exposeCargo;if(signature===last)return;
   if(last)clear();last=signature;
   for(const {o,part,original}of items){
+   if(o.userData.missionPatch){o.visible=!o.parent.material.userData.domainGhost;continue}
    if(exposeCargo&&o.userData.cargoWall){o.material=ghost;continue}
    const color=exposeCargo&&domain==='launcher'&&part==='adapter'?'native':isolated&&part!==isolated?null:focusColor(part,domain,o);
    if(!color){o.material=o.isLine?ghostLine:['launcher','booster','fairing'].includes(part)?carrier:ghost;}

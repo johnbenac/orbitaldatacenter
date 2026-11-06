@@ -2,7 +2,7 @@
 import {propulsionReview} from './spacecraft-architecture.js';
 import {aiPurposes} from './ai-purpose.js';
 import {purposeId,purposeInfo} from './purpose-display.js';
-import {sizingEnvelope,ageProperties} from './design.js';
+import {sizingEnvelope,ageProperties,sizingLabel} from './design.js';
 import {launchFleet} from './launch-fleet.js';
 import {launchReferenceFor,launchSiteFor} from './launch-sites.js';
 import {launchPath} from './launch-path.js';
@@ -120,7 +120,7 @@ export const domains={
   ['Mass assumptions','Specify subsystem margins, shielding, enclosure skin and allowable launch mass.','dryMarginPct shieldDensity skinDensity blanketDensity adapterMass allowance'],
   ['Hardware allocations','Review the additive mass boundaries from dry frame to launched stack.','dryMass initialWet launchMass pressurant propLoad adapterMass'],
   ['Integrated mass closure','Track launch allowance, dry growth margin and consumable mass as the launcher fit changes.','dryMass dryGrowth initialWet launchMass launchMargin massResidual'],
-  ['Manifest and separation','Distinguish launched hardware and adapter from spacecraft wet mass after separation.','launchMass adapterMass initialWet wetKg launchMargin'],
+  ['Manifest and separation','Distinguish launched hardware and adapter from spacecraft wet mass after separation.','launchMass attachedAdapter carriedMass wetKg launchMargin'],
   ['Consumable mass balance','Installed dry hardware and pressurant remain fixed while burns deplete the two liquids.','dryMass pressurant fuelKg oxidizerKg wetKg wetResidual'],
   ['Terminal flight mass','Reconcile the final vehicle mass, protected stock and actual disposal consumption.','dryMass pressurant propellantKg wetKg disposalUsedKg wetResidual']
  ],'launch insertion trim reboost maneuver disposal impact graveyard'),
@@ -138,7 +138,7 @@ export const domains={
   ['Choose the launch service','Select a flight-proven carrier or a development concept and compare its LEO reference with the mission allowance.','launcherName padName padStatus lvStatus referenceMass lvReferenceOrbit allowance'],
   ['Carrier configuration','Inspect the core, strap-on propulsion and upper-stage arrangement that deliver the spacecraft.','launcherName padName padLocation padStatus lvStages lvBoosters lvRecovery lvArchitecture fitBasis'],
   ['Launcher trade and manifest','Evaluate the same folded spacecraft against both mass screens and the selected fairing profile.','padName referenceMass allowance launchMass lvBenchmarkMargin launchMargin lvScreenMargin radialClearance axialClearance'],
-  ['Ascent and payload release','The launch vehicle carries the adapter and spacecraft through ascent. The spacecraft performs its own trim after separation.','phase launcherName padName padLocation padStatus padHeading lvHandoff launchMass adapterMass altitudeKm'],
+  ['Ascent and payload release','The launch vehicle carries the adapter and spacecraft through ascent. The spacecraft performs its own trim after separation.','phase launcherName padName padLocation padStatus padHeading lvHandoff attachedAdapter carriedMass altitudeKm'],
   ['Delivered spacecraft record','The original launch manifest stays fixed while the spacecraft consumes propellant in orbit.','launcherName padName launchMass initialWet adapterMass wetKg lvCarrierService'],
   ['Carrier delivery closeout','Reconcile the original selected launch service with the spacecraft mass delivered at release and its recorded retirement outcome.','launcherName padName referenceMass launchMass initialWet adapterMass lvScreenMargin closureReason']
  ],'integration pad launch insertion deployment disposal coast entry impact graveyard'),
@@ -147,7 +147,7 @@ export const domains={
   ['Mechanical design drivers','Set installed equipment quantities and structural areal masses against the payload envelope.','trays rawStorage initialWet launchMass'],
   ['Equipment accommodation','Inspect each installed item at its body station and follow its contribution to the mass center.','dryMass initialWet radialClearance axialClearance'],
   ['Integrated mass properties','Compare dry, wet, deployed and adapter-supported configurations using the equipment register.','dryMass initialWet launchMass propellantKg'],
-  ['Stack balance and separation','Inspect the launch center of mass from the adapter datum and the stowed payload envelope.','launchMass adapterMass stackLength radialClearance axialClearance'],
+  ['Stack balance and separation','Inspect the launch center of mass from the adapter datum and the stowed payload envelope.','launchMass attachedAdapter carriedMass stackLength radialClearance axialClearance'],
   ['Changing mass distribution','Follow the center of mass as appendages move, liquid is consumed and the adapter separates.','deploymentPct wetKg fuelKg oxidizerKg'],
   ['Mechanical disposition','Inspect retained hardware for a raised orbit or screen individual items for survival during targeted reentry.','disposalMode disposalStatus disposalUsedKg finalPerigee finalApogee']
  ],'launch insertion deployment trim reboost maneuver disposal entry impact graveyard'),
@@ -213,6 +213,7 @@ fields('h',[
 fields('e',[
  ['meanBus','Planning mean bus demand','kW'],['annualProp','Station-keeping propellant','kg/yr','propAnnual'],['annualImpulse','Annual drag impulse','N·s/yr','yearlyImpulse'],['supplyYears','Station-keeping coverage','yr'],['meanTraffic','Planning payload production','Mbit/s','traffic'],['requiredGoodput','Required goodput during access','Mbit/s','goodputNeeded'],['accessGoodput','Planned in-contact capacity','Mbit/s','linkGoodput'],['solarRequired','End-of-service array requirement','m²','solarNeeded'],['batteryNeeded','End-of-service pack requirement','kWh'],['radRequired','End-of-service radiator requirement','m²','radiatorNeeded'],['transportRise','Design junction transport rise','K','transportRiseK'],['designJunction','Design-state junction estimate','K','thermalK'],['propRequired','Propellant for allocated years','kg','propForCoverage'],['trimBudget','Ideal insertion trim consumption','kg','trimKg'],['disposalBudget','Protected disposal Δv','m/s','disposalBudgetDv'],['planLimit','Binding design constraint','','binding']
 ],'Planning envelope at requested mission age');
+registry.planLimit.read=c=>sizingLabel(c.e?.binding);
 function calc(id,label,unit,read,note='Calculated from model channels'){registry[id]={label,unit,note,read}}
 const primaryKeys={text:'slaTurns',voice:'audibleTurns',batch:'qualifiedItems',agents:'verifiedTasks',finetune:'deliveredRun',pretrain:'deliveredRun'};
 calc('aiPurpose','Mission purpose','',c=>purposeInfo(c.h).name,'Selected Earth-customer mission');
@@ -247,7 +248,7 @@ calc('padLocation','Launch-site geography','',c=>{const p=selectedPad(c);return 
 calc('padStatus','Pad and vehicle status','',c=>selectedPad(c).statusLabel,'Evidence for the selected vehicle and launch complex');
 calc('padHeading','Direct-ascent heading','°',c=>ascent(c).headingDeg,'Inertial tangent at the rotating pad, clockwise from local north');
 calc('padPlaneGap','Target-plane mismatch','°',c=>ascent(c).planeErrorDeg,'Angle between the site-derived insertion plane and the requested orbit');
-calc('padPositionGap','Target position mismatch at release','km',c=>ascent(c).gapKm,'Distance between the site-derived and requested positions at MET 540 s');
+calc('padPositionGap','Target position mismatch at insertion','km',c=>ascent(c).gapKm,'Distance between the site-derived and requested positions at MET 540 s');
 calc('lvStatus','Programme status','',c=>lv(c).status,'Provider and agency references in the vehicle catalogue');
 calc('lvReferenceOrbit','Capacity reference conditions','',c=>lv(c).referenceOrbit,'Cited LEO reference');
 calc('lvStages','Axial propulsion stages','stages',c=>lv(c).stages);
@@ -256,8 +257,10 @@ calc('lvArchitecture','Carrier arrangement','',c=>lv(c).architecture);
 calc('lvRecovery','Recovery configuration','',c=>lv(c).recovery);
 calc('lvBenchmarkMargin','LEO reference minus launch stack','kg',c=>c.h.launchReferenceMarginKg,'Nominal provider-reference screen; mission orbit can differ');
 calc('lvScreenMargin','Governing launch mass headroom','kg',c=>c.h.launchScreenMarginKg,'Smaller of mission allowance and LEO reference, less launched mass');
-calc('lvHandoff','Launch service state','',c=>c.s.t<0?'Integrated on the ground':c.s.t<540?'Payload rides the carrier':'Payload released','Modeled release at MET 540 s; illustrative ascent clock');
-calc('lvCarrierService','Post-release carrier contribution','',()=>'Spacecraft propulsion and power after release','Carrier service ends at the modeled injection boundary');
+calc('lvHandoff','Launch service state','',c=>c.s.t<0?'Integrated on the ground':c.s.carrierAttached?'Payload rides the carrier':'Payload released','At the selected carrier’s payload release, the spacecraft takes pointing authority and leaves the adapter behind.');
+calc('attachedAdapter','Adapter attached to payload','kg',c=>c.s.carrierAttached?c.d.adapterKg:0,'The adapter is removed from the payload mass at the carrier-specific release event.');
+calc('carriedMass','Spacecraft and attached fittings','kg',c=>c.s.wetKg+(c.s.carrierAttached?c.d.adapterKg:0),'Current wet spacecraft plus the adapter while attached.');
+calc('lvCarrierService','Post-release carrier contribution','',()=>'Spacecraft propulsion and power after release','Carrier pointing authority ends at the selected payload release event');
 const pc=(id,label,key)=>calc(id,label,'%',c=>100*c.d[key],'Design input');
 pc('duty','Scheduled compute duty','duty');pc('reservePct','Spare SSD capacity','diskReserve');pc('codingPct','Application efficiency','codingEff');pc('dryMarginPct','Dry engineering margin','structureMargin');pc('floorPct','SOC operating floor','socMin');pc('targetPct','Design minimum SOC','targetSOC');
 const ratio=(a,b)=>b>0?100*a/b:null;
@@ -322,19 +325,19 @@ const nonSpacecraftFields=new Set(['aiUnitsComputed','aiProductGeneratedGB','aiP
 function readMetric(code,c){
  const metric=registry[code];if(!metric)throw new Error('Missing domain quantity '+code);
  const beyond=c.s.spacecraftModelEndedAt!=null&&c.s.t>c.s.spacecraftModelEndedAt+1e-6;
- const inOrbitalEnvironment=c.s.t>=540;
+ const inOrbitalEnvironment=!c.s.carrierAttached;
  const unavailablePrelaunch=!inOrbitalEnvironment&&['f107Daily','densityKgM3','magFieldUT','sunFlux','earthIR','albedoFlux','betaDeg','ramAreaM2','dragN'].includes(code);
  const closed=(c.s.referenceBody||beyond)&&!nonSpacecraftFields.has(code)&&(metric.source==='s'||['burst','groundLink','station','burnKind','deploymentPct','earthIR','albedoFlux','sunFlux','wetResidual','byteResidual','lastContact'].includes(code));
  return {key:code,label:metric.label,unit:effectiveUnit(metric.unit,c),value:closed||unavailablePrelaunch?null:numberValue(metric.read(c)),note:closed?'Spacecraft channel outside propagation interval':unavailablePrelaunch?'Orbital environment begins at insertion':metric.note};
 }
 const F=(source,receiver,quantity,value,unit,kind='Induced')=>({source,receiver,quantity,value:numberValue(value),unit,kind});
 export function environmentFlows({hardware:h,state:s}){
- const d=h.input,open=s.t>=540&&!s.referenceBody,A=open?s.radiatorCoupledM2/1000:0;
+ const d=h.input,open=!s.carrierAttached&&!s.referenceBody,A=open?s.radiatorCoupledM2/1000:0;
  const heatRows=[
-  F('Sun','Solar-wing surface','Normal irradiance',s.t>=540?s.solarIrradiance:null,'W/m²','Natural'),
-  F('Sun','Radiator coating','Absorbed direct shortwave',s.t>=540?A*s.absorptivity*s.solarIrradiance*s.radiatorSunCos:null,'kW','Natural'),
-  F('Illuminated Earth','Radiator coating','Absorbed albedo',s.t>=540?A*s.absorptivity*s.albedoIrradiance:null,'kW','Natural'),
-  F('Earth thermal IR','Radiator faces','Absorbed longwave',s.t>=540?A*s.emissivity*s.earthIRIrradiance:null,'kW','Natural'),
+  F('Sun','Solar-wing surface','Normal irradiance',!s.carrierAttached?s.solarIrradiance:null,'W/m²','Natural'),
+  F('Sun','Radiator coating','Absorbed direct shortwave',!s.carrierAttached?A*s.absorptivity*s.solarIrradiance*s.radiatorSunCos:null,'kW','Natural'),
+  F('Illuminated Earth','Radiator coating','Absorbed albedo',!s.carrierAttached?A*s.absorptivity*s.albedoIrradiance:null,'kW','Natural'),
+  F('Earth thermal IR','Radiator faces','Absorbed longwave',!s.carrierAttached?A*s.emissivity*s.earthIRIrradiance:null,'kW','Natural'),
   F('Earth and Sun','Enclosure exterior','Area-weighted shortwave',open?s.enclosureSolarWm2:null,'W/m²','Natural'),
   F('Thermosphere','Ram-facing silhouette','Local neutral density',s.t>=540?s.densityKgM3:null,'kg/m³','Natural'),
   F('Solar activity','Density scenario','81-day F10.7 proxy',s.t>=540?s.f107Mean:null,'sfu','Natural'),

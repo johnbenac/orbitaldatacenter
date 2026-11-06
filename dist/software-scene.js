@@ -72,7 +72,7 @@ if(glow){const norm=new T.Vector3(),toEye=new T.Vector3();for(let i=0;i<n;i++){
 if(intensity)for(let i=0;i<n;i++){vec.fromBufferAttribute(normal,i).applyMatrix3(normMat).normalize();intensity[i]=(lighting?.ambient??.33)+(lighting?.direct??1.05)*Math.max(0,vec.dot(lighting?.sun??sun))+(lighting?.rim??.38)*Math.max(0,vec.dot(lighting?.rimDirection??rim));
  if(lighting?.softbox)intensity[i]+=1.12*Math.max(0,vec.dot(lighting.softbox))+.68*Math.max(0,vec.dot(lighting.bounce));
 }
-const physical=gain&&mat.toneMapped!==false&&(mat.isMeshStandardMaterial||glow);
+const physical=gain&&mat.toneMapped!==false&&(mat.isMeshStandardMaterial||glow||mat.userData.celestial);
 const texel=mat.map?.colorSpace===T.SRGBColorSpace?srgbBytes:linearBytes;
 const nearU=[0,0],nearV=[0,0];
 function triangle(ia,ib,ic){
@@ -81,7 +81,7 @@ function triangle(ia,ib,ic){
  const xlo=Math.max(0,Math.ceil(Math.min(x0,x1,x2)-.5)),xhi=Math.min(width-1,Math.floor(Math.max(x0,x1,x2)-.5)),ylo=Math.max(0,Math.ceil(Math.min(y0,y1,y2)-.5)),yhi=Math.min(height-1,Math.floor(Math.max(y0,y1,y2)-.5));
  if(xlo>xhi||ylo>yhi)return;
  const la=intensity?intensity[ia]:1,lb=intensity?intensity[ib]:1,lc=intensity?intensity[ic]:1;const ca=(y1-y2)/den,cb=(y2-y0)/den,da=(x2-x1)/den,db=(x0-x2)/den,za=a[A+2],zb=a[B+2],zc=a[C+2];let ua=0,ub=0,uc=0,va=0,vb=0,vc=0;let texture=baseTexture;if(texture&&uv){ua=ia<n?uv.getX(ia):nearU[ia-n];ub=ib<n?uv.getX(ib):nearU[ib-n];uc=ic<n?uv.getX(ic):nearU[ic-n];va=ia<n?uv.getY(ia):nearV[ia-n];vb=ib<n?uv.getY(ib):nearV[ib-n];vc=ic<n?uv.getY(ic):nearV[ic-n];const footprint=Math.max(Math.abs((ua-uc)*ca+(ub-uc)*cb)*texture.width,Math.abs((ua-uc)*da+(ub-uc)*db)*texture.width,Math.abs((va-vc)*ca+(vb-vc)*cb)*texture.height,Math.abs((va-vc)*da+(vb-vc)*db)*texture.height);if(footprint>2)texture=imageData(mat.map,Math.min(9,Math.max(0,Math.round(Math.log2(footprint)))));}
-for(let y=ylo;y<=yhi;y++){let w0=ca*(xlo+.5-x2)+da*(y+.5-y2),w1=cb*(xlo+.5-x2)+db*(y+.5-y2);for(let x=xlo;x<=xhi;x++,w0+=ca,w1+=cb){const w2=1-w0-w1;if(w0<-.001||w1<-.001||w2<-.001)continue;const z=za*w0+zb*w1+zc*w2,k=y*width+x;if(z>=depth[k]||z< -1||z>1)continue;const light=lc+w0*(la-lc)+w1*(lb-lc);let rr=color.r*light,gg=color.g*light,bb=color.b*light;
+for(let y=ylo;y<=yhi;y++){let w0=ca*(xlo+.5-x2)+da*(y+.5-y2),w1=cb*(xlo+.5-x2)+db*(y+.5-y2);for(let x=xlo;x<=xhi;x++,w0+=ca,w1+=cb){const w2=1-w0-w1;if(w0<-.001||w1<-.001||w2<-.001)continue;const z=za*w0+zb*w1+zc*w2,k=y*width+x;if((mat.depthTest!==false&&z>=depth[k])||z< -1||z>1)continue;const light=lc+w0*(la-lc)+w1*(lb-lc);let rr=color.r*light,gg=color.g*light,bb=color.b*light;
  let alpha=opacity;
  if(glow){
   alpha=glow[ia]*w0+glow[ib]*w1+glow[ic]*w2;if(alpha<.003)continue;
@@ -116,7 +116,7 @@ for(let y=ylo;y<=yhi;y++){let w0=ca*(xlo+.5-x2)+da*(y+.5-y2),w1=cb*(xlo+.5-x2)+d
  if(physical){filmic(encoded,rr,gg,bb,gain);rr=encoded[0];gg=encoded[1];bb=encoded[2];}
  if(mat.userData.hatch?.value){const phase=((x+y)*canvas.width/width)%9,stripe=phase<1?.72:phase<2?(2-phase)*.72:0;rr+=(255-rr)*stripe;gg+=(255-gg)*stripe;bb+=(255-bb)*stripe;}const kk=k*4,dst=img[kk+3]/255,coverage=alpha+dst*(1-alpha);
  if(coverage>0&&alpha<1){const w=alpha/coverage,v=1-w;rr=img[kk]*v+rr*w;gg=img[kk+1]*v+gg*w;bb=img[kk+2]*v+bb*w;}
- img[kk]=rr;img[kk+1]=gg;img[kk+2]=bb;img[kk+3]=255*coverage;if(mat.depthWrite!==false)depth[k]=z;}}}
+ img[kk]=rr;img[kk+1]=gg;img[kk+2]=bb;img[kk+3]=255*coverage;if(mat.depthWrite!==false&&mat.depthTest!==false)depth[k]=z;}}}
  function distance(i){
   return (e[2]+e[3])*p.getX(i)+(e[6]+e[7])*p.getY(i)+(e[10]+e[11])*p.getZ(i)+e[14]+e[15];
  }

@@ -1,6 +1,8 @@
+import {launchClockFor,INSERTION_MET} from './launch-effects-state.js';
 // Launch assemblies use metres and a +Y vehicle axis. The fairing radius profile
 // and stowed sections come from the sizing solver; the support equipment is illustrative.
 import * as T from './vendor/three.module.js';
+import {missionPatchMaterial,mountMissionPatch} from './fairing-patch.js';
 import {buildLaunchGround,buildAscentWake,exhaustFactory,launchEffectsAt,launchRiseM} from './launch-ground.js';
 import {launchSiteFor,launchPropulsionFor} from './launch-sites.js';
 import {buildStarship,falconRecovery,launchNozzles,shipNose} from './launch-hardware.js';
@@ -26,7 +28,7 @@ function shellBands(section,begin,angle,n=Math.ceil(64*angle/Math.PI)){
  }
  const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(vertices,3));g.setAttribute('normal',new T.Float32BufferAttribute(normals,3));g.setIndex(indices);return g;
 }
-export function makeLaunch(h){
+export function makeLaunch(h,repaint){
  const root=new T.Group(), stage=group(root,'launcher'), lower=group(stage,'launcher'), upper=group(stage,'launcher'),
  payload=group(stage,'payload'), shell=group(stage,'fairing'), facility=group(root,'pad'), tower=group(root,'pad');
  const mat=(c,m=.2,r=.53)=>new T.MeshStandardMaterial({color:c,metalness:m,roughness:r});
@@ -46,6 +48,7 @@ export function makeLaunch(h){
  function guide(points){envelope.add(new T.Line(new T.BufferGeometry().setFromPoints(points),boundaryColor));}
  for(const [y,r] of profile)guide(Array.from({length:65},(_,i)=>v(r*Math.sin(i*Math.PI/32),y,r*Math.cos(i*Math.PI/32))));
  for(let i=0;i<6;i++){const a=i*Math.PI/3;guide(profile.map(([y,r])=>v(r*Math.sin(a),y,r*Math.cos(a))));}
+ const patch=missionPatchMaterial(repaint);
  const star=/starship/i.test(d.launcher), halves=[];
  if(!star)for(const side of [-1,1]){
   const g=group(shell,'fairing'),begin=side<0?Math.PI:0, angle=Math.PI;
@@ -62,6 +65,8 @@ export function makeLaunch(h){
    tube(g,v(r0*Math.sin(phi),y,r0*Math.cos(phi)),v(r1*Math.sin(phi),z,r1*Math.cos(phi)),j%4===0?R*.025:R*.014,j%4===0?steel:rib);}}
 
   body.name='Fairing half shell';g.userData.halfSide=side;
+  const patchY=maxH*.48;
+  mountMissionPatch(body,outerProfile,begin+.81,patchY,Math.min(radius(patchY)*1.42,maxH*.42),patch);
   for(const phi of [begin,begin+angle]){
    const poly=new T.Shape();section.forEach(([x,y],i)=>i?poly.lineTo(x,y):poly.moveTo(x,y));
    const cap=new T.ShapeGeometry(poly);cap.rotateY(phi-Math.PI*.5);const desired=v(Math.cos(phi),0,-Math.sin(phi)).multiplyScalar(phi===begin?-1:1);
@@ -130,8 +135,10 @@ export function makeLaunch(h){
  const baseR=fleet.diameterM/2,capH=star?shipNose.at(-1)[1]:outerProfile.at(-1)[1],bodyLength=Math.max(4*baseR,fleet.heightM-capH),
   stage2=single?0:star?fleet.shipLengthM-capH:bodyLength*(glenn?.26:.24),stage1=bodyLength-stage2,allH=bodyLength+capH,baseY=-bodyLength;
 
- const separationT=star?142:parallel?234:170,sideSeparationT=parallel?147:128,fairingT=parallel?257:230;
- const ship=star?buildStarship({lower,upper,shell,baseY,stage1,stage2}):null;
+ const clock=launchClockFor(d.launcher),{stageSeparation:separationT,boosterSeparation:sideSeparationT,fairingJettison:fairingT}=clock;
+ const ship=star?buildStarship({lower,upper,shell,baseY,stage1,stage2,patch}):null;
+ const fairingPatch=(star?shell:halves.find(half=>half.side===1).g).getObjectByName('Mission patch');
+ fairingPatch.geometry.computeBoundingSphere();
  if(!star){
  cylinder(lower,0,baseY+stage1*.50,0,baseR,baseR*.985,stage1,star?rib:ivory);
  cylinder(lower,0,baseY+stage1*.095,0,baseR*1.006,baseR*.994,stage1*(parallel?.035:.185),parallel?rib:dark);
@@ -145,9 +152,7 @@ export function makeLaunch(h){
  if(!parallel){
  for(const yy of [.23,.252,.277])cylinder(lower,0,baseY+stage1*yy,0,baseR*1.009,baseR*1.009,baseR*(yy===.252?.11:.045),accent,undefined,72);
  for(let i=0;i<4;i++){const a=i*Math.PI/2,o=box(lower,baseR*.994*Math.sin(a),baseY+stage1*.78,baseR*.994*Math.cos(a),baseR*.37,baseR*1.0,baseR*.026,accent);o.rotation.y=a;}
- const faceMap=document.createElement('canvas');faceMap.width=256;faceMap.height=400;const pen=faceMap.getContext('2d');pen.fillStyle='#e2e4de';pen.fillRect(0,0,256,400);pen.fillStyle='#243c48';pen.font='bold 77px sans-serif';pen.fillText('ODC',18,96);pen.fillRect(20,120,216,11);pen.font='bold 45px sans-serif';pen.fillText('01',20,188);pen.fillStyle='#c67c47';pen.fillRect(20,320,216,23);
- const decal=mat('#fff',.12,.62);decal.map=new T.CanvasTexture(faceMap);decal.map.colorSpace=T.SRGBColorSpace;
- for(const a of [0,Math.PI]){const plate=mesh(lower,new T.PlaneGeometry(baseR*.62,baseR*.98),decal,baseR*1.007*Math.sin(a),baseY+stage1*.61,baseR*1.007*Math.cos(a),'launcher');plate.rotation.y=a;}
+
  }
  if(parallel)falconRecovery(lower,baseR,baseY,stage1);
  }
@@ -188,13 +193,13 @@ export function makeLaunch(h){
  const bay=fitOutBay({facility,tower,halves,unit,R,baseR,baseY,maxH,h,profile,layout,box,tube,mesh,cylinder,mat,steel,rib,dark,gold,black});
  root.traverse(o=>{if(o.isMesh){o.receiveShadow=true;o.castShadow=o.geometry.type!=='PlaneGeometry'&&o.material.transparent!==true;}});
  function update(s,chapter,context={}){
-  let phase=s.flightPhase||(s.t< -600?'integration':s.t<0?'pad':s.t<540?'ascent':s.t<900?'insertion':s.t<1200?'commissioning':'operations');
+  let phase=s.flightPhase||(s.t< -600?'integration':s.t<0?'pad':s.t<INSERTION_MET?'ascent':s.t<900?'insertion':s.t<1200?'commissioning':'operations');
   const reference=!['integration','pad','ascent','insertion','commissioning','deorbit','entry','infeasible'].includes(phase);
   const vehicleStudy=context.domain==='launcher'&&reference,integration=!vehicleStudy&&(phase==='integration'||reference),pad=phase==='pad'||vehicleStudy,asc=phase==='ascent',insert=phase==='insertion',commission=phase==='commissioning';
   const directCraft=commission||['deorbit','entry','infeasible'].includes(phase);
-  const t=s.t,fx=launchEffectsAt(t,d.launcher,d.launchSite),up=asc?clamp(t/540):0,level=asc?Math.max(0,s.altitudeKm||0):0;
-  envelope.visible=integration||context.phase==='D'&&context.domain&&context.domain!=='launcher'&&context.domain!=='conops'&&(pad||asc&&t<230);facility.visible=integration;tower.visible=pad||(asc&&t<35);lower.visible=pad||(asc&&(single||t<separationT+45))||(single&&insert);upper.visible=!single&&!integration&&!directCraft;payload.visible=!directCraft;shell.visible=integration||pad||(asc&&(star||t<fairingT+46))||(star&&insert);
-  parked.visible=reference;referenceParts.forEach(o=>o.visible=reference);const opening=reference&&!vehicleStudy?.80:integration?clamp((-600-t)/2400)*.90:asc&&!star?clamp((t-fairingT)/46):star&&insert?clamp((t-540)/35):0;
+  const t=s.t,fx=launchEffectsAt(t,d.launcher,d.launchSite),up=asc?clamp(t/INSERTION_MET):0,level=asc?Math.max(0,s.altitudeKm||0):0;
+  envelope.visible=integration||context.phase==='D'&&context.domain&&context.domain!=='launcher'&&context.domain!=='conops'&&(pad||asc&&(star||t<fairingT));facility.visible=integration;tower.visible=pad||(asc&&t<35);lower.visible=pad||(asc&&(single||t<separationT+45))||(single&&insert);upper.visible=!single&&!integration&&!directCraft;payload.visible=!directCraft;shell.visible=integration||pad||(asc&&(star||t<fairingT+46))||(star&&insert);
+  parked.visible=reference;referenceParts.forEach(o=>o.visible=reference);const opening=reference&&!vehicleStudy?.80:integration?clamp((-600-t)/2400)*.90:asc&&!star?clamp((t-fairingT)/46):star&&insert?clamp((t-clock.doorOpen)/(clock.release-clock.doorOpen)):0;
   const working=phase==='integration',groundTime=h.payloadInterface.passes?t:Math.min(t,-3000),seq=working?integrationState(groundTime):null,pose=working?bayHandlingPose(h,layout,seq):null;
   bay.update(pose?.opening??opening,context.domain,working,seq,pose);ship?.openDoor(working?0:opening);halves.forEach(({g,side})=>{
    // Stow each half across the aisle; the crane approaches the ring along X.
@@ -211,10 +216,10 @@ export function makeLaunch(h){
   const lag=asc?allH*.34*(1-Math.exp(-rise/(allH*.34)))*(1-clamp((t-10)/16)):0;
   stage.position.y=lag;tower.position.y=asc?lag-rise:0;ground.update(t,fx,(pad&&!vehicleStudy||asc)&&!reference);wake.update(t,fx,asc);
 
-  const release=clamp((t-(star?575:540))/60);upper.position.y=insert?-release*stage2*1.5:0;if(single&&insert)lower.position.y=-clamp((t-540)/60)*baseR*4;shell.position.y=star?upper.position.y:0;payload.position.x=star&&insert?release*baseR*3.5:0;
+  const release=clamp((t-clock.release)/(clock.releaseClear-clock.release));upper.position.y=insert?-release*stage2*1.5:0;if(single&&insert)lower.position.y=-release*baseR*4;shell.position.y=star?upper.position.y:0;payload.position.x=star&&insert?release*baseR*3.5:0;
   payload.position.y=insert?release*R*1.45:0;
-  if(merged){merged.visible=(asc||pad&&!vehicleStudy&&!reference)&&fx.ignition>.06&&t<140;merged.scale.set(1+up*.33,Math.max(.01,fx.ignition)*(1+.03*Math.sin(5*t)),1+up*.33);}
-  flames.forEach(({fire,p},i)=>{const hotStaging=star&&p===lower&&t>=140&&t<142;
+  if(merged){merged.visible=(asc||pad&&!vehicleStudy&&!reference)&&fx.ignition>.06&&t<clock.hotStage;merged.scale.set(1+up*.33,Math.max(.01,fx.ignition)*(1+.03*Math.sin(5*t)),1+up*.33);}
+  flames.forEach(({fire,p},i)=>{const hotStaging=star&&p===lower&&t>=clock.hotStage&&t<clock.coreCutoff;
    const throttle=hotStaging?(i<3?1:0):p===lower?fx.ignition:p===upper?fx.upperPower:fx.boosterPower;
    fire.visible=!!throttle&&(asc||pad&&!vehicleStudy&&!reference);if(!fire.visible)return;
    const pulse=1+.055*Math.sin(9*t+i*.69)+.023*Math.sin(t*13.2-i);
@@ -244,5 +249,5 @@ export function makeLaunch(h){
   const backdrop=integration?'hangar':pad||asc&&level<15?'ground':asc&&level<95?'sky':'space';
   return {center,half:zoomH,environment:backdrop,directCraft,reference,vehicleStudy,phase,opening:pose?.opening??opening,bayTime:working?t:null,launchFX:fx};
  }
- return {root,update,bay,faceLaunchClouds(camera){ground.faceClouds(camera);wake.faceClouds(camera);},geometry:{heightM:allH,diameterM:baseR*2,upperLengthM:stage2,lowerLengthM:stage1,stages:fleet.stages,sideBoosters:boosters.length},parts:{payload,fitting,liveMount,shell,facility,tower,stage,lower,upper,boosterBase,sideOutlines,boosters:boosters.map(q=>q.br)}};
+ return {root,update,bay,faceLaunchClouds(camera){ground.faceClouds(camera);wake.faceClouds(camera);},geometry:{heightM:allH,diameterM:baseR*2,upperLengthM:stage2,lowerLengthM:stage1,stages:fleet.stages,sideBoosters:boosters.length},parts:{payload,fitting,liveMount,shell,fairingPatch,facility,tower,stage,lower,upper,boosterBase,sideOutlines,boosters:boosters.map(q=>q.br)}};
 }

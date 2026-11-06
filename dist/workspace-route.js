@@ -4,6 +4,7 @@ import {chapters} from './flight-chapters.js';
 import {phases,chapterPhase} from './lifecycle.js';
 import {domains} from './domain-analysis.js';
 import {DEPLOY_START_S} from './commissioning-clock.js';
+import {DAY} from './orbit.js';
 
 export function entryRoute(query){
  const selected=chapters.find(item=>item.id===query.get('chapter'));
@@ -26,6 +27,12 @@ export function entryClock(view,query,sim){
  if(view.phase==='D')return view.chapter==='pad'?-8:stage.start;
  if(view.phase==='F'||view.chapter==='commissioning')return stage.start;
  return stage?.instant??3438;
+}
+
+// Keep the visitor's study interval until the cursor crosses its boundary.
+export function windowStartFor(cursor,start,duration){
+ const shift=Math.floor((cursor-start)/DAY);
+ return Math.max(0,Math.min(Math.max(0,duration-DAY),start+shift*DAY));
 }
 
 const checkpointKey='odc-workspace-v1';

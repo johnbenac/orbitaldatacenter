@@ -26,7 +26,13 @@ for(const s of sample){
  if(s.eclipse){near(s.radiatorDirectSolarKW,0);assert.ok(s.radiatorEarthIRKW>0);}
 }
 near(day.energyKWh.absorbed,day.energyKWh.radiatorDirectSolar+day.energyKWh.radiatorAlbedo+day.energyKWh.radiatorEarthIR,1e-6);
-const shifted=sim.daySummary(1234.5);
+const start=1234.5,shifted=sim.daySummary(start);
+assert.deepEqual(Object.keys(shifted).sort(),Object.keys(day).sort());
+for(const key of ['minSocTime','maxJunctionTime','peakQueueTime','peakMomentumTime'])assert.ok(shifted[key]>=start&&shifted[key]<=start+DAY,key);
+near(shifted.minMomentumMarginNms+shifted.peakMomentumNms,d.cmgMomentumNms,1e-6);
+near(shifted.deliveredGB,sim.at(start+DAY).deliveredGB-sim.at(start).deliveredGB,1e-8);
+assert.ok(shifted.activeComputeSeconds>0&&shifted.activeComputeSeconds<=DAY);
+assert.ok(shifted.payloadServiceSeconds>0&&shifted.payloadServiceSeconds<=DAY);
 near(Object.values(shifted.attitudeModeSeconds).reduce((a,b)=>a+b,0),DAY,1e-5);
 near(shifted.energyKWh.absorbed,shifted.energyKWh.radiatorDirectSolar+shifted.energyKWh.radiatorAlbedo+shifted.energyKWh.radiatorEarthIR,1e-6);
 const changing=createSimulation({...d,attitude:'lowdrag'}),second=changing.daySummary(0);

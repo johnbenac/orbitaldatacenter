@@ -25,3 +25,50 @@
 .mel-additional{border-top:1px solid var(--mel-edge);margin-top:6px;padding-top:5px}
 .mech-planes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0}.mech-planes svg{width:100%;background:#15212a;border:1px solid #354752;border-radius:7px}.mech-planes svg text{fill:#c5d5d8;font:11px var(--mono)}.mech-legend,.mech-explain{font-size:12px;color:#b5c4ca;margin:8px 0}.mech-legend b{color:#f3b463}.mech-filters{display:flex!important;flex-wrap:wrap;gap:10px}.mech-filters label{flex:1;min-width:150px}.mec .mel-table th small{display:block;margin-bottom:2px}.mech-end{margin:14px 0;padding:16px;line-height:1.55}.mech-end h3{margin:.35rem 0}.mech-end p{color:var(--soft);margin:10px 0}.mech-end .mel-scroll{margin:14px 0}.mech-metrics strong{font-size:clamp(12px,1.1vw,18px)!important}.mel-views{flex-wrap:wrap}
 @media(max-width:700px){.mech-planes{grid-template-columns:repeat(2,minmax(0,1fr))}.mech-planes svg:last-child{grid-column:1/-1;max-width:50%}.mech-end{padding:12px}}
+
+/* The three views share station identities with the equipment table below. */
+.mech-plot-head{padding:16px 18px 0}
+.mech-plot-head h3{font-size:16px;line-height:1.2;margin:0 0 5px}
+.mech-plot-head p{margin:0;color:#bed0d4;font-size:12px;line-height:1.5}
+.mec .mech-planes{margin:10px 12px}
+.mec .mech-legend,.mec .mech-explain{margin:8px 18px;line-height:1.5}
+.mec .mech-explain{max-width:100ch;margin-bottom:15px}
+.mech-planes svg text{pointer-events:none}
+.mech-mark{cursor:pointer;outline:none}
+.mech-mark>*{pointer-events:none}
+.mech-mark .mech-hit{fill:transparent;pointer-events:all}
+.mech-dot{fill-opacity:.9}
+.mech-stack{fill:none;stroke:#c9d9da;stroke-opacity:.7;stroke-width:.9;stroke-dasharray:1.4 2.2}
+.mech-halo{fill:none;stroke:#a1f4e4;stroke-width:1.8;opacity:0}
+.mech-mark:is(.is-inspected,:focus-visible) .mech-halo{opacity:1;animation:mech-identify 1s ease-out 2}
+@keyframes mech-identify{from{transform:scale(.82);stroke-width:3}to{transform:scale(1);stroke-width:1.8}}
+.mech-station-list{display:grid;gap:3px;margin-top:6px}
+.mec .mel-table .mech-station-entry{padding:4px 6px;border-left:2px solid #3e5159;text-align:left}
+.mec .mel-table .mech-station-entry b{font-size:11px}
+.mec :is([data-mech-row],.mech-station-entry,[data-mount-label]){scroll-margin:clamp(70px,20vh,150px) 0 24px}
+.mec [data-mount-label]:focus-visible{outline:2px solid #9ae8da;outline-offset:-2px}
+.mec .mech-arrival,.mec tr.mech-arrival>*{background-color:#2a4847;animation:mech-found .85s ease-out 2}
+.mec .mech-station-entry.mech-arrival{border-left-color:#9be9d8}
+@keyframes mech-found{0%,100%{background-color:#2a4847}35%{background-color:#416760}}
+.mech-inspector{position:fixed;z-index:1700;box-sizing:border-box;width:max-content;max-width:min(355px,calc(100vw - 20px));max-height:min(60vh,450px);overflow:auto;background:#111f26;color:#e5f3f1;border:1px solid #71a9a3;border-radius:8px;box-shadow:0 6px 28px #071015a8;padding:11px 14px;font:12px/1.45 var(--sans,system-ui);pointer-events:none;text-align:left}
+.mec .mech-inspector[hidden],.mech-inspector [hidden]{display:none!important}
+.mech-inspector-title{display:block;color:#eff9f5;font-size:13px;font-weight:650;line-height:1.35}
+.mech-inspector-facts,.mech-inspector-help{display:block;color:#c6d5d7;margin-top:4px}
+.mech-inspector-help{color:#9fd6cc;font-size:11px}
+.mech-inspector.is-picker{pointer-events:auto;display:flex;flex-direction:column;gap:5px;width:min(355px,calc(100vw - 20px));max-height:min(52dvh,440px);padding:12px}
+.mech-inspector.is-picker .mech-inspector-title{padding-right:28px}
+.mech-inspector-options{display:grid;gap:3px;overflow-y:auto;overscroll-behavior:contain;min-height:0;scrollbar-color:#4d6768 #16242a}
+.mech-inspector-option,.mech-inspector-close,.mech-inspector-filter{font:inherit;color:inherit}
+.mech-inspector-option{display:block;width:100%;padding:7px 9px;text-align:left;line-height:1.4;background:#1b2c33;border:1px solid #35494f;border-radius:4px;cursor:pointer}
+.mech-inspector-option:hover,.mech-inspector-option:focus-visible{border-color:#8bd7c8;background:#263f42}
+.mech-inspector-option strong,.mech-inspector-option small{display:block}
+.mech-inspector-option strong{font-size:12px;font-weight:550}
+.mech-inspector-option small{color:#b7cacf;font:10px/1.5 var(--mono)}
+.mech-inspector-filter{padding:6px 8px;min-width:0;background:#15262e;border:1px solid #526971;border-radius:4px}
+.mech-inspector-close{position:absolute;right:7px;top:7px;display:grid;place-items:center;width:28px;height:28px;border:1px solid #425a5d;border-radius:4px;cursor:pointer}
+@media(max-width:580px){.mech-plot-head{padding-inline:12px}.mec .mech-planes{margin-inline:6px;gap:4px}.mec .mech-explain,.mec .mech-legend{margin-inline:12px}}
+@media(prefers-reduced-motion:reduce){.mech-mark.is-inspected .mech-halo,.mech-mark:focus-visible .mech-halo,.mec .mech-arrival,.mec tr.mech-arrival>*{animation:none}}
+
+.mech-back-to-plot{display:block;width:max-content;max-width:100%;margin-top:6px;padding:3px 7px;line-height:1.4;color:#b8eee4;background:#223b3d;border:1px solid #52847f;border-radius:4px;font-size:11px;text-transform:none;letter-spacing:normal;cursor:pointer}
+.mech-back-to-plot::before{content:'↩ ';color:#9be5d7}
+.mech-back-to-plot:hover,.mech-back-to-plot:focus-visible{border-color:#9be5d7;color:#f2fffd}

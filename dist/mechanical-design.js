@@ -1,7 +1,9 @@
+import {launchClockFor} from './launch-effects-state.js';
 import {renderLaunchStructure} from './launch-structure.js';
 import {buildEquipmentList,filterEquipmentRows} from './equipment-list.js';
 import {componentMassProperties,equipmentAllocations} from './component-stations.js';
 import {entryDensity} from './entry.js';
+import {bindStationInspector} from './mass-station-inspector.js';
 
 const phaseInfo={
  A:['Mechanical design requirements','Inspect the launch manifest, structural envelope and center-of-mass datum of the selected design.'],
@@ -19,7 +21,7 @@ const sectionPhase=phase=>phase==='A'?'launch':phase==='B'?'deployed':'current';
 function pose(h,s,key){
  if(key==='launch')return [h.propellantKg,0,true];
  if(key==='deployed')return [h.propellantKg,1,false];
- return [s?.propellantKg??h.propellantKg,s?.deployment??1,(s?.t??540)<540];
+ return [s?.propellantKg??h.propellantKg,s?.deployment??1,s?.carrierAttached??(s?.t??Infinity)<launchClockFor(h.input.launcher).release];
 }
 function stateFor(h,s,mode){
  const [remaining,progress,adapter]=pose(h,s,mode);
@@ -89,15 +91,48 @@ export function exportMechanical(h,s,phase,context={}){
   rows:p.rows.map(r=>({wbs:r.wbs,equipmentKg:r.massKg,predictedKg:r.predictedKg,centerM:r.centroidM,stationsM:r.stationsM,stationMassFractions:r.stationShares})),...(phase==='F'?{demisability:demiseScreen(h,s,context)}:{})};
 }
 const tones=['#85aee3','#a4d779','#dcab7b','#b8a0e7','#8bd5ce','#df9a7d','#95a9b2','#f2ce7d','#aab8c1'];
-function projection(h,rows,total,selection,axis){
- const zAxis=axis===2?1:2,a=axis===2?0:axis; // transverse coordinate across the panel; longitudinal Z vertical in side views.
- const label=['X','Y','Z'],dims=[h.bodyWidthM,h.bodyHeightM,h.bodyLengthM],w=300,y=108,pts=[selection.all,...rows.flatMap(r=>r.stationsM)];
- const maxH=Math.max(dims[a]/2,...pts.map(p=>Math.abs(p[a]))),maxV=Math.max(dims[zAxis]/2,...pts.map(p=>Math.abs(p[zAxis])));
- const scale=Math.min(117/Math.max(maxH,.05),76/Math.max(maxV,.05)),cx=w/2,X=v=>cx+v*scale,Y=v=>y-v*scale;
- const box='<rect x="'+X(-dims[a]/2)+'" y="'+Y(dims[zAxis]/2)+'" width="'+dims[a]*scale+'" height="'+dims[zAxis]*scale+'" fill="#253641" stroke="#758b92"/>';
- const dots=rows.map(r=>r.stationsM.map((pt,j)=>'<circle cx="'+X(pt[a])+'" cy="'+Y(pt[zAxis])+'" r="'+(2+Math.min(5,Math.sqrt(r.predictedKg*r.stationShares[j]/Math.max(total,1))*12))+'" fill="'+tones[parseInt(r.wbs)-1]+'" fill-opacity=".77"><title>'+esc(r.item)+' · '+f(r.massKg*r.stationShares[j])+' kg installed · '+vec(pt)+' m</title></circle>').join('')).join('');
- const point=(p,mark)=>p?'<g transform="translate('+X(p[a])+' '+Y(p[zAxis])+')">'+(mark?'<path d="m0-6 6 6-6 6-6-6z" fill="none" stroke="#f3b463" stroke-width="2"/>':'<circle r="5" stroke="white" fill="#10161d"/><path d="M-8 0H8M0-8V8" stroke="white"/>')+'</g>':'';
- return '<svg viewBox="0 0 300 198" role="img" aria-label="'+label[a]+' and '+label[zAxis]+' mounting stations"><text x="10" y="17">'+label[a]+'–'+label[zAxis]+' plane</text>'+box+'<path d="M15 '+y+' H285M'+cx+' 26 V189" stroke="#61747a" stroke-dasharray="2 5"/>'+dots+point(selection.all,false)+point(selection.part,true)+'<text x="277" y="'+(y-5)+'">+'+label[a]+'</text><text x="'+(cx+4)+'" y="29">+'+label[zAxis]+'</text></svg>';
+const stationUnits={'01.01':'Tray','01.02':'Tray','02.01':'Wing','02.02':'Pack','03.01':'Bank','04.01':'Gyro','05.01':'Patch','06.01':'Engine'};
+function installedStations(h,row){
+ return row.stationsM.map((pt,i)=>{
+  const n=i+1,kg=row.massKg*row.stationShares[i];
+  const name=(row.wbs==='06.08'?['Fuel ullage','Oxidizer ullage','Helium bottle'][i]:row.wbs==='07.01'?h.enclosure.frameLabels[i]:null)||((stationUnits[row.wbs]||'Station')+' '+n);
+  const label=row.stationsM.length===1?row.item:row.item+' · '+name;
+  return {id:'mech-station-'+row.wbs.replace('.','-')+'-'+n,n,name,label,pt,kg,
+   facts:f(kg)+' kg installed · X '+f(pt[0],3)+' / Y '+f(pt[1],3)+' / Z '+f(pt[2],3)+' m',
+   tone:tones[parseInt(row.wbs)-1],predictedKg:row.predictedKg*row.stationShares[i]};
+ });
+}
+function projection(h,stations,total,selection,axis){
+ const planes=[[0,2],[1,2],[0,1]],[a,b]=planes[axis],labels=['X','Y','Z'],name=labels[a]+'–'+labels[b];
+ const dims=[h.bodyWidthM,h.bodyHeightM,h.bodyLengthM];
+ let maxH=Math.max(dims[a]/2,Math.abs(selection.all[a])),maxV=Math.max(dims[b]/2,Math.abs(selection.all[b]));
+ for(const {pt} of stations){maxH=Math.max(maxH,Math.abs(pt[a]));maxV=Math.max(maxV,Math.abs(pt[b]))}
+ const scale=Math.min(117/Math.max(maxH,.05),76/Math.max(maxV,.05)),X=v=>150+v*scale,Y=v=>108-v*scale;
+ const groups=new Map();
+ for(const st of stations){
+  const x=X(st.pt[a]),y=Y(st.pt[b]),key=x.toFixed(5)+','+y.toFixed(5);
+  if(!groups.has(key))groups.set(key,{x,y,members:[],largest:st});
+  const group=groups.get(key);group.members.push(st.id);
+  if(st.predictedKg>group.largest.predictedKg)group.largest=st;
+ }
+ let first=true;
+ function mark(x,y,members,label,art){
+  const tab=first?0:-1;first=false;
+  return `<g class="mech-mark" data-mount="${members[0]}" data-members="${members.join(' ')}" data-x="${x}" data-y="${y}" transform="translate(${x} ${y})" role="button" tabindex="${tab}" aria-label="${esc(label)}"><circle class="mech-hit" r="8"/>${art}<circle class="mech-halo" r="9"/></g>`;
+ }
+ const dots=Array.from(groups.values(),({x,y,members,largest})=>{
+  const radius=2+Math.min(5,Math.sqrt(largest.predictedKg/Math.max(total,1))*12);
+  const stacked=members.length>1;
+  const art=`<circle class="mech-dot" r="${radius}" fill="${largest.tone}"/>`+(stacked?`<circle class="mech-stack" r="${radius+2}"/>`:'');
+  return mark(x,y,members,stacked?members.length+' equipment stations at this point. Choose a station.':largest.label,art);
+ }).join('');
+ function centerMark(pt,filtered){
+  if(!pt)return '';
+  const label=filtered?'Selected center of mass':'Vehicle center of mass',id=filtered?'mech-cm-filtered':'mech-cm-all';
+  const art=filtered?'<path d="m0-6 6 6-6 6-6-6z" fill="none" stroke="#f3b463" stroke-width="2"/>':'<circle r="5" stroke="white" fill="#10161d"/><path d="M-8 0H8M0-8V8" stroke="white"/>';
+  return mark(X(pt[a]),Y(pt[b]),[id],label,art);
+ }
+ return `<svg viewBox="0 0 300 198" data-mech-plane="${axis}" role="group" aria-label="${name} mounting stations" aria-describedby="mech-inspect-help"><text x="10" y="17">${name} plane</text><rect x="${X(-dims[a]/2)}" y="${Y(dims[b]/2)}" width="${dims[a]*scale}" height="${dims[b]*scale}" fill="#253641" stroke="#758b92"/><path d="M15 108 H285M150 26 V189" stroke="#61747a" stroke-dasharray="2 5"/>${dots}${centerMark(selection.all,false)}${centerMark(selection.part,true)}<text x="277" y="103">+${labels[a]}</text><text x="154" y="29">+${labels[b]}</text></svg>`;
 }
 function disposal(h,s,context){
  const a=demiseScreen(h,s,context);
@@ -107,37 +142,50 @@ function disposal(h,s,context){
  const details=a.rows.map(r=>'<tr><th>'+r.item+'<small>'+r.material+' · '+r.count+' article'+(r.count===1?'':'s')+'</small></th><td>'+f(r.modeledKg)+'<small>'+f(r.share*100)+'% of '+r.wbs+'</small></td><td>'+f(r.betaKgM2)+'</td><td>'+f(r.thresholdMJ)+'</td><td>'+f(r.lowHeatMJ)+'–'+f(r.highHeatMJ)+'</td><td>'+r.outcome+'</td></tr>').join('');
  return '<section class="panel mech-end"><span class="mel-eyebrow">TARGETED REENTRY · MATERIAL SENSITIVITY</span><h3>Component demisability</h3><p>Does a released component receive enough convective energy to melt? The screen covers <strong>'+f(a.modeledKg)+' kg ('+f(100*a.modeledKg/a.dryPhysicalKg,1)+'%)</strong> of '+f(a.dryPhysicalKg)+' kg of installed dry hardware. '+f(a.unassessedKg)+' kg remains unassessed, including the flexible solar laminate and composite booms, electronics, batteries, fluid lines and unresolved portions of mixed assemblies. Consumable fluids and the launch adapter are outside the dry hardware total.</p><div class="mel-scroll"><table class="mel-table"><thead><tr><th>Article and material proxy</th><th>Screened kg</th><th>Ballistic coefficient · kg/m²</th><th>Energy to melt one · MJ</th><th>Heat exposure per article · MJ</th><th>Thermal screen</th></tr></thead><tbody>'+details+'</tbody></table></div><details><summary>Material, release and heating assumptions</summary><p>Release speed '+f(a.releaseSpeedMs,0)+' m/s · '+a.speedBasis+'. All cases start at 300 K. Release altitude and downward flight angle pairs are 70 km / 8°, 78 km / 5° and 85 km / 2°. Drag coefficient is 1.2. Titanium and steel use 1,940 / 1,750 K melting points, 650 / 600 J/(kg·K) heat capacities and 295 / 270 kJ/kg latent heats. The aluminum surrogate uses 933 K, 900 J/(kg·K) and 397 kJ/kg.</p><p>'+a.rows[0].shapeNote+' '+a.rows[3].shapeNote+' '+a.rows[4].shapeNote+' The 35% solar substrate and 65% radiator metal fractions are study assumptions.</p><p>Convective stagnation heating is integrated over the projected area along a constant-angle, drag-only path until speed falls below 1 km/s. Radiation losses, shielding, interactions, fragmentation and shedding are unresolved. This screening result cannot predict surviving fragment mass, casualties or impact locations. <a href="'+tankLink+'" target="_blank" rel="noopener">NASA tank survivability ↗</a> · <a href="'+heatingLink+'" target="_blank" rel="noopener">NASA heating correlation ↗</a> · <a href="'+methodLink+'" target="_blank" rel="noopener">NASA ORSAT ↗</a> · <a href="https://webbook.nist.gov/cgi/cbook.cgi?ID=C7429905&amp;Mask=2" target="_blank" rel="noopener">NIST aluminum phase data ↗</a></p></details></section>';
 }
-function stationName(r){
- if(r.stationsM.length===1)return esc(r.item);
- const labels=r.wbs==='06.08'?['Fuel ullage','Oxidizer ullage','Helium bottle']:[];
- return '<details data-station="'+r.wbs+'"><summary>'+esc(r.item)+'</summary><small>'+r.stationsM.map((p,i)=>esc(labels[i]||(['01.01','01.02'].includes(r.wbs)?'Tray ':'Station ')+(i+1))+' · '+f(r.massKg*r.stationShares[i])+' kg · '+vec(p)+' m').join('<br>')+'</small></details>';
+function anchorAttrs(st,wbs){
+ return `id="${st.id}" tabindex="-1" data-wbs="${wbs}" data-station-index="${st.n}" data-mount-label="${esc(st.label)}" data-mount-facts="${esc(st.facts)}"`;
 }
-function report(h,s,phase,key,filter){
+function equipmentRow(r,reference){
+ const single=r.stations.length===1;
+ const name=single?esc(r.item):`<details data-station="${r.wbs}"><summary>${esc(r.item)}</summary><div class="mech-station-list">${r.stations.map(st=>
+  `<div class="mech-station-entry" ${anchorAttrs(st,r.wbs)}><b>${esc(st.name)}</b><small>${f(st.kg)} kg · ${vec(st.pt)} m</small></div>`).join('')}</div></details>`;
+ return `<tr data-mech-row="${r.wbs}" ${single?anchorAttrs(r.stations[0],r.wbs):''}><th scope="row"><small>${r.wbs}</small>${name}</th><td>${esc(reference)}</td><td>${f(r.massKg)}</td>${r.centroidM.map(v=>'<td>'+f(v,3)+'</td>').join('')}</tr>`;
+}
+export function renderMassReport(h,s,phase,key,filter={}){
  const p=stateFor(h,s,key),reg=buildEquipmentList(h,s),meta=new Map(reg.rows.map(r=>[r.wbs,r])),chosen=new Set(filterEquipmentRows(reg.rows,filter).map(r=>r.wbs));
- const rows=p.rows.filter(r=>chosen.has(r.wbs)&&r.massKg>0).map(r=>({...r,item:meta.get(r.wbs).item})),selected=center(rows);
+ const rows=p.rows.filter(r=>chosen.has(r.wbs)&&r.massKg>0).map(r=>({...r,item:meta.get(r.wbs).item}));
+ for(const row of rows)row.stations=installedStations(h,row);
+ const stations=rows.flatMap(r=>r.stations),cm=center(rows).cm;
  const z0=h.fairing.stack.find(v=>/insulated bus/i.test(v.part))?.z0M||0;
- const cm=selected.cm;
- const tiles=[['Vehicle center of mass',vec(p.cm)+' m'],['Selected center of mass',cm?vec(cm)+' m':'—'],['Selected equipment',f(rows.reduce((a,r)=>a+r.massKg,0))+' kg'],[p.adapterAttached?'Stack CM above interface':'Remaining propellant',p.adapterAttached?f(z0+h.bodyLengthM*.5+p.cm[2])+' m':f(p.remainingKg)+' kg']];
- return '<div class="mel-cards mech-metrics">'+tiles.map(([l,v])=>'<div><small>'+l+'</small><strong>'+v+'</strong></div>').join('')+'</div><div class="mech-planes">'+[0,1,2].map(a=>projection(h,rows,p.massKg,{all:p.cm,part:cm},a)).join('')+'</div><p class="mech-legend">⊕ Entire vehicle CM &nbsp; <b>◇</b> Filtered CM &nbsp; ● Equipment mass stations &nbsp; ▭ Bus envelope</p>'
- +'<p class="mech-explain">Coordinates are metres from the bus center. +Z points from the adapter toward the fairing tip. Each WBS line contributes mass × position. The model assigns the dry budget allowance proportionally to installed hardware when calculating the predicted vehicle center. Consumables and the detachable adapter retain their own stations.</p>'
- +'<div class="mel-scroll" tabindex="0" aria-label="Filtered mechanical equipment"><table class="mel-table"><thead><tr><th>WBS / component</th><th>Reference model or part</th><th>Physical mass · kg</th><th>X · m</th><th>Y · m</th><th>Z · m</th></tr></thead><tbody>'+rows.map(r=>'<tr><th><small>'+r.wbs+'</small>'+stationName(r)+'</th><td>'+esc(meta.get(r.wbs).referenceModel)+'</td><td>'+f(r.massKg)+'</td>'+r.centroidM.map(v=>'<td>'+f(v,3)+'</td>').join('')+'</tr>').join('')+'</tbody></table>'+(!rows.length?'<p class="mel-none">No installed items match this selection.</p>':'')+'</div>';
+ const tiles=[['Vehicle center of mass',vec(p.cm)+' m','mech-cm-all'],['Selected center of mass',cm?vec(cm)+' m':'—',cm?'mech-cm-filtered':null],['Selected equipment',f(rows.reduce((a,r)=>a+r.massKg,0))+' kg'],[p.adapterAttached?'Stack CM above interface':'Remaining propellant',p.adapterAttached?f(z0+h.bodyLengthM*.5+p.cm[2])+' m':f(p.remainingKg)+' kg']];
+ return '<div class="mel-cards mech-metrics">'+tiles.map(([l,v,id])=>`<div${id?` id="${id}" tabindex="-1" data-mount-label="${l}" data-mount-facts="Body X / Y / Z · ${v}"`:''}><small>${l}</small><strong>${v}</strong></div>`).join('')+'</div>'
+ +'<div class="mech-plot-head"><h3>Equipment mass stations</h3><p id="mech-inspect-help">Hover over a point to identify it. Select it to find its table entry. A dotted ring groups stations that line up in this view.<span class="mel-sr"> Use the arrow keys to explore each plane and Enter to select.</span></p></div>'
+ +'<div class="mech-planes">'+[0,1,2].map(a=>projection(h,stations,p.massKg,{all:p.cm,part:cm},a)).join('')+'</div><p class="mech-legend">⊕ Vehicle center of mass &nbsp; <b>◇</b> Selected center of mass &nbsp; ▭ Bus envelope</p>'
+ +'<p class="mech-explain">Coordinates are metres from the bus center. +Z points from the adapter toward the fairing tip. Each equipment line contributes its mass times its position. The model distributes the dry budget allowance across installed hardware when predicting the vehicle center. Consumables and the detachable adapter retain their own stations.</p>'
+ +'<div class="mel-scroll" tabindex="0" aria-label="Filtered mechanical equipment"><table class="mel-table"><thead><tr><th>WBS / component</th><th>Reference model or part</th><th>Physical mass · kg</th><th>X · m</th><th>Y · m</th><th>Z · m</th></tr></thead><tbody>'+rows.map(r=>equipmentRow(r,meta.get(r.wbs).referenceModel)).join('')+'</tbody></table>'+(!rows.length?'<p class="mel-none">No installed items match this selection.</p>':'')+'</div>';
 }
 export function renderMechanical(h,s,phase,context={}){
  const [title,desc]=phaseInfo[phase],key=sectionPhase(phase);
- return (['B','C','D'].includes(phase)?renderLaunchStructure(h,'mechanical',['B','C'].includes(phase)):'')+'<section class="mel mec" data-mechanical><header class="mel-header"><div><span class="mel-eyebrow">Mechanical design / Phase '+phase+'</span><h2>'+title+'</h2><p>'+desc+'</p></div></header><div class="mel-controls mech-filters"><label>Find component or part<input type="search" data-mech-find placeholder="Name, WBS, supplier or part number"></label><label>Subsystem<select data-mech-sub><option value="">All subsystems</option>'+buildEquipmentList(h).subsystems.map(r=>'<option>'+esc(r.name)+'</option>').join('')+'</select></label><label>Configuration viewed<select data-mech-pose>'+Object.entries(massCases).filter(([v])=>phase==='C'||v===key).map(([v,l])=>'<option value="'+v+'" '+(v===key?'selected':'')+'>'+l+'</option>').join('')+'</select></label></div><div data-mech-report>'+report(h,s,phase,key,{})+'</div></section>'+(phase==='F'?disposal(h,s,context):'');
+ return (['B','C','D'].includes(phase)?renderLaunchStructure(h,'mechanical',['B','C'].includes(phase)):'')+'<section class="mel mec" data-mechanical><header class="mel-header"><div><span class="mel-eyebrow">Mechanical design / Phase '+phase+'</span><h2>'+title+'</h2><p>'+desc+'</p></div></header><div class="mel-controls mech-filters"><label>Find component or part<input type="search" data-mech-find placeholder="Name, WBS, supplier or part number"></label><label>Subsystem<select data-mech-sub><option value="">All subsystems</option>'+buildEquipmentList(h).subsystems.map(r=>'<option>'+esc(r.name)+'</option>').join('')+'</select></label><label>Configuration viewed<select data-mech-pose>'+Object.entries(massCases).filter(([v])=>phase==='C'||v===key).map(([v,l])=>'<option value="'+v+'" '+(v===key?'selected':'')+'>'+l+'</option>').join('')+'</select></label></div><div data-mech-report>'+renderMassReport(h,s,phase,key)+'</div></section>'+(phase==='F'?disposal(h,s,context):'');
 }
 const live=new WeakMap();
 export function bindMechanical(container,h,s,phase){
  const el=container?.matches?.('[data-mechanical]')?container:container?.querySelector?.('[data-mechanical]');if(!el||el.dataset.bound)return;
  el.dataset.bound='1';const elFor=key=>el.querySelector('[data-mech-'+key+']'),query=elFor('find'),sub=elFor('sub'),mode=elFor('pose');
- const ctx={h,s,phase};const refresh=()=>{
+ const ctx={h,s,phase},inspector=bindStationInspector(el);const refresh=()=>{
   const host=elFor('report'),openWB=new Set(Array.from(host.querySelectorAll('details[open]'),e=>e.dataset.station));
-  host.innerHTML=report(ctx.h,ctx.s,ctx.phase,mode.value||sectionPhase(ctx.phase),{query:query.value||'',subsystem:sub.value||''});
+  inspector.beforeRefresh();
+  host.innerHTML=renderMassReport(ctx.h,ctx.s,ctx.phase,mode.value||sectionPhase(ctx.phase),{query:query.value||'',subsystem:sub.value||''});
   for(const detail of host.querySelectorAll('[data-station]'))if(openWB.has(detail.dataset.station))detail.open=true;
+  inspector.afterRefresh();
  };
- query.addEventListener('input',refresh);sub.addEventListener('change',refresh);mode.addEventListener('change',refresh);live.set(el,{ctx,refresh});
+ query.addEventListener('input',refresh);sub.addEventListener('change',refresh);mode.addEventListener('change',refresh);live.set(el,{ctx,refresh,mode});
 }
 export function updateMechanical(container,h,s,phase){
  const el=container?.matches?.('[data-mechanical]')?container:container?.querySelector?.('[data-mechanical]');const state=live.get(el);
- if(state){Object.assign(state.ctx,{h,s,phase});state.refresh()}
+ if(state){
+  const changed=state.ctx.h!==h||state.ctx.phase!==phase;
+  Object.assign(state.ctx,{h,s,phase});
+  if(changed||(state.mode.value||sectionPhase(phase))==='current')state.refresh();
+ }
 }

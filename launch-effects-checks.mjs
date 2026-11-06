@@ -43,7 +43,7 @@ for(const id of ['starship','falconHeavy','ariane64','vulcan6','longMarch5B','gl
  if(fuel.booster)assert(lift.visible.includes(fuel.booster));
  const first=JSON.stringify(lift);sample(78);assert(!ground.visible);sample(-50);assert.equal(JSON.stringify(sample(4.5)),first);
  for(const p of cloud.children.filter(x=>x.visible))assert(Math.abs(p.getWorldQuaternion(new T.Quaternion()).dot(camera.quaternion))>1-1e-10);
- if(id==='starship'){assert.equal(sample(141).colors.length,3);assert.equal(site.trenchOutlets,2);assert(launchEffectsAt(-10,id).water>0);assert(launchEffectsAt(-10,id).ignition===0);}
+ if(id==='starship'){assert.equal(sample(141).colors.length,3+6,'Three booster engines continue to fire while the six ship engines start before separation');assert.equal(site.trenchOutlets,2);assert(launchEffectsAt(-10,id).water>0);assert(launchEffectsAt(-10,id).ignition===0);}
  if(id==='ariane64'){assert(launchEffectsAt(-6.5,id).ignition>0);assert.equal(launchEffectsAt(-6.5,id).boosterPower,0);assert.equal(launchEffectsAt(0,id).boosterPower,1);}
  assert.equal(launchEffectsAt(540,id).upperPower,0);assert.equal(launchEffectsAt(540,id).ignition,0);
 }

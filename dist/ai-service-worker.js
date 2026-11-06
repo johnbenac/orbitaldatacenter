@@ -5,6 +5,7 @@ self.onmessage=({data})=>{
  try{
   const {design,start,span}=data,sim=createSimulation(design);
   if(!Number.isFinite(start)||!Number.isFinite(span)||span<=0||span>90*DAY+.001)throw Error('Service horizon must be positive and at most 90 days.');
+  if(data.acceptedWindow){const {segments,initial,provenance}=data.acceptedWindow;self.postMessage({result:assessServiceSegments(sim.hardware,segments,{start,end:start+span,initial,provenance})});return}
   if(data.firstDay){self.postMessage({result:evaluateService(sim,0,span)});return}
   const begin=Math.max(0,Math.min(sim.duration,start)),end=Math.min(sim.duration,begin+span),totalDays=Math.ceil((end-begin)/DAY);
   const segments=[];let seed=data.initialSeed??sim.serviceSeed(begin),t=begin;

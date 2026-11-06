@@ -1,6 +1,6 @@
 // Exercise the production scene, camera controls and CPU lighting passes without a GPU.
 import assert from 'node:assert/strict';
-import {Object3D} from './dist/vendor/three.module.js';
+import {Object3D,Vector3} from './dist/vendor/three.module.js';
 import {canvas as rasterCanvas} from './render-test-canvas.mjs';
 import {sizeDesign} from './dist/design.js';
 import {createSimulation} from './dist/model.js';
@@ -109,7 +109,8 @@ function cameraFrame(){
  assert.ok(camera,'Expected the scene camera to aim at a pivot');
  const eye=camera.position.clone(),radius=eye.distanceTo(pivot);
  const height=2*(camera.isPerspectiveCamera?radius:1)/camera.projectionMatrix.elements[5];
- return {eye,pivot,radius,height,orthographic:camera.isOrthographicCamera===true};
+ const right=new Vector3().setFromMatrixColumn(camera.matrixWorld,0),up=new Vector3().setFromMatrixColumn(camera.matrixWorld,1);
+ return {eye,pivot,radius,height,right,up,orthographic:camera.isOrthographicCamera===true};
 }
 scene.setBayView('overview',false);
 for(const [view,chapter,t,phase] of [['spacecraft','operations',6402,'E'],['spacecraft','commissioning',1700,'E'],['spacecraft','operations',1700,'C'],['launch','integration',-1500,'D']]){
@@ -121,13 +122,62 @@ for(const [view,chapter,t,phase] of [['spacecraft','operations',6402,'E'],['spac
  fire('pointerdown',40,50,1,1);fire('pointermove',54,61,1,1);fire('pointerup',54,61,1,1);
  const panned=cameraFrame();assert.ok(panned.pivot.distanceTo(zoomed.pivot)>1e-3);
  const y=chapter==='integration'?-125:97;
- fire('pointerdown',40,50);fire('pointermove',139,y);fire('pointerup',139,y);
+ fire('pointerdown',canvas.width/2,canvas.height/2);fire('pointermove',139,y);fire('pointerup',139,y);
  const rotated=cameraFrame();
  assert.ok(rotated.eye.distanceTo(panned.eye)>1,`${chapter}: the drag must rotate the camera`);
  assert.ok(Math.abs(rotated.height/panned.height-1)<1e-8,`${chapter}: drag changed the visible span from ${panned.height} to ${rotated.height}`);
  assert.ok(Math.abs(rotated.radius/panned.radius-1)<1e-8,`${chapter}: drag changed the orbit radius`);
  assert.ok(rotated.pivot.distanceTo(panned.pivot)<1e-8,`${chapter}: drag moved the pan target`);
 }
+// Drag the right-hand rim down to six o'clock. The physical canvas is resized
+// above, so derive the three pointer positions from the actual viewport.
+function rimDrag(){
+ const x=canvas.width/2,y=canvas.height/2,r=.47*Math.min(canvas.width,canvas.height);
+ fire('pointerdown',x+r,y);fire('pointermove',x+r/Math.SQRT2,y+r/Math.SQRT2);
+ fire('pointermove',x,y+r);fire('pointerup',x,y+r);
+}
+const closeVector=(a,b)=>a.distanceTo(b)<1e-7;
+for(const view of ['core','spacecraft','orbit']){
+ scene.setDomain('compute','E');scene.setChapter('operations');scene.setView(view);scene.update(h,snap);scene.resetCamera();
+ canvas.events.wheel({deltaY:-115,preventDefault(){}});
+ // Offset the pivot to catch a roll that orbits a newly fitted center.
+ fire('pointerdown',50,50,1,1);fire('pointermove',57,56,1,1);fire('pointerup',57,56,1,1);
+ const initial=cameraFrame(),legacy=scene.getCameraState()[view].slice(0,6);
+ rimDrag();const rolled=cameraFrame(),saved=JSON.parse(JSON.stringify(scene.getCameraState()));
+ assert(closeVector(initial.eye,rolled.eye)&&closeVector(initial.pivot,rolled.pivot),view+': rim roll moved the sightline');
+ assert(Math.abs(rolled.height/initial.height-1)<1e-8,view+': rim roll changed zoom');
+ assert(closeVector(rolled.right,initial.up),view+': clockwise quarter-turn should map screen up to screen right');
+ if(view==='core'){
+  assert(Math.abs(initial.right.z)<1e-7&&initial.up.z>.5,'Expected longitudinal body Z to start visibly upright');
+  assert(Math.abs(rolled.up.z)<1e-7&&rolled.right.z>.5,'Orbital core thrust axis should project horizontally');
+  const cx=canvas.width/2,cy=canvas.height/2;
+  fire('pointerdown',cx,cy);fire('pointermove',cx+21,cy-10);fire('pointerup',cx+21,cy-10);
+  const tumble=cameraFrame();assert(tumble.eye.distanceTo(rolled.eye)>1);
+  assert(closeVector(tumble.pivot,rolled.pivot)&&Math.abs(tumble.radius/rolled.radius-1)<1e-8);
+ }
+ scene.setCameraState({[view]:legacy});
+ const restoredLegacy=cameraFrame();assert(closeVector(restoredLegacy.up,initial.up)&&closeVector(restoredLegacy.eye,initial.eye));
+ scene.setCameraState(saved);
+ const restored=cameraFrame();assert(closeVector(restored.up,rolled.up)&&closeVector(restored.eye,rolled.eye));
+ scene.resetCamera();
+}
+// The launch camera serves both space and Earth. Scrub back into the bay, onto
+// the pad and through high ascent after a roll in orbital insertion.
+scene.setDomain('launcher','D');scene.setView('launch');scene.setChapter('insertion');scene.update(h,sim.at(700));scene.resetCamera();
+const insertion=cameraFrame();rimDrag();const rolledInsertion=cameraFrame();assert(closeVector(rolledInsertion.right,insertion.up));
+for(const [chapter,t] of [['integration',-1500],['pad',-8],['ascent',450]]){
+ scene.setChapter(chapter);scene.update(h,sim.at(t));const ground=cameraFrame();
+ assert(Math.abs(ground.right.y)<1e-7&&ground.up.y>0,chapter+': entering this view inherited a roll');
+ rimDrag();const moved=cameraFrame();assert(Math.abs(moved.right.y)<1e-7&&moved.up.y>0,chapter+': vertical tilted under an edge drag');
+ assert(moved.eye.distanceTo(ground.eye)>1e-3,chapter+': ground orbit stopped responding');
+}
+scene.setChapter('insertion');scene.update(h,sim.at(700));
+const returned=cameraFrame();
+scene.setCameraState({launch:scene.getCameraState().launch.slice(0,6)});
+const withoutRoll=cameraFrame();
+assert(closeVector(returned.right,withoutRoll.up)&&closeVector(returned.eye,withoutRoll.eye),'Returning from Earth lost the orbital roll');
+scene.resetCamera();
+console.log('Orbital center tumble, viewport-rim roll, horizontal core axis, locked terrestrial vertical and camera-state compatibility passed.');
 // Both projections follow the same payload station. End-on looks along its
 // launch axis and side elevation is perpendicular, with no perspective distortion.
 scene.setDomain('mechanical','D');scene.setView('launch');scene.setChapter('integration');scene.update(h,sim.at(-3600));
@@ -137,6 +187,18 @@ assert(endOn.orthographic&&sideOn.orthographic);
 assert(endOn.pivot.distanceTo(sideOn.pivot)<1e-7);
 assert(Math.abs(endOn.eye.clone().sub(endOn.pivot).normalize().dot(sideOn.eye.clone().sub(sideOn.pivot).normalize()))<1e-6);
 scene.setBayView('overview',false);
+// Semantic flight vectors are present by default. They follow geometric visibility
+// even without an acquired link, and a saved off state survives camera changes.
+const vectorLabels=()=>box.children.flatMap(e=>e.children||[]).map(e=>e.attributes?.['data-orbit-vector']).filter(Boolean);
+scene.setDomain('conops','E');scene.setView('spacecraft');scene.setChapter('operations');scene.resetCamera();
+const visiblePass=sim.events(2200,86400).find(e=>e.type==='contact'&&e.start>2200);
+const passState={...sim.at((visiblePass.start+visiblePass.end)/2),goodputMbps:0,acquired:false};
+scene.update(h,passState);paintFrame();assert.deepEqual(vectorLabels().sort(),['station','sun','velocity']);
+scene.setOrbitVectors(false);paintFrame();assert.equal(vectorLabels().length,0);
+scene.setView('core');scene.update(h,passState);paintFrame();assert.equal(vectorLabels().length,0);
+scene.setOrbitVectors(true);paintFrame();assert(vectorLabels().includes('station'));
+scene.setView('launch');scene.update(h,sim.at(-300));paintFrame();assert(!vectorLabels().length);
+scene.setView('spacecraft');scene.update(h,sim.at(6402));paintFrame();assert(!vectorLabels().includes('station'));
 const shadow=sim.at(6402),original=structuredClone(shadow);
 assert.ok(shadow.eclipse);assert.equal(shadow.solarKW,0);
 scene.setDomain('conops','E');scene.setChapter('operations');scene.setView('spacecraft');scene.update(h,shadow);
@@ -173,7 +235,8 @@ for(let i=0;i<thermal.length;i+=4){
 assert.ok(measuredPixels>20,'Both frames must include visible calibrated thermal surfaces');
 assert.deepEqual(shadow,original,'Changing lights must preserve all mission telemetry');
 scene.setOverlays([]);scene.setView('orbit');scene.resetCamera();
-const [studioMap]=paintFrame();scene.setLightingMode('realistic');const [realMap]=paintFrame();
+const [studioSky,studioMap]=paintFrame();scene.setLightingMode('realistic');const [realSky,realMap]=paintFrame();
+assert.deepEqual(studioSky,realSky,'Studio mode preserves the inertial sky in Earth Orbit');
 let changed=0;for(let i=0;i<studioMap.length;i+=4){
  if(realMap[i]!==studioMap[i]||realMap[i+1]!==studioMap[i+1]||realMap[i+2]!==studioMap[i+2])changed++;
 }

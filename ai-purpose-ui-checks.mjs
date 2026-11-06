@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {aiPurposes} from './dist/ai-purpose.js';
-import {applyAIPurpose,controls,defaults,missionStarter,sizeDesign} from './dist/design.js';
+import {applyAIPurpose,controls,defaults,missionStarter,sizeDesign,inverseSolve,estimateLife} from './dist/design.js';
 import {createSimulation} from './dist/model.js';
 import {evaluateService} from './dist/ai-service.js';
 import {primaryServiceMetric,renderAIPurpose} from './dist/ai-purpose-ui.js';
@@ -64,3 +64,27 @@ for(const id of ids){
  assert(!conopsPurpose(custom,'B').includes('data-preview-purpose'));
 }
 console.log('Six mission starters in a shared catalogue, canonical preview on edited hardware, primary build review, separate current-machine path, read-only flight records and all thirty-six purpose/phase interpretations verified.');
+
+// One saved design must produce the same qualification in the solver and review.
+const {impactOfChange}=await import('./dist/design-impact.js');
+const starter=missionStarter('text'),required=inverseSolve({...starter,requiredTps:1e6});
+const maxLaunch=inverseSolve(required.input,'launch'),referenceLaunch=inverseSolve(starter,'launch');
+assert.equal(maxLaunch.feasible,false);assert.ok(maxLaunch.achieved>0);assert.equal(maxLaunch.achieved,referenceLaunch.achieved);
+assert.equal(required.feasible,false);assert.equal(required.binding,'decodeThroughput');
+assert.equal(inverseSolve(required.input,'throughput').feasible,false);
+assert.equal(estimateLife(required.hardware).years,0);
+const requiredReview=impactOfChange(starter,required.input);
+assert.ok(requiredReview.newFailures.some(r=>r.key==='decodeThroughput'));
+assert.ok(requiredReview.margins.some(r=>r.key==='onboardLatency'&&r.after>1));
+const constrained=impactOfChange(starter,{...starter,customerUplinkMbps:.001});
+assert.deepEqual(constrained.newFailures.map(r=>r.key),['inputLink']);
+const adapter=missionStarter('finetune'),incompatible=impactOfChange(adapter,{...adapter,artifactKind:'restart',baseCompatible:'no'});
+assert.ok(incompatible.newFailures.some(r=>r.key==='artifact'&&r.before===Infinity&&r.after===0));
+const marginCard=renderAIPurpose(required.hardware,'A',{context:'conops',envelope:required.envelope});
+assert.match(marginCard,/Sizing needs attention · Active onboard decode throughput/);
+assert.match(marginCard,/Payload adapter interface/);
+const textHardware=sizeDesign(starter),svc=evaluateService(createSimulation(textHardware),0,86400);
+const currentCard=renderAIPurpose(textHardware,'A',{context:'conops',service:svc});
+assert.match(currentCard,/86,400 text turns expected to qualify/);assert.match(currentCard,/data-action="ai-routes"/);
+assert.match(currentCard,/Earth first visible token/);
+console.log('Installed throughput, onboard latency, uplink and Earth-artifact gates agree with reviewed margins and visible mission cards.');

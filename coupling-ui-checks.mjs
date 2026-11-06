@@ -12,7 +12,7 @@ const backing=new Map();globalThis.window={localStorage:{getItem:k=>backing.get(
 
 const realTimeout=globalThis.setTimeout;globalThis.setTimeout=(f,t,...a)=>{const r=realTimeout(f,t,...a);if(t>=2500)r.unref?.();return r};
 const rawError=console.error;console.error=(e)=>{if(e?.stack?.includes('scene.js')||e?.stack?.includes('three.module.js'))return;rawError(e)};
-class AuditWorker{async postMessage(input){if(input.firstDay){this.onmessage({data:{result:{purpose:input.design.aiPurpose,metrics:[],status:'partial'}}});return}const {chronologicalAudit}=await imp('mission-worker.js');try {this.onmessage({data:chronologicalAudit(input,p=>this.onmessage({data:{progress:p}}))})} catch(e){this.onerror(e)}}terminate(){}}
+class AuditWorker{async postMessage(input){if(input.firstDay||input.acceptedWindow){this.onmessage({data:{result:{purpose:input.design.aiPurpose,window:{start:input.start,end:input.start+input.span,span:input.span},offers:0,onTime:0,metrics:[],network:{route:input.design.serviceRoute},sources:[],status:'no-offers'}}});return}const {chronologicalAudit}=await imp('mission-worker.js');try {this.onmessage({data:chronologicalAudit(input,p=>this.onmessage({data:{progress:p}}))})} catch(e){this.onerror(e)}}terminate(){}}
 globalThis.Worker=AuditWorker;
 await imp('app.js');
 const el=id=>document.getElementById(id), fire=async(data)=>{const e=new Element();e.dataset=data;await listeners.get('click')({target:e})},change=async(id,value,data={})=>{const q=new Element(id);Object.assign(q,{value,valueAsNumber:Number(value),dataset:data,tagName:'SELECT'});return listeners.get('change')({target:q})};
@@ -20,6 +20,24 @@ const {decodeScenario}=await imp('exports.js');
 const snapshot=async()=>{await fire({action:'share'});const encoded=el('dialogbody').innerHTML.match(/#design=([A-Za-z0-9_-]+)/)[1];await fire({action:'close'});return decodeScenario(encoded)};
 const accept=async()=>{assert.equal(el('dialogtitle').textContent,'Review design change');assert.match(el('dialogbody').innerHTML,/data-action="applyimpact"/);await fire({action:'applyimpact'})};
 const {domainIds}=await imp('matrix-ui.js');
+// A deep link chooses the initial view, and playing advances only the cursor.
+if(!process.env.ODC_DEEP){
+ const original=await snapshot(),originalUrl=location;
+ globalThis.location=new URL('https://example.test/?phase=C&domain=orbit&field=ecc');
+ await imp('app.js?window-route');
+ const linked=await snapshot();assert.equal(linked.view.phase,'C');assert.deepEqual(linked.design,original.design);
+ await fire({action:'window'});el('windowdate').value=original.design.epoch.slice(0,10)+'T06:00:00';await fire({action:'setwindow'});
+ const chosen=await snapshot();assert.equal(chosen.view.start,21600);assert.equal(chosen.view.t,29400);
+ await fire({action:'flightplay'});frames.get(frameCount)(performance.now()+100);
+ const ticked=await snapshot();assert.ok(ticked.view.t>chosen.view.t);assert.equal(ticked.view.start,chosen.view.start);
+ // Commissioning itself is available immediately; a deliberate late seek starts the worker.
+ let requests=0;
+ globalThis.Worker=class extends AuditWorker{postMessage(input){if(input.firstDay)return super.postMessage(input);requests++}};
+ await fire({phase:'D'});await fire({phase:'E'});assert.equal((await snapshot()).view.chapter,'commissioning');assert.equal(requests,0);
+ await fire({action:'midlife'});assert.equal(requests,1);await fire({action:'cancelaudit'});
+ globalThis.Worker=AuditWorker;globalThis.location=originalUrl;await imp('app.js?default-after-window');
+ console.log('Deep-link starter orbit, arbitrary UTC playback window and explicit late jump from commissioning passed.');
+}
 await fire({domain:'attitude'});await fire({gyroCase:'iss'});assert.equal(el('dialogtitle').textContent,'Review design change');await fire({action:'cancelimpact'});
 await fire({gyroCase:'0'});await accept();assert.equal((await snapshot()).design.cmgMomentumNms,30);
 await fire({gyroCase:'1'});await accept();await fire({domain:'conops'});
@@ -177,12 +195,17 @@ console.log('Adapter-to-integration handoff, reversible payload milestones, foll
 await fire({phase:'C'});await fire({camera:'spacecraft'});await fire({attitudeTime:'6402'});
 const orbitBefore=await snapshot();assert.equal(orbitBefore.view.lighting,'realistic');
 assert.equal(el('orbit-lighting').hidden,false);
+assert.equal(orbitBefore.view.orbitVectors,true);assert.equal(el('flight-vector-toggle').getAttribute('aria-pressed'),'true');
+await fire({action:'flightvectors'});
+const hiddenVectors=await snapshot();
+assert.equal(hiddenVectors.view.orbitVectors,false);assert.equal(el('flight-vector-key').hidden,true);
+assert.deepEqual(hiddenVectors.design,orbitBefore.design);assert.equal(hiddenVectors.view.t,orbitBefore.view.t);
 await fire({lighting:'studio'});await change('camera-exposure',1);const studioView=await snapshot();
 assert.deepEqual(studioView.design,orbitBefore.design);assert.equal(studioView.view.t,orbitBefore.view.t);
 assert.equal(studioView.view.camera,orbitBefore.view.camera);assert.equal(studioView.view.lighting,'studio');
 await fire({camera:'core'});assert.equal(el('lighting-studio').getAttribute('aria-pressed'),'true');
 await fire({action:'share'});const studioLink=el('dialogbody').innerHTML.match(/#design=[A-Za-z0-9_-]+/)[0];await fire({action:'close'});
 globalThis.location=new URL(studioLink,'https://example.test');await imp('app.js?shared-orbital-lighting');
-const sharedLighting=await snapshot();assert.equal(sharedLighting.view.lighting,'studio');assert.equal(sharedLighting.view.exposureEV,1);await fire({phase:'D'});
+const sharedLighting=await snapshot();assert.equal(sharedLighting.view.orbitVectors,false,'Shared view preserves the vector switch');assert.equal(sharedLighting.view.lighting,'studio');assert.equal(sharedLighting.view.exposureEV,1);await fire({phase:'D'});
 assert.equal(el('orbit-lighting').hidden,true);
 console.log('Lighting defaults, camera continuity, fixed mission time and design, shared studio view, and ground-view scope passed.');

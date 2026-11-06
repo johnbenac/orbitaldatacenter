@@ -6,7 +6,7 @@ import {fairings,radiusAt,fairingFit} from './dist/fairings.js';
 import {enclosureHeat,solveOuter} from './dist/enclosure.js';
 import {createSimulation} from './dist/model.js';
 import {chronologicalAudit} from './dist/mission-worker.js';
-import {makePacket} from './dist/exports.js';
+import {makePacket,packetIdentity} from './dist/exports.js';
 const near=(a,b,tol=1e-7)=>assert.ok(Math.abs(a-b)<=tol,`${a} vs ${b}`);
 const h=sizeDesign(defaults),e=h.enclosure;
 for(const id of Object.keys(fairings)){
@@ -30,7 +30,7 @@ for(const [interior,sw,ir] of [[300,0,0],[325,400,238],[200,1361,0],[390,1000,15
  near(net,outwardKW*1000,1e-6);
 }
 const envelope=sizingEnvelope(h);assert.ok(envelope.disposalBudgetDv>defaults.disposalDv);
-const study={...defaults,missionYears:.003},hw=sizeDesign(study),sim=createSimulation(hw),audit=chronologicalAudit(hw).result;
+const study={...defaults,missionYears:.003,serviceRoute:'relay',relayDownMbps:100,initialQueueGB:10000},hw=sizeDesign(study),sim=createSimulation(hw),audit=chronologicalAudit(hw).result;
 const story=sim.story();assert.ok(story.some(c=>c.id==='integration'&&c.instant<0));assert.ok(story.some(c=>c.id==='deorbit'));
 assert.ok(Number.isFinite(sim.at(3000).enclosureLeakKW));assert.ok(Number.isFinite(audit.energyKWh.enclosureOutward));
 const module={exports:{}},context={module,exports:module.exports,require,Buffer,Promise,setImmediate,clearImmediate,setTimeout,clearTimeout,ArrayBuffer,Uint8Array,Blob,TextEncoder,TextDecoder};
@@ -46,6 +46,24 @@ const t=sim.story('contact').instant,view={page:'overview',chapter:'contact',cam
 exported=await makePacket({scenario:{schema:'odc-scenario/1',modelVersion:'2',design:study,view},hardware:hw,sim,result:inverseSolve(study),snap:sim.at(t),day:sim.daySummary(0),events:sim.events(0,86400),audit});
 const zip=await JSZip.loadAsync(await exported.arrayBuffer());
 for(const file of ['mechanical/installed-stations.csv','mechanical/component-resources.csv','mechanical/launch-mass-properties.json','mechanical/terminal-disposition.json','attitude/gyro-benchmark.json','attitude/pointing-power-heat.csv','attitude/mission-mode-duration-s.json','design/master-equipment-list.csv','design/mass-rollup.json','propulsion/geometric-screens.csv','propulsion/depletion-mass-properties.csv','propulsion/tank-installation.csv','propulsion/engine-stations.csv','design/launch-vehicle.json','design/fairing-fit.csv','design/fairing-stations.csv','design/stowed-stack.csv','design/enclosure-walls.csv','operations/chapter-samples.csv','operations/selected-story.json','operations/disposal.json','PDR.html'])assert.ok(zip.file(file),file);
+const timeline=JSON.parse(await zip.file('operations/master-timeline.json').async('text'));
+assert.equal(timeline.launcher,hw.input.launcher);
+assert.equal(timeline.events.find(r=>r.id==='launch-liftoff').start_met_s,0);
+assert.equal(timeline.events[0].replay_met_s,null);
+assert.equal(timeline.events[0].start_utc.length,10);
+assert.match(await zip.file('operations/master-timeline.csv').async('text'),/received_commands_gb/);
+const identity=JSON.parse(await zip.file('review-revision.json').async('text'));
+const packetCase={design:study,view,modelVersion:'2'};
+assert.equal(identity.revision,packetIdentity(packetCase,sim.duration).revision);
+assert.notEqual(identity.revision,packetIdentity({...packetCase,design:{...study,batteryKWh:study.batteryKWh+1}},sim.duration).revision);
+assert.equal(identity.window_start_met_s,view.start);assert.equal(identity.window_end_met_s,86400);assert.equal(identity.instant_met_s,t);
+const lines=(await zip.file('operations/ground-passes.csv').async('text')).split('\r\n').map(s=>JSON.parse('['+s+']'));
+const passes=lines.slice(1).map(cells=>Object.fromEntries(lines[0].map((k,i)=>[k,cells[i]])));
+assert.ok(passes.some(p=>Number(p.relay_payload_gb)>0));assert.ok(passes.every(p=>Number(p.direct_payload_gb)===0));
+for(const call of timeline.events.filter(e=>e.direct_payload_gb!=null)){
+ const pass=passes.find(p=>p.station===call.station&&Math.abs(Number(p.end)-call.start_met_s)<.1);assert.ok(pass);
+ near(+pass.direct_payload_gb,call.direct_payload_gb);near(+pass.relay_payload_gb,call.relay_payload_gb);near(+pass.received_commands_gb,call.received_commands_gb);
+}
 const carrier=JSON.parse(await zip.file('design/launch-vehicle.json').async('text'));
 assert.equal(carrier.selection,hw.input.launcher);assert.equal(carrier.reference.referenceKg,hw.input.referenceKg);
 near(carrier.limitingMassScreenKg,hw.launchScreenMarginKg);assert.ok(carrier.reference.sourceUrl.startsWith('https://'));

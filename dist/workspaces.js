@@ -18,6 +18,7 @@ export const pages={
  avionics:['Command & Data Handling','panels-top-left','Operate the spacecraft flight computer, command receiver and housekeeping recorder.'],
  software:['Flight Software','workflow','Inspect the active mode, its reference, actuator feedback and the interlock permitting the next operation.'],
  architecture:['Spacecraft architecture','box','One spacecraft layout for all six customer missions. Inspect its fixed interfaces and the dimensions of your current build.'],
+ timeline:['Master timeline','clock-3','Follow this design from ground processing through launch and the first operating checkout. Select a call to inspect its timing or replay it on the mission clock.'],
  equipment:['Master equipment list','list-checks','Trace each mass allocation to the installed hardware, its sizing basis and its published reference.'],
  sources:['Model & sources','book-open','Inspect the equations, assumptions, and reference hardware behind this design.'],
  checks:['Numerical checks','list-checks','Reproduce reference calculations and verify coupled mission behavior.']

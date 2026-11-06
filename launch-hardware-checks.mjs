@@ -28,6 +28,27 @@ for(const core of [f.lower,...f.boosters]){assert.equal(byName(core,'Falcon land
 assert.equal(f.boosterBase.parent,f.boosters[0]);update(falcon,145);near(f.boosters[0].rotation.z,0);update(falcon,155);assert(f.boosters[0].rotation.z>0);assert.equal(byName(f.boosters[0],'Falcon landing leg').filter(o=>o.visible).length,4);
 update(falcon,232);near(f.lower.position.y,0);update(falcon,242);assert(f.lower.position.y<0);update(falcon,310);assert(!f.shell.visible);
 assert.notEqual(spacexSilhouette('starship'),spacexSilhouette('falconHeavy'));
+// A reusable ship retains its painted door. Two opposing conventional
+// graphics belong to their own jettisonable skins and stay inside each seam.
+const doorPatch=byName(door,'Mission patch');assert.deepEqual(doorPatch,[p.fairingPatch]);assert.equal(doorPatch[0].parent.userData.cargoWall,true);
+const halves=f.shell.children.filter(o=>o.userData.halfSide);
+assert.equal(halves.length,2);
+for(const half of halves){
+ const decals=byName(half,'Mission patch');assert.equal(decals.length,1);
+ const decal=decals[0],pos=decal.geometry.attributes.position,uv=decal.geometry.attributes.uv;
+ assert.equal(decal.parent.name,'Fairing half shell');
+ let low=Infinity,high=-Infinity;
+ for(let i=0;i<pos.count;i++){
+  assert(pos.getX(i)*half.userData.halfSide>0);
+  if(uv.getY(i)===0)low=Math.min(low,pos.getY(i));
+  if(uv.getY(i)===1)high=Math.max(high,pos.getY(i));
+ }
+ assert(high-low>2,'A physically sized, right-side-up badge on each Falcon fairing half');
+ const tangent=new T.Vector3().subVectors(new T.Vector3().fromBufferAttribute(pos,1),new T.Vector3().fromBufferAttribute(pos,0));
+ const radial=new T.Vector3(pos.getX(0),0,pos.getZ(0));
+ assert(tangent.cross(new T.Vector3(0,1,0)).dot(radial)>0,'Texture reads left-to-right on the exterior');
+}
+
 const geo=new Set(),a=new T.Vector3(),b=new T.Vector3(),c=new T.Vector3(),n=new T.Vector3(),sum=new T.Vector3();
 for(const root of [p.lower,p.upper,p.shell,f.lower,...f.boosters])root.traverse(o=>{if(o.isMesh&&!o.material.transparent)geo.add(o.geometry)});
 for(const g of geo){const pos=g.attributes.position,norm=g.attributes.normal,ix=g.index;if(!pos||!norm)continue;

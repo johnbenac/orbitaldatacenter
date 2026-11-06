@@ -1,3 +1,4 @@
+import {launchClockFor} from './launch-effects-state.js';
 import {DEPLOY_END_S} from './commissioning-clock.js';
 // Interactive engineering plates. Geometry is schematic except where dimensions are marked.
 import {aiPurposes} from './ai-purpose.js';
@@ -247,7 +248,7 @@ function launcher({h,d,s}){
  const vehicle=launchFleet[d.launcher],reference=vehicle.referenceKg,stack=h.launchKg,pad=launchSiteFor(d.launcher,d.launchSite);
  const parts=[
   P('carrier','Carrier propulsion',vehicle.architecture,'launcher','launcher',[row('Provider',vehicle.provider),row('Status',vehicle.status),row('Axial stages',String(vehicle.stages)),row('Strap-on boosters',String(vehicle.boosters)),row('Recovery',vehicle.recovery)]),
-  P('delivery','Payload delivery stage',vehicle.stages===1?'The direct-injection core releases its payload.':'The upper stage carries the payload adapter to injection. The illustrative mission clock places release at MET 540 s.','trimDv','adapter',[row('Service boundary',s.t<540?'Spacecraft attached':'Spacecraft released'),row('Initial spacecraft wet mass',val(h.wetKg,'kg',0)),row('Launch-only adapter',val(d.adapterKg,'kg',0)),row('Target altitude',val(d.altitudeKm,'km'))]),
+  P('delivery','Payload delivery stage',vehicle.stages===1?'The direct-injection core releases its payload.':'The upper stage carries the payload adapter to injection. The modeled payload release occurs at T+'+launchClockFor(h.input.launcher).release+' s.','trimDv','adapter',[row('Service boundary',s.carrierAttached?'Spacecraft attached':'Spacecraft released'),row('Initial spacecraft wet mass',val(h.wetKg,'kg',0)),row('Launch-only adapter',val(d.adapterKg,'kg',0)),row('Target altitude',val(d.altitudeKm,'km'))]),
   P('benchmark','Provider payload reference',vehicle.description,'launcher','launcher',[row('LEO reference',val(reference,'kg',0)),row('Reference conditions',vehicle.referenceOrbit),row('Reference headroom',val(h.launchReferenceMarginKg,'kg',0))]),
   P('allowance','Mission allowance','The current manifest must meet the entered allowance, the catalogue reference mass screen and the tapered fairing fit.','launchAllowanceKg','payload',[row('Entered allowance',val(d.launchAllowanceKg,'kg',0)),row('Integrated stack',val(stack,'kg',0)),row('Governing mass headroom',val(h.launchScreenMarginKg,'kg',0)),row('Fairing fit',h.fit?'Fits profile':'Exceeds profile')]),
   P('launchpad','Launch complex',pad.siteNote,'launchSite','launcher',[row('Launch complex',pad.name),row('Range',pad.range),row('Location',pad.region+' · '+pad.country),row('Evidence',pad.statusLabel),row('Coordinate basis',pad.pinBasis)])
@@ -256,7 +257,7 @@ function launcher({h,d,s}){
   T(x,y-7,label,'sd-over','start')+T(x+w,y-7,val(kg/1000,'t',2),'sd-name','end')+rect(x,y,w,8,'sd-unfilled',2)+rect(x,y,w*kg/max,8,cl,2));
  const art='<g transform="translate(46,3) scale(1.50)">'+launcherSilhouette(d.launcher)+'</g>'+
   pick(parts[0],50,113,197,91,path('M100 171h40l14 -8h92','sd-dim')+T(152,153,'CORE + BOOSTERS','sd-over','start')+T(152,177,vehicle.boosters+' strap-ons','sd-name','start'))+
-  pick(parts[1],60,31,181,77,path('M100 70h39l15 -9h92','sd-dim')+T(152,50,vehicle.stages===1?'CORE RELEASE':'UPPER STAGE','sd-over','start')+T(152,77,s.t<540?'Attached':'Released','sd-name','start'))+
+  pick(parts[1],60,31,181,77,path('M100 70h39l15 -9h92','sd-dim')+T(152,50,vehicle.stages===1?'CORE RELEASE':'UPPER STAGE','sd-over','start')+T(152,77,s.carrierAttached?'Attached':'Released','sd-name','start'))+
   pick(parts[4],35,195,211,40,T(50,209,'LAUNCH COMPLEX','sd-over','start')+T(50,227,pad.name.split(' · ')[0],'sd-name','start'))+
   T(x,27,'PAYLOAD MASS COMPARISON','sd-over','start')+bar(parts[2],65,'LEO REFERENCE',reference,'sd-bar-steel')+
   bar(parts[3],119,'MISSION ALLOWANCE',d.launchAllowanceKg,'sd-bar-violet')+bar(parts[3],173,'LAUNCHED STACK',stack,h.launchScreenMarginKg<0?'sd-bar-red':'sd-bar-green')+
@@ -322,7 +323,7 @@ function environment({h,d,s,day},id){
    T(290,218,'SPACECRAFT EQUIPMENT MODEL ENDED AT INTERFACE','sd-over');
   return info('Atmospheric entry environment','Local air density, dynamic pressure and target location for the surviving reference body',parts,art,[legend('cyan','Relative flow'),legend('amber','Ground approach')],'Reference-body descent');
  }
- const exposed=s.t>=540&&!s.referenceBody,projected=s.radiatorCoupledM2/1000;
+ const exposed=!s.carrierAttached&&!s.referenceBody,projected=s.radiatorCoupledM2/1000;
  const parts=[
  P('sun','Solar and Earth flux','Direct sunlight reaches the wings and radiator. Earth-reflected sunlight and longwave infrared enter the surface heat balance separately.','solarTiltDeg','solar',[row('Normal solar flux',exposed?val(s.solarIrradiance,'W/m²'):'Encapsulated'),row('Radiator albedo',exposed?val(s.albedoIrradiance,'W/m²'):'—'),row('Radiator IR',exposed?val(s.earthIRIrradiance,'W/m²'):'—'),row('Absorbed sunlight',exposed?val(projected*s.absorptivity*s.solarIrradiance*s.radiatorSunCos,'kW'):'—')]),
  P('flow','Relative atmosphere','Density and atmospheric-relative speed act on the ram-facing silhouette, producing drag and a torque about the spacecraft mass center.','solarCyclePhase','structure',[row('Daily F10.7 proxy',val(s.f107Daily,'sfu')),row('81-day F10.7 proxy',val(s.f107Mean,'sfu')),row('Density',exposed&&Number.isFinite(s.densityKgM3)?s.densityKgM3.toExponential(3)+' kg/m³':'—'),row('Silhouette / drag',val(s.ramAreaM2,'m²')+' / '+val(s.dragN,'N',5))]),
@@ -338,7 +339,7 @@ function environment({h,d,s,day},id){
  T(432,70,'Generation','sd-name','start')+T(432,89,val(s.solarKW,'kW'),'sd-value','start')+
  T(432,127,'Loop heat','sd-name','start')+T(432,146,val(s.heatInputKW,'kW'),'sd-value','start')+
  T(432,189,'Disturbance','sd-name','start')+T(432,208,val(s.torqueNm,'N·m',4),'sd-value','start');
- return info('Environmental coupling','Natural forcing and onboard response at the shared mission instant',parts,art,[legend('amber','Radiation / generation'),legend('cyan','Flow / heat'),legend('violet','Field / torque')],s.referenceBody?'Reference-body descent':s.t<540?'Launch boundary':s.eclipse?'Earth shadow':'Sunlit orbit');
+ return info('Environmental coupling','Natural forcing and onboard response at the shared mission instant',parts,art,[legend('amber','Radiation / generation'),legend('cyan','Flow / heat'),legend('violet','Field / torque')],s.referenceBody?'Reference-body descent':s.carrierAttached?'Launch boundary':s.eclipse?'Earth shadow':'Sunlit orbit');
 }
 
 function data({h,d,s,day,events},id){

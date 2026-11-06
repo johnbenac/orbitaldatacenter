@@ -1,36 +1,36 @@
 {
   "release": "site",
-  "source_commit": "7906cf4abfb111901d59f64227824aebc2e64eec",
-  "index_sha256": "15fb41c546c4d364adbbc84c81d2bac43d8476b751c0385832171487fdb75984",
+  "source_commit": "77523d4bc407a6c37fb25fb7d2493d9143d05b3b",
+  "index_sha256": "94df33c8444f2f82e874b0e620f268911d24194ae64a92f0747fe60e976c44cd",
   "project": "orbitaldatacenter",
   "deployment": {
-    "id": "da53f971-e5c7-4b93-a29f-3472106f9d7b",
-    "short_id": "da53f971",
+    "id": "12298e5d-17b2-465d-8c32-e69633ec0e59",
+    "short_id": "12298e5d",
     "project_id": "8cfed813-a5e3-48d5-9451-47e81b01d88f",
     "project_name": "orbitaldatacenter",
     "environment": "production",
-    "url": "https://da53f971.orbitaldatacenter-2o2.pages.dev",
-    "created_on": "2026-11-06T03:09:40.655787Z",
-    "modified_on": "2026-11-06T03:09:42.24111Z",
+    "url": "https://12298e5d.orbitaldatacenter-2o2.pages.dev",
+    "created_on": "2026-11-06T08:28:19.74442Z",
+    "modified_on": "2026-11-06T08:28:21.131408Z",
     "latest_stage": {
       "name": "deploy",
       "started_on": null,
-      "ended_on": "2026-11-06T03:09:42.24111Z",
+      "ended_on": "2026-11-06T08:28:21.131408Z",
       "status": "success"
     },
     "deployment_trigger": {
       "type": "ad_hoc",
       "metadata": {
         "branch": "main",
-        "commit_hash": "7906cf4abfb111901d59f64227824aebc2e64eec",
-        "commit_message": "feat(release): import upstream v26\r\n\r\nImport the verified Boiler ZIP while preserving local author links and SEO extensions.\r\nTrack the reviewed identity generator and record archive provenance.\r\n\r\nValidate all 50 application suites, 15 integration tests, asset and syntax checks,\r\nand desktop and mobile browser rendering.",
+        "commit_hash": "77523d4bc407a6c37fb25fb7d2493d9143d05b3b",
+        "commit_message": "feat(release): import upstream v31\r\n\r\nImport the supplied Boiler ZIP while preserving AGPLv3 and local site extensions.\r\nRecord verified assets, syntax, integration and browser checks.\r\n\r\nHand the upstream engine assertion and slow validation runs back to the developer\r\nteam in a memo copied to Boiler. Deploy without local application or test patches.",
         "commit_dirty": true
       }
     },
     "stages": [
       {
         "name": "queued",
-        "started_on": "2026-11-06T03:09:40.655787Z",
+        "started_on": "2026-11-06T08:28:19.74442Z",
         "ended_on": null,
         "status": "active"
       },
@@ -55,7 +55,7 @@
       {
         "name": "deploy",
         "started_on": null,
-        "ended_on": "2026-11-06T03:09:42.24111Z",
+        "ended_on": "2026-11-06T08:28:21.131408Z",
         "status": "success"
       }
     ],

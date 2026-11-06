@@ -1,4 +1,4 @@
-// Phase A engineering rationale. All prose is local and available on a static host.
+// Preliminary-design engineering rationale. Prose is available on a static host.
 // A source's locator identifies the relevant method, benchmark or product boundary.
 import {controls,defaults,presets,solveModes} from './design.js';
 import {thermalNodes} from './thermal-limits.js';
@@ -6,9 +6,10 @@ import {fairings} from './fairings.js';
 import {launchSites,launchSitesFor} from './launch-sites.js';
 import {launchFleet} from './launch-fleet.js';
 import {serviceSources} from './ai-service.js';
+import {energySources} from './energy-system.js';
 
 const GOLD='https://standards.nasa.gov/system/files/tmp/GSFC-STD-1000RevI_Approved_0.pdf';
-const GEVS='https://standards.nasa.gov/sites/default/files/standards/GSFC/B/0/gsfc-std-7000b_signature_cycle_04_28_2021_fixed_links.pdf';
+const GEVS='https://standards.nasa.gov/system/files/tmp/GSFC-STD-7000B_Approved_Admn%20Ext.pdf';
 const SOA='https://www.nasa.gov/smallsat-institute/sst-soa/';
 const refs=new Map();
 function source(id,title,url,locator,kind='Technical reference'){
@@ -16,6 +17,7 @@ function source(id,title,url,locator,kind='Technical reference'){
  refs.set(id,record);
  return record;
 }
+for(const entry of energySources)source(entry.id,entry.title,entry.url,entry.basis,'Architecture reference and project applicability');
 source('flightio','NASA · LADEE flight computer and telemetry','https://technology.nasa.gov/patent/TOP2-239','Integrated avionics functional description · command ingest, telemetry output and engineering data');
 source('gyroref','Airbus · CMG 75-75 S','https://www.airbus.com/sites/g/files/jlcbta136/files/2022-10/AVIONICS-CMG75-75S-v7_2022.pdf','Interface and performance tables · per-unit mass, torque, momentum, dimensions and typical draw');
 source('seh','NASA Systems Engineering Handbook','https://www.nasa.gov/reference/4-0-system-design-processes/','Rev 2, §§4.1–4.4 · stakeholder expectations, requirements, logical decomposition and design solution');
@@ -23,7 +25,7 @@ source('trade','NASA Systems Engineering Handbook','https://www.nasa.gov/referen
 source('smad','Larson & Wertz · Space Mission Analysis and Design','https://link.springer.com/book/9780792359012','3rd ed., 1999 · ISBN 978-0-7923-5901-2 · publisher catalog, print and licensed library access','Published handbook');
 source('smadprint','Space Technology Series · SMAD III','https://spacetechnologyseries.com/books/Space-Mission-Analysis-and-Design.html','Publisher series catalog · printed third edition and ordering information','Authorized access');
 source('gevs','GSFC-STD-7000B · GEVS',GEVS,'Rev B, 28 Apr 2021 · §§2.2, 2.3 and 2.9 · applicability, electrical performance and end-to-end tests','Verification guidance');
-source('gevst','GSFC-STD-7000B · thermal verification',GEVS,'Rev B · §§2.6.1, 2.6.3.2, 2.6.4 · terms, thermal-vacuum test parameters and thermal balance','Verification guidance');
+source('gevst','GSFC-STD-7000B · thermal verification',GEVS,'Rev B · §§2.6.1, 2.6.3.2, 2.6.4.1 · terms, test parameters and thermal-balance uncertainty practice','Verification guidance');
 source('gevsm','GSFC-STD-7000B · mechanical verification',GEVS,'Rev B · §2.4 · structural and mechanical verification of flight hardware','Verification guidance');
 source('gold','GSFC-STD-1000I · GOLD Rules',GOLD,'Rev I, 19 Aug 2025 · Introduction and Rules 1.08–1.09 · system-level testing in representative configurations','Design guidance');
 source('margin','GSFC GOLD · resource margins',GOLD+'#page=12','Rev I · Rule 1.06, Table 1.06-1 and notes · resource boundaries and milestone-dependent margins','Design guidance');
@@ -93,8 +95,8 @@ group('power margin',assume,[
  ['solarM2','Sum the physical planform of all four photovoltaic wings. Size at elapsed age with eclipse recharge, pointing, packing and bus conversion losses.','At 1,361 W/m² and 30% efficiency, 1 m² yields 408.3 W before bus losses.'],
  ['batteryKWh','Enter installed beginning-of-life nameplate energy for the full pack. Check both peak discharge power and usable energy through the longest deficit.'],
  ['targetSOC','Set the design reserve at the most demanding discharge. Choose a value above the operating floor that leaves useful energy for the following interval.'],
- ['chargeC','Use the allowable sustained pack charge rate across the intended temperature range. The cap applies on the bus side in this model.','1 C on a 40 kWh nameplate pack gives a 40 kW charge cap.'],
- ['dischargeC','Use the pack’s sustained bus-discharge rating over the expected state of charge and temperature. Check eclipse and slewing demand together.','2 C on a 40 kWh pack gives an 80 kW discharge cap.'],
+ ['chargeC','Use the allowable sustained pack charge rate across the intended temperature range. The bus-side charge limit is the lower of this pack rating and the installed bidirectional converter capacity.','1 C on a 40 kWh nameplate pack gives a 40 kW pack-side allocation before the converter-capacity limit.'],
+ ['dischargeC','Use the pack’s sustained bus-discharge rating over the expected state of charge and temperature. The installed bidirectional converter can impose a lower limit. Check eclipse and slewing demand together.','2 C on a 40 kWh pack gives an 80 kW pack-side allocation before the converter-capacity limit.'],
  ['socMin','Use the lowest operational fraction allowed by the pack and mission policy. Energy at this floor remains unavailable to the modeled bus.'],
  ['socMax','Set the charge ceiling below the cell-management maximum when the operating plan calls for reduced upper SOC.'],
  ['socInitial','Enter stored energy at launch as a fraction of initial installed capacity, between the operating floor and ceiling.','A starting SOC of 0.90 in a 40 kWh pack gives 36 kWh at the epoch.'],
@@ -103,8 +105,8 @@ group('power margin',assume,[
  ['packWhKg','Use installed nameplate Wh per kilogram including pack structure, protection electronics and interconnects.','100 kWh at 150 Wh/kg gives about 667 kg of installed pack.'],
  ['packWhL','Use pack-level volumetric energy density including packaging, restraints and protection electronics.','40 kWh at 200 Wh/L occupies 200 L.'],
  ['batteryRetention','Convert a life-test result for comparable temperature, cycle depth and throughput to an equivalent annual capacity retention.','80% remaining after 8 years gives an annual multiplier of 0.8^(1/8) ≈ 0.9725.'],
- ['pvEfficiency','Enter beginning-of-life cell electrical efficiency at the assumed illumination and temperature. Account for panel packing and bus losses in the delivery factor.'],
- ['solarDelivery','Multiply packing fraction and downstream electrical efficiencies once. Include harness and regulated conversion in this combined factor.','0.90 active coverage × 0.95 electrical delivery gives 0.855.'],
+ ['pvEfficiency','Enter beginning-of-life cell electrical efficiency at the assumed illumination and temperature. Panel packing and mismatch use the array delivery factor; MPPT conversion and routed harness losses are modeled separately.'],
+ ['solarDelivery','Apply active-cell packing and array mismatch only. The selected energy architecture computes MPPT conversion and routed harness losses separately, so exclude those losses from this factor.','0.90 active-cell coverage × 0.95 array mismatch gives 0.855 before the explicit MPPT and harness calculations.'],
  ['pvRetention','Derive an elapsed-year multiplier from radiation or flight degradation at a stated reference dose, orbit and duration.','90% output after five reference years gives 0.9^(1/5) ≈ 0.9791 per year.'],
  ['pvKgM2','Enter cell and substrate mass per square metre of installed wing planform. Deployment booms, release fittings and drive joints have their own allocation.']
 ]);
@@ -191,7 +193,7 @@ group('ccsds rf',assume,[
 group('thermal gevst thermalrules',assume,[
  ['radiatorM2','Enter total physical radiator planform. Both faces emit in this architecture. Include absorbed direct sunlight, reflected light and Earth IR in the net-rejection balance.','At 300 K and ε = 0.90, one emitting face radiates about 413 W/m² before environmental absorption.'],
  ['appliedHeatKw','Choose an independent heat experiment in kilowatts to isolate thermal response. Linked mode derives heat from the operating electrical system instead.'],
- ['thermalResistanceKPerKw','Use a per-tray effective resistance from junction to the shared radiator node. Estimate it from the stack-up or measured temperature rise at known transported power.','A 2 kW tray and 4 K/kW interface give an 8 K model rise above the rejection node.'],
+ ['thermalResistanceKPerKw','Use the per-tray junction-to-cold-plate resistance from the package and interface stack-up or a measured temperature rise at known power. The separate cold-plate-to-fluid and fluid-to-radiator paths carry their own resistance and flow limits.','A 2 kW tray at 4 K/kW has an 8 K junction rise above its cold plate.'],
  ['radiatorDesignK','Use a radiator design temperature that leaves adequate cold-plate and junction headroom at peak heat transport. Compare the sizing target with time-resolved temperatures.'],
  ['radKgM2','Use installed radiator bank mass per physical planform, including its panel construction. Coolant, pumps, external hinges and frame have separate mass boundaries.'],
  ['initialCoreK','Initialize the modeled core/loop temperature from the prelaunch soak condition. Inspect commissioning transients before using a steady operating result.'],
@@ -216,14 +218,14 @@ group('mech gevsm clear',hardware,[
  ['adapterKg','Enter the launch-only adapter and separation-hardware allocation at the chosen interface. It contributes to launched mass and stays with the launcher on separation.'],
  ['fairingM','Use an approved payload keep-in diameter for this exact fairing and adapter, not the rocket’s advertised outside diameter. The control scales all radial profile stations.'],
  ['fairingLengthM','Measure usable keep-in height from the payload adapter plane. Tapered nose stations may bind before the stated axial height.'],
- ['radialPaddingM','Budget one-sided payload lateral motion and clearance at each axial station. Check the provider envelope’s allowance for fairing motion before adding project deflections.'],
- ['axialPaddingM','Allow for axial motion, integration tolerances and separation geometry. A forward shift in a tapered fairing can also consume lateral clearance.']
+ ['radialPaddingM','The read-only project allowance reserves one-sided payload lateral motion and clearance at each axial station. Check the provider envelope’s allowance for fairing motion before adding project deflections.'],
+ ['axialPaddingM','The read-only project allowance reserves axial motion, integration tolerances and separation geometry. A forward shift in a tapered fairing can also consume lateral clearance.']
 ]);
 group('shield mech',hardware,[
  ['shieldKgM2','Choose added shielding mass per covered wall area from a mission-specific dose/transport study and component tolerance. This input adds hardware mass.','At 2,700 kg/m³ density, a uniform 1 mm aluminium layer adds 2.7 kg/m² before fasteners and cutouts.']
 ]);
 group('margin seh',assume,[
- ['structureMargin','Apply the editable growth factor once to modeled dry hardware. Record launch headroom separately as allowable minus predicted stack mass. GOLD Table 1.06-1 distinguishes milestone mass margin from item growth allowance.','At 15% modeled growth, 2,000 kg of basic dry hardware receives 300 kg of added dry allocation.'],
+ ['structureMargin','Read the carried top-down dry growth assumption used by this saved design. It is locked while item-specific mass growth evidence is established under the Mission Baseline. Imported values remain part of the reproducible study calculation.','A carried 15% factor adds 300 kg to 2,000 kg of modeled dry hardware; this arithmetic does not establish bottom-up MGA or mission mass-margin compliance.'],
  ['launchAllowanceKg','Enter the accepted mission-specific stack allowance for the target insertion and recovery mode, including the launch-only adapter on the same mass boundary.'],
  ['referenceKg','Use the provider’s specified reference orbit, mass boundary and recovery configuration when interpreting the published performance point.']
 ]);
@@ -235,7 +237,7 @@ group('prop atv rocket',hardware,[
  ['fuelDensity','Use the fuel’s bulk liquid density at modeled tank temperature. Convert kg to litres before sizing the fuel vessel and ullage.'],
  ['oxidizerDensity','Use the oxidizer’s liquid density at the selected temperature and composition. Check the oxidizer tank capacity independently.'],
  ['mixtureRatio','Use delivered oxidizer-to-fuel mass ratio from the engine map over its permitted inlet conditions.','O/F = 2 makes 300 kg of loaded liquid equal to 100 kg fuel and 200 kg oxidizer.'],
- ['reserveFraction','Protect an explicitly allocated fraction of loaded liquid for operational contingency. Keep trapped residuals and disposal allocation separate.'],
+ ['reserveFraction','Read the carried fraction of loaded liquid protected by the study model. It is locked pending the mission-specific propellant uncertainty assessment. Keep this allocation, inaccessible residuals and disposal distinct, with each counted once.','A carried fraction of 0.10 protects 10% of loaded liquid in this study; its 3σ adequacy remains unassessed.'],
  ['residualFraction','Estimate inaccessible liquid using tank/PMD geometry, feed-line volume and shutdown conditions. Express it as a fraction of the initial total liquid load.'],
  ['trimDv','Budget post-separation velocity correction from the launch dispersion envelope and spacecraft maneuver plan. Compare requested and delivered trim.'],
  ['maneuverDv','Allocate additional chemical velocity change for a nominated operational maneuver, independently of daily drag compensation.'],
@@ -277,6 +279,7 @@ const selectFields={
  storage:['Choose the device capacity, sustained read/write mix, endurance and thermal mounting as a complete package.','ssd gevst'],
  battery:['Choose chemistry together with pack-level energy density, allowable rates, thermal envelope and life-test retention.','power gevst'],
  pv:['Compare beginning-of-life conversion, EOL retention and deployed mass at the same temperature, incidence and exposure assumptions.','power margin'],
+ powerArchitecture:['Select the installed electrical family, including primary voltage, converter module ratings, current paths and family limits. The 120 V reference and 400 V development cases both require application-specific hardware evidence.','crisa-ghps crisa-mppt power'],
  coating:['Compare solar absorptance and IR emittance at launch and after mission exposure. Use installed-finish data from comparable samples.','thermal coatings'],
  engine:['Select a compatible fuel, oxidizer, mixture ratio and pressure-fed engine set. Keep thrust, delivered Isp, fluid density and feed constraints together.','prop atv rocket'],
  launchSite:['Select a complex documented for the chosen vehicle. Check the site status, latitude and direct-ascent geometry against the requested orbit.','clear elements'],
@@ -314,6 +317,10 @@ options('battery',[
 options('pv',[
  ['multijunction','Use the multijunction example to trade a smaller area for the required bus watts. Enter measured beginning-of-life efficiency and dose-specific degradation for the selected cells.','power',material],
  ['silicon','Compare the silicon example at the same EOL output requirement. Additional deployed area affects stowed fit, drag torque, mass and recharge.','power clear',material]
+]);
+options('powerArchitecture',[
+ ['reference120','Use the regulated 120 V primary bus with project 48 V payload and 28 V flight/service rails. The Crisa GHPS reference documents 120/28 V distribution, 3 kW modular conversion and a 30 kW unit example. ODC channel counts, 48 V output, masses and the 80 kW electronics study limit are project allocations.','crisa-ghps crisa-mppt','Published supplier architecture with preliminary ODC equipment and interface allocations.'],
+ ['highPower400','Use the 400 V development family with allocated 12 kW modules and a 320 kW electronics study limit. Review insulation, switching, rotary interfaces, fault isolation and qualification for this voltage. The cited 120 V hardware provides design context; it supplies no 400 V flight qualification.','crisa-ghps crisa-mppt','Project development architecture; selected 400 V equipment and qualification remain open.']
 ]);
 options('coating',[
  ['osr','Use the optical solar reflector example for a low-solar-absorption radiator. Check panel seams, backing, view factors and EOL optical measurements.','thermal coatings',material],
@@ -398,12 +405,12 @@ const specials={
  savePreset:['Save a named design','Store the current design, solver choice and thermal requirement settings as a reusable baseline. Give experimental variants distinct names.','seh trade'],
  loadPreset:['Import a saved design','Load a workbench design file and inspect the solver, units, technology selections and mission scope before comparing results.','seh trade'],
  managePresets:['Saved designs','Open a named copy, download it as JSON or unload it from this browser. Import a downloaded copy to use it again.','trade'],
- thermalRole:['Temperature rating or derived requirement','Use a supplier/project rating to evaluate hardware. Derive a required limit from the coldest or hottest covered state plus the chosen padding when specifying new hardware.','gevst thermalrules'],
+ thermalRole:['Temperature rating or study requirement','Compare modeled temperatures with a documented supplier/project rating. Derived study requirements use covered extrema and the carried padding; adopting a derived value does not demonstrate component capability or GEVS verification.','gevst thermalrules'],
  thermalScope:['Temperature coverage','Choose a selected 24-hour operating window for a local transient or an integrated whole mission for a design requirement. Confirm coverage of each activity state.','gevst thermalrules'],
- thermalPadding:['Requirement padding','Specify project uncertainty headroom in kelvin. Subtract it from the observed cold extreme or add it to the hot extreme for a derived requirement.','gevst thermalrules'],
+ thermalPadding:['Carried study padding','This read-only, unvalidated project assumption is retained with imported designs. The study subtracts it from the cold extreme or adds it to the hot extreme. Mission policy requires a component-specific uncertainty and temperature-limit basis before adequacy can be assessed.','gevst thermalrules'],
  thermalNode:['Thermal hardware node','Select the physical reference point to assess. Compare temperatures from that point with its own operating or survival rating.','gevst thermalrules'],
- thermalScale:['Thermal color scale','Use the narrow working span for small temperature differences or the wider span for boundary excursions. Qualification uses the full numerical temperature against rated limits.','gevst thermal'],
- adoptRating:['Adopt a derived temperature','Review the evaluated state, time span and padding, then explicitly adopt the derived limit as a new study input if this defines the requirement.','gevst thermalrules'],
+ thermalScale:['Thermal color scale','Use the narrow working span for small temperature differences or the wider span for boundary excursions. Model range checks use the full numerical temperature; the color scale does not establish qualification.','gevst thermal'],
+ adoptRating:['Adopt a derived study temperature','Review the covered state, time span and carried padding before using the derived bound as a study rating. Hardware capability, allowable flight limits and verification remain separate evidence requirements.','gevst thermalrules'],
  technologyCompare:['Compare compatible technology presets','Hold the other design assumptions fixed. Compare the achievable integer hardware sizes, mass, throughput and limiting margins for each compatible package.','seh trade smad'],
  independentTarget:['Independent sizing target','Select the quantity to solve after declaring the measured or constrained inputs. Recheck compatible materials, whole units and any negative margins.','seh trade'],
  referenceOrbit:['Reference orbit','Compare published payload points only after identifying altitude, inclination, recovery mode and interface boundary. Use the mission-specific allowance for the actual design.','elements margin'],
@@ -426,7 +433,7 @@ options('missionPreset',[
 ]);
 options('thermalRole',[
  ['input','Specify the allowable rating for this hardware and state. The current temperature and all modeled excursions are assessed against this rating.','gevst thermalrules',missionBasis],
- ['derive','Infer a requirement from observed extremes and study padding. Review state coverage before adopting that requirement as an input.','gevst thermalrules',codeInput]
+ ['derive','Infer a study requirement from observed extremes and carried padding. Review state coverage and uncertainty before adopting it as an input; no hardware capability is inferred.','gevst thermalrules',codeInput]
 ]);
 options('thermalScope',[
  ['window','Resolve extrema and state transitions across the selected consecutive 86,400 seconds.','gevst',codeInput],
@@ -434,14 +441,16 @@ options('thermalScope',[
 ]);
 options('thermalScale',[
  ['working','Use the fixed 245–305 K display span for near-operating temperatures. The endpoints saturate outside that span.','thermal',codeInput],
- ['full','Use the fixed 180–380 K span for a broader view of temperature variation. Read the numeric node rating for qualification.','thermal',codeInput]
+ ['full','Use the fixed 180–380 K span for a broader view of temperature variation. Read the numeric model range check and its rating basis separately.','thermal',codeInput]
 ]);
 opts.thermalNode=Object.fromEntries(thermalNodes.map(n=>[n.id,{advice:nodeAdvice[n.id],basis:'Modeled hardware temperature point.',ids:['thermal','gevst']}]));
 // Distinguish component assumptions from published verification and resource-margin practice.
-catalog.structureMargin.advice+=' GOLD gives a PDR mission mass margin above 10% using basic dry mass as its denominator. The workbench growth factor is a separate dry-ledger input.';
-catalog.solarM2.advice+=' For applicable GSFC Phase A reviews, GOLD Table 1.06-1 gives more than 20% EOL power margin, calculated against available power. Size this mission’s own margin from its loads and uncertainties.';
+catalog.structureMargin.advice+=' The adopted GOLD PDR mission criterion is >10% of basic dry mass, after bottom-up item MGA. The carried factor does not establish either assessment.';
+catalog.solarM2.advice+=' The Mission Baseline adopts >15% EOL available-power margin for the PDR target in Phase B. Account for physical degradation and losses before applying that capacity-based criterion.';
 catalog.reserveFraction.ids.push('margin');
-catalog.reserveFraction.advice+=' GOLD Table 1.06-1 frames propellant uncertainty as a 3σ budget. Enter the fraction derived for this mission rather than treating 3σ as 3%.';
+catalog.reserveFraction.advice+=' GOLD Table 1.06-1 calls for a 3σ variation basis and supplies no universal propellant percentage. A controlled maneuver / uncertainty assessment must resolve this legacy assumption.';
+for(const key of ['structureMargin','reserveFraction','thermalPadding','radialPaddingM','axialPaddingM']){catalog[key].readOnly=true;catalog[key].basis='Carried study assumption; read only. Mission-policy assessment remains open.';}
+catalog.structureMargin.title='Carried dry growth assumption';catalog.reserveFraction.title='Carried propellant reserve assumption';
 catalog.f107Floor.example='The workbench nominal cycle uses 70–180 sfu. The ECSS lookup’s low, moderate and long-term high F10.7 reference cases are 65, 140 and 250 sfu.';
 catalog.solarDriver.example='The observed option repeats 132 monthly samples beginning in 2009. The nominal option repeats once per eleven Julian years.';
 catalog.pvRetention.ids.unshift('pvtest');catalog.pvEfficiency.ids.unshift('pvtest');opts.pv.multijunction.ids.unshift('pvtest');
@@ -499,7 +508,7 @@ group('agent-study claude-study mlperf-inference',estimate,[
  ['humanSteeringS','Add the Earth-side human review time for each task requiring steering. The request and response still need contact opportunities.']
 ]);
 group('optimizer parallel mlperf-training',estimate,[
- ['fabricGbps','Use sustained useful collective bandwidth per worker at the selected topology. Gradients, optimizer steps and communication overhead affect attainable training throughput.'],
+ ['fabricGbps','Request usable per-tray worker bandwidth. The hardware model selects 25/50/100/200/400 Gbit/s physical ports with an 80% usable allocation and caps application traffic at the installed useful and bisection limits. Demand above that capacity remains a shortfall. Collective communication and local placement still constrain attainable training throughput.'],
  ['trainingStateBytes','Enter device memory bytes per updated parameter, including the relevant weights, gradients and optimizer state at actual precision.'],
  ['trainableFraction','For parameter-efficient tuning, enter updated parameters divided by total base parameters. The resident base and activation workspace still need memory.'],
  ['activationFraction','Reserve activation and temporary workspace memory as a fraction of modeled training state. Use measurements at the selected batch, context and recomputation settings.'],
@@ -520,11 +529,11 @@ group('optimizer parallel mlperf-training',estimate,[
  ['validationBaseline','Enter the base model’s evaluation score on the same task and protocol. The achieved gain is the calibrated tuned score less the baseline.']
 ]);
 group('laser filing suncatcher',assume,[
- ['relayUpMbps','Use contract-level customer uplink goodput after routing and overhead. Hardware intersatellite line rates do not establish customer access.'],
- ['relayDownMbps','Specify the customer downlink separately from uplink, ground access and the laser hardware line rate.'],
+ ['relayUpMbps','Set the project customer-uplink allocation after routing and overhead. The selected 2 Gbit/s optical modem interface caps useful uplink at 1,600 Mbit/s. A numeric allocation does not establish a provider contract, compatibility or availability.'],
+ ['relayDownMbps','Set the project customer-downlink allocation separately from uplink and ground access. The selected 2 Gbit/s optical modem interface caps useful downlink at 1,600 Mbit/s. Confirm provider service and terminal compatibility separately.'],
  ['relayAvailability','Specify the available share of a repeatable service cycle. The experiment applies an additional handover blackout each cycle.'],
  ['relayCycleS','Choose the period of the assumed relay availability pattern. This scheduling sensitivity stands in for a signed service trace.'],
- ['relayHandoverS','Reserve a blackout at the start of each relay cycle. Direct-plus-relay falls back to the ground link only if the station is acquired.'],
+ ['relayHandoverS','Reserve a blackout at the start of each relay cycle. The modeled blackout is the greater of this value and the selected 35 s terminal-acquisition requirement. One installed optical terminal receives no make-before-break credit; hybrid service can fall back only to an acquired direct ground link.'],
  ['relayRttMs','Enter the complete relay-path round trip including switching and gateway legs. The model uses half of this value per direction.'],
  ['groundEdgeMs','Add Earth-side gateway processing one way. This is separate from slant-range propagation or contracted relay RTT.']
 ]);
@@ -617,6 +626,6 @@ export function fieldGuidance(rawKey,design=defaults,context={}){
   if(pkg&&['fairingM','fairingLengthM','launcherEnvelope'].includes(key))advice+=' '+pkg.note;
  }
  const example=entry.example??optionExample(key,option)??numericExample(key,ctrl,d);
- const bounds=ctrl&&!ctrl.options?{min:ctrl.min,max:ctrl.max,step:ctrl.step,unit:ctrl.unit||'',note:'Workbench input range. Hardware qualification and mission acceptance use separate evidence.'}:null;
+ const bounds=ctrl&&!ctrl.options?{min:ctrl.min,max:ctrl.max,step:ctrl.step,unit:ctrl.unit||'',...(entry.readOnly?{readOnly:true}:{}),note:entry.readOnly?'Workbench input range retained for import compatibility. The carried value is read only; mission-policy evidence remains open.':'Workbench input range. Hardware qualification and mission acceptance use separate evidence.'}:null;
  return {title:entry.title??ctrl?.label??key,advice,basis,sources:records(ids),...(example?{example}:{}),...(bounds?{bounds}:{}),...(choices?{options:choices}:{}),...(choice?{selectedOption:option}:{})};
 }

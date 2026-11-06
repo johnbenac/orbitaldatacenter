@@ -5,8 +5,9 @@ import {deploymentReferences} from './deployment-view.js';
 import {icon} from './icons.js';
 import {propulsionSectionDrawing} from './propulsion-drawing.js';
 import {propulsionReview} from './spacecraft-architecture.js';
+import {renderArchitectureTrade} from './architecture-trades.js';
 
-export const vehicleBaseline='ODC-01 / Rev H';
+export const vehicleBaseline='ODC-01 / Rev I';
 const number=(v,d=2)=>Number.isFinite(v)?v.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:d}):'—';
 const esc=v=>String(v).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;');
 const rule=(id,scope,fixed,variable)=>({id,scope,fixed,variable});
@@ -53,7 +54,8 @@ export function renderArchitecture(h,s){
  const fixed=groundRules.map(r=>`<tr><td><small>${r.id}</small><strong>${r.scope}</strong></td><td>${r.fixed}</td><td>${r.variable}</td></tr>`).join('');
  const row=(cells)=>'<tr>'+cells.map(v=>'<td>'+v+'</td>').join('')+'</tr>';
  return `<div class="arch-sheet">
- <section class="arch-lead panel"><div><span class="arch-index">VEHICLE DEFINITION &nbsp; / &nbsp; REV H</span><h2>Launch-axis packaging</h2><p>Four roll cassettes sit against the ±X walls. The two radiator packs lie against the ±Y walls and unfold toward +Z. Fuel and oxidizer sit side by side immediately above the adapter, with helium in the gap behind them. Both engines exhaust through the −Z launch-adapter face. On orbit, the +Y deck carries the pointing terminals. Every customer mission uses this layout.</p></div><div class="arch-actions"><button class="btn" data-chapter="commissioning">Watch deployment →</button><button class="btn" data-attitude-flight>Inspect flight pointing →</button>${action('data-inspect-bay="true"','Inspect propulsion in 3D','box')}${action('data-page="equipment"','Master equipment list','list-checks')}</div></section>
+ <section class="arch-lead panel"><div><span class="arch-index">VEHICLE DEFINITION &nbsp; / &nbsp; REV I</span><h2>Protected core and articulated energy systems</h2><p>The selected preliminary architecture retains a protected compute core, four solar wings, two pumped radiator banks and a pressure-fed propulsion module. Mission changes evaluate this installed spacecraft. The architecture decision, matched alternatives and supported study range are recorded below.</p></div><div class="arch-actions"><button class="btn" data-chapter="commissioning">Watch deployment →</button><button class="btn" data-attitude-flight>Inspect flight pointing →</button>${action('data-inspect-bay="true"','Inspect propulsion in 3D','box')}${action('data-page="equipment"','Master equipment list','list-checks')}</div></section>
+ ${renderArchitectureTrade(h)}
  ${renderLaunchStructure(h,'architecture')}
  <section class="panel arch-figure"><div class="panelhead"><h2>${icon('fuel',16)} Spacecraft packaging</h2><span class="arch-stamp">CURRENT BUILD</span></div>${propulsionSectionDrawing(h,s)}<div class="arch-strip"><span>Bus, X × Y × Z <b>${number(h.bodyWidthM)} × ${number(h.bodyHeightM)} × ${number(h.bodyLengthM)} m</b></span><span>Launch propellant <b>${number(h.propellantKg)} kg</b></span><span>Combined thrust <b>${number(h.input.thrustN)} N</b></span></div></section>
  ${renderInterface(h,true)}

@@ -5,13 +5,13 @@ const dependencies={
  hkPeriodS:['Command & Data Handling','Electrical Power'],hkRecorderMB:['Command & Data Handling','Mechanical Design'],
  commandKbps:['Communications','Command & Data Handling'],cmgMomentumNms:['Attitude Determination & Control','Mechanical Design','Electrical Power','Mass Budget'],cmgTorqueNm:['Attitude Determination & Control','Propulsion','Electrical Power'],
  aiPurpose:['AI Data Center Purpose','Mission CONOPS','Compute & Storage','Data & Delivery','Communications','Electrical Power','Thermal','Mass Budget'],
- launchSite:['Launch Vehicle','Launch & Insertion','Orbit & Eclipse'],
- launcher:['Launch Vehicle','Launch & Insertion','Mass Budget','Orbit & Eclipse'],battery:['Electrical Power','Thermal','Mass Budget','Mechanical Design','Launch & Insertion'],
+ launchSite:['Launch Vehicle','Launch & Insertion','Flight Dynamics'],
+ launcher:['Launch Vehicle','Launch & Insertion','Mass Budget','Flight Dynamics'],battery:['Electrical Power','Thermal','Mass Budget','Mechanical Design','Launch & Insertion'],
  compute:['Compute & Storage','Data & Delivery','Electrical Power','Thermal','Mass Budget'],workload:['Compute & Storage','Data & Delivery','Communications','Electrical Power'],
  storage:['Compute & Storage','Data & Delivery','Electrical Power','Mass Budget'],pv:['Electrical Power','Environment','Attitude Determination & Control','Mass Budget'],coating:['Thermal','Environment','Electrical Power'],
- engine:['Propulsion','Orbit & Eclipse','Mass Budget','Mission CONOPS'],network:['Communications','Data & Delivery','Attitude Determination & Control','Electrical Power'],
- link:['Communications','Data & Delivery','Electrical Power','Attitude Determination & Control'],disposalMethod:['Mission CONOPS','Propulsion','Orbit & Eclipse','Mass Budget'],
- attitude:['Environment','Attitude Determination & Control','Electrical Power','Propulsion'],thermalMode:['Thermal','Electrical Power','Environment'],solarDriver:['Environment','Orbit & Eclipse','Propulsion']
+ engine:['Propulsion','Flight Dynamics','Mass Budget','Mission CONOPS'],network:['Communications','Data & Delivery','Attitude Determination & Control','Electrical Power'],
+ link:['Communications','Data & Delivery','Electrical Power','Attitude Determination & Control'],disposalMethod:['Mission CONOPS','Propulsion','Flight Dynamics','Mass Budget'],
+ attitude:['Environment','Attitude Determination & Control','Electrical Power','Propulsion'],thermalMode:['Thermal','Electrical Power','Environment'],solarDriver:['Environment','Flight Dynamics','Propulsion']
 };
 // Each item is an independently entered requirement whose validity can change
 // even when the preset does not supply a replacement value.
@@ -52,7 +52,7 @@ export function impactOfChange(before,after,mode='installed',nextMode=mode,curre
  const retained=[...new Map(keys.flatMap(k=>validationLinks[k]||[]).filter(([key])=>Object.hasOwn(after,key)&&!keys.includes(key)).map(([key,note])=>[key,{key,label:fields[key]?.label||key,value:after[key],unit:fields[key]?.unit||'',note}])).values()];
  const proposed=inverseSolve(after,nextMode),deltas=metrics.map(([label,unit,f])=>({label,unit,before:f(current),after:f(proposed)})).filter(r=>Number.isFinite(r.before)&&Number.isFinite(r.after)&&unequal(r.before,r.after));
  const margins=Object.entries(proposed.envelope.rates).map(([key,after])=>({key,label:sizingLabel(key),before:current.envelope.rates[key],after}));
- const newFailures=margins.filter(r=>!meetsSizingRequirement(r.after)&&(r.before===undefined||meetsSizingRequirement(r.before)));
+ const newFailures=margins.filter(r=>!meetsSizingRequirement(r.after,r.key)&&(r.before===undefined||meetsSizingRequirement(r.before,r.key)));
  const review=mode!==nextMode||keys.some(k=>fields[k]?.options)||newFailures.length>0||current.feasible&&!proposed.feasible;
  return {changes,domains,errors,deltas,margins,newFailures,retained,review,proposed};
 }

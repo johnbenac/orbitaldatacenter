@@ -4,6 +4,7 @@ import {DEPLOY_END_S} from './commissioning-clock.js';
 // acquisition-, power- and activity-limited service opportunities. Resources are
 // reserved in chronological FCFS order. One clock covers ingress, work and egress.
 import {serviceDefaults,relayGate,relayBoundaries} from './ai-service-inputs.js';
+import {serviceArchitecture,allocatedRelayRates} from './service-architecture.js';
 export {serviceControls,serviceDefaults} from './ai-service-inputs.js';
 const DAY=86400,MAX_DAYS=90,INF=Infinity;
 const num=x=>Number.isFinite(x)?x:null;
@@ -46,6 +47,8 @@ function percentile(entries,p){
 }
 function rates(d,h,raw){
  const rows=[],network={directSeconds:0,directServiceSeconds:0,relaySeconds:0,route:d.serviceRoute,upGB:0,downGB:0,stations:[],maxOutageS:0};
+ const architecture=h.serviceArchitecture||serviceArchitecture(h),terminal=architecture.terminal,relayRates=allocatedRelayRates(h);
+ const efficiency=Math.max(0,Math.min(1,d.codingEff)),directUpCap=architecture.route.directCustomerUplinkCapMbps;
  let outage=0,busKWh=0,itKWh=0;const stations=new Set();
  for(const seg of raw){
   const dt=seg.end-seg.start;if(!(dt>0))continue;
@@ -54,13 +57,17 @@ function rates(d,h,raw){
   for(let i=1;i<cuts.length;i++){
    const start=cuts[i-1],end=cuts[i],n=end-start,relay=d.serviceRoute!=='direct'&&relayGate((start+end)/2,d);
    const commissioned=seg.commissioned??seg.serviceAvailable??(start>=DEPLOY_END_S);
-   const ref=seg.routePoweredFraction??seg.poweredSupport??1;
-   const useRelay=relay&&commissioned&&ref>0&&(seg.relayOn??true),allowDirect=d.serviceRoute==='direct'||d.serviceRoute==='hybrid'&&!useRelay;
-   let up=useRelay?d.relayUpMbps*ref:allowDirect?seg.upMbps||0:0;
-   let down=useRelay?d.relayDownMbps*ref:allowDirect?seg.downMbps||0:0;
-   if(!commissioned){up=0;down=0}
-   if(Number.isFinite(seg.routeUpMbps))up=seg.routeUpMbps;
-   if(Number.isFinite(seg.routeDownMbps))down=seg.routeDownMbps;
+   const ref=seg.routePoweredFraction??seg.poweredSupport??1,routePowered=commissioned&&Number.isFinite(ref)&&ref>=1-1e-6;
+   const selectedRelay=relay&&(seg.relayOn??true),useRelay=selectedRelay&&routePowered,allowDirect=routePowered&&(d.serviceRoute==='direct'||d.serviceRoute==='hybrid'&&!selectedRelay);
+   // Supplied intervals can reduce installed capacity, never enlarge it. A
+   // fractional electrical allocation cannot maintain the terminal's carrier.
+   const directTerminal=String(seg.payloadTerminal||seg.groundLink||d.link||'auto').toLowerCase();
+   const directLine=/optic|laser|auto/.test(directTerminal)?terminal.directOpticalLineMbps:/s-band|sband|^s$/.test(directTerminal)?terminal.directSLineMbps:terminal.directKaLineMbps;
+   const directDownCap=Math.min(directLine*efficiency,Number.isFinite(d.linkCapMbps)?Math.max(0,d.linkCapMbps):Infinity);
+   const upLimit=useRelay?relayRates.upMbps:allowDirect?Math.min(Math.max(0,seg.upMbps||0),directUpCap):0;
+   const downLimit=useRelay?relayRates.downMbps:allowDirect?Math.min(Math.max(0,seg.downMbps||0),directDownCap):0;
+   const up=Math.min(upLimit,Number.isFinite(seg.routeUpMbps)?Math.max(0,seg.routeUpMbps):upLimit);
+   const down=Math.min(downLimit,Number.isFinite(seg.routeDownMbps)?Math.max(0,seg.routeDownMbps):downLimit);
    const oneWay=d.groundEdgeMs/1000+(useRelay?d.relayRttMs/2000:(seg.rangeKm||0)/299792.458);
    rows.push({...seg,start,end,up:Math.max(0,up)*1e6/8,down:Math.max(0,down)*1e6/8,oneWay,active:Number.isFinite(seg.capacityUnitsPerSec)&&h.ai.activeUnitsPerSec>0?Math.max(0,Math.min(1,seg.capacityUnitsPerSec/h.ai.activeUnitsPerSec)):Math.max(0,seg.activeFraction||0),compute:Math.max(0,seg.aiUnitRate||0)});
    if(useRelay&&(up>0||down>0))network.relaySeconds+=n;
@@ -88,7 +95,7 @@ function inference(d,h,a,rows,start,end){
  const fanout=agent?Math.max(1,Math.round(d.agentFanout??1)):1;
  const workers=agent?Math.max(1,Math.min(fanout,Math.floor((a.agentWorkerSlots??h.sessions)/slots))):1;
  const waves=Math.ceil(fanout/workers),peerBytes=a.internalBytesPerTask??fanout*steps*(d.agentMessageKB??0)*1000;
- const fabricRate=a.fabricSecondsPerTask>0?peerBytes/a.fabricSecondsPerTask:d.fabricGbps*1e9/8;
+ const fabricRate=a.fabricSecondsPerTask>0?peerBytes/a.fabricSecondsPerTask:(h.serviceArchitecture||serviceArchitecture(h)).fabric.effectivePerWorkerGbps*1e9/8;
  const fabric=new Calendar(rows,r=>r.active*fabricRate);
  const burstRate=agent?(a.modelOnlyUnitsPerSec??(h.tokensPerSec*a.fabricEfficiency/(d.outputTokens*steps*fanout))):a.activeUnitsPerSec;
  const modelCritical=agent?(a.serialModelSeconds??INF)*waves/Math.max(1,a.agentWaves??1):batch?0:(h.ttfSeconds+d.outputTokens/Math.max(1e-30,h.perUserTps))*(voice?1.35:1);

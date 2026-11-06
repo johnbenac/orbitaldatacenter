@@ -22,6 +22,7 @@ const terms={
 export const domainTerms=id=>terms[id]||[];
 export function referenceLesson(id){
  const notes={
+  mission:['What must this design demonstrate at PDR?','The Mission Baseline defines the design approach, margin rules, applicability decisions and evidence gates for every subsystem. PDR is near the end of Phase B. The configuration remains a preliminary design until its evidence and review findings are accepted.', 'Inspect subsystem design','conops','B'],
   architecture:['Which parts belong to every mission?','Follow the load from the spacecraft’s aft deck to its launcher. A different mission can resize the computers, wings or batteries while keeping the same spacecraft attachment pattern.', 'See the launcher adapter','launcher','B'],
   timeline:['What clock is the launch team watching?','Zero marks liftoff. Before zero, read how much time remains. After zero, read how long the vehicle has been in flight. The opening campaign uses planning days. Modeled events can be opened at their actual mission instants.', 'Visit the launch sequence','launcher','D'],
   equipment:['How do individual parts become a vehicle mass?','Quantity times unit mass gives each equipment allocation. To find the balance point, the mechanical model also needs the location of that mass. Filter a subsystem here, then inspect its contribution in Mechanical Design.', 'Inspect mass properties','mechanical','B'],

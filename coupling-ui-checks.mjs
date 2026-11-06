@@ -62,7 +62,7 @@ for(const id of ['falconHeavy','longMarch9']){
  await fire({useLauncher:id});await accept();const after=await snapshot();assert.equal(after.design.launcher,id);assert.equal(after.design.launchAllowanceKg,before.design.launchAllowanceKg);assert.equal(after.view.solve,before.view.solve);
 }
 await change('',.003,{param:'missionYears'});if(el('dialog').open)await accept();
-await fire({phase:'B'});for(const domain of domainIds){await fire({domain});assert.match(el('system-choice').innerHTML,/>Design</);assert.match(el('engineering-toggle').innerHTML,/>Analysis</);assert(!el('study').hidden&&!el('lower').hidden&&!el('timeline').hidden);assert.match(el('study').innerHTML,/data-chart=/);assert.match(el('lower').innerHTML,/ledger|Engineering readouts/i)}
+await fire({phase:'B'});for(const domain of domainIds){await fire({domain});assert.match(el('system-choice').innerHTML,/>Preliminary design</);assert.match(el('engineering-toggle').innerHTML,/>Analysis</);assert(!el('study').hidden&&!el('lower').hidden&&!el('timeline').hidden);assert.match(el('study').innerHTML,/data-chart=/);assert.match(el('lower').innerHTML,/ledger|Engineering readouts/i)}
 await fire({phase:'C'});await fire({domain:'thermal'});await fire({domain:'data'});assert(!(await snapshot()).view.overlays.includes('thermal'));
 await fire({phase:'D'});await fire({domain:'launcher'});const before=(await snapshot()).design;await fire({useLauncher:'terran'});assert.deepEqual((await snapshot()).design,before);
 console.log('All Phase B Design and Analysis sections, cited field help, coupled impact preview/cancel/apply, custom overrides, solver and allowance retention, flight locks and thermal layer isolation passed.');

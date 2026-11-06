@@ -10,7 +10,11 @@ for(const id of Object.keys(aiPurposes)){
  const selected=applyAIPurpose(defaults,id);assert.deepEqual(selected,{...defaults,aiPurpose:id});
  const h=sizeDesign(selected);assert.equal(h.launchKg,base.launchKg);assert.deepEqual(h.massLedger,base.massLedger);assert.equal(h.bodyLengthM,base.bodyLengthM);assert.equal(h.bodyWidthM,base.bodyWidthM);
  const d=applyAIPurpose(defaults,id,true),built=sizeDesign(d);assert.equal(built.input.aiPurpose,id);assert.deepEqual(built.errors,[]);
- assert.ok(built.ai.activeUnitsPerSec>=0);if(id==='batch'||id==='agents')assert.ok(built.launchScreenFeasible,id);
+ assert.ok(built.ai.activeUnitsPerSec>=0);
+ if(id==='batch'||id==='agents'){
+  assert.equal(built.launchScreenFeasible,built.fairing.fit&&built.payloadInterface.passes&&built.launchScreenMarginKg>=0,id+' must expose the actual launch screen');
+  if(!built.payloadInterface.passes)assert.ok(built.payloadInterface.boreClearanceM<0||built.payloadInterface.deckClearanceM<0||built.payloadInterface.bellTipClearanceM<0,id+' needs a specific interface shortfall');
+ }
 }
 // Switching among any two starters must produce the same destination as a
 // fresh start with the same mission constraints, including nested technology.
@@ -57,7 +61,10 @@ assert.ok(trillion.ai.memoryMarginGB<0);assert.equal(trillion.ai.activeUnitsPerS
 const weak=createSimulation(trillion).at(5000);assert.equal(weak.aiTrainingTokens,0);assert.equal(weak.tokensGenerated,0);assert.equal(weak.aiProductGeneratedGB,0);
 const big=applyAIPurpose(defaults,'pretrain',true),dense=sizeDesign(big),sparse=sizeDesign({...big,activeParamFraction:.125});assert.equal(dense.ai.modelMemoryGB,sparse.ai.modelMemoryGB);assert.equal(dense.ai.artifactGB,sparse.ai.artifactGB);assert.ok(sparse.ai.activeUnitsPerSec>dense.ai.activeUnitsPerSec);assert.ok(dense.ai.trainingDays>big.trainingBudgetDays);
 assert.ok(sizeDesign({...big,fabricGbps:10}).ai.activeTrainingTps<dense.ai.activeTrainingTps);
-const ag=applyAIPurpose(defaults,'agents',true),starved=sizeDesign({...ag,hostCores:1,toolCpuSeconds:100});assert.ok(starved.ai.activeUnitsPerSec<sizeDesign(ag).ai.activeUnitsPerSec);assert.ok(starved.ai.hostKw>0);
+const ag=applyAIPurpose(defaults,'agents',true),starved=sizeDesign({...ag,hostCores:1,toolCpuSeconds:100});assert.ok(starved.ai.activeUnitsPerSec<sizeDesign(ag).ai.activeUnitsPerSec);
+assert.equal(starved.ai.hostKw,0,'The allocated core is already powered inside the selected tray');
+assert.equal(starved.serviceArchitecture.compute.extraHostModules,0);
+const extraHosts=sizeDesign({...ag,hostCores:ag.trayCount*8+16});assert.equal(extraHosts.serviceArchitecture.compute.extraHostModules,1);assert.ok(extraHosts.ai.hostKw>0,'An added host module must draw additional power');
 const narrow=sizeDesign({...ag,agentFanout:1}),wide=sizeDesign({...ag,agentFanout:10000});assert.ok(wide.ai.agentWaves>1&&wide.ai.agentWorkerSlots<10000);assert.equal(wide.ai.agentCallsPerTask,ag.agentSerialSteps*10000);assert.equal(wide.ai.tokensPerUnit,10000*narrow.ai.tokensPerUnit);assert.equal(wide.ai.outputBytesPerUnit,narrow.ai.outputBytesPerUnit);assert.ok(wide.ai.activeUnitsPerSec<narrow.ai.activeUnitsPerSec);assert.equal(wide.ai.internalBytesPerTask,narrow.ai.internalBytesPerTask*10000);
 const partial=createSimulation(wide).at(DEPLOY_END_S+100);assert.ok(partial.aiUnitsComputed>0&&partial.aiUnitsComputed<1);assert.equal(partial.aiProductGeneratedGB,0);assert.ok(partial.aiPeerTrafficGB>0);
 near(10000*50*4*8/1e6,16);const voice=sizeDesign(applyAIPurpose(defaults,'voice',true));near(voice.ai.inputBytesPerUnit*8/voice.input.voiceTurnSeconds/1000,24);near(voice.ai.outputBytesPerUnit,voice.ai.inputBytesPerUnit);near(24*1000*.020/8,60);

@@ -3,7 +3,7 @@ import {defaults, sizeDesign, estimateLife, applyPreset, YEAR} from './dist/desi
 import {chronologicalAudit} from './dist/mission-worker.js';
 import {DAY} from './dist/orbit.js';
 import {createSimulation} from './dist/model.js';
-import {loadScenario, scenarios} from './verification-fixtures.mjs';
+import {loadScenario, scenarios, nominalCheckoutDesign} from './verification-fixtures.mjs';
 
 const near=(a,b,tolerance=1e-6)=>assert.ok(Number.isFinite(a)&&Number.isFinite(b)&&Math.abs(a-b)<=tolerance,`${a} vs ${b}`);
 const testDays=2.75;
@@ -18,9 +18,20 @@ for(const key of ['generatedGB','deliveredGB','uploadedGB','unmetKWh','propellan
 near(end.queueGB+end.deliveredGB+end.droppedGB,baseline.initialQueueGB+end.generatedGB);
 assert.ok(audit.dayStats.every(s=>s.minSocPct>=0&&s.maxSocPct<=100&&s.maxJunctionK>150));
 assert.equal(audit.result.days,3);
-assert.equal(audit.result.firstCrossing.id,'battery');
-assert.equal(audit.result.firstCrossing.side,'low');
-assert.equal(audit.result.firstCrossing.time,audit.result.thermalQualifiedUntilS);
+assert.ok(audit.result.physicalLifetimeSeconds<=audit.result.thermal.coveredSeconds+1e-6,'Hardware lifetime cannot exceed modeled hardware coverage');
+assert.ok(audit.result.physicalLifetimeSeconds<=audit.result.finalState.spacecraftModelEndedAt+1e-6,'A later disposal outcome cannot extend modeled hardware lifetime');
+if(audit.result.thermal.firstViolation)assert.ok(audit.result.physicalLifetimeSeconds<=audit.result.thermal.firstViolation.time+1e-6,'The earliest operational limit cannot follow a modeled thermal limit');
+assert.equal(audit.result.thermalQualifiedUntilS,audit.result.thermal.firstViolation?.time??audit.result.thermal.coveredSeconds);
+assert.equal(audit.result.physicalLifetimeSeconds,Math.min(audit.result.firstCrossing?.time??Infinity,audit.result.thermal.coveredSeconds));
+// Synthetic timestamps isolate the reporting contract; chronological hardware
+// and resource evolution are exercised by the replay checks above and below.
+const lifetimeHardware=sizeDesign(nominalCheckoutDesign()),coverageRecord={thermal:{coveredSeconds:3600},physicalLifetimeSeconds:3600,firstCrossing:{limit:'Later disposal outcome',time:4500}};
+const coveredLife=estimateLife(lifetimeHardware,30,coverageRecord);
+near(coveredLife.years,3600/YEAR);assert.equal(coveredLife.binding,'Modeled hardware coverage');assert.equal(coveredLife.lowerBound,true);
+const horizonLife=estimateLife(lifetimeHardware,1800/YEAR,coverageRecord);
+near(horizonLife.years,1800/YEAR);assert.equal(horizonLife.binding,'Audited horizon');assert.equal(horizonLife.lowerBound,true);
+const limitedLife=estimateLife(lifetimeHardware,30,{...coverageRecord,physicalLifetimeSeconds:1200,firstCrossing:{limit:'Earlier resource limit',time:1200}});
+near(limitedLife.years,1200/YEAR);assert.equal(limitedLife.binding,'Earlier resource limit');assert.equal(limitedLife.lowerBound,false);
 const long=chronologicalAudit(dayTime(5.25));
 for(const key of ['prop','momentum','queue','energy','heat','usedImpulse'])for(let i=1;i<audit.seeds.length;i++)near(long.seeds[i][key],audit.seeds[i][key]);
 const failures=[
@@ -45,7 +56,7 @@ for(const c of scenarios){
   assert.equal(s.groundLink,'Optical');assert.equal(s.station,'Madrid');assert.ok(s.acquired&&s.goodputMbps>1000);
   assert.ok(sim.at(d.event.end).deliveredGB>sim.at(d.event.start).deliveredGB+10);
  }else if(d.id==='compute-burst'){
-  assert.ok(s.burst);near(s.itKW,32);assert.ok(sim.at(d.event.end+2).itKW<s.itKW/2);
+  assert.ok(s.burst);near(s.itKW,sim.hardware.itKw);assert.ok(s.itKW>=sim.hardware.acceleratorKw);assert.ok(sim.at(d.event.end+2).itKW<s.itKW/2);
  }else {assert.equal(sim.daySummary(0).shadowSeconds,0);assert.ok(Math.abs(s.betaDeg)>75);}
 }
 console.log('Passed chronological replay, partial final day, all event types, energy/data/propellant counters, restart invariance, five physical failure modes, sizing lifetime sensitivity and three named mission scenarios.');

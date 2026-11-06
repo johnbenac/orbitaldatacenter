@@ -1,20 +1,21 @@
 {
-  "release": "v31",
+  "release": "v36",
   "source_host": "boiler",
-  "source_path": "/home/johnb/Downloads/orbital-data-center-v31.zip",
-  "archive_sha256": "504cfc0fb46f9c8c8a30c6678bb67c8b4298aa17b6c9f4f40ce00ddfc60afdc6",
+  "source_path": "/home/johnb/Downloads/orbital-data-center-v36.zip",
+  "archive_sha256": "5100d0b6ff48cf96e6066287728793a62ee1bb563bf37c5d4ab868c583f9b99b",
   "static_directory": "dist",
   "checks_passed": [
-    "162 asset manifest entries",
-    "123 JavaScript syntax checks",
+    "184 asset manifest entries",
+    "142 JavaScript syntax checks",
     "15 import and assembly regression tests",
-    "Desktop and mobile browser startup, 3D rendering, footer links and social metadata"
+    "input-guidance-test.mjs",
+    "Desktop and mobile startup, 3D rendering, footer links and social metadata; no browser errors or failed assets"
   ],
   "validation_notes": [
-    "Unmodified engine-checks.mjs fails its contact CMG power increase assertion; handed upstream.",
-    "ai-service-test.mjs exceeded the 600-second limit; retry and remaining long checks stopped at user request.",
-    "Deploy the upstream application as supplied; no local model or test patch.",
-    "Issue memo copied to boiler:/home/johnb/Downloads/orbital-data-center-v31-validation-memo.md."
+    "Unmodified interface-checks.mjs fails its agents payload-interface assertion at line 22; handed upstream.",
+    "Full numerical validation remains with the upstream team per user instruction.",
+    "Upstream application and tests deployed as supplied without patches.",
+    "Issue memo copied to boiler:/home/johnb/Downloads/orbital-data-center-v36-validation-memo.md."
   ],
-  "upstream_issue_memo": "docs/upstream-issues/v31-validation.md"
+  "upstream_issue_memo": "docs/upstream-issues/v36-validation.md"
 }

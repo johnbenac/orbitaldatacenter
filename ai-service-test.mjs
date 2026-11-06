@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
 import {defaults,sizeDesign} from './dist/design.js';
 import {createSimulation} from './dist/model.js';
 import {assessServiceSegments,evaluateService,artifactBudget} from './dist/ai-service.js';
@@ -21,11 +22,16 @@ const v=assessServiceSegments(fixture('voice',{serviceRoute:'direct',serviceConc
 const v0=assessServiceSegments(fixture('voice',{serviceRoute:'direct',serviceConcurrency:3,liveQualityFraction:0}),open,env);assert.equal(v0.onTime,0);assert.equal(v0.completed,v.completed);
 const a1=assessServiceSegments(fixture('agents',{agentSerialSteps:1,toolsPerTask:2,earthToolFraction:0,humanSteeringS:0,toolCpuSeconds:.01}),open,env);
 const a2=assessServiceSegments(fixture('agents',{agentSerialSteps:1,toolsPerTask:2,earthToolFraction:1,humanSteeringS:50,toolRttS:5}),open,env);
-assert.ok(a2.completed<a1.completed);assert.ok(a2.latency.p95>a1.latency.p95);
+assert.ok(a2.completed<a1.completed);assert.equal(a2.latency.p95,null,'A remote-tool result that cannot traverse the physical uplink in the window has no receipt latency');
+const agentLong=[segment(0,400,1000,1000)],agentWindow={start:0,end:400};
+const localLong=assessServiceSegments(fixture('agents',{agentFanout:1,agentSerialSteps:1,toolsPerTask:2,earthToolFraction:0,humanSteeringS:0,toolCpuSeconds:.01}),agentLong,agentWindow);
+const remoteLong=assessServiceSegments(fixture('agents',{agentFanout:1,agentSerialSteps:1,toolsPerTask:2,earthToolFraction:1,humanSteeringS:50,toolRttS:5}),agentLong,agentWindow);
+assert.ok(remoteLong.completed>0&&remoteLong.completed<localLong.completed);assert.ok(remoteLong.latency.p95>localLong.latency.p95);
 const hy={serviceRoute:'hybrid',relayUpMbps:21,relayDownMbps:38,relayCycleS:100,relayAvailability:.6,relayHandoverS:10};
-assert.equal(relayGate(5,hy),false);assert.equal(relayGate(30,hy),true);assert.deepEqual(relayBoundaries(0,100,hy),[10,60,100].filter(t=>t<100));
-const route=assessServiceSegments(fixture('text',hy),[segment(0,100,10,6)],env);almost(route.network.upGB,50*(21+10)/8000);almost(route.network.downGB,50*(38+6)/8000);
-assert.equal(route.network.relaySeconds,50);assert.equal(route.network.directServiceSeconds,50);
+assert.equal(relayGate(5,hy),false);assert.equal(relayGate(30,hy),false);assert.equal(relayGate(35,hy),true);assert.deepEqual(relayBoundaries(0,100,hy),[35,60]);
+const route=assessServiceSegments(fixture('text',hy),[segment(0,100,10,6)],env);almost(route.network.upGB,(25*21+75*1.56)/8000);almost(route.network.downGB,(25*38+75*6)/8000);
+assert.equal(route.network.relaySeconds,25);assert.equal(route.network.directServiceSeconds,75);
+almost(ready.network.upGB,100*1.56/8000);almost(ready.network.downGB,100*390/8000);
 const budget=artifactBudget({...defaults,aiPurpose:'pretrain',pretrainParamsB:1000,trainableFraction:.001,trainingTokensB:1000,artifactBits:16,corpusTokenBytes:4,checkpointBytesPerParam:14});
 assert.equal(budget.bf16GB,2000);assert.equal(budget.fourBitGB,500);assert.equal(budget.adapterGB,2);assert.equal(budget.restartGB,14000);assert.equal(budget.corpusGB,4000);
 const tune=fixture('finetune',{fineTuneTokensM:.001,datasetGB:.01,initialInputGB:.01,trainingCalibration:'none',artifactKind:'adapter',baseCompatible:'yes'});
@@ -55,7 +61,18 @@ assert.deepEqual(firstDay.result,real,'Background landing-page service must matc
 const midnight=sim.at(DAY);
 sim.daySummary(DAY);
 assert.deepEqual(sim.at(DAY),midnight,'Reading a midnight seed must agree with integrating the following day');
-const older=createSimulation(fixture('batch',{missionYears:1,serviceOffersPerHour:2})),start=61.25*DAY,seed61=older.serviceSeed(start),span=1.5*DAY;
+// The worker contract starts with a supplied late-age inventory. An isolated
+// fixture uses one representative day to prepare its projected checkpoint.
+// The background worker imports the production model and integrates that seed.
+const modelUrl=new URL('./dist/model.js',import.meta.url);
+let projectionSource=await readFile(modelUrl,'utf8');
+assert.ok(projectionSource.includes('const earlyDays=60,sampleBlock=90'));
+projectionSource=projectionSource.replace('const earlyDays=60,sampleBlock=90','const earlyDays=0,sampleBlock=90');
+projectionSource=projectionSource.replace(/from '(\.\/[^']+)'/g,(_,path)=>`from '${new URL(path,modelUrl).href}'`);
+const {createSimulation:createProjectedSimulation}=await import('data:text/javascript;base64,'+Buffer.from(projectionSource).toString('base64'));
+const older=createProjectedSimulation(fixture('batch',{missionYears:1,serviceOffersPerHour:2})),start=61.25*DAY,seed61=older.serviceSeed(start),span=1.5*DAY;
+assert.equal(seed61.t,start);
+assert.equal(older.at(start).projected,true);
 const later=await backend({design:older.hardware.input,start,span,initialSeed:seed61,seedProvenance:'test supplied inventory'});
 assert.ok(later.result,later.error);assert.equal(later.progress.length,2);assert.ok(later.result.notes.some(s=>s.includes('test supplied inventory')));
 const exact=evaluateService(older,start,span);assert.equal(later.result.completed,exact.completed);almost(later.result.energy.busKWh,exact.energy.busKWh,1e-7);

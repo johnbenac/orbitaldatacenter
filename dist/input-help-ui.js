@@ -25,7 +25,7 @@ export function helpForElement(el,design){
 export function shortHint(row){return row?[row.advice,row.example?String(row.example):'',row.sources.slice(0,2).map(s=>s.title+(s.locator?' · '+s.locator:'')).join(' / ')].filter(Boolean).join(' '):''}
 export function helpBody(key,design,option){
  const r=fieldGuidance(key,design,{option:option||design[key]});if(!r)return '';
- const bounds=r.bounds?'<div class="field-range"><b>Editable range</b> '+esc(r.bounds.min)+'–'+esc(r.bounds.max)+' '+esc(r.bounds.unit||'')+'<small>'+esc(r.bounds.note)+'</small></div>':'';
+ const bounds=r.bounds?'<div class="field-range"><b>'+(r.bounds.readOnly?'Import compatibility range':'Editable range')+'</b> '+esc(r.bounds.min)+'–'+esc(r.bounds.max)+' '+esc(r.bounds.unit||'')+'<small>'+esc(r.bounds.note)+'</small></div>':'';
  const options=r.options?.length?'<details class="guide-options"><summary>Compare the choices ('+r.options.length+')</summary>'+r.options.map(o=>'<section><h4>'+esc(o.label)+'</h4><p>'+esc(o.advice)+'</p>'+(o.example?'<p>'+esc(o.example)+'</p>':'')+'<small>'+esc(o.basis||'')+'</small><div>'+o.sources.map(refLink).join(' · ')+'</div></section>').join('')+'</details>':'';
  return '<p class="field-advice">'+esc(r.advice)+'</p>'+(r.example?'<p class="field-example">'+esc(r.example)+'</p>':'')+'<div class="guide-basis"><strong>Basis for this choice</strong><p>'+esc(r.basis)+'</p></div>'+bounds+options+'<h3 class="gap">Sources</h3><ul class="field-refs">'+r.sources.map(s=>'<li>'+refLink(s)+'</li>').join('')+'</ul>';
 }

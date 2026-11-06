@@ -12,7 +12,12 @@ MANIFEST = 'upstream-files.json'
 ROOT_DOCS = {'DESIGN.md', 'ENGINE.md', 'SCENE.md', 'requirements.txt', 'package.json'}
 UPSTREAM_TOOLS = {'tools/build-identity.py'}
 MAPPED = {'README.md': 'upstream-docs/README.md',
-          '.openai/hosting.json': 'upstream-docs/hosting.json'}
+          '.openai/hosting.json': 'upstream-docs/hosting.json',
+          'VALIDATION-v21.0.md': 'upstream-docs/VALIDATION-v21.0.md',
+          'VALIDATION-v32.md': 'upstream-docs/VALIDATION-v32.md',
+          'validation-power-interface-1793995613763.jpg':
+              'upstream-docs/validation-power-interface-1793995613763.jpg',
+          'validation-ui-work.jpg': 'upstream-docs/validation-ui-work.jpg'}
 
 
 def digest(data):

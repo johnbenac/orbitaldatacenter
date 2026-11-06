@@ -70,7 +70,7 @@ function preview(h,id){
  let fit=f.fit?'Stowed fairing fits':'Stowed fairing exceeded';
  if(!f.fit)fit+=' · '+[f.radialClearanceM<0?value(-f.radialClearanceM,'m radial'):'',f.axialClearanceM<0?value(-f.axialClearanceM,'m axial'):''].filter(Boolean).join(' / ');
  const service='<dl class="ap-dossier ap-facts">'+datum('Earth deliverable',p.product)+workloadFact(id,b)+'</dl>';
- const failed=Object.entries(e.rates).filter(([,v])=>!meetsSizingRequirement(v));
+ const failed=Object.entries(e.rates).filter(([k,v])=>!meetsSizingRequirement(v,k));
  const challenge=failed.length?'<p class="ap-fit ap-short"><strong>Sizing challenge · '+failed.length+' unmet '+(failed.length===1?'requirement':'requirements')+'</strong><br>'+failed.map(([k])=>esc(sizingLabel(k))).join(' · ')+'</p>':'';
  const hardware=challenge+'<p class="ap-fit '+(e.feasible?'ap-ok':'ap-short')+'"><b>'+esc(constraint)+'</b> · '+esc(percent)+' of sizing requirement</p><p class="ap-fit '+(f.fit?'':'ap-short')+'">'+esc(fit)+'</p>';
  const details='<details><summary>Equipment and acceptance criteria</summary><dl class="ap-dossier">'+datum('Compute package',presets.compute[d.compute].label)+datum('Installed trays',value(b.trays,'trays')+' · '+value(q.installedMemoryGB,'GB high-bandwidth memory',0))+datum('Host and fabric',value(d.hostCores,'cores')+' · '+value(d.fabricGbps,'Gbit/s'))+datum('Storage / battery',value(b.storageTB,'TB')+' / '+value(b.batteryKWh,'kWh'))+datum('Solar / radiator area',value(b.solarM2,'m²')+' / '+value(b.radiatorM2,'m²'))+datum('Launched mass',value(b.launchKg,'kg',0))+datum('Launch mass headroom',value(b.launchScreenMarginKg,'kg',0))+datum('Memory headroom',value(q.memoryMarginGB,'GB'))+datum('Customer acceptance',criteria(id,d))+'</dl></details>';
@@ -86,9 +86,9 @@ function committed(h,phase,snapshot,service,full=true){
 }
 function activeLimits(e){
  const entries=Object.entries(e.rates).filter(([k,r])=>r!==Infinity||k==='chemicalBurnClearance');
- const failed=entries.filter(([,r])=>!meetsSizingRequirement(r));
+ const failed=entries.filter(([k,r])=>!meetsSizingRequirement(r,k));
  const summary=failed.length?'Sizing needs attention · '+failed.map(([k])=>sizingLabel(k)).join(', '):'Review installed sizing margins';
- return '<details class="ap-sizing"><summary>'+esc(summary)+'</summary><dl>'+entries.map(([k,r])=>datum(sizingLabel(k),sizingMargin(k,r))).join('')+'</dl><p class="ap-note">A zero margin meets a sizing requirement. Customer response times above include waiting for Earth access.</p></details>';
+ return '<details class="ap-sizing"><summary>'+esc(summary)+'</summary><dl>'+entries.map(([k,r])=>datum(sizingLabel(k),sizingMargin(k,r,e))).join('')+'</dl><p class="ap-note">PDR mass and power require strictly positive headroom above their adopted thresholds. Other sizing bounds use their stated limits. Customer response times above include waiting for Earth access.</p></details>';
 }
 export function renderAIPurpose(h,phase='A',{snapshot,selectedId,service,envelope,failed=false,context='purpose'}={}){
  const active=purposeId(h),editable=['A','B','C'].includes(phase),id=editable&&Object.hasOwn(purposeDisplay,selectedId)?selectedId:active;

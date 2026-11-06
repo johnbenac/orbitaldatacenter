@@ -31,8 +31,8 @@ export function heliumDistribution(p,remainingKg){
 export function equipmentAllocations(h){
  const d=h.input,p=h.propulsion,m=p.massKg,by=Object.fromEntries(h.massLedger.map(v=>[v.id,v]));
  const specs=[
- ['01.01','compute'],['01.02','host'],['01.03','storage'],['01.04','switch',by.switch.kg-20],
- ['02.01','array'],['02.02','battery'],['02.03','switch',8],['03.01','radiator'],['03.02','coolant'],['03.03','blanket'],
+ ['01.01','compute'],['01.02','host'],['01.03','storage'],['01.04','switch',h.serviceArchitecture.fabric.massKg],
+ ['02.01','array'],['02.02','battery'],['02.03','switch',h.energySystem.masses.electricalKg],['03.01','radiator'],['03.02','coolant'],['03.03','blanket'],
  ['04.01','cmg',by.cmg.kg-6-.0015*d.dipoleAm2],['04.02','cmg',.0015*d.dipoleAm2],['04.03','cmg',6],
  ['05.01','terminals',2],['05.02','terminals',10+10*d.kaDishM**2],['05.03','terminals',7+250*d.opticalApertureM**2],
  ['06.01','engine',m.engineHeads],['06.02','engine',m.feedAssembly],['06.03','tanks',m.fuelShell],

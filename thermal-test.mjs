@@ -17,7 +17,8 @@ let unserved=powerless.window(DEPLOY_END_S,DAY,450).find(s=>s.eclipse&&s.unmetKW
 const end=m.at(m.duration);assert.ok(end.thermalQualification.every(r=>r.status==='unassessed'));
 const cut=m.at(m.disposal().cutoff);assert.equal(cut.deployment,1);assert.equal(cut.thermalQualification.find(r=>r.id==='radiator').state,'operating');assert.equal(cut.thermalQualification.find(r=>r.id==='enclosure').state,'operating');
 const w=m.thermalWindow(0,m.duration),result=chronologicalAudit(d).result,audit=result.thermal;
-assert.equal(result.firstCrossing.id,'battery');near(result.firstCrossing.time,w.firstViolation.time,.1);near(result.thermalQualifiedUntilS,w.firstViolation.time,.1);near(w.coveredSeconds,result.finalState.spacecraftModelEndedAt,1e-5);
+if(w.firstViolation){assert.equal(audit.firstViolation.id,w.firstViolation.id);near(audit.firstViolation.time,w.firstViolation.time,.1);}else assert.equal(audit.firstViolation,null);
+near(result.thermalQualifiedUntilS,w.firstViolation?.time??w.coveredSeconds,.1);near(w.coveredSeconds,result.finalState.spacecraftModelEndedAt,1e-5);
 for(const n of thermalNodes){
  const rows=w.rows.filter(x=>x.id===n.id);near(rows.reduce((t,row)=>t+row.durationS,0),w.coveredSeconds);
  for(const state of thermalStates){const row=rows.find(r=>r.state===state),ref=audit.rows.find(r=>r.id===n.id&&r.state===state);
@@ -34,4 +35,4 @@ for(const n of thermalNodes){const changed={...d,[n.keys.operating.min]:d[n.keys
 const after=createSimulation({...d,batteryOpMinK:256,junctionLimitK:340});for(const t of [0,2000,23000,DAY])for(const n of thermalNodes)near(m.at(t)[n.tempKey],after.at(t)[n.tempKey]);assert.equal(createSimulation({...d,initialBatteryK:366}).at(0).batteryK,366);
 const synthetic={...d,junctionOpMinK:270,junctionLimitK:300},r1=newThermalSummary(synthetic,0,10,'test',true),r2=newThermalSummary(synthetic,10,20,'test',true),joint=newThermalSummary(synthetic,0,20,'test'),temps=k=>[k,294,294,294,294,294];
 accumulateThermal(r1,0,10,1,temps(280),temps(260));accumulateThermal(r2,10,20,1,temps(260),temps(320));mergeThermal(joint,r1);mergeThermal(joint,r2);const jr=joint.rows[0];assert.equal(jr.lowCount,1);assert.equal(jr.highCount,1);near(jr.firstLowTime,5);near(jr.lowSeconds,5+10/6);near(jr.firstHighTime,10+40/6);near(jr.highSeconds,10/3);
-console.log('Thermal tests passed: 24 independent input bounds, duty/standby and starvation, passive and prelaunch states, two-node battery, inverse bounds, crossing duration and boundary merge, window/audit agreement, stop at physical termination.');
+console.log('Thermal tests passed: 24 independent input bounds, duty/standby and starvation, passive and prelaunch states, three-store thermal network and finite cold control, inverse bounds, crossing duration and boundary merge, window/audit agreement, stop at physical termination.');

@@ -45,7 +45,7 @@ export function renderLaunchFleet(h,phase='A'){
  if(!active)return '<section class="panel"><div class="panelpad">Choose a supported launch vehicle to view its catalogue record.</div></section>';
  const {vehicle:v,fairing:f}=active,editable=['A','B','C'].includes(phase);
  const catalogue=rows.map(r=>{
-  const v=r.vehicle,body=`<svg viewBox="0 0 66 151" aria-hidden="true">${launcherSilhouette(r.id)}</svg><span class="fleet-card-copy"><small>${e(v.provider)}</small><strong>${e(v.name)}</strong><span>${num(v.referenceKg/1000,1)} t LEO reference</span><em>${e(v.status)}</em><span>${r.screenMarginKg<0?'Mass screen exceeded':'Mass screen passed'} · ${num(r.screenMarginKg,0)} kg</span><span>${r.fairing.fit?'Envelope fits':r.fairing.cargoAccess?.fits===false?'Cargo path held':'Envelope exceeded'} · ${num(r.fairing.radialClearanceM,2)} m lateral</span></span>`;
+  const v=r.vehicle,body=`<svg viewBox="0 0 66 151" aria-hidden="true">${launcherSilhouette(r.id)}</svg><span class="fleet-card-copy"><small>${e(v.provider)}</small><strong>${e(v.name)}</strong><span>${num(v.referenceKg/1000,1)} t LEO reference</span><em>${e(v.status)}</em><span>Mass headroom ${r.screenMarginKg>=0?'+':''}${num(r.screenMarginKg,0)} kg</span><span>${r.fairing.fit?'Envelope fits':r.fairing.cargoAccess?.fits===false?'Cargo path held':'Envelope exceeded'} · ${num(r.fairing.radialClearanceM,2)} m lateral</span></span>`;
   return editable?`<button class="fleet-card ${r.selected?'selected':''}" type="button" data-use-launcher="${r.id}" aria-pressed="${r.selected}">${body}</button>`:`<div class="fleet-card ${r.selected?'selected':''}">${body}</div>`;
  }).join('');
  const dimension=v.dimensionNote?'<p>'+e(v.dimensionNote)+'</p>':'';

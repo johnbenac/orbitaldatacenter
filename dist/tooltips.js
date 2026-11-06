@@ -64,7 +64,7 @@ Object.assign(paramHelp,{
  emissivity:'Infrared emissivity at beginning of life. Higher emissivity increases gross radiator emission at a fixed temperature.',
  absorptivity:'Fraction of incident shortwave radiation absorbed by the radiator coating.',
  junctionLimitK:'Maximum allowable modeled chip junction temperature. The thermal dashboard shows remaining headroom.',
- thermalResistanceKPerKw:'Temperature rise per kilowatt along one tray’s junction-to-radiator path.',
+ thermalResistanceKPerKw:'Local junction-to-cold-plate resistance per tray. The selected loop independently calculates cold-plate contact, fluid temperature rise and radiator transport.',
  isp:'Effective exhaust velocity divided by standard gravity. Higher delivered specific impulse reduces propellant needed for the same impulse.',
  thrustN:'Combined thrust from the two installed spacecraft engines. Determines burn duration for a required impulse.',
  mixtureRatio:'Oxidizer mass consumed per kilogram of fuel. Alters tank allocation for a fixed propellant load.',

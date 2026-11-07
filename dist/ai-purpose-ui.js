@@ -1,5 +1,5 @@
 import {aiPurposes} from './ai-purpose.js';
-import {missionStarter,presets,sizeDesign,sizingEnvelope,sizingLabel,sizingMargin,meetsSizingRequirement} from './design.js';
+import {applyAIPurpose,presets,sizeDesign,sizingEnvelope,sizingLabel,sizingMargin,meetsSizingRequirement} from './design.js';
 import {elapsedDuration,earthOutcome} from './purpose-studies.js';
 import {purposeDisplay,purposeId,purposeGlyph} from './purpose-display.js';
 const esc=v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
@@ -7,11 +7,12 @@ const measured=(v,d=2)=>typeof v==='number'&&Number.isFinite(v)?v.toLocaleString
 const value=(v,u,d=2)=>Number.isFinite(v)?measured(v,d)+(u?' '+u:''):typeof v==='string'?v:'—';
 const metric=(label,v,unit='',digits=2)=>'<div class="ap-metric"><dt>'+esc(label)+'</dt><dd>'+esc(value(v,unit,digits))+'</dd></div>';
 const datum=(label,text)=>'<div><dt>'+esc(label)+'</dt><dd>'+esc(text)+'</dd></div>';
-const nominal=new Map(),contextBuilds=new WeakMap();
-function starter(id,h){
- let cache=nominal;
- if(h){if(!contextBuilds.has(h))contextBuilds.set(h,new Map());cache=contextBuilds.get(h);}
- if(!cache.has(id))cache.set(id,sizeDesign(missionStarter(id,h?.input)));
+const contextBuilds=new WeakMap();
+// A workload preview keeps every installed-hardware and mission input unchanged.
+function workloadPreview(id,h){
+ if(!contextBuilds.has(h))contextBuilds.set(h,new Map());
+ const cache=contextBuilds.get(h);
+ if(!cache.has(id))cache.set(id,sizeDesign(applyAIPurpose(h.input,id,false)));
  return cache.get(id);
 }
 export const primaryServiceMetric={text:'slaTurns',voice:'audibleTurns',batch:'qualifiedItems',agents:'verifiedTasks',finetune:'deliveredRun',pretrain:'deliveredRun'};
@@ -48,10 +49,18 @@ function cardHardware(id,h){
  const memory=h.ai.installedMemoryGB,second={text:value(h.solarM2,'m² solar'),voice:value(h.input.hostCores,'host cores'),batch:value(h.storageTB,'TB storage'),agents:value(h.input.fabricGbps,'Gbit/s fabric'),finetune:value(memory,'GB high-bandwidth memory'),pretrain:value(memory/1000,'TB high-bandwidth memory')};
  return value(h.chips,'accelerators',0)+' · '+second[id];
 }
-function missionCards(selected,active){
- return '<div class="ap-grid" role="group" aria-label="Choose a mission to preview">'+Object.entries(purposeDisplay).map(([id,p],index)=>{
-  const chosen=id===selected;
-  return '<button type="button" class="ap-card" data-preview-purpose="'+id+'" aria-pressed="'+chosen+'" style="--accent:'+p.accent+'"><span class="ap-cardhead">'+purposeGlyph(id)+'<small>0'+(index+1)+(id===active?' / ACTIVE PURPOSE':'')+'</small><span class="ap-indicator" aria-hidden="true"></span></span><strong>'+esc(p.name)+'</strong><em>'+esc(p.shortGoal)+'</em><span class="ap-hardware">'+esc(cardHardware(id,starter(id)))+'</span></button>';
+function workloadCards(selected,active,h){
+ return '<div class="ap-grid" role="group" aria-label="Preview a payload workload">'+Object.entries(purposeDisplay).map(([id,p],index)=>{
+  const chosen=id===selected,b=workloadPreview(id,h),q=b.ai,fit=q.memoryMarginGB>=0&&q.storageMarginGB>=0;
+  const result=fit?'Resident state and storage fit':'Memory or storage shortfall';
+  return '<button type="button" class="ap-card" data-preview-purpose="'+id+'" aria-pressed="'+chosen+'" style="--accent:'+p.accent+'"><span class="ap-cardhead">'+purposeGlyph(id)+'<small>0'+(index+1)+(id===active?' / ACTIVE WORKLOAD':'')+'</small><span class="ap-indicator" aria-hidden="true"></span></span><strong>'+esc(p.name)+'</strong><em>'+esc(p.shortGoal)+'</em><span class="ap-hardware '+(fit?'':'ap-short')+'">'+esc(result)+'</span></button>';
+ }).join('')+'</div>';
+}
+function workloadCapacity(q){
+ const pairs=[['Model-state memory',q.modelMemoryGB,q.installedMemoryGB,'GB'],['Usable local storage',q.requiredStorageGB,q.requiredStorageGB+q.storageMarginGB,'GB']];
+ return '<div class="ap-capacity" aria-label="Workload requirements against installed resources">'+pairs.map(([label,need,installed,unit])=>{
+  const known=Number.isFinite(need)&&Number.isFinite(installed)&&installed>0,ratio=known?need/installed:0;
+  return '<div class="ap-capacity-row '+(known&&ratio>1?'ap-short':'')+'"><div><span>'+esc(label)+'</span><strong>'+esc(value(need,unit))+' / '+esc(value(installed,unit))+'</strong></div><span class="ap-capacity-track" aria-hidden="true"><i style="width:'+Math.min(100,Math.max(0,ratio*100)).toFixed(1)+'%"></i></span><small>'+esc(known?(ratio>1?'Exceeds installed capacity by '+value(need-installed,unit):value(installed-need,unit)+' headroom'):'Requirement unassessed')+'</small></div>';
  }).join('')+'</div>';
 }
 function workloadFact(id,h){
@@ -65,23 +74,17 @@ function workloadFact(id,h){
  }
 }
 function preview(h,id){
- const b=starter(id,h),p=purposeDisplay[id],q=b.ai,d=b.input,e=sizingEnvelope(b),f=b.fairing;
- const constraint=sizingLabel(e.binding),ratio=e.rates[e.binding],percent=Number.isFinite(ratio)?value(ratio*100,'%',1):'—';
- let fit=f.fit?'Stowed fairing fits':'Stowed fairing exceeded';
- if(!f.fit)fit+=' · '+[f.radialClearanceM<0?value(-f.radialClearanceM,'m radial'):'',f.axialClearanceM<0?value(-f.axialClearanceM,'m axial'):''].filter(Boolean).join(' / ');
+ const b=workloadPreview(id,h),p=purposeDisplay[id],q=b.ai,d=b.input,active=purposeId(h)===id;
  const service='<dl class="ap-dossier ap-facts">'+datum('Earth deliverable',p.product)+workloadFact(id,b)+'</dl>';
- const failed=Object.entries(e.rates).filter(([k,v])=>!meetsSizingRequirement(v,k));
- const challenge=failed.length?'<p class="ap-fit ap-short"><strong>Sizing challenge · '+failed.length+' unmet '+(failed.length===1?'requirement':'requirements')+'</strong><br>'+failed.map(([k])=>esc(sizingLabel(k))).join(' · ')+'</p>':'';
- const hardware=challenge+'<p class="ap-fit '+(e.feasible?'ap-ok':'ap-short')+'"><b>'+esc(constraint)+'</b> · '+esc(percent)+' of sizing requirement</p><p class="ap-fit '+(f.fit?'':'ap-short')+'">'+esc(fit)+'</p>';
- const details='<details><summary>Equipment and acceptance criteria</summary><dl class="ap-dossier">'+datum('Compute package',presets.compute[d.compute].label)+datum('Installed trays',value(b.trays,'trays')+' · '+value(q.installedMemoryGB,'GB high-bandwidth memory',0))+datum('Host and fabric',value(d.hostCores,'cores')+' · '+value(d.fabricGbps,'Gbit/s'))+datum('Storage / battery',value(b.storageTB,'TB')+' / '+value(b.batteryKWh,'kWh'))+datum('Solar / radiator area',value(b.solarM2,'m²')+' / '+value(b.radiatorM2,'m²'))+datum('Launched mass',value(b.launchKg,'kg',0))+datum('Launch mass headroom',value(b.launchScreenMarginKg,'kg',0))+datum('Memory headroom',value(q.memoryMarginGB,'GB'))+datum('Customer acceptance',criteria(id,d))+'</dl></details>';
- const keep='<details class="ap-alternate"><summary>Use this purpose with installed hardware</summary><p class="ap-note">Apply the customer purpose to the spacecraft currently in the workspace.</p><button type="button" class="btn" data-use-purpose="'+id+'" '+(purposeId(h)===id?'disabled':'')+'>'+esc(purposeId(h)===id?'Already the active purpose':'Review purpose change')+'</button></details>';
- return '<section class="ap-proposal" data-purpose-preview="'+id+'" style="--ap:'+p.accent+'"><div class="ap-novel"><small class="ap-kicker">Selected starting design</small>'+purposeGlyph(id)+'</div><h3>'+esc(p.name)+'</h3><p class="ap-goal">'+esc(p.goal)+'</p><p class="ap-buildline">'+esc(cardHardware(id,b))+'<span>'+esc(b.launcherLabel)+'</span></p>'+service+hardware+'<button type="button" class="btn ap-primary" data-provision-purpose="'+id+'">Review mission and spacecraft <span aria-hidden="true">→</span></button>'+details+keep+'</section>';
+ const details='<details><summary>Installed equipment and acceptance criteria</summary><dl class="ap-dossier">'+datum('Compute package',presets.compute[d.compute].label)+datum('Installed trays',value(b.trays,'trays')+' · '+value(q.installedMemoryGB,'GB accelerator memory',0))+datum('Host and fabric',value(d.hostCores,'cores')+' · '+value(d.fabricGbps,'Gbit/s'))+datum('Local storage',value(b.storageTB,'TB'))+datum('Customer acceptance',criteria(id,d))+'</dl></details>';
+ const trace='<div class="ap-trace"><span>'+esc(p.input)+'</span><i aria-hidden="true">→</i><span>'+esc(p.process)+'</span><i aria-hidden="true">→</i><span>'+esc(p.output)+'</span></div>';
+ return '<section class="ap-proposal" data-purpose-preview="'+id+'" style="--ap:'+p.accent+'"><div class="ap-novel"><small class="ap-kicker">Workload on installed hardware</small>'+purposeGlyph(id)+'</div><h3>'+esc(p.name)+'</h3><p class="ap-goal">'+esc(p.goal)+'</p>'+trace+'<p class="ap-buildline">'+esc(cardHardware(id,b))+'<span>'+esc(b.launcherLabel)+'</span></p>'+service+workloadCapacity(q)+'<button type="button" class="btn ap-primary" data-use-purpose="'+id+'" '+(active?'disabled':'')+'>'+esc(active?'Active payload workload':'Review workload change')+' <span aria-hidden="true">→</span></button><p class="ap-note">Choose a spacecraft in Design references. This selection applies the workload to the current design; power, cooling and Earth delivery remain part of its assessment.</p>'+details+'</section>';
 }
 function committed(h,phase,snapshot,service,full=true){
  const id=purposeId(h),p=purposeDisplay[id],i=Math.max(0,'ABCDEF'.indexOf(phase));
- const hero='<div class="ap-summary"><div class="ap-art">'+purposeGlyph(id)+'</div><div><span class="ap-kicker">Active mission · '+esc(p.family)+'</span><h3>'+esc(p.name)+'</h3><p class="ap-goal">'+esc(p.goal)+'</p></div></div>';
+ const hero='<div class="ap-summary"><div class="ap-art">'+purposeGlyph(id)+'</div><div><span class="ap-kicker">Active workload · '+esc(p.family)+'</span><h3>'+esc(p.name)+'</h3><p class="ap-goal">'+esc(p.goal)+'</p></div></div>';
  const chain='<div class="ap-trace"><span>'+esc(p.input)+'</span><i>→</i><span>'+esc(p.process)+'</span><i>→</i><span>'+esc(p.output)+'</span></div>';
- if(!full)return '<div class="ap-currentline"><span>Active mission · <b>'+esc(p.name)+'</b></span><button type="button" class="btn" data-open-purpose="'+id+'">Inspect service results ↗</button></div>';
+ if(!full)return '<div class="ap-currentline"><span>Active workload · <b>'+esc(p.name)+'</b></span><button type="button" class="btn" data-open-purpose="'+id+'">Inspect service results ↗</button></div>';
  return hero+chain+'<p class="ap-guidance">'+esc(p.phases[i])+'</p><p class="ap-note">'+esc(criteria(id,h.input))+'</p>'+'<div data-active-appraisal>'+appraisal(h,id,service,snapshot)+'</div>';
 }
 function activeLimits(e){
@@ -90,22 +93,22 @@ function activeLimits(e){
  const summary=failed.length?'Sizing needs attention · '+failed.map(([k])=>sizingLabel(k)).join(', '):'Review installed sizing margins';
  return '<details class="ap-sizing"><summary>'+esc(summary)+'</summary><dl>'+entries.map(([k,r])=>datum(sizingLabel(k),sizingMargin(k,r,e))).join('')+'</dl><p class="ap-note">PDR mass and power require strictly positive headroom above their adopted thresholds. Other sizing bounds use their stated limits. Customer response times above include waiting for Earth access.</p></details>';
 }
-export function renderAIPurpose(h,phase='A',{snapshot,selectedId,service,envelope,failed=false,context='purpose'}={}){
+export function renderAIPurpose(h,phase='A',{snapshot,selectedId,service,envelope,failed=false,context='compute'}={}){
  const active=purposeId(h),editable=['A','B','C'].includes(phase),id=editable&&Object.hasOwn(purposeDisplay,selectedId)?selectedId:active;
  let body;
  if(editable){
-  const intro='<div class="ap-intro"><span class="ap-kicker">Mission catalogue · 06 starting designs</span><h3>Choose a customer mission</h3><p>Each purpose has a starting spacecraft. Preview its equipment, Earth deliverable and sizing limits before reviewing the design.</p></div>';
-  const outcome=phase==='A'?'<section class="ap-earth-card" aria-label="Installed mission performance"><div class="ap-novel"><small class="ap-kicker">Installed mission · Earth service</small><strong>'+esc(purposeDisplay[active].name)+'</strong></div><div data-earth-outcome aria-live="polite">'+earthOutcome(h,service,failed)+'</div><button type="button" class="btn" data-action="ai-routes">Compare direct contacts and relay →</button>'+activeLimits(envelope||sizingEnvelope(h))+'</section>':'';
-  body=outcome+intro+'<div class="ap-workbench">'+missionCards(id,active)+preview(h,id)+'</div>';
+  const intro='<div class="ap-intro"><span class="ap-kicker">Payload workloads · 06 service profiles</span><h3>What should this data center deliver?</h3><p>Preview each workload on the installed payload. Review its memory, storage and customer acceptance criteria before applying the change.</p></div>';
+  const outcome=phase==='A'?'<section class="ap-earth-card" aria-label="Installed payload performance"><div class="ap-novel"><small class="ap-kicker">Installed payload · Earth service</small><strong>'+esc(purposeDisplay[active].name)+'</strong></div><div data-earth-outcome aria-live="polite">'+earthOutcome(h,service,failed)+'</div><button type="button" class="btn" data-action="ai-routes">Compare direct contacts and relay →</button>'+activeLimits(envelope||sizingEnvelope(h))+'</section>':'';
+  body=outcome+intro+'<div class="ap-workbench">'+workloadCards(id,active,h)+preview(h,id)+'</div>';
   if(context==='conops')body+=committed(h,phase,snapshot,service,false);
-  else body+='<details class="ap-current"><summary>Active mission and measured service · '+esc(descriptor(active))+'</summary><div>'+committed(h,phase,snapshot,service)+'</div></details>';
+  else body+='<details class="ap-current"><summary>Active workload and measured service · '+esc(descriptor(active))+'</summary><div>'+committed(h,phase,snapshot,service)+'</div></details>';
  }else{
   body=committed(h,phase,snapshot,service)+'<dl class="ap-dossier">'+datum('Customer',purposeDisplay[active].customer)+datum('Earth deliverable',purposeDisplay[active].product)+datum('Flight state',snapshot?.flightPhase||'Flight record')+'</dl>';
  }
- return '<section class="panel ai-purpose" style="--ap:'+purposeDisplay[active].accent+'" data-ai-purpose="'+active+'"><header class="panelhead"><h2>AI Data Center Purpose</h2><span class="guideflag">'+(editable?'MISSION STARTERS':'FLIGHT RECORD')+'</span></header><div class="panelpad">'+body+'</div></section>';
+ return '<section class="panel ai-purpose" style="--ap:'+purposeDisplay[active].accent+'" data-ai-purpose="'+active+'"><header class="panelhead"><h2>Payload workload &amp; service</h2><span class="guideflag">'+(editable?'INSTALLED PAYLOAD':'FLIGHT RECORD')+'</span></header><div class="panelpad">'+body+'</div></section>';
 }
 
-// Update just the calculated fields when a background replay completes. Keep catalogue and keyboard focus intact.
+// Update just the calculated fields when a background replay completes. Keep workload selection and keyboard focus intact.
 export function refreshEarthOutcome(host,h,service,snapshot,failed=false){
  const region=host.querySelector('[data-earth-outcome]');
  if(region)region.innerHTML=earthOutcome(h,service,failed);

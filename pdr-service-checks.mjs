@@ -1,4 +1,4 @@
-// Focused checks for the seven service / flight-computing PDR assessments.
+// Focused checks for the six service / flight-computing PDR assessments.
 // Synthetic service intervals below isolate access and accounting; they are test
 // fixtures, not measured benchmarks or claims about an operational spacecraft.
 import assert from 'node:assert/strict';
@@ -12,7 +12,7 @@ let passed=0;
 const failures=[];
 function check(name,run){try{run();passed++;console.log('PASS '+name);}catch(error){failures.push(name);console.error('FAIL '+name+'\n'+error.stack);}}
 const find=(reports,domain,id)=>reports[domain].checks.find(c=>c.id===id);
-const reportIds=['conops','purpose','compute','data','comm','avionics','software'];
+const reportIds=['conops','compute','data','comm','avionics','software'];
 const activeRules=new Set(goldRules.map(r=>r.id));
 const base=sizeDesign({...missionStarter('text'),serviceOffersPerHour:12,missionYears:2.75});
 const identity=h=>({trays:h.trays,chips:h.chips,memoryGB:h.memoryGB,storageTB:h.storageTB,solarM2:h.solarM2,radiatorM2:h.radiatorM2,batteryKWh:h.batteryKWh,propellantKg:h.propellantKg,tankVolumeL:h.tankVolumeL,body:[h.bodyWidthM,h.bodyHeightM,h.bodyLengthM],dryKg:h.dryKg,launchKg:h.launchKg,installedElectronicsKw:h.installedElectronicsKw,massLedger:h.massLedger.map(({id,kg,group})=>({id,kg,group}))});
@@ -110,9 +110,9 @@ check('direct and relay cases assess actual offers, receipt and contact delay',(
   assert.equal(find(direct.reports,'conops','conops-outage').status,'shortfall');
   assert.equal(relay.service.network.maxOutageS,35,'One terminal must reacquire even with a requested zero handover');
   assert.equal(find(relay.reports,'conops','conops-outage').status,'shortfall','A 35 s acquisition gap exceeds the interactive response budget');
-  assert.equal(find(direct.reports,'purpose','purpose-ttft').status,'unassessed','No response cannot be counted as zero latency');
-  assert.notEqual(direct.reports.purpose.graphic,relay.reports.purpose.graphic,'Outcome graphic must show physically returned work');
-  assert.equal(find(relay.reports,'purpose','purpose-quality-evidence').status,'unassessed','Expected acceptance is not measured quality');
+  assert.equal(find(direct.reports,'compute','purpose-ttft').status,'unassessed','No response cannot be counted as zero latency');
+  assert.notEqual(direct.reports.compute.supplementalGraphics.find(g=>g.id==='payload-acceptance').svg,relay.reports.compute.supplementalGraphics.find(g=>g.id==='payload-acceptance').svg,'Outcome graphic must show physically returned work');
+  assert.equal(find(relay.reports,'compute','purpose-quality-evidence').status,'unassessed','Expected acceptance is not measured quality');
   const wrongPurpose=assessServiceDomains({h:sizeDesign({...base.input,aiPurpose:'voice'}),service:relay.service});
   assert.equal(find(wrongPurpose,'conops','conops-outage').status,'unassessed','Stale workload replay must not be reused');
 });
@@ -129,15 +129,26 @@ check('current RF, optical goodput and EOL RF evidence remain distinct',()=>{
   assert.equal(find(optical,'comm','comm-rf-eol').status,'unassessed','Independent flight command/telemetry still needs an RF basis');
 });
 
+check('omitted RF equipment cannot claim independent command availability',()=>{
+  const h=sizeDesign({...base.input,communicationsPackage:'optical-only'});
+  const reports=assessServiceDomains({h,s:{contact:true,uplinkMbps:2,codingEff:.78,commandGoodputKbps:0}});
+  assert.equal(find(reports,'comm','comm-command-installation').status,'shortfall');
+  assert.equal(find(reports,'avionics','avionics-command-throughput').actual,0,'An inherited cursor rate cannot create an absent receiver.');
+  assert.equal(find(reports,'avionics','avionics-command-hold').status,'not_applicable');
+  assert.match(reports.comm.graphic,/RF hardware omitted/);
+  assert.match(reports.avionics.graphic,/RF telemetry not installed/);
+  shape(reports);
+});
+
 check('partial training windows and undeclared quality cannot pass an order',()=>{
   const h=sizeDesign({...base.input,aiPurpose:'finetune',trainingCalibration:'none'});
   const service={purpose:'finetune',offers:1,completed:0,expired:0,window:{start:0,end:3600,span:3600},artifact:{physicalReceipt:false,withinOrder:false,receivedGB:0},staging:{availableGB:0},metrics:[]};
   const partial=assessServiceDomains({h,service});
-  assert.equal(find(partial,'purpose','purpose-order-deadline').status,'unassessed');
-  assert.equal(find(partial,'purpose','purpose-validation').status,'unassessed');
+  assert.equal(find(partial,'compute','purpose-order-deadline').status,'unassessed');
+  assert.equal(find(partial,'compute','purpose-validation').status,'unassessed');
   const end=h.input.trainingBudgetDays*86400+1;
   const expired=assessServiceDomains({h,service:{...service,expired:1,window:{start:0,end,span:end}}});
-  assert.equal(find(expired,'purpose','purpose-order-deadline').status,'shortfall');
+  assert.equal(find(expired,'compute','purpose-order-deadline').status,'shortfall');
 });
 
 check('unknown inputs stay unassessed, evidence is serializable, and no simulation is invoked',()=>{
@@ -155,4 +166,4 @@ check('unknown inputs stay unassessed, evidence is serializable, and no simulati
 });
 
 if(failures.length){console.error(`Service PDR: ${passed} groups passed; ${failures.length} failed.`);process.exitCode=1;}
-else console.log(`Service PDR: all ${passed} focused groups passed across seven domains and six payload purposes.`);
+else console.log(`Service PDR: all ${passed} focused groups passed across six domains and six payload purposes.`);

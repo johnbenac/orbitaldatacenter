@@ -1,3 +1,4 @@
+import {architectureFamily,architectureTerminalStations} from './architecture-families.js';
 import {payloadFreeMET,INSERTION_MET} from './launch-effects-state.js';
 // Quaternions [x,y,z,w] actively rotate body vectors into Earth-centred inertial axes.
 // Controlled rigid-body dynamics. Body momentum, gimbals and mechanism encoders
@@ -6,7 +7,8 @@ import {R as earthRadiusKm,DEG,clip,cross,dot,unit} from './orbit.js';
 import {componentInertia} from './attitude-inertia.js';
 import {stepAttitude,transformEciToBody} from './attitude-dynamics.js';
 import {mechanismMomentum} from './mechanism-momentum.js';
-import {deploymentSchedule,deploymentLayout,bankNormal,terminalLayout,terminalStations} from './deployment.js';
+import {deploymentSchedule,deploymentLayout,bankNormal,terminalLayout,mechanismPose,leafPose,leafAxes} from './deployment.js';
+import {terminalSightline,installedTerminalStations} from './architecture-visibility.js';
 
 export const guidanceReferences=[
  ['ISS solar tracking rotary joints','https://www.nasa.gov/wp-content/uploads/2022/06/508318main_iss_ref_guide_nov2010.pdf'],
@@ -33,11 +35,14 @@ export function attitudeLimits(h){
  // the hinge offset, sheet edge and clearance for fittings. Wider banks need more cant.
  const bankHalfWidthM=h.radiatorWidthM/2+.18,bankClearanceY=Math.max(.02,ry-b/2-.135-.25*Math.min(.40,.052*Math.min(w,b)));
  const bankCantDeg=clip(safeAcos(bankClearanceY/bankHalfWidthM)/DEG+1,45,89.96);
- // The upper bank shares the +Y deck with two moving terminals. Bound each
- // swept head by a sphere, then test it against the bank's full rotary cylinder.
+ // Bound each installed directional head by a sphere and screen the bank's
+ // rotary cylinder. Omitted RF hardware cannot constrain a physical joint.
  const fixture=terminalLayout(w,b,d.kaDishM,d.opticalApertureM);
- const mounts=terminalStations(w,l,d),targets=[[mounts.ka[0],fixture.kaHeight+b/2-ry,mounts.ka[1]-rz,.61*d.kaDishM+.065],
-  [mounts.optical[0],fixture.opticalHeight+b/2-ry,mounts.optical[1]-rz,1.05*d.opticalApertureM+.065]];
+ const targets=installedTerminalStations(h).filter(t=>t.kind!=='s').map(t=>{
+  const height=t.kind==='ka'?fixture.kaHeight:fixture.opticalHeight;
+  const p=t.positionM.map((v,k)=>v+t.normalBody[k]*height);
+  return [p[0],p[1]-ry,p[2]-rz,t.kind==='ka'?.61*d.kaDishM+.065:1.05*d.opticalApertureM+.065];
+ });
  function clearsTerminals(cant){
   const c=Math.cos(cant*DEG),s=Math.sin(cant*DEG);
   return targets.every(([x,y,z,r])=>y*s+z*c+r<0||Math.hypot(x,y*c-z*s)>bankHalfWidthM+r);
@@ -117,7 +122,19 @@ function reference(d,g,mode,o){
  }
  if(mode==='contact'||mode==='coast')return q;
  let roll=(d.rollDeg||0)*DEG;
- if(d.attitude==='inertial')q=IDENTITY;
+ if(d.attitude==='tracking'&&architectureFamily(d).id!=='protected-core'){
+  // The legacy small cant cannot illuminate a one-axis wing when the Sun is
+  // nearly parallel to its span. Give the selected family a realizable solar
+  // reference frame, then let the same finite-rate controller try to attain it.
+  // Redwire keeps the fixed radiator edge-on while its nominal PV normal is +Z.
+  const f=architectureFamily(d),sun=unit(g.sunECI);
+  if(f.solarBasePitchDeg===90){
+   const bz=sun,candidate=cross(g.along,bz),bx=unit(Math.hypot(...candidate)>1e-8?candidate:cross(g.radial,bz));q=basisQuat(bx,cross(bz,bx),bz);
+  }else{
+   const by=sun,projection=g.along.map((v,k)=>v-dot(g.along,by)*by[k]),bz=unit(Math.hypot(...projection)>1e-8?projection:g.radial.map((v,k)=>v-dot(g.radial,by)*by[k]));q=basisQuat(cross(by,bz),by,bz);
+  }
+ }
+ else if(d.attitude==='inertial')q=IDENTITY;
  else if(d.attitude==='lowdrag'){
   const p=g.positionECI,v=g.velocityECI,ram=unit([v[0]+.00007292115*p[1],v[1]-.00007292115*p[0],v[2]]);
   const bz=unit(cross(ram,y));q=basisQuat(ram,cross(bz,ram),bz);
@@ -239,10 +256,9 @@ function bankDrive(sign,fraction,oldPitch,oldRoll,ctx){
  const [roll,rollRate]=moveAngle(rollGoal,oldRoll,dt,l.radiatorTrimRateDegS);
  return {pitch,roll,pitchGoal,rollGoal,limit,pitchRate,rollRate};
 }
-function coneTarget(dir){
- const angle=safeAcos(dir[1]),stop=motionCaps.terminalConeDeg*DEG;
- if(angle<=stop)return dir;
- const n=Math.hypot(dir[0],dir[2]);return [n>1e-10?dir[0]/n*Math.sin(stop):Math.sin(stop),Math.cos(stop),n>1e-10?dir[2]/n*Math.sin(stop):0];
+function coneTarget(dir,axis=Y){
+ const cosine=dot(dir,axis),angle=safeAcos(cosine),stop=motionCaps.terminalConeDeg*DEG;if(angle<=stop)return dir;
+ const projected=dir.map((v,k)=>v-cosine*axis[k]),transverse=Math.hypot(...projected)>1e-10?unit(projected):unit(cross(axis,Math.abs(axis[0])<.8?X:Z));return axis.map((v,k)=>v*Math.cos(stop)+transverse[k]*Math.sin(stop));
 }
 function moveVector(old,to,dt,rate){
  if(!old)return [to,0];const a=safeAcos(dot(old,to)),max=rate*DEG*dt;
@@ -254,14 +270,14 @@ function moveVector(old,to,dt,rate){
 }
 const deployed=deploymentSchedule(1),stowed=deploymentSchedule(0);
 export function attitudeGuidance(h,g,options={}){
- const o=options,d=h.input,l=attitudeLimits(h),u=o.deployment??1,m=u>=1?deployed:u<=0?stowed:deploymentSchedule(u);
+ const o=options,d=h.input,l=attitudeLimits(h),u=o.deployment??1,m=architectureFamily(h).id==='protected-core'?(u>=1?deployed:u<=0?stowed:deploymentSchedule(u)):deploymentSchedule(u,h);
  const rule=modeRules.find(r=>r.test(d,g,o,l)),mode=rule.mode?rule.mode(d,o):rule.id,hold=mode==='passive',old=o.previous,dt=Math.max(0,o.elapsedS??(old?g.t-old.t:0));
  const goal=hold&&old?old.q:reference(d,g,mode,o);
  const controlLimits=o.controlLimits?{...l,...o.controlLimits}:l;
  let body=followBody(h,g,goal,old,dt,controlLimits,hold,mode,o),[x,y,z]=axes(body.q);
  const toBody=v=>[dot(x,v),dot(y,v),dot(z,v)];
  let sun=toBody(g.sunECI),earth=toBody(g.radial);
- const wingGoal=Math.hypot(sun[1],sun[2])>1e-8?wrap(Math.atan2(sun[2],sun[1])/DEG+(d.solarTiltDeg||0)):(old?.wing??0);
+ const wingGoal=Math.hypot(sun[1],sun[2])>1e-8?wrap(Math.atan2(sun[2],sun[1])/DEG-(h.solarBasePitchDeg||0)+(d.solarTiltDeg||0)):(old?.wing??0);
  const commissioningWing=wrap(wingGoal)*m.tracking;
  const [wing,wingRate]=moveAngle(hold?old?.wing??0:u<1?commissioningWing:wingGoal,old?.wing,dt,l.wingRateDegS,true);
  const park=['trim','reboost','disposal','prepoint'].includes(mode);
@@ -280,17 +296,27 @@ export function attitudeGuidance(h,g,options={}){
   sunriseSlew=dot(r,r)-rs*rs<earthRadiusKm**2&&radialSlope>0&&perp2>=earthRadiusKm**2;
  }
  const ctx={u,dt,hold,park,cold,g,sun,earth,l,sunriseSlew};
- const up=bankDrive(-1,m.upperRoot,old?.upper,old?.upperRoll,ctx),lo=bankDrive(1,m.lowerRoot,old?.lower,old?.lowerRoll,ctx);
+ let up=bankDrive(-1,m.upperRoot,old?.upper,old?.upperRoll,ctx),lo=bankDrive(1,m.lowerRoot,old?.lower,old?.lowerRoll,ctx);
+ if(architectureFamily(h).radiatorTracking==='fixed-after-deployment'){
+  const banks=mechanismPose(deploymentLayout(h),u,d.solarTiltDeg).banks;
+  const fixed=(end,previous)=>{const b=banks.find(b=>b.end===end),pitch=(b?.rootPitch||0)/DEG,roll=(b?.roll||0)/DEG;return {pitch,roll,pitchGoal:pitch,rollGoal:roll,limit:0,pitchRate:dt>0?(pitch-(previous??pitch))/dt:0,rollRate:0};};
+  up=fixed(-1,old?.upper);lo=fixed(1,old?.lower);
+ }
  const upper=up.pitch,lower=lo.pitch;
- const upperN=bankNormal(upper*DEG,up.roll*DEG),lowerN=bankNormal(lower*DEG,lo.roll*DEG);
- const radiatorControlLaw=hold?'Hold last encoder position':u<1?'Deployment interlock':park?'Park for thrust':!g.eclipse?'Turn emitting faces edge-on to sunlight':sunriseSlew?'Warm loop · prepoint for shadow exit':cold?'Cold loop · turn faces toward Earth':'Warm loop · minimize Earth infrared';
+ let upperN=bankNormal(upper*DEG,up.roll*DEG),lowerN=bankNormal(lower*DEG,lo.roll*DEG),pvN=null;
+ if(architectureFamily(h).id!=='protected-core'){
+  const layout=deploymentLayout(h),drive={wingPitchDeg:wing,upperRadiatorPitchDeg:upper,lowerRadiatorPitchDeg:lower,upperRadiatorRollDeg:up.roll,lowerRadiatorRollDeg:lo.roll};
+  const normal=(type,end)=>{const q=layout.descriptors.find(s=>s.type===type&&(end==null||s.end===end));return q?leafAxes(leafPose(layout,q,u,d.solarTiltDeg,drive))[1]:[0,0,0];};
+  upperN=normal('rad',-1);lowerN=normal('rad',1);pvN=normal('pv');
+ }
+ const radiatorControlLaw=architectureFamily(h).radiatorTracking==='fixed-after-deployment'?'Family platform geometry · fixed after deployment; no independent Sun-avoidance credit':hold?'Hold last encoder position':u<1?'Deployment interlock':park?'Park for thrust':!g.eclipse?'Turn emitting faces edge-on to sunlight':sunriseSlew?'Warm loop · prepoint for shadow exit':cold?'Cold loop · turn faces toward Earth':'Warm loop · minimize Earth infrared';
  let sight=g.stationECI&&g.station?toBody(unit(g.stationECI.map((v,i)=>v-g.positionECI[i]))):null;
- const terminal=mode==='contact'?o.terminal:null,aim=terminal&&sight?coneTarget(sight):Y;
+ const terminal=mode==='contact'?o.terminal:null,mounts=architectureTerminalStations(h),dishAxis=mounts.find(t=>t.kind==='ka')?.normalBody||Y,opticalAxis=mounts.find(t=>t.kind==='optical')?.normalBody||Y,parkAxis=terminal==='Ka'?dishAxis:opticalAxis,aim=terminal&&sight?coneTarget(sight,parkAxis):parkAxis;
  // A receiver near zenith follows a curved path even between adjacent replay
  // checkpoints. Re-evaluate its line of sight in the reconstructed body frame.
  const anchor=o.terminalPrevious??old,terminalDt=o.terminalElapsedS??dt;
- const [dish,dishRate]=moveVector(anchor?.dish,hold?old?.dish??Y:terminal==='Ka'?aim:Y,terminalDt,l.dishRateDegS);
- const [optic,opticRate]=moveVector(anchor?.optic,hold?old?.optic??Y:terminal==='Optical'?aim:Y,terminalDt,l.opticalRateDegS);
+ const [dish,dishRate]=moveVector(anchor?.dish,hold?old?.dish??dishAxis:terminal==='Ka'?aim:dishAxis,terminalDt,l.dishRateDegS);
+ const [optic,opticRate]=moveVector(anchor?.optic,hold?old?.optic??opticalAxis:terminal==='Optical'?aim:opticalAxis,terminalDt,l.opticalRateDegS);
  const pose={deployment:u,wing,upper,lower,upperRoll:up.roll,lowerRoll:lo.roll,dish,optic};
  const properties=componentInertia(h,{remainingKg:o.remainingKg??h.propellantKg,deployment:u,
   adapterAttached:!!g.carrierAttached,attitude:drivePose(pose)});
@@ -303,13 +329,15 @@ export function attitudeGuidance(h,g,options={}){
  sight=g.stationECI&&g.station?toBody(unit(g.stationECI.map((v,i)=>v-g.positionECI[i]))):null;
  const directional=terminal==='Ka'||terminal==='Optical',encoder=terminal==='Ka'?dish:optic;
  const residual=directional&&sight?safeAcos(dot(encoder,sight))/DEG:null;
- const reachable=!!sight&&terminal!=null&&(!directional||sight[1]>=Math.cos(l.terminalConeDeg*DEG)-1e-12);
+ const withinCone=!!sight&&terminal!=null&&(!directional||dot(sight,parkAxis)>=Math.cos(l.terminalConeDeg*DEG)-1e-12);
+ const visibility=directional&&sight?terminalSightline(h,terminal==='Ka'?'ka-0':'optical-0',sight,u,drivePose(pose)):null;
+ const reachable=withinCone&&(!visibility||visibility.clear);
  const acq=terminal==='Optical'?35:terminal==='Ka'?20:5;
  const beamHalfDeg=terminal==='Optical'?1.22*1.55e-6/(d.opticalApertureM||.1)/DEG:35*299792458/(26e9*(d.kaDishM||.6));
- const state=hold?'passivated':u<1?'stowed':!terminal?'parked':!directional?'fixed patch':!reachable?'travel limit':residual>beamHalfDeg||(o.contactAge??0)<acq?'acquiring':'tracking';
+ const state=hold?'passivated':u<1?'stowed':!terminal?'parked':!directional?'fixed patch':!withinCone?'travel limit':visibility&&!visibility.clear?'obstructed':residual>beamHalfDeg||(o.contactAge??0)<acq?'acquiring':'tracking';
  const rates=dt===0&&old?.rates&&!hold?old.rates:[wingRate,up.pitchRate,lo.pitchRate,Math.max(dishRate,opticRate),up.rollRate,lo.rollRate];
  const attitudeState={t:g.t,mode,...pose,referenceQ:goal,referenceRate:body.referenceRate,dynamics:body.dynamics,q:body.q,rate:body.rate,axis:body.axis,momentum:body.momentum,cold,rates};
- return {attitudeState,modeRuleId:rule.id,prepointLeadWindowS:o.plannedBurnWindowS??l.prepointS,attitudeMode:mode,attitudeModeLabel:modes[mode][0],attitudeObjective:modes[mode][1],
+ return {attitudeState,modeRuleId:rule.id,prepointLeadWindowS:o.plannedBurnWindowS??l.prepointS,attitudeMode:mode,attitudeModeLabel:modes[mode][0],attitudeObjective:mode==='tracking'&&architectureFamily(h).id!=='protected-core'?'Track the family solar reference with the installed finite-rate body controller and wing drives. Fixed radiator exposure follows the achieved geometry.':modes[mode][1],
   attitudeDynamics:{...body.diagnostics,inertiaKgM2:body.properties.tensorKgM2,principalKgM2:body.properties.principalKgM2,cmM:body.properties.cm},
   bodyReferenceQ:goal,bodyAttitudeQ:body.q,bodyXECI:x,bodyUpECI:y,bodyZECI:z,attitudeSlewErrorDeg:body.error,bodyRateDegS:body.rate,bodySlewMomentumNms:body.momentum,
   wingPitchDeg:wrap(wing),wingTargetDeg:hold?wrap(wing):u<1?commissioningWing:wingGoal,wingRateDegS:rates[0],upperRadiatorPitchDeg:upper,lowerRadiatorPitchDeg:lower,upperRadiatorRateDegS:rates[1],lowerRadiatorRateDegS:rates[2],
@@ -317,10 +345,10 @@ export function attitudeGuidance(h,g,options={}){
   upperRadiatorTrimLimitDeg:up.limit,lowerRadiatorTrimLimitDeg:lo.limit,
   upperRadiatorTargetDeg:up.pitchGoal,lowerRadiatorTargetDeg:lo.pitchGoal,upperRadiatorTargetRollDeg:up.rollGoal,lowerRadiatorTargetRollDeg:lo.rollGoal,
   radiatorControlLaw,radiatorControlTemperatureK:loopTemperatureK,radiatorColdThresholdK:coldThresholdK,radiatorColdProtection:cold&&g.eclipse&&!park&&!hold&&u===1,
-  pvNormalECI:normalFor(wing,y,z),upperRadiatorNormalECI:fromBody(upperN,x,y,z),lowerRadiatorNormalECI:fromBody(lowerN,x,y,z),
+  pvNormalECI:pvN?fromBody(pvN,x,y,z):normalFor(wing,y,z),upperRadiatorNormalECI:fromBody(upperN,x,y,z),lowerRadiatorNormalECI:fromBody(lowerN,x,y,z),
   upperRadiatorSunCos:Math.abs(dot(upperN,sun)),lowerRadiatorSunCos:Math.abs(dot(lowerN,sun)),
-  dishTargetBody:hold?dish:terminal==='Ka'?aim:Y,opticalTargetBody:hold?optic:terminal==='Optical'?aim:Y,
-  terminalBeamHalfDeg:directional?beamHalfDeg:null,terminalConeMarginDeg:directional&&sight?l.terminalConeDeg-safeAcos(sight[1])/DEG:null,
-  terminalState:state,terminalErrorDeg:residual,terminalReachable:reachable,terminalAngularRateDegS:rates[3],
+  dishTargetBody:hold?dish:terminal==='Ka'?aim:dishAxis,opticalTargetBody:hold?optic:terminal==='Optical'?aim:opticalAxis,
+  terminalBeamHalfDeg:directional?beamHalfDeg:null,terminalConeMarginDeg:directional&&sight?l.terminalConeDeg-safeAcos(dot(sight,parkAxis))/DEG:null,
+  terminalState:state,terminalErrorDeg:residual,terminalReachable:reachable,terminalObstruction:visibility?.blocker??null,terminalAngularRateDegS:rates[3],
   dishBoresightBody:dish,opticalBoresightBody:optic,terminalBoresightECI:directional?fromBody(encoder,x,y,z):null,stationDirectionBody:sight};
 }

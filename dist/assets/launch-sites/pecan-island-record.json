@@ -57,7 +57,7 @@
     "nativeResolutionBasis": "Nominal source acquisition, not bundled display sampling"
   },
   "elevation": {
-    "url": "assets/launch-sites/pecan-island-elevation.json",
+    "url": "assets/launch-sites/pecan-island-elevation.json.zip",
     "width": 257,
     "height": 257,
     "bounds": [

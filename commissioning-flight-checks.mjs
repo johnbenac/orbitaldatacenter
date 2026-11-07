@@ -8,6 +8,7 @@ import {deploymentLayout,deploymentSchedule,mechanismPose,leafAxes,leafPose} fro
 import {surfaces} from './dist/physics.js';
 import {geometry,dot} from './dist/orbit.js';
 import {componentMassProperties} from './dist/component-stations.js';
+import {energySolarDelivery} from './dist/energy-system.js';
 const close=(a,b,tol=1e-7)=>assert.ok(Math.abs(a-b)<tol,`${a} != ${b}`);
 const d={...defaults,solarTiltDeg:30},h=sizeDesign(d),g=deploymentLayout(h),sim=createSimulation(h);
 for(const u of [0,.025,.17,.42,.61,.68,.72,.901,.97,1]){
@@ -19,10 +20,11 @@ for(const u of [0,.025,.17,.42,.61,.68,.72,.901,.97,1]){
   const n=leafAxes(leafPose(g,g.descriptors.find(p=>p.type==='rad'&&p.end===bank.end),u,30,f))[1];
   for(const [axis,v] of [f.bodyXECI,f.bodyUpECI,f.bodyZECI].entries())close(dot(radNormals[i],v),n[axis]);
  }
- close(f.solarKW,1.361*f.solarDeployedM2*d.pvEfficiency*d.solarDelivery*Math.max(0,dot(f.pvNormalECI,orbit.sunECI))*d.pvRetention**orbit.windowAgeYears);
+ close(f.solarArrayInputKW,1.361*f.solarDeployedM2*d.pvEfficiency*d.solarDelivery*Math.max(0,dot(f.pvNormalECI,orbit.sunECI))*d.pvRetention**orbit.windowAgeYears);
+ close(f.solarKW,energySolarDelivery(h,f.solarArrayInputKW).busKW);
  close(s.upperRadiatorNetKW+s.lowerRadiatorNetKW,s.netRejectionKW);
  assert.ok(!motion.upperFlow||motion.upperLocked);assert.ok(!motion.lowerFlow||motion.lowerLocked);
- if(u<.665)close(s.netRejectionKW,0);if(u<.895)close(s.lowerRadiatorNetKW,0);
+ if(u<.665)close(s.loopToRadiatorKW,0);if(u<.895)close(s.lowerRadiatorFlow,0);
  if(u>0&&u<.42){const solar=componentMassProperties(h,s.propellantKg,u).rows.find(r=>r.wbs==='02.01');
   const wing=parts.wings[0],frac=wing.span/g.wl;
   close(solar.stationsM[0][0],wing.tip[0]+(wing.root[0]-wing.tip[0])*frac/2);

@@ -2,20 +2,21 @@ import {flightButtons} from './flight-transport.js';
 import {helpButton} from './input-help-ui.js';
 import {icon} from './icons.js';
 import {designName} from './mission-presets.js';
-import {domains,domainReadout,purposeDomainFields} from './domain-analysis.js';
+import {domains,domainReadout,purposeDomainFields,visibleDomainIds,canonicalDomainId} from './domain-analysis.js';
 import {solveModes} from './design.js';
 import {groupDesignInputs,roleLabels} from './design-contract.js';
 import {designOutput,phases} from './lifecycle.js';
 const esc=v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
 const number=(v,d=2)=>Number.isFinite(v)?v.toLocaleString('en-US',{maximumFractionDigits:d}):'—';
-export const domainIds=Object.keys(domains);
+export const domainIds=visibleDomainIds;
 export const isEditable=p=>['A','B','C'].includes(p);
 export function domainNav(v,ref=null){
- const baseline=[['mission','Design rules & margins','book-open','Read the mission engineering approach, PDR margin policy, Goddard rule decisions and evidence plan.'],['architecture','Spacecraft architecture','box','Inspect the fixed spacecraft layout, internal tank frame and geometric checks.'],['equipment','Master equipment list','list-checks','Explore the installed hardware, mass, heritage and manufacturer references.'],['timeline','Master timeline','clock-3','Inspect ground processing, the countdown, ascent, insertion, deployment and the first complete operating pass.']];
- const links=baseline.map(([id,label,ic,tip])=>`<button class="navitem ${ref===id?'selected':''}" data-page="${id}" data-tip="${tip}" aria-label="${label}" aria-current="${ref===id?'page':'false'}">${icon(ic,16)}<span>${label}</span></button>`).join('');
- return '<div class="navgroup vehicle-baseline"><div class="navlabel">MISSION BASELINE</div>'+links+'</div><div class="navgroup"><div class="navlabel">MISSION DOMAINS</div>'+domainIds.map((id,i)=>{
- const d=domains[id],current=!ref&&v.domain===id;return `<button class="navitem ${current?'selected':''}" data-domain="${id}" data-tip="${esc(d.summary)} Open the ${esc(d.label)} view within Phase ${v.phase}." aria-current="${current?'page':'false'}">${icon(d.icon,16)}<span>${esc(d.label)}</span><i class="domain-index">${String(i+1).padStart(2,'0')}</i></button>`;
- }).join('')+'</div><div class="navgroup"><div class="navlabel">REFERENCE</div>'+[['sources','Model & sources','book-open'],['checks','Numerical checks','list-checks']].map(([id,label,ic])=>`<button class="navitem ${ref===id?'selected':''}" data-page="${id}">${icon(ic,16)}<span>${label}</span></button>`).join('')+'</div>';
+ const designs=[['designs','Design references','orbit','Explore published orbital data centers, compare their evidence and open a configured engineering study.'],['architecture','Spacecraft architecture','box','Inspect the active reference architecture, its workbench adaptation and the geometry of the installed design.'],['equipment','Master equipment list','list-checks','Explore this design’s installed hardware, mass, heritage and manufacturer references.'],['timeline','Master timeline','clock-3','Inspect this design’s ground processing, countdown, ascent, deployment and operating checkout.']];
+ const references=[['mission','Design rules & margins','book-open','Shared engineering approach, PDR margins, Goddard rule decisions and evidence plan for every reference design.'],['materials','Materials & finishes','box','Trace spacecraft surfaces to materials, texture maps and their source evidence.'],['sources','Model & sources','book-open','Inspect the equations, assumptions and source evidence.'],['checks','Numerical checks','list-checks','Reproduce reference calculations and verify coupled model behavior.']];
+ const links=items=>items.map(([id,label,ic,tip])=>`<button class="navitem ${ref===id?'selected':''}" data-page="${id}" data-tip="${esc(tip)}" aria-label="${label}" aria-current="${ref===id?'page':'false'}">${icon(ic,16)}<span>${label}</span></button>`).join('');
+ return '<div class="navgroup vehicle-baseline"><div class="navlabel">DATA CENTER DESIGNS</div>'+links(designs)+'</div><div class="navgroup"><div class="navlabel">MISSION DOMAINS</div>'+domainIds.map((id,i)=>{
+ const d=domains[id],current=!ref&&canonicalDomainId(v.domain)===id;return `<button class="navitem ${current?'selected':''}" data-domain="${id}" data-tip="${esc(d.summary)} Open the ${esc(d.label)} view within Phase ${v.phase}." aria-current="${current?'page':'false'}">${icon(d.icon,16)}<span>${esc(d.label)}</span><i class="domain-index">${String(i+1).padStart(2,'0')}</i></button>`;
+ }).join('')+'</div><div class="navgroup"><div class="navlabel">REFERENCE</div>'+links(references)+'</div>';
 }
 function disposalPicker(d,row,domain){
  const isReturn=d.disposalMethod!=='graveyard',keys=isReturn?['targetLatDeg','targetLonDeg','targetToleranceKm']:['graveyardAltitudeKm'];

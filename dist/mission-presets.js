@@ -1,4 +1,6 @@
 import {defaults,applyPreset,normalizeDesign,sizeDesign,solveModes,validateDesign} from './design.js';
+import {getReferenceCenter} from './reference-centers.js';
+import {referenceAssociation} from './reference-configurations.js';
 import {sanitizeTargets} from './thermal-review.js';
 import {icon} from './icons.js';
 
@@ -15,14 +17,22 @@ export const presetList=[
  {id:'carrier',name:'Compute carrier',type:'High-duty compute',icon:'layers-3',design:{...applyPreset(defaults,'launcher','glenn'),trayCount:26,solarM2:390,radiatorM2:132.6,batteryKWh:104,propellantKg:850,storageTB:32,launchAllowanceKg:32000}},
  {id:'scale',name:'10 MW study',type:'Launch-limit case',icon:'rocket',design:{...applyPreset(applyPreset(defaults,'launcher','starship'),'compute','dgx'),trayCount:981,solarM2:86000,radiatorM2:31000,batteryKWh:15000,storageTB:512,propellantKg:45000,launchAllowanceKg:85000}}
 ].map(p=>({...p,h:sizeDesign(p.design)}));
-export const customId=()=> 'user-'+crypto.randomUUID();
+let localIdSequence=0;
+export function customId(){
+ const crypto=globalThis.crypto;
+ if(crypto?.randomUUID)return 'user-'+crypto.randomUUID();
+ // Downloaded/offline copies and HTTP previews may not expose randomUUID.
+ // These identifiers name local saved designs, never credentials or access.
+ if(crypto?.getRandomValues)return 'user-'+Array.from(crypto.getRandomValues(new Uint8Array(16)),n=>n.toString(16).padStart(2,'0')).join('');
+ return 'user-'+Date.now().toString(36)+'-'+(++localIdSequence).toString(36)+'-'+Math.random().toString(36).slice(2,14);
+}
 export function missionPreset({id=customId(),name,description='',design,solver='installed',thermalTargets={},thermalPadding=0,thermalScope='window'}){
  const title=String(name||'').trim();if(!title||title.length>64)throw Error('Give the preset a name between 1 and 64 characters.');
  if(typeof description!=='string'||description.length>320)throw Error('Keep the preset description to 320 characters.');
  if(typeof design!=='object'||!design||Array.isArray(design)||!Object.keys(design).length)throw Error('A preset needs its mission design inputs.');
  for(const [k,v] of Object.entries(design))if(Object.hasOwn(defaults,k)&&typeof defaults[k]==='number'&&!Number.isFinite(v))throw Error('Invalid numeric preset input: '+k);
  const d=normalizeDesign(design),errors=validateDesign(d);if(errors.length)throw Error(errors[0]);if(!Object.hasOwn(solveModes,solver))throw Error('Unknown sizing method in preset.');
- return {schema,id:/^user-[a-zA-Z0-9-]{1,96}$/.test(id)?id:customId(),name:title,description:description.trim(),design:d,solver,thermalTargets:sanitizeTargets(thermalTargets),thermalScope:thermalScope==='mission'?'mission':'window',thermalPadding:Math.min(100,Math.max(0,Number(thermalPadding)||0))};
+ return {schema,id:/^user-[a-zA-Z0-9-]{1,96}$/.test(id)?id:customId(),name:title,description:description.trim(),designReference:referenceAssociation(d),design:d,solver,thermalTargets:sanitizeTargets(thermalTargets),thermalScope:thermalScope==='mission'?'mission':'window',thermalPadding:Math.min(100,Math.max(0,Number(thermalPadding)||0))};
 }
 export function parsePreset(text){
  if(typeof text!=='string'||text.length>750000)throw Error('Choose a mission preset JSON under 750 kB.');
@@ -57,8 +67,9 @@ export function designName(view,design){
  const namedSnapshot=typeof view.presetName==='string'&&view.presetName.trim()&&(
   /^user-/.test(view.preset)||(view.preset==='custom'&&view.presetName!=='New mission')
  );
- const name=namedSnapshot?view.presetName.trim():(buildNames[purpose]||'Mission spacecraft');
- return name+(view.modified?' · edited':'');
+ const input=design?.input||design,association=input?referenceAssociation(input):null,reference=getReferenceCenter(association?.id||view.referenceCenterId);
+ const name=namedSnapshot?view.presetName.trim():reference?reference.shortName+' · workbench study':(buildNames[purpose]||'Custom spacecraft');
+ return name+(view.modified?' · edited':!namedSnapshot&&(association?.modified||view.referenceCenterModified)?' · variant':'');
 }
 
 export function presetShelf(view,shelf=[],hardware){

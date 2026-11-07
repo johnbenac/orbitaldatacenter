@@ -1,0 +1,223 @@
+import {referenceCenters,referenceCenterOrder,defaultReferenceCenterId,getReferenceCenter,referenceEvidenceDate} from './reference-centers.js';
+import {buildReferenceDesign,assessReferenceDesign,referenceConfigurationRevision} from './reference-configurations.js';
+import {sizeDesign} from './design.js';
+import {icon} from './icons.js';
+import {referenceMissionCases,normalizeReferenceMissionCase} from './reference-missions.js';
+import {evidenceClassLabels,getReferenceSource,referenceRetrievalBacklog} from './reference-evidence.js';
+
+const esc=value=>String(value??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
+const fmt=(value,places=1)=>Number.isFinite(value)?value.toLocaleString('en-US',{maximumFractionDigits:places}):'—';
+const categoryLabels={engineering:'Engineering point design',commercial:'Commercial concept',historical:'Historical configuration',analytical:'Analytical benchmark'};
+const accents={engineering:'#87d9cc',commercial:'#9abced',historical:'#c5b7db',analytical:'#e5c28b'};
+const studyCache=new Map();
+
+// Fast, deterministic sizing only. Catalog inspection never runs a mission replay,
+// installs a design, or substitutes the user's edited variant into the comparison.
+export function referenceStudySnapshot(id,options={}){
+ if(!getReferenceCenter(id))return null;
+ const missionCase=normalizeReferenceMissionCase(options.missionCase??'source'),key=id+'|'+missionCase;
+ if(!studyCache.has(key)){
+  const hardware=sizeDesign(buildReferenceDesign(id,{missionCase}));
+  studyCache.set(key,{hardware,assessment:assessReferenceDesign(hardware)});
+ }
+ return studyCache.get(key);
+}
+
+function publicValue(q,{compact=false}={}){
+ if(!q||!Number.isFinite(q.value))return '<span class="rc-unpublished">Not published</span>';
+ const decimals=q.value>100?0:q.value>10?1:2;
+ const label=fmt(q.value,decimals)+(q.unit&&q.unit!=='ratio'?' '+q.unit:'');
+ return '<strong>'+esc(label)+'</strong>'+(q.method?'<span class="rc-derived">Derived from source</span>':'')+(!compact?'<small>'+esc(q.basis)+(q.method?' · '+esc(q.method):'')+(q.qualifier?' · '+esc(q.qualifier):'')+'</small>':q.qualifier?'<small>'+esc(q.qualifier)+'</small>':'');
+}
+function headline(r){
+ const q=r.reported;
+ if(q.itPowerKW.value!=null)return [q.itPowerKW,'IT power'];
+ if(q.generationPowerKW.value!=null)return [q.generationPowerKW,'Solar generation'];
+ return [q.statedPowerKW,'Stated power · boundary open'];
+}
+const text=(x,y,label,size=11,color='#bdcdd5',anchor='start')=>'<text x="'+x+'" y="'+y+'" font-size="'+size+'" fill="'+color+'" text-anchor="'+anchor+'">'+esc(label)+'</text>';
+function cells(x,y,w,h,color='#7ab7de'){
+ let lines='';for(let i=1;i<9;i++)lines+='<path d="M '+(x+w*i/9)+' '+y+' v '+h+'"/>';for(let i=1;i<4;i++)lines+='<path d="M '+x+' '+(y+h*i/4)+' h '+w+'"/>';
+ return '<g stroke="'+color+'"><rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="1" fill="#203d54"/><g opacity=".45" stroke-width=".6">'+lines+'</g></g>';
+}
+function leader(x,y,endX,endY,label,{anchor='start',color='#b2c7ce'}={}){
+ return '<g fill="none" stroke="'+color+'" stroke-width=".8"><circle cx="'+x+'" cy="'+y+'" r="2"/><path d="M '+x+' '+y+' L '+endX+' '+endY+'"/></g>'+text(endX+(anchor==='end'?-5:5),endY+4,label,10,color,anchor);
+}
+
+/** Dated topologies and identified model interpretations, never scaled imagery. */
+export function referenceArchitectureSketch(r,{compact=false,prefix='reference'}={}){
+ const uid=prefix+'-'+r.id,titleId=uid+'-title',descId=uid+'-desc',accent=accents[r.category];
+ let shape='',caption='Functional architecture · arrangement illustrative';
+ if(r.architecture.kind==='radiator-compute-platform'){
+  caption='Published topology · schematic, not to scale';
+  shape=cells(28,110,183,42)+cells(349,110,183,42)+
+   '<path d="M 211 131 H 249 M 310 131 H 349" fill="none" stroke="#9eb2bc" stroke-width="4"/>'+ 
+   '<path d="M 252 124 L 272 105 L 308 105 L 315 125 L 315 156 L 252 156 Z" fill="#405860" stroke="#a7c7ce"/>'+ 
+   '<path d="M 272 106 V 70 L 319 52 L 359 93 L 311 111 Z" fill="#8eafb4" stroke="#c2e4df"/>'+ 
+   '<path d="M 281 75 L 317 61 L 345 91 L 310 103 Z" fill="#a4c9c6" stroke="#d4e8db"/>'+ 
+   '<path d="M 285 87 L 310 78 L 326 94 L 305 102 Z" fill="#a99154" stroke="#e8cf8a"/>'+ 
+   '<g stroke="#6d9299" opacity=".65"><path d="M 286 71 L 321 106 M 297 67 L 333 101 M 307 63 L 343 96"/></g>';
+  if(!compact)shape+=leader(97,116,82,78,'2 × roll-out solar wings')+leader(336,81,384,54,'Compute / radiator platform')+leader(281,148,317,199,'Flat-stack bus')+text(280,230,'2 × 20 m wings · 3.25 m square radiator',11,'#a6c6ca','middle');
+ }else if(r.architecture.kind==='inline-deployables'){
+  caption='Manufacturer animation topology · panel roles partly interpreted';
+  shape=cells(26,112,130,33)+cells(404,112,130,33)+
+   '<g fill="#7b9fa5" stroke="#bcdbd8"><rect x="164" y="112" width="80" height="33"/><rect x="316" y="112" width="80" height="33"/></g>'+
+   '<g fill="none" stroke="#4d747c" stroke-width="1"><path d="M 174 112 V 145 M 184 112 V 145 M 194 112 V 145 M 204 112 V 145 M 214 112 V 145 M 224 112 V 145 M 234 112 V 145 M 326 112 V 145 M 336 112 V 145 M 346 112 V 145 M 356 112 V 145 M 366 112 V 145 M 376 112 V 145 M 386 112 V 145"/></g>'+
+   '<path d="M 250 117 L 260 105 H 310 V 139 L 300 151 H 250 Z" fill="#344e5a" stroke="#a4c5ce"/>'+
+   '<g fill="#b69e60" stroke="#e4ca83"><rect x="257" y="119" width="13" height="22"/><rect x="275" y="119" width="13" height="22"/><rect x="293" y="119" width="9" height="22"/></g>'+
+   '<g fill="none" stroke="#79d6d3" stroke-width="2"><path d="M 243 123 Q 230 89 251 117 M 309 137 Q 329 168 317 134 M 155 130 Q 161 142 165 130 M 395 130 Q 400 142 405 130"/></g>'+
+   '<g fill="#abdcd2" stroke="#d1fff4"><circle cx="257" cy="106" r="5"/><circle cx="305" cy="150" r="5"/></g>';
+  if(!compact)shape+=leader(197,118,185,75,'Inboard radiator allocation',{anchor:'end'})+leader(443,115,429,83,'Outboard PV')+leader(285,135,348,190,'Thin equipment bay')+leader(256,105,310,56,'Separated optical stations')+text(280,226,'Paired inline deployables · exact full span unresolved',11,'#adc4ce','middle');
+ }else if(r.architecture.kind==='orthogonal-cross'){
+  caption='August 2026 specification and images · area convention explicit';
+  shape=cells(30,103,211,59)+cells(319,103,211,59)+
+   '<path d="M 241 132 H 258 M 302 132 H 319" fill="none" stroke="#acc0c8" stroke-width="4"/>'+
+   '<g fill="#8db5ba" stroke="#d5e7df"><rect x="266" y="40" width="28" height="62"/><rect x="266" y="164" width="28" height="50"/></g>'+
+   '<g stroke="#537a86"><path d="M 274 40 V 101 M 285 40 V 101 M 274 164 V 214 M 285 164 V 214"/></g>'+
+   '<path d="M 258 107 L 269 99 H 303 V 157 L 292 165 H 258 Z" fill="#3b525c" stroke="#a5c7d0"/>'+
+   '<g fill="#c4ae71"><rect x="264" y="113" width="29" height="9"/><rect x="264" y="127" width="29" height="9"/><rect x="264" y="141" width="29" height="9"/></g>';
+  if(!compact)shape+=leader(142,115,112,65,'Two broad solar wings')+leader(283,62,327,54,'Opposed radiator blades')+'<path d="M 30 216 V 224 H 530 V 216" fill="none" stroke="#829ea9"/>'+text(280,240,'75 m span · 30 m height · 840 m² PV derived',11,'#bdd5dc','middle');
+ }else if(r.architecture.kind==='rack-cross'){
+  caption='June dimensions · April image is a historical visual antecedent';
+  shape=cells(26,116,211,28)+cells(323,116,211,28)+
+   '<path d="M 237 130 H 254 M 306 130 H 323 M 280 99 V 65 M 280 161 V 197" fill="none" stroke="#aec8d2" stroke-width="3"/>'+
+   '<g fill="#8fb1b5" stroke="#c5ded9"><path d="M 263 58 H 297 V 99 H 263 Z"/><path d="M 263 162 H 297 V 203 H 263 Z"/></g>'+
+   '<rect x="253" y="101" width="54" height="59" fill="#364e58" stroke="#a9c5cd"/>'+
+   '<g fill="#a38e56" stroke="#ddc789"><rect x="260" y="108" width="17" height="8"/><rect x="283" y="108" width="17" height="8"/><rect x="260" y="120" width="17" height="8"/><rect x="283" y="120" width="17" height="8"/><rect x="260" y="132" width="17" height="8"/><rect x="283" y="132" width="17" height="8"/><rect x="260" y="144" width="17" height="8"/><rect x="283" y="144" width="17" height="8"/></g>';
+  if(!compact)shape+=leader(139,119,100,75,'Long paired solar wings')+leader(283,76,326,64,'Radiator interpretation')+leader(281,148,347,195,'Rack accommodation')+text(280,233,'100 m full span · approximately 100 kW generation',11,'#b8cdd6','middle');
+ }else if(r.architecture.kind==='reflex-functional'){
+  caption='September functional requirements · displayed geometry allocated';
+  shape='<g opacity=".8" stroke-dasharray="5 4">'+cells(46,106,169,53)+cells(345,106,169,53)+'</g>'+
+   '<path d="M 215 132 H 251 M 309 132 H 345" stroke="#9cb6c3" stroke-width="3"/>'+
+   '<path d="M 251 108 L 265 94 H 309 V 152 L 295 166 H 251 Z" fill="#3d555f" stroke="#a7c5cf"/>'+
+   '<g fill="#73959d" stroke="#c0d8d6" stroke-dasharray="5 3"><path d="M 235 72 L 280 56 L 313 73 L 268 90 Z"/><path d="M 251 184 L 296 167 L 329 184 L 284 201 Z"/></g>'+
+   text(280,130,'REFLEX',9,'#d6e6e8','middle')+text(280,146,'BUS STUDY',7,'#afc9d2','middle');
+  if(!compact)shape+=leader(116,112,87,74,'Array geometry allocated')+leader(281,73,355,52,'Transport / area unresolved')+text(280,230,'Peak target approaching 250 kW · no published full envelope',11,'#b5cbd5','middle');
+ }else if(r.architecture.kind==='analytical-self-powered'){
+  caption='Analytical allocation · no published packaged geometry';
+  shape='<g fill="#173039" stroke="'+accent+'"><rect x="27" y="95" width="139" height="64" rx="6"/><rect x="211" y="95" width="139" height="64" rx="6"/><rect x="395" y="95" width="139" height="64" rx="6"/></g>'+
+   '<path d="M 166 127 H 211 M 350 127 H 395 M 280 61 V 95" fill="none" stroke="'+accent+'" stroke-width="2"/>'+
+   '<path d="M 203 123 L 211 127 L 203 131 M 387 123 L 395 127 L 387 131 M 276 87 L 280 95 L 284 87" fill="none" stroke="'+accent+'" stroke-width="2"/>'+
+   text(96,116,'COLD SIDE',10,'#93d9dc','middle')+text(96,143,'~100°C',16,'#deeded','middle')+text(280,116,'POWERED HEAT PUMP',10,accent,'middle')+text(280,143,'COP allocated',12,'#e0e9e7','middle')+text(464,116,'HOT RADIATOR',10,'#f1b68b','middle')+text(464,143,'~150°C',16,'#e0e9e7','middle')+text(280,52,'Electrical work',11,accent,'middle');
+  if(!compact)shape+=text(280,194,'Hot-side heat = cold-side heat + electrical work',12,'#cad7d9','middle')+text(280,218,'1,100 m² source solar allocation · no beamed utility',10,'#a3b9c4','middle');
+ }else{
+  shape=cells(36,96,157,48)+cells(367,96,157,48)+
+   '<g fill="none" stroke="#a3b9c4" stroke-width="2"><path d="M 193 120 H 242 M 318 120 H 367"/><path d="M 280 76 V 169"/></g>'+ 
+   '<path d="M 245 92 L 261 80 L 318 80 L 318 151 L 302 164 L 245 164 Z" fill="#3b525c" stroke="#a0c2cc"/>'+ 
+   '<path d="M 245 92 H 302 V 164 M 302 92 L 318 80" fill="none" stroke="#91aeb8"/>'+ 
+   '<g fill="#86aeb2" stroke="#b3d6d3" stroke-dasharray="4 3"><path d="M 221 68 L 264 51 L 294 66 L 250 83 Z"/><path d="M 272 175 L 316 159 L 347 174 L 301 193 Z"/></g>'+ 
+   '<g fill="#ad9c66" stroke="#e1ce91"><rect x="255" y="103" width="36" height="10"/><rect x="255" y="119" width="36" height="10"/><rect x="255" y="135" width="36" height="10"/></g>';
+  if(!compact)shape+=leader(94,101,69,62,'Solar collection')+leader(279,67,343,43,'Heat rejection')+leader(274,131,368,190,'Compute + spacecraft bus')+text(280,231,'Deployable sizes and counts are symbolic',11,'#a6bdc7','middle');
+ }
+ const desc=r.architecture.summary+' '+caption+'.';
+ return '<svg class="rc-sketch" viewBox="0 0 560 '+(compact?'225':'255')+'" role="img" aria-labelledby="'+titleId+' '+descId+'"><title id="'+titleId+'">'+esc(r.name)+' architecture sketch</title><desc id="'+descId+'">'+esc(desc)+'</desc><defs><pattern id="'+uid+'-grid" width="28" height="28" patternUnits="userSpaceOnUse"><path d="M 28 0 H 0 V 28" fill="none" stroke="#64828e" stroke-width=".35" opacity=".19"/></pattern></defs><rect width="560" height="255" fill="#10212a"/><rect width="560" height="255" fill="url(#'+uid+'-grid)"/>'+text(19,25,compact?r.organization.toUpperCase():r.architecture.label.toUpperCase(),10,accent)+shape+(!compact?text(19,248,caption,9,'#91aab6'):'')+'</svg>';
+}
+
+function referenceCard(r,{selectedId,activeId,comparedIds}){
+ const [q,label]=headline(r),selected=r.id===selectedId,active=r.id===activeId;
+ return '<article class="rc-card '+(selected?'is-selected':'')+'" style="--rc-accent:'+accents[r.category]+'"><button type="button" class="rc-card-preview" data-preview-reference="'+r.id+'" aria-pressed="'+selected+'" aria-label="Inspect '+esc(r.name)+'"><span class="rc-card-meta"><span>'+esc(categoryLabels[r.category])+'</span>'+(active?'<b>ACTIVE STUDY</b>':'')+'</span>'+referenceArchitectureSketch(r,{compact:true,prefix:'card'})+'<span class="rc-card-copy"><span class="rc-card-org">'+esc(r.organization)+'</span><strong class="rc-card-title">'+esc(r.shortName)+'</strong><span class="rc-card-summary">'+esc(r.summary)+'</span></span><span class="rc-card-stat"><span>'+publicValue(q,{compact:true})+'<small>'+esc(label)+'</small></span><span class="rc-card-inspect">Inspect '+icon('arrow-up-right',15)+'</span></span></button><button type="button" class="rc-compare-toggle" data-compare-reference="'+r.id+'" aria-pressed="'+comparedIds.includes(r.id)+'">'+icon(comparedIds.includes(r.id)?'check':'plus',13)+' '+(comparedIds.includes(r.id)?'Included in comparison':'Add to comparison')+'</button></article>';
+}
+const resourceLabel=a=>a?.resourceStatus==='meets'?'Resource budgets meet':'Resource shortfall';
+function applicabilityLabel(a){return a?.applicability?.label||'Applicability unassessed'}
+function checkMeter(c){
+ const status=c.status==='meets'?'meets':c.status==='shortfall'?'shortfall':'unassessed';
+ const ratio=c.ratio,known=Number.isFinite(ratio)||ratio===Infinity,width=ratio===Infinity?100:Number.isFinite(ratio)?Math.min(100,Math.max(0,ratio*100)):0;
+ return '<div class="rc-check" data-status="'+status+'"><span>'+esc(c.label||c.id)+'</span><strong>'+esc(ratio===Infinity?'Not limiting':known?fmt(ratio,3)+'× requirement':'Unassessed')+'</strong><span class="rc-check-track" aria-hidden="true"><i style="width:'+width+'%"></i></span></div>';
+}
+function missionCaseControls(missionCase){
+ return '<section class="panel rc-case-toolbar" aria-label="Reference mission comparison case"><div><span class="rc-kicker">Choose the evaluation case</span><h3>Same installed spacecraft. Different mission.</h3><p>'+esc(referenceMissionCases[missionCase].description)+'</p></div><div class="rc-case-buttons" role="group" aria-label="Mission case">'+Object.values(referenceMissionCases).map(c=>'<button type="button" class="btn" data-reference-mission-case="'+c.id+'" aria-pressed="'+(c.id===missionCase)+'">'+esc(c.label)+'</button>').join('')+'</div><small>Preview only. Open study to review and apply the selected case.</small></section>';
+}
+function evidenceSources(ids=[]){
+ return ids.map(getReferenceSource).filter(Boolean).map(s=>'<a href="'+esc(s.url)+'" target="_blank" rel="noopener noreferrer" title="'+esc(s.title+' · '+s.location)+'">'+esc(s.date)+' ↗</a>').join(' · ');
+}
+function evidencePanel(r){
+ const summary=r.evidenceSummary,parts=[['documented','Published','#8fd9c7'],['interpreted','Interpreted / derived','#a7bee6'],['allocated','Allocated','#dfc28c'],['unresolved','Unresolved','#8c9aa5']];
+ const segments=parts.filter(([key])=>summary[key]).map(([key,label,color])=>'<span style="flex:'+summary[key]+';background:'+color+'" title="'+summary[key]+' '+label.toLowerCase()+' fields"></span>').join('');
+ const legend=parts.map(([key,label,color])=>'<span><i style="background:'+color+'"></i><b>'+summary[key]+'</b> '+label+'</span>').join('');
+ const backlog=referenceRetrievalBacklog.filter(x=>x.referenceId===r.id);
+ return '<section class="rc-evidence-panel" aria-label="Field-level design evidence"><span class="rc-kicker">Evidence belongs to each field</span><div class="rc-evidence-bar" aria-hidden="true">'+segments+'</div><div class="rc-evidence-legend">'+legend+'</div><details class="rc-details"><summary>Inspect '+summary.total+' architecture fields and their sources</summary><div class="rc-field-scroll"><table class="rc-field-table"><caption>Published facts, visual interpretations, engineering allocations and unresolved fields for '+esc(r.shortName)+'</caption><thead><tr><th scope="col">Design field</th><th scope="col">Basis</th><th scope="col">Value and interpretation</th></tr></thead><tbody>'+r.fieldEvidence.map(f=>'<tr><th scope="row">'+esc(f.label)+'</th><td><span class="rc-field-tag" data-evidence="'+f.evidence+'">'+esc(evidenceClassLabels[f.evidence])+'</span></td><td><strong>'+esc(f.value??'Unresolved')+'</strong><p>'+esc(f.basis)+'</p>'+(f.location?'<small>'+esc(f.location)+'</small>':'')+'<span class="rc-field-citations">'+evidenceSources(f.sourceIds)+'</span></td></tr>').join('')+'</tbody></table></div>'+(backlog.length?'<div class="rc-retrieval"><h4>Primary-document retrieval backlog</h4><ul>'+backlog.map(x=>'<li><a href="'+esc(x.url)+'" target="_blank" rel="noopener noreferrer">'+esc(x.title)+' ↗</a> · '+esc(x.status)+'<small>'+esc(x.needed)+'</small></li>').join('')+'</ul><p>Unverified geometry numbers from secondary summaries are excluded from the design inputs.</p></div>':'')+'</details></section>';
+}
+function environmentGraphic(a){
+ const env=a.sourceEnvironment,mission=a.missionDescription;
+ if(!env||env.status!=='sampled')return '<section class="rc-environment"><h4>Seasonal environment unassessed</h4><p>'+esc(env?.scope||'A valid circular mission is required for this preliminary screen.')+'</p></section>';
+ const zero=Math.max(1,env.conservativeEclipseS),samples=env.samples||[],bars=samples.map((s,i)=>{const x=28+i*500/Math.max(1,samples.length),height=Math.max(0,s.eclipseS/zero*57);return '<rect x="'+x.toFixed(2)+'" y="'+(91-height).toFixed(2)+'" width="'+Math.max(1,500/Math.max(1,samples.length)-1).toFixed(2)+'" height="'+height.toFixed(2)+'" fill="#91bad6"><title>'+esc(s.epoch.slice(0,10)+' · beta '+fmt(s.betaDeg,1)+'° · eclipse '+fmt(s.eclipseS/60,1)+' min')+'</title></rect>'}).join('');
+ const diagram='<svg viewBox="0 0 560 121" role="img" aria-label="Seasonal eclipse duration against the conservative zero-beta bound"><path d="M 28 33 H 531" stroke="#d3b77e" stroke-dasharray="5 4"/><path d="M 28 91 H 531" stroke="#657f8d"/>'+text(28,22,'ZERO-BETA BOUND · '+fmt(env.conservativeEclipseS/60,1)+' MIN',9,'#dcc596')+bars+text(28,110,'First and last mission-year samples',9,'#a2bcc9')+text(532,110,fmt(env.longestEclipseS/60,1)+' min maximum sampled',9,'#b7d6e8','end')+'</svg>';
+ const sourceChecks=a.sourceEnvironmentChecks||[];
+ return '<section class="rc-environment"><div class="rc-section-title"><div><span class="rc-kicker">Seasonal environmental case</span><h4>'+esc(mission?.label||'Selected mission')+'</h4></div><span class="rc-badge" data-status="'+esc(a.sourceEnvironmentStatus)+'">'+(a.sourceEnvironmentStatus==='meets'?'Sampled energy / thermal checks meet':a.sourceEnvironmentStatus==='shortfall'?'Sampled case has shortfalls':'Unassessed')+'</span></div><p>'+esc(mission?.sourceOrbit||'Selected input orbit')+'</p><dl class="rc-orbit-metrics"><div><dt>Altitude / inclination</dt><dd>'+fmt(a.modelMetrics.orbitAltitudeKm,0)+' km / '+fmt(a.modelMetrics.inclinationDeg,2)+'°</dd></div><div><dt>LTAN at epoch</dt><dd>'+fmt(env.ltanAtEpochHours,2)+' h</dd></div><div><dt>Minimum sampled sunlight</dt><dd>'+fmt(100*env.minSunFraction,1)+'%</dd></div><div><dt>Allocated epoch</dt><dd>'+esc(mission?.inputs?.epoch?.slice(0,10)||'Saved input')+'</dd></div></dl>'+diagram+'<p class="rc-note">'+esc(mission?.allocations||'')+'</p><details class="rc-details"><summary>Seasonal checks and scope</summary><div class="rc-checks">'+sourceChecks.map(checkMeter).join('')+'</div><p>'+esc(env.method)+'</p><p>'+esc(env.scope)+'</p><p>The common resource screen above retains zero-beta eclipse. Neither case changes installed hardware or the margin policy.</p></details></section>';
+}
+function sourcePointGraphic(a){
+ const c=a.sourcePointComparison;
+ if(!c)return '';
+ const temperatures=[...c.sourceReported.points.map(p=>p.maximumInterfaceC),...c.modelResult.map(p=>p.interfaceC),...c.busSensitivity.modelResult.map(p=>p.interfaceC)];
+ const lo=Math.floor(Math.min(...temperatures)/10)*10-10,hi=Math.ceil(Math.max(...temperatures)/10)*10+10,x=v=>70+(v-lo)/(hi-lo)*450;
+ const grid=Array.from({length:Math.round((hi-lo)/10)+1},(_,i)=>{const v=lo+i*10;return '<path d="M '+x(v)+' 40 V 126" stroke="#415a66" opacity=".6"/>'+text(x(v),145,fmt(v,0)+'°C',9,'#b2c6ce','middle')}).join('');
+ const rows=c.modelResult.map((p,i)=>{const y=65+i*43,source=c.sourceReported.points[i],sensitivity=c.busSensitivity.modelResult[i],sx=x(source.maximumInterfaceC);return text(12,y+4,fmt(p.payloadHeatKW,0)+' kWt',10,'#d0dfe2')+'<path d="M '+x(p.interfaceC)+' '+y+' H '+x(sensitivity.interfaceC)+'" stroke="#91bcb9"/><circle cx="'+x(p.interfaceC)+'" cy="'+y+'" r="5" fill="#8bd8c6"/><circle cx="'+x(sensitivity.interfaceC)+'" cy="'+y+'" r="5" fill="#172831" stroke="#8bd8c6" stroke-width="2"/><path d="M '+sx+' '+(y-6)+' l 6 6 -6 6 -6 -6 Z" fill="#e5c38b"/>'}).join('');
+ const graphic='<svg viewBox="0 0 560 157" role="img" aria-label="Published spatial maximum interface temperatures and separately allocated lumped model temperatures at 8 and 10 kilowatts payload heat">'+text(12,19,'INTERFACE TEMPERATURE · DIFFERENT MODEL STATISTICS',10,'#bbced8')+grid+rows+'</svg>';
+ const delta=v=>(v>0?'+':'')+fmt(v,2);
+ return '<section class="rc-environment rc-source-point"><div class="rc-section-title"><div><span class="rc-kicker">Separate source thermal point</span><h4>Redwire · beta 90° steady comparison</h4></div><span class="rc-badge" data-status="open">Allocated boundary comparison</span></div><p>The paper reports a spatial maximum at the compute-module interface. This model calculates a lumped spreader interface under declared environmental and conductance allocations. Neither temperature is a chip-junction rating. This fixed reference-load comparison is independent of edited spacecraft inputs.</p>'+graphic+'<div class="rc-evidence-legend"><span><i style="background:#e5c38b"></i> Source spatial maximum</span><span><i style="background:#8bd8c6"></i> Lumped model · payload only</span><span><i style="border:2px solid #8bd8c6;background:transparent"></i> Model + 2 kW bus sensitivity</span></div><div class="rc-field-scroll"><table class="rc-field-table"><caption>Matched payload heat, declared boundary differences</caption><thead><tr><th>Payload heat</th><th>Source max</th><th>Lumped model</th><th>Model − source</th><th>+ 2 kW bus</th></tr></thead><tbody>'+c.difference.map((p,i)=>'<tr><th>'+fmt(p.payloadHeatKW,0)+' kWt</th><td>'+fmt(p.sourceMaximumInterfaceC,1)+' °C</td><td>'+fmt(p.modelInterfaceC,2)+' °C</td><td>'+delta(p.interfaceMinusSourceK)+' K</td><td>'+fmt(c.busSensitivity.modelResult[i].interfaceC,2)+' °C</td></tr>').join('')+'</tbody></table></div><p class="rc-note">The default comparison deposits zero bus heat on this platform to isolate the published payload load. '+esc(c.busSensitivity.basis)+' The operating spacecraft separately includes an allocated bus strap whose hinge route is unverified.</p><details class="rc-details"><summary>Boundary assumptions, method and source</summary><ul>'+c.assumptions.map(p=>'<li><strong>'+esc(p.label)+':</strong> '+esc(typeof p.value==='number'?fmt(p.value,4):p.value)+(p.unit?' '+esc(p.unit):'')+'. '+esc(p.basis)+'</li>').join('')+'</ul><p>'+esc(c.method)+'</p><p>'+esc(c.evidenceLimit)+'</p><a href="'+esc(c.sourceReported.url)+'" target="_blank" rel="noopener noreferrer">Redwire · '+esc(c.sourceReported.location)+' ↗</a></details></section>';
+}
+function assemblyReview(h){
+ const checks=h.assemblyChecks||h.physicalArchitecture?.checks||[];
+ if(!checks.length)return '';
+ const shortfalls=checks.filter(c=>c.status==='shortfall'),open=checks.filter(c=>['open','unassessed'].includes(c.status));
+ return '<details class="rc-details rc-assembly-review"><summary>Geometry and installation · '+(shortfalls.length?shortfalls.length+' shortfall'+(shortfalls.length===1?'':'s'):checks.filter(c=>c.status==='meets').length+' modeled checks meet')+(open.length?' · evidence open':'')+'</summary><ul>'+checks.map(c=>'<li><span class="rc-badge" data-status="'+esc(c.status)+'">'+esc(c.status)+'</span> <strong>'+esc(c.label||c.id.replaceAll('-',' '))+'</strong>'+(Number.isFinite(c.actual)?' · '+fmt(c.actual,3)+(c.unit?' '+esc(c.unit):'')+(Number.isFinite(c.required)?' / '+fmt(c.required,3)+' required':''):'')+(c.detail?'<p>'+esc(c.detail)+'</p>':'')+'</li>').join('')+'</ul><p class="rc-note">An area-conserving surface model or a fitted folded envelope is separate from an approved interface and qualified deployment.</p></details>';
+}
+function geometryComparison(r,h){
+ const a=h.physicalArchitecture,bounds=a?.dimensions?.deployed?.size||[],span=a?.dimensions?.fullSolarSpanM;
+ const notes={
+  'redwire-8kw':'Source solar-wing and radiator-panel dimensions retained. Service-bus dimensions and the New Glenn folded package are engineering allocations.',
+  'starcloud-3':'Dimensional boundary unresolved: the reported 400 ft (121.92 m) deployable could refer to an appendage or another extent. It is not identified as the full spacecraft span. The model’s paired arrangement and aspect ratio are allocated; PV and radiator areas are unchanged.',
+  'starmind-ai1':'75 m span and 30 m height constrain the model. The source’s 160 m² radiator convention is unresolved; this study explicitly interprets it as planform with two emitting faces.',
+  'orbital-1-202606':'The source’s approximately 100 m full span is retained. Wing width, radiator dimensions, bus shape and folded interfaces remain allocated; the April image is an antecedent.',
+  'orbital-1-202609':'No matched September envelope was located. These physical dimensions are an allocated preliminary layout; June’s 100 m span and 2 t mass are not imported.',
+  'star-catcher-self-powered':'The source specifies an analytical power/mass model. These dimensions describe the allocated geometry, with no claimed source flight envelope.'
+ };
+ const published=r.reported.deployedSpanM?.value??r.reported.deployableDimensionM?.value;
+ return '<section class="rc-geometry-comparison"><span class="rc-kicker">Source geometry and installed realization</span><dl class="rc-orbit-metrics"><div><dt>Actual modeled full span</dt><dd>'+fmt(span,2)+' m</dd></div><div><dt>Published dimension</dt><dd>'+ (Number.isFinite(published)?fmt(published,2)+' m'+(r.id==='starcloud-3'?' · boundary open':''):'Not published')+'</dd></div><div><dt>Deployed bounds X × Y × Z</dt><dd>'+bounds.map(x=>fmt(x,2)).join(' × ')+' m</dd></div><div><dt>Each solar blanket</dt><dd>'+fmt(h.wingLengthM,2)+' × '+fmt(h.wingWidthM,2)+' m</dd></div></dl><p>'+esc(notes[r.id])+'</p></section>';
+}
+function studyAssessment(r,study){
+ const h=study.hardware,a=study.assessment,m=a.modelMetrics||{},checks=a.checks||[],short=checks.filter(c=>c.status==='shortfall');
+ const applicability=a.applicability,scope=applicability?.status||'unassessed';
+ const metrics=[['Installed IT',m.itPowerKW??h.itKw,'kW'],['Launched stack',m.launchMassKg??h.launchKg,'kg'],['Stowed diameter',m.stowedDiameterM??h.stowedDiameterM,'m'],['Stowed length',m.stowedLengthM??h.stowedLengthM,'m']];
+ const changes=a.nominalRecipeContext?.changes||[];
+ return '<section class="rc-study"><div class="rc-section-title"><div><span class="rc-kicker">Configured workbench study</span><h3>'+esc(r.architecture.label)+'</h3></div><span class="rc-family-id">'+esc(m.architectureFamily||r.architecture.family)+'</span></div><p>'+esc(a.adaptation)+'</p><dl class="rc-study-metrics">'+metrics.map(([label,value,unit])=>'<div><dt>'+label+'</dt><dd>'+fmt(value)+' <small>'+unit+'</small></dd></div>').join('')+'</dl>'+geometryComparison(r,h)+'<p class="rc-note"><strong>Installed communications:</strong> '+esc(m.communicationsPackageLabel)+' · '+fmt(m.opticalTerminalCount,0)+' optical, '+fmt(m.kaTerminalCount,0)+' Ka and '+fmt(m.sPatchCount,0)+' S-band patches. Counts, mass and available service follow this project allocation.</p><div class="rc-section-title rc-screen-heading"><h4>Conservative resource screen</h4><span class="rc-badge" data-status="'+esc(a.resourceStatus)+'">'+esc(resourceLabel(a))+'</span></div><p class="rc-note">EOL resources, shared PDR margins and the zero-beta eclipse bound. Published geometry is retained even when a budget fails.</p><div class="rc-checks">'+checks.slice(0,6).map(checkMeter).join('')+'</div>'+(checks.length>6?'<details class="rc-details"><summary>All '+checks.length+' resource checks</summary><div class="rc-checks">'+checks.map(checkMeter).join('')+'</div></details>':'')+(short.length?'<p class="rc-shortfall">'+esc(short.map(c=>c.label||c.id).join(' · '))+'</p>':'')+'<div class="rc-evidence-line"><span class="rc-badge" data-status="'+esc(scope)+'">'+esc(applicabilityLabel(a))+'</span><span class="rc-badge" data-status="open">Qualification / PDR evidence open</span></div>'+assemblyReview(h)+environmentGraphic(a)+sourcePointGraphic(a)+'<details class="rc-details"><summary>Study assumptions and applicability</summary><ul>'+[...(a.assumptions||[]),...(r.assumptions||[])].map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>'+(applicability?.checks?.some(c=>c.status!=='inside')?'<ul>'+applicability.checks.filter(c=>c.status!=='inside').map(c=>'<li><strong>'+esc(c.label)+'</strong> · '+esc(c.basis||c.status)+'</li>').join('')+'</ul>':'')+'</details>'+(changes.length?'<details class="rc-details"><summary>Recipe revision and changed hardware</summary><p>'+esc(referenceConfigurationRevision)+' · previous r1 snapshots are retained unchanged. Opening an old saved study restores its saved inputs.</p><ul>'+changes.map(c=>'<li><strong>'+esc(c.field)+'</strong>: '+esc(c.previous??'Not previously allocated')+' → '+esc(c.current)+'</li>').join('')+'</ul></details>':'')+'</section>';
+}
+function sourceLinks(r){return r.sources.filter(s=>/^https:\/\//.test(s.url)).map((s,i)=>'<li><a href="'+esc(s.url)+'" target="_blank" rel="noopener noreferrer"><b>'+String(i+1).padStart(2,'0')+'</b><span>'+esc(s.title)+' ↗<small>'+esc(s.date||'Date not stated')+' · '+esc(s.kind)+'</small><small>'+esc(s.location||'')+'</small>'+(s.sha256?'<small class="rc-source-hash">SHA-256 '+esc(s.sha256)+'</small>':'')+'</span></a></li>').join('')}
+function dossier(r,study,{activeId,modified,missionCase}){
+ const publicKeys=[['itPowerKW','IT power'],['peakItPowerKW','Peak IT'],['statedPowerKW','Stated power'],['generationPowerKW','Solar generation'],['solarSpecificWm2','Solar rating density'],['totalPowerKW','Total electrical load'],['busPowerKW','Spacecraft service allocation'],['massKg','Whole spacecraft mass'],['solarAreaM2','Solar collecting area'],['radiatorPlanformM2','Radiator planform'],['radiatingAreaM2','Active radiating area'],['radiatorStatedAreaM2','Radiator area · convention open'],['deployedSpanM','Deployed span'],['deployedHeightM','Deployed height'],['deployableDimensionM','Deployable dimension'],['stowedHeightM','Stowed height'],['orbitAltitudeKm','Orbit altitude']].filter(([key])=>r.reported[key]?.value!=null);
+ const active=r.id===activeId;
+ return '<section class="panel rc-dossier" id="reference-detail" aria-labelledby="reference-detail-title"><div class="rc-dossier-head"><div><span class="rc-kicker">Inspect reference · '+esc(r.revision)+'</span><h2 id="reference-detail-title">'+esc(r.name)+'</h2><p>'+esc(r.status.detail)+'</p></div><div class="rc-dossier-action"><button type="button" class="btn rc-primary" data-open-reference="'+r.id+'" data-open-reference-case="'+missionCase+'">'+esc(active&&!modified?'Review reference study':'Open study')+' '+icon('chevron-right',15)+'</button><small>'+esc(referenceMissionCases[missionCase].label)+' · review before applying</small></div></div><div class="rc-dossier-layout"><section class="rc-published"><figure>'+referenceArchitectureSketch(r,{prefix:'detail'})+'<figcaption>'+esc(r.architecture.evidence)+'</figcaption></figure><div class="rc-public-body"><span class="rc-kicker">Published reference</span><dl class="rc-public-stats">'+publicKeys.map(([key,label])=>'<div><dt>'+label+'</dt><dd>'+publicValue(r.reported[key])+'</dd></div>').join('')+'</dl>'+evidencePanel(r)+'<details class="rc-details"><summary>Architecture, launch and missing information</summary><dl class="rc-architecture-notes">'+[['Power',r.architecture.power],['Thermal',r.architecture.thermal],['Packaging',r.architecture.packaging],['Launcher evidence',r.launch.evidence]].map(([key,value])=>'<div><dt>'+key+'</dt><dd>'+esc(value)+'</dd></div>').join('')+'</dl><h4>Public specification gaps</h4><ul>'+r.unresolved.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></details>'+(r.sourceHistory?'<details class="rc-details"><summary>Earlier source revisions retained separately</summary><ul>'+r.sourceHistory.map(x=>'<li><strong>'+esc(x.date)+'</strong> · '+fmt(x.massKg,0)+' kg / '+fmt(x.statedPowerKW,0)+' kW stated. '+esc(x.basis)+' '+evidenceSources(x.sourceIds)+'</li>').join('')+'</ul></details>':'')+'<details class="rc-details"><summary>'+r.sources.length+' sources and provenance</summary><ol class="rc-sources">'+sourceLinks(r)+'</ol></details></div></section>'+studyAssessment(r,study)+'</div></section>';
+}
+
+const publishedRows=[
+ ['massKg','Whole spacecraft mass'],['itPowerKW','IT power · average / continuous'],['peakItPowerKW','IT power · peak'],['totalPowerKW','Total electrical load'],['busPowerKW','Spacecraft services excl. IT'],['generationPowerKW','Solar generation'],['statedPowerKW','Power · unspecified boundary'],['solarAreaM2','Solar collecting area'],['solarSpecificWm2','Solar rating density'],['radiatorPlanformM2','Radiator planform · one face'],['radiatingAreaM2','Active radiating surface'],['radiatorStatedAreaM2','Radiator area · face convention open'],['deployedSpanM','Deployed span'],['deployedHeightM','Deployed height'],['deployableDimensionM','Other deployable dimension'],['stowedHeightM','Stowed height'],['orbitAltitudeKm','Operating altitude']
+];
+const modeledRows=[
+ ['itPowerKW','Installed IT capability','kW'],['meanItPowerKW','Scheduled mean IT load','kW'],['meanBusPowerKW','Mean total bus demand','kW'],['bolGenerationPowerKW','BOL solar generation','kW'],['eolAvailablePowerKW','EOL available solar power','kW'],['launchMassKg','Launched stack incl. adapter','kg'],['dryMassKg','Dry mass incl. growth','kg'],['stowedDiameterM','Stowed maximum diameter','m'],['stowedLengthM','Stowed stack length','m'],['deployedSpanM','Modeled full deployed span','m'],['deployedHeightM','Modeled deployed height','m'],['solarAreaM2','Solar collecting area','m²'],['radiatorPlanformM2','Radiator planform','m²'],['radiatingAreaM2','Two-face emitting area','m²'],['batteryKWh','Installed battery energy','kWh'],['propellantKg','Installed propellant','kg'],['orbitAltitudeKm','Selected mission altitude','km'],['inclinationDeg','Selected mission inclination','°'],['missionYears','Analysis duration','yr']
+];
+function comparison(ids,studies,missionCase){
+ const records=ids.map(getReferenceCenter),group=(title,sub)=>'<tr class="rc-table-group"><th colspan="'+(records.length+1)+'">'+title+'<span>'+sub+'</span></th></tr>';
+ const row=(label,body)=>'<tr><th scope="row">'+label+'</th>'+records.map(r=>'<td>'+body(r,studies.get(r.id))+'</td>').join('')+'</tr>';
+ const published=publishedRows.filter(([key])=>records.some(r=>r.reported[key]?.value!=null)).map(([key,label])=>row(label,r=>publicValue(r.reported[key]))).join('');
+ const modeled=modeledRows.map(([key,label,unit])=>row(label,(_r,s)=>'<strong>'+fmt(s.assessment.modelMetrics?.[key])+' '+unit+'</strong>')).join('');
+ return '<section class="panel rc-comparison" id="reference-comparison" aria-labelledby="reference-comparison-title"><div class="rc-comparison-head"><div><span class="rc-kicker">Compare references · '+esc(referenceMissionCases[missionCase].label)+'</span><h2 id="reference-comparison-title">Different designs. Visible assumptions.</h2><p>Source figures retain their date and meaning. Configured studies use the selected mission case, fixed installed equipment and one margin policy.</p></div><button type="button" class="btn" data-compare-reference="all">Compare all '+referenceCenterOrder.length+'</button></div><div class="rc-table-scroll" tabindex="0" role="region" aria-label="Reference data center comparison; scroll horizontally for more designs"><table class="rc-table"><caption>Published design references and separate '+esc(referenceMissionCases[missionCase].label.toLowerCase())+' workbench estimates</caption><thead><tr><th scope="col">Characteristic</th>'+records.map(r=>'<th scope="col"><small>'+esc(categoryLabels[r.category])+'</small><strong>'+esc(r.shortName)+'</strong><small>'+esc(r.revision)+'</small><button type="button" data-preview-reference="'+r.id+'">Inspect reference ↗</button></th>').join('')+'</tr></thead><tbody>'+group('Published / source-derived','Not published means no matched value was located in the reviewed evidence. A stated radiator area with an open face convention is kept separate.')+row('Architecture evidence',r=>'<strong>'+esc(r.architecture.label)+'</strong><small>'+esc(r.architecture.evidence)+'</small>')+published+row('Launch family evidence',r=>'<strong>'+esc(r.launch.families.join(' / ')||'Not established')+'</strong><small>'+esc(r.launch.evidence)+'</small>')+group('Configured workbench studies','Model estimates for '+esc(referenceMissionCases[missionCase].label.toLowerCase())+'. Architecture and unpublished equipment are explicitly interpreted or allocated; they are not manufacturer ratings.')+row('Installed physical family',(_r,s)=>'<strong class="rc-family-id">'+esc(s.assessment.modelMetrics.architectureFamily)+'</strong>')+row('Thermal / payload arrangement',r=>'<small>'+esc(r.architecture.summary)+' '+esc(r.architecture.thermal)+'</small>')+row('Installed communications',(_r,s)=>'<strong>'+esc(s.assessment.modelMetrics.communicationsPackageLabel)+'</strong><small>'+fmt(s.assessment.modelMetrics.opticalTerminalCount,0)+' optical · '+fmt(s.assessment.modelMetrics.kaTerminalCount,0)+' Ka · '+fmt(s.assessment.modelMetrics.sPatchCount,0)+' S-band patches. RF choices are project allocations.</small>')+modeled+row('Selected study launcher',(_r,s)=>'<strong>'+esc(s.hardware.launcherLabel)+'</strong><small>Allocated candidate; source approval remains separate</small>')+row('LTAN at analysis epoch',(_r,s)=>'<strong>'+fmt(s.assessment.sourceEnvironment?.ltanAtEpochHours,2)+' h</strong><small>Epoch and RAAN are explicit mission inputs</small>')+row('Maximum sampled eclipse',(_r,s)=>'<strong>'+fmt(s.assessment.sourceEnvironment?.longestEclipseS/60,1)+' min</strong><small>First / last-year seasonal screen; no guarantee of continuous sunlight</small>')+row('Conservative resource screen',(_r,s)=>'<span class="rc-badge" data-status="'+esc(s.assessment.resourceStatus)+'">'+esc(resourceLabel(s.assessment))+'</span><small>Zero-beta eclipse; EOL; shared margins</small>')+row('Seasonal energy / thermal screen',(_r,s)=>'<span class="rc-badge" data-status="'+esc(s.assessment.sourceEnvironmentStatus)+'">'+(s.assessment.sourceEnvironmentStatus==='meets'?'Sampled checks meet':s.assessment.sourceEnvironmentStatus==='shortfall'?'Sampled shortfalls':'Unassessed')+'</span>')+row('Study applicability',(_r,s)=>'<span class="rc-badge" data-status="'+esc(s.assessment.applicability?.status||'unassessed')+'">'+esc(applicabilityLabel(s.assessment))+'</span>')+row('Field evidence',r=>'<strong>'+r.evidenceSummary.documented+' published · '+r.evidenceSummary.interpreted+' interpreted / derived</strong><small>'+r.evidenceSummary.allocated+' allocated · '+r.evidenceSummary.unresolved+' unresolved. Field-level provenance is in the dossier.</small>')+row('Qualification / PDR acceptance',()=>'<span class="rc-badge" data-status="open">Evidence open</span>')+'</tbody></table></div><p class="rc-table-note">Peak, average, generation and total power are separate boundaries. Deployed dimensions are not folded launch envelopes. Model mass is not evidence against a company mass statement until its power, mission, hardware and revision match. Case selection changes mission inputs only; reference hardware never resizes itself.</p></section>';
+}
+
+export function renderReferenceCenters({hardware,activeId,selectedId,comparedIds=[],modified=false,missionCase='source'}={}){
+ missionCase=normalizeReferenceMissionCase(missionCase);
+ const active=getReferenceCenter(activeId||hardware?.input?.referenceCenterId)?.id||null;
+ const selected=getReferenceCenter(selectedId)?.id||active||defaultReferenceCenterId;
+ const compared=[...new Set(comparedIds)].filter(id=>getReferenceCenter(id));
+ const ids=compared.length?referenceCenterOrder.filter(id=>compared.includes(id)):referenceCenterOrder;
+ const studies=new Map([...new Set([...ids,selected])].map(id=>[id,referenceStudySnapshot(id,{missionCase})]));
+ const state={activeId:active,selectedId:selected,comparedIds:compared.length?compared:referenceCenterOrder};
+ const primary=referenceCenterOrder.filter(id=>referenceCenters[id].group==='main');
+ const secondary=referenceCenterOrder.filter(id=>referenceCenters[id].group!=='main');
+ return '<div class="rc-catalog"><section class="panel rc-hero"><div><span class="rc-kicker">Design reference orbital data centers</span><h2>Different architectures.<br><em>Engineering you can inspect.</em></h2><p>Explore the public designs, inspect each field’s evidence, then open a reproducible study. The selected family drives geometry, equipment and thermal connections.</p></div><div class="rc-hero-aside"><span><strong>'+referenceCenterOrder.length+'</strong> references</span><span><strong>01</strong> shared margin policy</span><button type="button" class="btn" data-reference-comparison>'+icon('chart-no-axes-column-increasing',15)+' Compare designs</button></div></section>'+missionCaseControls(missionCase)+'<div class="rc-section-title"><div><span class="rc-kicker">Reference collection</span><h3>Engineering and commercial designs</h3></div><small>Inspecting a card keeps your active study</small></div><div class="rc-card-grid">'+primary.map(id=>referenceCard(referenceCenters[id],state)).join('')+'</div><div class="rc-secondary-head"><h3>Historical configuration &amp; analytical benchmark</h3><p>Distinct source dates, physical families and evidence boundaries.</p></div><div class="rc-card-grid rc-secondary-grid">'+secondary.map(id=>referenceCard(referenceCenters[id],state)).join('')+'</div>'+dossier(referenceCenters[selected],studies.get(selected),{activeId:active,modified,missionCase})+comparison(ids,studies,missionCase)+'<p class="rc-catalog-foot">Evidence reviewed '+esc(referenceEvidenceDate||'November 2026')+' · recipe '+esc(referenceConfigurationRevision)+'. Field counts describe the evidence register, not qualification progress. Design rules remain shared under Reference.</p></div>';
+}
+
+export function activeReferenceStrip({hardware,referenceId,modified=false,name}={}){
+ const r=getReferenceCenter(referenceId||hardware?.input?.referenceCenterId),label=name||r?.shortName||'Imported spacecraft design';
+ const revision=hardware?.input?.referenceCenterRevision,earlier=revision&&revision!==referenceConfigurationRevision,caseLabel=referenceMissionCases[normalizeReferenceMissionCase(hardware?.input?.referenceMissionCase)].shortLabel;
+ return '<section class="rc-active-strip" aria-label="Active orbital data center design"><div class="rc-active-identity">'+icon('orbit',20)+'<div><span>ACTIVE DATA CENTER '+(modified?'<b>EDITED VARIANT</b>':'')+(earlier?' <b>EARLIER RECIPE</b>':'')+'</span><strong>'+esc(label)+'</strong>'+(r?'<small>'+esc(caseLabel)+' · '+esc(hardware?.input?.architectureFamily||'protected-core')+(earlier?' · '+esc(revision):'')+'</small>':'<small>Saved configuration · no catalog association</small>')+'</div></div><div class="rc-active-actions"><button type="button" class="btn" data-page="designs">Design references</button><button type="button" class="btn" data-reference-comparison>Compare</button><button type="button" class="btn" data-action="savepreset">Save variant</button><button type="button" class="btn" data-action="managepresets">Saved designs</button>'+(r&&(modified||earlier)?'<button type="button" class="rc-restore" data-restore-reference="'+r.id+'">'+(earlier?'Review current reference':'Restore reference')+'</button>':'')+'</div></section>';
+}

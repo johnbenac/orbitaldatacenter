@@ -230,10 +230,27 @@ for(const view of ['spacecraft','core']){
   if(lit[i]+lit[i+1]+lit[i+2]>dark[i]+dark[i+1]+dark[i+2]+75)revealed++;
  }
  assert.ok(revealed>100,`${view}: only ${revealed} appreciably brighter pixels in eclipse`);
+ scene.setLightingMode('auto');const [autoEarth,autoLit]=paintFrame();
+ assert.deepEqual(autoEarth,earth,'Auto eclipse lighting must preserve the physical background');
+ assert.deepEqual(autoLit,lit,'Auto in eclipse must use the actual Studio rendering path');
  scene.setLightingMode('realistic');const [,restored]=paintFrame();assert.deepEqual(restored,dark);
  assert.deepEqual(scene.getCameraState(),camera);
  console.log(`${view}: ${revealed} pixels brightened by more than 25 mean RGB levels at MET +6402 s.`);
 }
+// Auto responds to time changes while remaining selected. Compare actual pixels
+// with the corresponding explicit mode at each instant, including both edges.
+scene.setView('spacecraft');scene.resetCamera();
+const sunlit=sim.at(7800),sunlitOriginal=structuredClone(sunlit);assert.equal(sunlit.eclipse,false);
+scene.update(h,sunlit);scene.setLightingMode('realistic');const dayReference=paintFrame(),autoCamera=scene.getCameraState();
+scene.setLightingMode('auto');assert.deepEqual(paintFrame(),dayReference,'Auto in sunlight must match Realistic');
+scene.update(h,shadow);const automaticNight=paintFrame();
+scene.setLightingMode('studio');assert.deepEqual(paintFrame(),automaticNight,'Auto must enter Studio when the advancing state enters eclipse');
+scene.setLightingMode('auto');scene.update(h,sunlit);const automaticDay=paintFrame();
+scene.setLightingMode('realistic');assert.deepEqual(paintFrame(),automaticDay,'Auto must return to Realistic when the state leaves eclipse');
+assert.deepEqual(scene.getCameraState(),autoCamera,'Lighting changes must not alter free camera controls');
+assert.deepEqual(sunlit,sunlitOriginal,'Auto must preserve sunlit mission telemetry');
+assert.deepEqual(shadow,original,'Auto must preserve eclipsed mission telemetry');
+scene.update(h,shadow);
 scene.setOverlays(['thermal']);
 const [,thermal]=paintFrame(),colors=shadow.thermalQualification.map(q=>temperatureColor(q.temperatureK));
 scene.setLightingMode('studio');const [earthAtZero,thermalStudio]=paintFrame();
@@ -257,9 +274,13 @@ let changed=0;for(let i=0;i<studioMap.length;i+=4){
  if(realMap[i]!==studioMap[i]||realMap[i+1]!==studioMap[i+1]||realMap[i+2]!==studioMap[i+2])changed++;
 }
 assert.ok(changed>0&&changed<40,`Only the orbital vehicle marker should change (${changed} altered pixels)`);
+scene.setLightingMode('auto');const [autoSky,autoMap]=paintFrame();
+assert.deepEqual(autoSky,studioSky);assert.deepEqual(autoMap,studioMap,'Auto in eclipse lights only the orbital locator in the globe view');
 scene.setLightingMode('studio');scene.setDomain('launcher','D');scene.setChapter('pad');scene.setView('launch');scene.update(h,sim.at(-8));
 const [ground]=paintFrame();scene.setLightingMode('realistic');
 if(!pendingFrame)scene.resize();
 assert.deepEqual(paintFrame()[0],ground,'Studio preference must not relight a launch pad');
+scene.setLightingMode('auto');assert.deepEqual(paintFrame()[0],ground,'Auto must not relight a launch pad');
 scene.destroy();
+console.log('Auto rendering matches Realistic in sunlight and Studio in eclipse, switches on the mission clock, preserves physical backgrounds and telemetry, and retains the camera.');
 console.log('Six thermal node mappings, neutral surfaces, two fixed scales, live saturation flags, button callbacks, band hatching, both stowed nodes, material restoration and four-camera pan/zoom/resize/reset/restore passed.');

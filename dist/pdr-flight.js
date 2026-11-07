@@ -8,7 +8,8 @@ import {componentInertia} from './attitude-inertia.js';
 import {disposalRequirement,ENTRY_KM} from './trajectory.js';
 import {launchPath} from './launch-path.js';
 import {launchStructure} from './launch-structure.js';
-import {spacecraftInterface,interfaceHoles} from './payload-interface.js';
+import {payloadInterfaceFor,interfaceHoles} from './payload-interface.js';
+import {architectureFamily} from './architecture-families.js';
 import {launchFleet} from './launch-fleet.js';
 import {launcherSilhouette} from './launch-fleet-ui.js';
 import {architectureReference,mechanicalAllocation,structuralBounds,structuralBoundsGraphic,navigationAllocation,propulsionUncertaintyBound,propulsionUncertaintyGraphic} from './architecture-trades.js';
@@ -195,7 +196,7 @@ function attitudeGraphic(h,cases,torqueDemand,momentumDemand,torqueCapacity,mome
 }
 
 function launchGraphic(h,structure){
- const f=h?.fairing,stack=f?.stack;
+ const f=h?.fairing,stack=f?.stack,face=h.payloadInterface||payloadInterfaceFor(h),rectangular=face.attachmentShape==='rectangular-lugs';
  if(!Array.isArray(f?.profile)||!Array.isArray(stack)||!positive(f.heightM))return unavailableGraphic('launch','Stowed launch interface');
  const radius=Math.max(...f.profile.map(r=>r[1]),...stack.map(r=>r.radiusM)),k=Math.min(175/Math.max(radius,.1),320/f.heightM),cx=225,y0=388;
  const X=x=>cx+x*k,Y=z=>y0-z*k;
@@ -206,16 +207,22 @@ function launchGraphic(h,structure){
  stack.forEach((part,i)=>{const rr=part.radiusM,top=part.z1M,bottom=part.z0M;if(![rr,top,bottom].every(finite))return;art+=`<g><title>${esc(part.part+': '+fmt(2*rr)+' m diameter, '+fmt(top-bottom)+' m length')}</title>${rect(X(-rr),Y(top),2*rr*k,(top-bottom)*k,palette[i%palette.length]+'58',palette[i%palette.length],1)}</g>`;});
  art+=line(cx,Y(f.heightM),cx,y0,colors.dim,1,'4 4');
  art+=text(26,415,`Radial ${fmt(f.radialClearanceM,3)} m · axial ${fmt(f.axialClearanceM,3)} m clearance`,{fill:colors.gold,size:12});
- const bx=711,by=182,bk=99/(spacecraftInterface.outerM/2),bore=spacecraftInterface.boreM*bk/2;
- art+=circle(bx,by,spacecraftInterface.outerM*bk/2,'#263d49',colors.blue,1.5)+circle(bx,by,bore,colors.bg,colors.teal,1.5)+circle(bx,by,spacecraftInterface.pcdM*bk/2,'none',colors.dim);
- interfaceHoles().forEach(([x,y])=>{art+=circle(bx+x*bk,by-y*bk,2.5,colors.blue,colors.blue);});
+ const bx=711,by=182,bk=99/(rectangular?Math.max(h.bodyWidthM,h.bodyHeightM)/2:face.outerM/2);
+ if(rectangular){
+  art+=rect(bx-h.bodyWidthM*bk/2,by-h.bodyHeightM*bk/2,h.bodyWidthM*bk,h.bodyHeightM*bk,'#182e3a',colors.dim,1);
+  art+=rect(bx-face.openWidthM*bk/2,by-face.openHeightM*bk/2,face.openWidthM*bk,face.openHeightM*bk,colors.bg,colors.teal,1.5);
+  face.lugPositionsBodyM.forEach(([x,y])=>{art+=rect(bx+(x-face.lugSizeM/2)*bk,by-(y+face.lugSizeM/2)*bk,face.lugSizeM*bk,face.lugSizeM*bk,'#49708a',colors.blue,1.5);});
+ }else{
+  art+=circle(bx,by,face.outerM*bk/2,'#263d49',colors.blue,1.5)+circle(bx,by,face.boreM*bk/2,colors.bg,colors.teal,1.5)+circle(bx,by,face.pcdM*bk/2,'none',colors.dim);
+  interfaceHoles(h).forEach(([x,y])=>{art+=circle(bx+x*bk,by-y*bk,2.5,colors.blue,colors.blue);});
+ }
  (h.propulsion?.engines||[]).forEach(e=>{if([e.x,e.y,e.exitRadiusM].every(finite))art+=circle(bx+e.x*bk,by-e.y*bk,e.exitRadiusM*bk,'#5a4735',colors.gold,1.5);});
- art+=text(bx,306,`${spacecraftInterface.holes} × ${spacecraftInterface.fastener} · ${fmt(spacecraftInterface.pcdM,2)} m bolt circle`,{anchor:'middle',fill:colors.blue,size:12});
- art+=text(bx,326,`${fmt(finite(h.payloadInterface?.boreClearanceM)?h.payloadInterface.boreClearanceM*1000:null,1)} mm nozzle-to-bore clearance`,{anchor:'middle',fill:colors.gold,size:12});
+ art+=text(bx,306,rectangular?'Four allocated corner attachments · drilling unresolved':`${face.holes} × ${face.fastener} · ${fmt(face.pcdM,2)} m project bolt circle`,{anchor:'middle',fill:colors.blue,size:12});
+ art+=text(bx,326,`${fmt(finite(face.boreClearanceM)?face.boreClearanceM*1000:null,1)} mm ${rectangular?'nozzle-to-attachment':'nozzle-to-bore'} clearance`,{anchor:'middle',fill:colors.gold,size:12});
  art+=text(504,364,`Example interface load: ${fmt(structure?.interfaceForceN?Math.abs(structure.interfaceForceN[2])/1000:null)} kN axial`,{size:12});
  art+=text(504,385,`Bending demand: ${fmt(finite(structure?.interfaceBendingNm)?structure.interfaceBendingNm/1000:null)} kN·m`,{size:12});
  art+=lines(504,410,'The +2 g lateral / +6 g axial case is a project screen. Allowables and provider coupled loads are not supplied.',63);
- return svg('launch','Stowed payload and aft interface geometry','Actual fairing stations, stowed package envelopes, bolt circle and engine exits are shown; load values are an example demand, not a structural qualification.',art,460);
+ return svg('launch','Stowed payload and selected family attachment','Actual fairing stations, stowed envelopes and the installed family’s circular ring or allocated corner attachments are shown with engine exits. Load values are an example demand, not structural qualification.',art,460);
 }
 
 function launcherGraphic(h){
@@ -238,6 +245,7 @@ function launcherGraphic(h){
 
 function flightDynamics(h,o,p){
  const d=h.input,nav=navigationAllocation(h),perigeeCheck=check('orbit-perigee','Nominal perigee above modeled atmospheric interface',o.rp,ENTRY_KM,'km','>','The propagator treats 120 km as its entry interface; this is a model boundary, not a compliant disposal altitude.',['1.06'],'Keplerian geometry of the selected elements.');
+ const groundTrackingInstalled=architectureFamily(h).sPatchCount>0;
  const rangeMargin=o.elements?Math.min(d.altitudeKm-o.bounds.min,o.bounds.max-d.altitudeKm):null;
  const densityMargin=o.elements?Math.min(o.rp-o.densityMin,o.densityMax-o.ra):null;
  const coverageStatus=o.sourceSupported?'meets':'unassessed';
@@ -250,7 +258,7 @@ function flightDynamics(h,o,p){
   value('Analytic disposal Δv',p.disposalDv,'m/s','Impulsive orbit-energy screen; the simulation can separately resolve finite burns.'),
   value('J₂ nodal drift',o.nodalDegDay,'°/day','Secular orientation change in the current propagation model.'),
   value('Controlled reference mission',architectureReference.id,'','550 km circular, 53° inclination, five-year design-life allocation. Changed mission inputs remain explicit cases.'),
-  value('Navigation architecture','GNSS + independent ground tracking','',nav.architecture),
+  value('Navigation architecture',groundTrackingInstalled?'GNSS + allocated S-band tracking':'GNSS; independent ground tracking unresolved','',groundTrackingInstalled?nav.architecture:'S-band is omitted from the installed package. A replacement tracking and command implementation is not assumed; navigation accuracy remains an open evidence requirement.'),
   value('Position / velocity knowledge requirement',`${fmt(nav.position3SigmaM,0)} / ${fmt(nav.velocity3SigmaMS,2)}`,'m / m·s⁻¹ at 3σ',nav.basis),
   value('Insertion-correction sensitivity',nav.injectionResidualDvMS,'m/s','Project residual-injection allocation; provider dispersion evidence is still required. The launch-path illustration is not this bound.'),
   value('Disposal design endpoint',d.disposalMethod==='graveyard'?d.graveyardAltitudeKm:d.disposalTargetPerigeeKm,'km',d.disposalMethod==='graveyard'?'Selected raised-orbit target; geometry alone establishes no debris-lifetime acceptance.':'Selected deorbit perigee. The terminal model uses a 120 km atmospheric interface and a surviving reference body; breakup, demise and casualty-risk acceptance remain open.')
@@ -259,7 +267,7 @@ function flightDynamics(h,o,p){
   check('orbit-input-domain','Selected orbit inside implemented element range',rangeMargin,0,'km','>=',`Current altitude control ${o.bounds.min}–${o.bounds.max} km; eccentricity 0–${o.eccBounds.max}. This is implementation scope.`,[],'No validated transfer or high-orbit capability is implied.',o.inputRange?'meets':'unassessed'),
   check('orbit-drag-domain','Nominal drag sizing inside its supported source case',densityMargin,0,'km','>=','The source density table spans 100–900 km. Annual sizing uses semi-major altitude rather than an eccentric-orbit integral.',['1.06'],'An eccentric case, extrapolated atmosphere or absent environment basis remains unassessed.',coverageStatus),
   check('orbit-maintenance-allocation','Station-keeping time allocation covers requested duration',d.yearsSupply,d.missionYears,'yr','>=','Mission duration and the independently entered station-keeping allocation must be reconciled.',['1.06'],'This compares declared allocations; actual propellant is assessed in Propulsion.'),
-  open('orbit-navigation','Orbit determination, targeting and dispersion budget',`${nav.id} selects GNSS plus independent S-band tracking, 100 m / 0.1 m/s 3σ knowledge requirements and a 5 m/s residual-injection sensitivity.`,['1.06'],'Provider dispersions, receiver/tracking performance, targeting correlations and maneuver reconstruction must substantiate these allocations. The runtime still assumes exact state.'),
+  open('orbit-navigation','Orbit determination, targeting and dispersion budget',`${nav.id} carries GNSS and 100 m / 0.1 m/s 3σ knowledge requirements with a 5 m/s residual-injection sensitivity. ${groundTrackingInstalled?'An independent S-band tracking implementation is allocated but unverified.':'S-band hardware is omitted; independent tracking and command implementation remain unresolved.'}`,['1.06'],'Provider dispersions, receiver/tracking performance, targeting correlations and maneuver reconstruction must substantiate these allocations. The runtime still assumes exact state.'),
   open('orbit-disposal','Disposal acceptability and mission-specific trajectory',nav.disposal,['1.06'],'The selected endpoint and protected stock are explicit. Breakup/demise, debris lifetime, casualty risk and mission-specific acceptance remain unresolved.')
  ],[{domain:'prop',label:'Maintenance, maneuver and disposal demand'},{domain:'power',label:'Eclipse duration and pointing'},{domain:'comm',label:'Contact geometry and link ranges'},{domain:'launch',label:'Injection state and dispersion allocation'}],[
   'Baseline the orbit and epoch, transfer/injection boundary, navigation accuracy, maneuver ledger and disposal endpoint.',
@@ -355,13 +363,13 @@ function attitude(h,p,s,day){
 }
 
 function launch(h,o){
- const d=h.input,structure=attempt(()=>launchStructure(h)),longerons=structuralBounds(h).longerons,path=o.elements&&Number.isFinite(Date.parse(d.epoch))?attempt(()=>launchPath(d)):null;
+ const d=h.input,structure=attempt(()=>launchStructure(h)),longerons=structuralBounds(h).longerons,path=o.elements&&Number.isFinite(Date.parse(d.epoch))?attempt(()=>launchPath(d)):null,face=h.payloadInterface||payloadInterfaceFor(h),rectangular=face.attachmentShape==='rectangular-lugs';
  const speed=o.elements?1000*Math.sqrt(MU/o.a):null;
  const planeEquivalent=positive(speed)&&finite(path?.planeErrorDeg)?2*speed*Math.sin(path.planeErrorDeg*DEG/2):null;
  const result=report('launch','Launch & Insertion','The stowed spacecraft, aft interface and release sequence are distinct from the provider’s orbit-delivery commitment. Geometry and example loads are calculated now; structural qualification and injection acceptance remain open.',[
   value('Launch stack / separated wet spacecraft',`${fmt(h.launchKg)} / ${fmt(h.wetKg)}`,'kg','The launch-only adapter is included once in the stack and excluded from the separated vehicle.'),
-  value('Aft interface',spacecraftInterface.id,'',`${spacecraftInterface.holes} ${spacecraftInterface.fastener} positions on a ${spacecraftInterface.pcdM} m project bolt circle.`),
-  value('Nozzle-to-bore clearance',h.payloadInterface?.boreClearanceM,'m','Engine exits against the fixed spacecraft-side interface bore.'),
+  value('Spacecraft attachment',face.id,'',rectangular?'Four allocated corner load-transfer attachments and an open cradle. No known vendor fastener drilling or dispenser acceptance is asserted.':`${face.holes} ${face.fastener} positions on a ${face.pcdM} m project bolt circle; provider acceptance remains open.`),
+  value(rectangular?'Nozzle-to-attachment clearance':'Nozzle-to-bore clearance',face.boreClearanceM,'m',rectangular?'Engine exits against the actual allocated corner pads.':'Engine exits against the installed circular spacecraft-side bore.'),
   value('Example axial load',structure?.interfaceForceN?Math.abs(structure.interfaceForceN[2])/1000:null,'kN','Project +6 g axial / +2 g lateral rigid-body case; no provider load envelope is inferred.'),
   value('Example interface bending',finite(structure?.interfaceBendingNm)?structure.interfaceBendingNm/1000:null,'kN·m','Whole stowed spacecraft mass center relative to the aft flange.'),
   value('Illustrated ascent plane discrepancy',path?.planeErrorDeg,'°','Difference between the simplified launch path and the requested mission plane.'),
@@ -370,8 +378,8 @@ function launch(h,o){
   value('Longeron yield / ultimate property demand',longerons?`${fmt(longerons.requiredYieldPa/1e6)} / ${fmt(longerons.requiredUltimatePa/1e6)}`:null,'MPa','Conservative four-longeron load path with GEVS metallic static factors 1.25 / 1.4 and planned test verification. No wall load sharing is credited.'),
   value('Maximum inter-frame longeron span',longerons?.unsupportedSpanM,'m','Pinned Euler stability screen for the equivalent section preserving the installed 1.8 kg/m per-longeron allocation.')
  ],[
-  check('launch-bore','Engine exits clear the interface bore',h.payloadInterface?.boreClearanceM,0,'m','>=','Project aft interface geometry.',['4.24'],'Preliminary clearance only; provider compatibility remains open.'),
-  check('launch-deck','Interface ring clears the structural deck',h.payloadInterface?.deckClearanceM,0,'m','>=','Project ring envelope against body width and height.',['4.24'],'No stress, fatigue, fastener or joint qualification follows from this screen.'),
+  check('launch-bore',rectangular?'Engine exits clear the allocated attachment pads':'Engine exits clear the circular interface bore',face.boreClearanceM,0,'m','>=','Actual family attachment geometry.',['4.24'],'Preliminary clearance only; provider compatibility remains open.'),
+  check('launch-deck',rectangular?'Corner attachments fit the structural deck':'Circular ring fits the structural deck',face.deckClearanceM,0,'m','>=',rectangular?'Allocated pad positions and sizes against the installed deck.':'Project ring envelope against body width and height.',['4.24'],'No stress, fatigue, fastener or joint qualification follows from this screen.'),
   check('launch-bell','Engine bells fit the axial adapter space',h.payloadInterface?.bellTipClearanceM,0,'m','>=','Installed engine length against launch adapter standoff.',['4.24'],'Dynamic relative motion and final separation clearances need verification.'),
   check('launch-longeron-yield','Allocated longeron material covers the static yield demand',longerons?.yieldMargin,0,'fraction','>=',longerons?.basis||'Preliminary four-longeron load path.',['4.03','4.14'],longerons?.evidence||'No installed structural record is available.'),
   check('launch-longeron-ultimate','Allocated longeron material covers the static ultimate demand',longerons?.ultimateMargin,0,'fraction','>=','GEVS metallic static ultimate factor 1.4 with planned qualification or protoflight testing.',['4.03','4.14'],longerons?.evidence||'No installed structural record is available.'),

@@ -20,6 +20,17 @@ for(const {id,control} of commTestCases){
 }
 assert.equal(JSON.stringify(hardware),before,'A checkout cannot spend flight inventory or change hardware.');
 assert.throws(()=>run('unknown'),RangeError);
+for(const [communicationsPackage,absent] of [['optical-ttc',['ka']],['optical-ka',['sband']],['optical-only',['ka','sband']]]){
+ const reduced=sizeDesign({...defaults,communicationsPackage});
+ for(const id of absent){
+  const result=run(id,0,reduced);
+  assert.equal(result.applicable,false);assert.equal(result.passed,null);
+  assert.equal(result.evidence.outcome,'not_applicable');
+  assert.equal(result.trace,null,'Absent equipment must not produce a passing numerical sweep.');
+  assert.ok(result.stages.every(stage=>stage.status==='not_applicable'));
+ }
+ assert.equal(run('optical',0,reduced).passed,true,'Each package retains the optical test article.');
+}
 
 const uplinkOnly=run('sband',12);
 assert.deepEqual(uplinkOnly.stages.map(s=>s.status),['pass','pass','pass','fail']);

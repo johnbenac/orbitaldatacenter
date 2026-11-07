@@ -2,10 +2,14 @@ import {equipmentAllocations,componentMassProperties} from './component-stations
 import {equipmentResources} from './equipment-resources.js';
 import {retainFile} from './file-delivery.js';
 import {equipmentMaturity} from './mission-policy.js';
+import {referenceAssociation} from './reference-configurations.js';
+import {architectureFamily} from './architecture-families.js';
+import {spacecraftSurfaceAssignments,getSpacecraftMaterial,materialEvidenceLabels,materialLibraryRevision} from './spacecraft-materials.js';
+import {materialSources} from './material-evidence.js';
 
 // Sources describe the cited reference article. The installed design has its own
 // mass and no assigned TRL. A reference mass is never added to the flight ledger.
-const flight='Flight reference', product='Supplier reference', ground='Ground reference';
+const flight='Flight reference', product='Supplier reference', ground='Ground reference',concept='Published concept',analytical='Analytical reference';
 function ref(manufacturer,referenceModel,sourceUrl,evidence,heritage,referenceUnitMassKg=null,referenceMassBoundary=''){
  return {manufacturer,referenceModel,sourceUrl,evidence,heritage,referenceUnitMassKg,referenceMassBoundary};
 }
@@ -23,7 +27,7 @@ const src={
  avionics:ref('BAE Systems','RAD750 single-board computer','https://www.baesystems.com/en/article/gps-iii-satellite-launches-with-rad750--single-board-computers',flight,'RAD750 boards flew on GPS III. This reference covers spacecraft housekeeping avionics.'),
  power:ref('Airbus Crisa','Spacecraft PCDU family','https://www.crisa.airbus.com/en/airbus-crisas-solutions/power-electronics/power-management-and-distribution-pcdus',product,'Supplier power-conditioning and distribution equipment. The selected 120/48/28 V architecture and optional 400 V development class have bounded project module allocations. Supplier configuration, flight compatibility and qualification remain open.'),
  battery:ref('Saft','VES16 space lithium-ion cell','https://www.nasa.gov/wp-content/uploads/2024/01/saft-ves16-cell-life-test-performance-update.pdf',flight,'Saft reports TELEOS-1 flight service for its 16 Wh NCA cell. This is a cell-level reference for the spacecraft pack. NMC and LFP pack properties are study inputs.'),
- pv:ref('Boeing Spectrolab / Redwire','XTJ Prime cells on ISS iROSA','https://rdw.com/newsroom/redwire-successfully-delivers-third-pair-of-irosa-solar-arrays-to-augment-iss-power/',flight,'iROSA uses Spectrolab triple-junction cells. ODC uses four strain-driven rollout wings with its own blanket packing and areal mass.'),
+ pv:ref('Boeing Spectrolab / Redwire','XTJ Prime cells on ISS iROSA','https://rdw.com/newsroom/redwire-successfully-delivers-third-pair-of-irosa-solar-arrays-to-augment-iss-power/',flight,'iROSA uses Spectrolab triple-junction cells. The selected architecture determines wing count, blanket packing and areal mass; heritage does not qualify its larger structures.'),
  silicon:ref('NASA / Boeing','ISS P6 silicon solar array wings','https://ntrs.nasa.gov/api/citations/20030068268/downloads/20030068268.pdf',flight,'Measured on-orbit output of crystalline-silicon ISS P6 wings. Cell performance and folding structure here are study assumptions.'),
  radiatorRotary:ref('NASA / ISS','Thermal Radiator Rotary Joint','https://www.nasa.gov/wp-content/uploads/2021/02/473486main_iss_atcs_overview.pdf',flight,'The station turns its radiator beam through a rotary fluid interface. The study assigns its own cant hinge and span-axis trim drive to each bank.'),
  drive:ref('Moog','Type 2 Solar Array Drive Assembly','https://www.moog.com/content/dam/moog/literature/sdg/space/spacecraft-mechanisms/moog-type-2-solar-array-drive-assembly-datasheet.pdf',product,'Supplier drive comparison. The boom saddles, blanket drums, radiator hinges, hold-downs and actuator drives add installation mass.',3.5,'one reference drive including harness, upper bound'),
@@ -33,6 +37,9 @@ const src={
  coolant:ref('NASA / ISS program','External Active Thermal Control System','https://www.nasa.gov/wp-content/uploads/2021/02/473486main_iss_atcs_overview.pdf',flight,'Flown pumped loop, fluid lines and heat exchangers. Pressurized ammonia is the selected preliminary fluid. One duty/standby pump station feeds two isolatable banks through shared headers; supplier curves, materials compatibility and phase margins remain to be verified.'),
  ssdPower:ref('Micron','7450 product specification · table 4','https://sg.micron.com/content/dam/micron/global/public/documents/products/technical-marketing-brief/7450-nvme-ssd-tech-prod-spec.pdf',ground,'Product-mode RMS drive data. The mounted carrier is sized separately.'),
  cold:ref('Advanced Cooling Technologies','HiK plates · ISS APTx','https://www.1-act.com/resources/learning-center/case-studies/copperwater-heat-pipes-and-hik-plates-for-spacecraft-applications/',flight,'ISS thermal experiment provides a heat-spreading precedent.'),
+ redwireThermal:ref('Redwire','May 2026 orbital data center point design','https://rdw.com/wp-content/uploads/2026/05/RDW26-053-ODC-Power-Thermal-Study-White-Paper-R11-Digital.pdf',concept,'Published local compute/spreader/heat-pipe radiator topology. Installed conductance, capacity, metal thickness, pipe mass and bus straps are explicit project allocations; the concept does not qualify the modeled hardware.'),
+ ai1Thermal:ref('SpaceX','AI1 archived thermal specification · August 2026','https://web.archive.org/web/20260804210223/https://www.spacex.com/spacexai/starmind',concept,'Archived official page identifies active liquid cooling, redundant pumping loops and micrometeoroid protection. Two separately contained half-duty loops, ammonia selection and one duty/standby pump pair per loop are project allocations; full-load one-fault tolerance is not established.'),
+ heatlift:ref('Star Catcher','Self-powered 250 kW analytical benchmark','https://www.star-catcher.com/news/the-orbital-data-center-power-problem-and-how-to-solve-it',analytical,'Analytical heat lift from approximately 100°C to 150°C, separate from beamed-power scenarios. COP, component temperatures, refrigerant, pressure, startup and flight material compatibility require an implementation basis. No flight-qualified heat pump is identified.'),
  cmg:ref('Airbus Defence and Space','CMG 15-45S','https://www.airbus.com/sites/g/files/jlcbta136/files/2022-02/AVIONICS-CMG15-45-v5-2022.pdf',flight,'The Airbus family has orbital service. A 15-45S stores 15 N·m·s. The four-unit cluster rating in this model is a separate design assumption.',18.4,'one mechanism plus allocated electronics'),
  tracker:ref('Sodern','HYDRA Baseline star tracker','https://sodern.com/wp-content/uploads/2025/04/HYDRA_BASELINE.pdf',product,'Optical heads with a shared electronics interface. The pointing-sensor allowance also covers inertial and magnetic sensing.'),
  rod:ref('NewSpace Systems','NSS magnetorquer rod family','https://www.newspacesystems.com/products/magnetorquer-rods/',flight,'The supplier reports TRL 9 for its rod family, first flown in 2014. A three-axis system at the entered magnetic dipole requires its own sizing and qualification.'),
@@ -53,7 +60,7 @@ const src={
 };
 const subs=['Compute & storage','Electrical power','Thermal control','Attitude control','Communications','Chemical propulsion','Structure & integration','Spacecraft avionics','Launch interface'];
 export function buildEquipmentList(h,s=null) {
- const d=h.input,ledger=Object.fromEntries(h.massLedger.map(item=>[item.id,item])),rows=[];
+ const d=h.input,architecture=architectureFamily(h),thermal=h.energySystem.thermal,ledger=Object.fromEntries(h.massLedger.map(item=>[item.id,item])),rows=[];
  const masses=Object.fromEntries(equipmentAllocations(h).map(r=>[r.wbs,r.kg]));
  const launch=Object.fromEntries(componentMassProperties(h,h.propellantKg,0,true).rows.map(r=>[r.wbs,r]));
  const add=(wbs,id,item,quantity,unit,basis,source,other=[])=>{
@@ -68,18 +75,20 @@ export function buildEquipmentList(h,s=null) {
  add('01.02','host','Host electronics, memory and tray carrier',h.trays,'tray','Remaining 35% of installed tray mass plus '+h.serviceArchitecture.compute.extraHostModules+' additional 16-core host modules at 2.4 kg each. CPUs and RAM integrated in a purchased reference server count once.',d.compute==='dgx'?src.dgx:src.host);
  add('01.03','storage','Solid-state storage modules',Math.ceil(d.storageTB/d.diskModuleTB),'drive','Rounded-up installed drive count × packaged module mass.',d.storage==='rugged'?src.rugged:src.ssd,d.storage==='rugged'?[src.ssdf]:[src.ssdf,src.ssdPower]);
  add('01.04','switch','Payload network fabric and host interfaces',h.serviceArchitecture.fabric.switchCount,'switch','Explicit leaf/spine allocation, ports, inter-switch cables and extra endpoint interfaces. Embedded tray NICs are counted inside tray mass. The installed fabric is '+h.serviceArchitecture.fabric.effectivePerWorkerGbps+' Gbit/s effective per worker.',src.fabric);
- add('02.01','array','Solar wings with cells and substrates',4,'wing','Installed cell area × array areal mass, apportioned evenly to four wings.',d.pv==='silicon'?src.silicon:src.pv);
+ add('02.01','array','Solar wings with cells and substrates',architecture.solarWingCount,'wing','Installed cell area × array areal mass, apportioned to '+architecture.solarWingCount+' physical wings. '+h.energySystem.electrical.source.seriesCells+' series cells per study string; cell voltage/temperature assumptions follow the selected technology.',d.pv==='silicon'?src.silicon:src.pv);
  add('02.02','battery','Battery enclosures, cells and BMS',4,'pack','Installed Wh ÷ pack-level Wh/kg, divided among four packs.',src.battery);
  add('02.03','switch','Power conditioning and distribution',1,'assembly',h.energySystem.electrical.family.primaryV+' V main bus, 48 V payload and 28 V services. '+h.energySystem.electrical.mppt.count+' MPPT, '+h.energySystem.electrical.payload.modules+' payload, '+h.energySystem.electrical.service.modules+' service and '+h.energySystem.electrical.battery.modules+' battery modules plus PCDU; masses are project module allocations.',src.power);
- add('03.01','radiator','Radiator panels and surface finish',2,'bank','Two equal banks. Total planform × radiator areal mass includes the selected optical finish.',src.radiator,[d.coating==='paint'?src.paint:src.osr]);
- add('03.02','coolant','Liquid loop and cold-control equipment',1,'loop','Calculated pressurized-ammonia inventory, routed stainless lines, accumulator and two installed pumps (one operating). Adds finite battery/loop/panel heaters and mixing control. Radiator tube and compute cold-plate metal stay in their parent allocations; no duplicate mass.',src.coolant);
+ add('03.01','radiator',thermal.kind==='passive-local'?'Local compute/radiator platform and finish':'Radiator panels and surface finish',architecture.radiatorBankCount,thermal.kind==='passive-local'?'platform':'bank',`${architecture.radiatorBankCount} physical ${architecture.radiatorBankCount===1?'assembly':'assemblies'} with ${h.radiatorPanelsPerBank||2} panels each. Total planform × radiator areal mass includes panel construction and finish; hinge offsets add no emitting area. Payload hardware is carried separately in WBS 01.`,thermal.kind==='passive-local'?src.redwireThermal:src.radiator,[d.coating==='paint'?src.paint:src.osr]);
+ if(thermal.kind==='passive-local')add('03.02','coolant','Local spreader, heat pipes, bus straps and cold control',1,'assembly',`${thermal.passive.heatPipeCount} heat-pipe allocations, a 1 m² spreader, bus thermal straps and finite battery cold control. ${thermal.passive.basis} ${thermal.passive.busRouteEvidence} No payload remote-fluid inventory, pump station, expansion accumulator or radiator fluid crossing is installed.`,src.redwireThermal,[src.cold]);
+ else if(thermal.kind==='heat-lift')add('03.02','coolant','Heat-pump assembly, motor drive and cold control',1,'assembly',`${thermal.heatPump.coldCapacityKW} kW cold-side allocation at cooling COP ${thermal.heatPump.cop}; ${thermal.heatPump.maxInputKW.toFixed(2)} kW maximum compressor input. ${thermal.heatPump.basis} Finite battery cold control is additional; no ammonia-loop inventory is inherited.`,src.heatlift);
+ else add('03.02','coolant',thermal.kind==='redundant-pumped'?'Independent liquid loops and cold-control equipment':'Liquid loop and cold-control equipment',thermal.loopCount||1,'loop',`Calculated pressurized-ammonia inventory, routed stainless lines, ${thermal.accumulator.count} × ${thermal.accumulator.unitL} L accumulator modules and ${thermal.pumpsInstalled} installed pumps (${thermal.pumpsOperating} operating). ${thermal.layout.radiatorSectionsPerBank} parallel panel-pair sections per bank; ${thermal.layout.additionalCrossings} added fold crossings. ${thermal.redundancy} Includes finite cold-control heaters; panel tube and cold-plate metal remain in parent allocations.`,thermal.kind==='redundant-pumped'?src.ai1Thermal:src.coolant);
  add('03.03','blanket','Tailored exterior MLI covers',1,'set','Covered wall area × installed MLI areal mass, including openings.',src.mli);
  add('04.01','cmg','Pyramid-mounted CMGs and drive electronics',4,'CMG',"Cluster mass follows the selected gyro package and usable directional capacity at the entered momentum and torque. Four gyroscopes share the pointing load.",h.cmg?ref('Airbus Defence and Space',h.cmg.model,h.cmg.referenceUrl,'Supplier reference','The selected cluster is sized against angular momentum and torque. Data-sheet values describe the reference mechanism.',h.cmg.referenceUnitKg,'one reference unit including allocated electronics'):src.cmg);
  add('04.02','cmg','Magnetic unload rods and drive stages',3,'axis','0.0015 kg per A·m² of entered magnetic dipole, distributed over the three-axis assembly.',src.rod);
  add('04.03','cmg','Attitude sensors and electronics',1,'suite','Fixed 6 kg sensor share of the attitude allocation.',src.tracker);
- add('05.01','terminals','S-band patches and tracking, telemetry and command radio',1,'set','2 kg study allocation includes two side-facing patch locations and tracking, telemetry and command electronics.',src.sb);
- add('05.02','terminals','Ka-band reflector, positioner and RF chain',1,'terminal','10 kg base plus 10 kg/m² × reflector diameter squared.',src.ka);
- add('05.03','terminals','Optical terminal and fine pointing assembly',1,'terminal','7 kg base plus 250 kg/m² × optical aperture diameter squared. One optical terminal is allocated to direct or relay use with a 2 Gbit/s line and 1.6 Gbit/s customer capacity in each relay direction. Provider/protocol compatibility remains open.',src.optical);
+ if(architecture.sPatchCount>0)add('05.01','terminals','S-band patches and tracking, telemetry and command radio',1,'set','Optional installed package: 2 kg study allocation includes '+architecture.sPatchCount+' side-facing patch locations and tracking, telemetry and command electronics. This is a project installation, not a reference-provider equipment claim.',src.sb);
+ if(architecture.kaTerminalCount>0)add('05.02','terminals','Ka-band reflector, positioner and RF chain',architecture.kaTerminalCount,'terminal','Optional installed payload-downlink package: 10 kg base plus 10 kg/m² × reflector diameter squared per terminal. A backup Ka command/telemetry implementation is not inferred.',src.ka);
+ add('05.03','terminals','Optical terminals and fine pointing assemblies',architecture.opticalTerminalCount,'terminal','Each head: 7 kg base plus 250 kg/m² × optical aperture diameter squared. '+architecture.opticalTerminalCount+' installed optical terminal(s). Terminal capability, allocated service rate, simultaneous links and provider/protocol compatibility have separate evidence boundaries; multiplying terminal count does not multiply guaranteed customer service.',src.optical);
  const prop=h.propulsion;
  const headNote=d.engine==='aero'?'Aerozine engine adaptation uses the 400 N-class mass relation.':prop.engineRangeOK?'Each selected head is inside the reference thrust and mixture envelope.':'Selected thrust or mixture falls outside the S400 family envelope.';
  add('06.01','engine','Aft engine heads and bipropellant valves',2,'engine','Two heads scale from 4.30 kg each at 425 N with thrust exponent 0.65. '+headNote,d.engine==='aero'?src.apollo:src.engine,d.engine==='aero'?[src.engine]:[]);
@@ -94,44 +103,88 @@ export function buildEquipmentList(h,s=null) {
  add('07.01','structure','Primary frame and tray mounts',1,'frame','Study subtotal for four axial longerons, transverse frames, launch restraint fittings, installed tray mounts and the retained aft interface. The six sandwich walls have their own mass row.',src.skin);
  add('07.02','skin','Sandwich enclosure walls',1,'set','Six unequal faces. Sum of individual structural wall masses after occupied cutouts.',src.skin);
  add('07.03','shield','Internal radiation shielding',1,'set','Net covered wall area × shielding areal mass.',src.shield);
- add('07.04','hinges','Wing and radiator deployment and tracking drives',1,'set','Four wing drives and two radiator assemblies share the area-scaled mechanism mass estimate. Each bank has a root cant drive, a latching outer hinge and a bounded span-axis trim drive with a rotary fluid interface. Installed mass and drive power are study allocations.',src.drive,[src.radiatorRotary]);
+ add('07.04','hinges','Wing and radiator deployment and tracking drives',1,'set',`${architecture.solarWingCount} solar wings and ${architecture.radiatorBankCount} radiator assemblies follow the resolved deployment graph. ${thermal.kind==='passive-local'?'The source platform deploys on a spring-loaded hinge with electrical harnessing. The added project bus thermal strap needs separate hinge accommodation; no pumped-fluid rotary crossing is allocated.':'Each bank carries its selected deployment and tracking joints; articulated-fluid fittings, where installed, are in 03.02.'} Installed mass, drives, springs, latch and torque ratings remain study allocations.`,src.drive,thermal.kind==='passive-local'?[src.redwireThermal]:[src.radiatorRotary]);
  add('07.05','cables','Power and data harness',1,'set','Routed two-conductor copper power feeds sized for current and voltage drop, with 40% insulation/attachment and termination allocations; separate signal harness. Array cell and compute board interconnects remain in their parent equipment.',src.harness);
  add('08.01','switch','Flight avionics and GNSS navigation',1,'suite','12 kg project allocation includes flight computer, spacecraft recorder, protected command interfaces and GNSS receiver/antenna. GNSS shares the existing service-electronics power budget; exact selected parts and accommodation remain open. Customer compute is in the payload group.',src.iau,[src.avionics]);
- add('09.01','adapter','Launch adapter and separation interface',1,'assembly','Active lower clamp, stand-off and launcher transition. Counted once in the launch stack. The passive upper fitting stays with the spacecraft under WBS 07.01.',src.adapter);
+ add('09.01','adapter','Launch adapter and separation interface',1,'assembly',(h.payloadInterface.attachmentShape==='rectangular-lugs'?'Allocated open cradle, lower attachment and launcher transition. The four spacecraft-side corner lugs remain in WBS 07.01; exact release hardware and provider acceptance are open.':'Active lower clamp, stand-off and launcher transition. The passive upper ring stays with the spacecraft under WBS 07.01.')+' Counted once in the launch stack.',src.adapter);
 
  const sum=(items)=>items.reduce((v,r)=>v+r.extendedMassKg,0);
  const hardwareKg=sum(rows.filter(r=>r.classification==='Hardware')),dryKg=hardwareKg+ledger.margin.kg,
   wetKg=dryKg+sum(rows.filter(r=>r.classification==='Consumables')),launchKg=wetKg+ledger.adapter.kg;
- return {schema:'orbital-data-center/mel/3',massUnit:'kg',massEpoch:'launch loading',purpose:d.aiPurpose,engine:d.engine,technology:{compute:d.compute,storage:d.storage,battery:d.battery,solar:d.pv,coating:d.coating,launcher:d.launcher},
+ const reference=referenceAssociation(h),designIdentity={designReferenceId:reference?.id||'',designReferenceRevision:reference?.revision||'',designReferenceName:reference?.name||'',designReferenceModified:reference?.modified??false,modelRealization:reference?.realization||'custom-study'};
+ // Surface detail is a description of the parent allocation, not a second mass
+ // ledger. Finish thickness, alloy allowables and layer masses remain PDR open
+ // items wherever the selected implementation has not established them.
+ const surfaceDetails=spacecraftSurfaceAssignments(h).map(detail=>{
+  const material=getSpacecraftMaterial(detail.materialId),parent=rows.find(row=>row.wbs===detail.parentWbs);
+  return {...designIdentity,libraryRevision:materialLibraryRevision,...detail,parentItem:parent?.item||'',subsystem:parent?.subsystem||'',materialName:material?.name||detail.materialId,materialComposition:material?.composition||'',materialFinish:material?.finish||'',texturePreviewUrl:material?.texture?.previewUrl||material?.previewUrl||null,selectionSourceUrls:(detail.evidence?.sourceIds||[]).map(id=>materialSources[id]?.url).filter(Boolean)};
+ });
+ for(const row of rows){
+  const materialAssignments=surfaceDetails.filter(detail=>detail.parentWbs===row.wbs),materialIds=[...new Set(materialAssignments.map(detail=>detail.materialId))];
+  Object.assign(row,designIdentity,{materialLibraryRevision,materialIds,surfaceDetailIds:materialAssignments.map(detail=>detail.id),materials:materialIds.map(id=>{const material=getSpacecraftMaterial(id);return {id,name:material?.name||id,composition:material?.composition||'',finish:material?.finish||'',textureId:material?.textureId||materialAssignments.find(detail=>detail.materialId===id)?.textureId||null}}),materialAssignments});
+  const bulk=row.wbs==='06.06'?(d.engine==='aero'?['Aerozine-50','Hydrazine / unsymmetrical dimethylhydrazine fuel blend','liquid']:['MMH','Monomethylhydrazine fuel','liquid']):row.wbs==='06.07'?(d.engine==='aero'?['NTO','Nitrogen tetroxide oxidizer','liquid']:['MON-3','Mixed oxides of nitrogen, MON-3 oxidizer','liquid']):row.wbs==='06.08'?['Helium','Helium (He) pressurant','pressurized gas']:null;
+  row.bulkMaterial=bulk?{name:bulk[0],composition:bulk[1],stateAtLoading:bulk[2],textureId:null,visibility:'Enclosed consumable; no exposed surface texture',selectionBasis:'Configured inventory for the active propulsion model. This is not a statement of the reference provider’s propellant selection.',sourceUrl:row.sourceUrl}:null;
+  row.materialDescription=bulk?bulk[1]:row.materials.map(material=>material.name).join('; ');
+ }
+ return {schema:'orbital-data-center/mel/4',reference,materialLibraryRevision,surfaceDetails,surfaceDetailAccounting:'Surface and material details are included in their named equipment allocations. They have no separately assigned mass and must not be added to the equipment or subsystem totals.',massUnit:'kg',massEpoch:'launch loading',purpose:d.aiPurpose,engine:d.engine,technology:{compute:d.compute,storage:d.storage,battery:d.battery,solar:d.pv,coating:d.coating,launcher:d.launcher},
   totals:{hardwareKg,growthKg:ledger.margin.kg,dryKg,wetKg,launchKg,closureKg:launchKg-h.launchKg},
   subsystems:subs.map((name,i)=>({wbs:String(i+1).padStart(2,'0'),name,extendedMassKg:sum(rows.filter(r=>r.subsystem===name))})),rows};
 }
 
-const quantityColumns=['wbs','parent','subsystem','item','ledgerId','classification','quantity','unit','unitMassKg','extendedMassKg','referenceUnitMassKg','referenceMassBoundary'];
+const quantityColumns=['designReferenceId','designReferenceRevision','designReferenceName','designReferenceModified','modelRealization','wbs','parent','subsystem','item','ledgerId','classification','quantity','unit','unitMassKg','extendedMassKg','referenceUnitMassKg','referenceMassBoundary'];
 const physicalColumns=['powerMode','operatingPowerW','unitOperatingPowerW','instantPowerW','dimensionsM','dimensionScope','bodyCentroidM','comparisonPowerW','comparisonDimensionsM','comparisonBoundary'];
-const allColumns=[...quantityColumns,...physicalColumns,'powerBasis','powerSourceUrl','dimensionBasis','dimensionSourceUrl','massBasis','manufacturer','referenceModel','sourceUrl','evidence','heritage','maturity','otherSources','tags'];
+const materialColumns=['materialLibraryRevision','materialDescription','materialIds','materials','surfaceDetailIds','materialAssignments','bulkMaterial'];
+const allColumns=[...quantityColumns,...physicalColumns,...materialColumns,'powerBasis','powerSourceUrl','dimensionBasis','dimensionSourceUrl','massBasis','manufacturer','referenceModel','sourceUrl','evidence','heritage','maturity','otherSources','tags'];
 function csv(rows,columns) {
  const quote=value=>'"'+String(value&&typeof value==='object'?JSON.stringify(value):value??'').replaceAll('"','""')+'"';
  return [columns.join(','),...rows.map(row=>columns.map(key=>quote(row[key])).join(','))].join('\r\n')+'\r\n';
 }
 // PDR receives the engineering fields; the full register carries the evidence as well.
-export const equipmentMassCsv=rows=>csv(rows,[...quantityColumns,...physicalColumns,'massBasis','powerBasis','powerSourceUrl','dimensionBasis','dimensionSourceUrl','sourceUrl']);
+export const equipmentMassCsv=rows=>csv(rows,[...quantityColumns,...physicalColumns,'materialLibraryRevision','materialDescription','materialIds','surfaceDetailIds','massBasis','powerBasis','powerSourceUrl','dimensionBasis','dimensionSourceUrl','sourceUrl']);
 export const equipmentCsv=rows=>csv(rows,allColumns);
+export const materialAssignmentsCsv=details=>csv(details,['designReferenceId','designReferenceRevision','designReferenceName','designReferenceModified','modelRealization','libraryRevision','id','parentWbs','parentItem','subsystem','role','label','materialId','materialName','materialComposition','materialFinish','textureId','texturePreviewUrl','evidence','selectionSourceUrls','coverage','visibility','massAccounting','accountedInWbs']);
 const esc=value=>String(value??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
 const mass=value=>value.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:value!==0&&Math.abs(value)<1?4:2});
 const option=(value,text)=>'<option value="'+esc(value)+'">'+esc(text)+'</option>';
 const link=(r)=>'<a href="'+esc(r.sourceUrl)+'" target="_blank" rel="noopener noreferrer">'+esc(r.referenceModel)+' ↗</a>';
 const evidenceBadge=r=>'<span class="mel-badge" data-tone="'+(r.evidence===flight?'flight':r.evidence===ground?'ground':'ref')+'">'+esc(r.evidence)+'</span>';
-export function filterEquipmentRows(rows,{query='',subsystem='',evidence=''}={}) {
+export function filterEquipmentRows(rows,{query='',subsystem='',evidence='',materialEvidence=''}={}) {
  const tokens=query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
  return rows.filter(r=>{
   if((subsystem&&subsystem!==r.subsystem)||(evidence&&evidence!==r.evidence))return false;
-  const haystack=[r.wbs,r.item,r.subsystem,r.ledgerId,r.manufacturer,r.referenceModel,r.massBasis,r.heritage,...r.tags,...r.otherSources.flatMap(x=>[x.manufacturer,x.referenceModel,x.heritage])].join(' ').toLocaleLowerCase();
-  return tokens.every(t=>haystack.includes(t));
+  if(materialEvidence&&!(r.materialAssignments||[]).some(detail=>detail.evidence?.status===materialEvidence))return false;
+  const haystack=[r.wbs,r.item,r.subsystem,r.ledgerId,r.manufacturer,r.referenceModel,r.massBasis,r.heritage,r.materialDescription,...r.tags,...r.otherSources.flatMap(x=>[x.manufacturer,x.referenceModel,x.heritage]),...(r.materials||[]).flatMap(m=>[m.id,m.name,m.composition,m.finish,m.textureId]),...(r.materialAssignments||[]).flatMap(detail=>[detail.id,detail.label,detail.role,detail.coverage,detail.visibility,detail.evidence?.status,detail.evidence?.basis,...(detail.evidence?.sourceIds||[])])].join(' ').toLocaleLowerCase();
+  return tokens.every(t=>/^\d{2}(?:\.\d{2}){0,2}$/.test(t)?[r.wbs,...(r.materialAssignments||[]).map(detail=>detail.id)].some(id=>id===t||id.startsWith(t+'.')):haystack.includes(t));
  });
 }
-function registerTable(rows,lens){
+function materialBadge(status){return '<span class="mel-badge mel-material-evidence" data-tone="'+esc(status)+'">'+esc(materialEvidenceLabels[status]||status||'Unresolved')+'</span>'}
+function materialLink(materialId,caption){return '<button type="button" class="mel-material-link" data-page="materials" data-material-id="'+esc(materialId)+'">'+esc(caption)+' ↗</button>'}
+function materialSourcesLinks(ids){
+ return [...new Set(ids||[])].map(id=>materialSources[id]).filter(Boolean).map(source=>'<a href="'+esc(source.url)+'" target="_blank" rel="noopener noreferrer" title="'+esc(source.boundary||source.claim||'')+'">'+esc(source.shortTitle||source.title)+' ↗</a>').join('<span aria-hidden="true"> · </span>');
+}
+function materialRegister(rows,selection=''){
+ let prior='',body='';
+ for(const row of rows){
+  if(row.parent!==prior){prior=row.parent;body+='<tr class="mel-group"><th colspan="5" scope="rowgroup"><span>'+esc(prior)+'</span> '+esc(row.subsystem)+'</th></tr>'}
+  const details=(row.materialAssignments||[]).filter(detail=>!selection||detail.evidence?.status===selection);
+  body+='<tr class="mel-material-parent"><th scope="rowgroup" colspan="5"><div><span><span class="mel-number">'+esc(row.wbs)+'</span> '+esc(row.item)+'</span><small>'+mass(row.extendedMassKg)+' kg in parent allocation · '+details.length+' material '+(details.length===1?'detail':'details')+'</small></div></th></tr>';
+  if(!details.length){body+='<tr class="mel-material-row"><td colspan="5"><p class="mel-material-empty">'+(row.bulkMaterial?'<b>'+esc(row.bulkMaterial.composition)+'</b> · '+esc(row.bulkMaterial.stateAtLoading)+'. '+esc(row.bulkMaterial.visibility)+'. '+esc(row.bulkMaterial.selectionBasis):'Material selection remains open for this equipment. No finish is established by its supplier reference alone.')+'</p></td></tr>';continue}
+  for(const detail of details){
+   const material=getSpacecraftMaterial(detail.materialId),preview=material?.texture?.previewUrl||material?.previewUrl||material?.texture?.baseColorUrl,texture=detail.textureId||material?.textureId;
+   const thumb=preview?'<img class="mel-material-swatch" src="'+esc(preview)+'" alt="" loading="lazy" width="72" height="54">':'<span class="mel-material-no-swatch" aria-hidden="true">'+(texture?'◧':'—')+'</span>';
+   const sources=materialSourcesLinks(detail.evidence?.sourceIds),accounts=detail.accountedInWbs?.length?detail.accountedInWbs:[detail.parentWbs];
+   body+='<tr class="mel-material-row"><th scope="row"><span class="mel-number">'+esc(detail.id)+'</span><b>'+esc(detail.label)+'</b><small>'+esc(detail.coverage)+'</small></th>'
+    +'<td><div class="mel-material-identity">'+thumb+'<div>'+materialLink(detail.materialId,material?.name||detail.materialName||detail.materialId)+'<small>'+esc(material?.finish||detail.materialFinish||'')+'</small></div></div></td>'
+    +'<td>'+materialBadge(detail.evidence?.status)+'<p>'+esc(detail.evidence?.basis)+'</p>'+(sources?'<div class="mel-material-sources">'+sources+'</div>':'')+'</td>'
+    +'<td>'+(texture?'<code class="mel-texture-id">'+esc(texture)+'</code>':'<small>No visible texture</small>')+'<p>'+esc(detail.visibility)+'</p></td>'
+    +'<td><strong>Included in WBS '+accounts.map(esc).join(', ')+'</strong><small>Describes parent hardware; no separate mass allocation.</small></td></tr>';
+  }
+ }
+ return '<table class="mel-table mel-material-table"><caption class="mel-sr">Selected material and finish details within parent equipment allocations</caption><thead><tr>'+['WBS / visible detail','Material and finish','Selection basis','Texture / visibility','Mass accounting'].map(label=>'<th scope="col">'+label+'</th>').join('')+'</tr></thead><tbody>'+body+'</tbody></table>';
+}
+function registerTable(rows,lens,{materialEvidence=''}={}){
  if(!rows.length)return '<div class="mel-none">No equipment matches these filters.</div>';
+ if(lens==='materials')return materialRegister(rows,materialEvidence);
  const trace=lens==='heritage',power=lens==='power',dims=lens==='dimensions',maturity=lens==='maturity';
  const headings=maturity?['WBS / equipment','Reference evidence','Installed maturity','Growth assignment','Evidence and owner']:power?['WBS / equipment','Design mode','Unit / total power','Supplied at instant','Power basis and references']:dims?['WBS / equipment','Dimension boundary','Envelope in metres','Launch centroid X / Y / Z','Dimension basis and references']:trace?['WBS / equipment','Benchmark and source','Reference evidence','Published mass']:['WBS / equipment','Qty','Unit kg','Total kg','Basis and reference'];
  let prior='',body='';
@@ -140,7 +193,8 @@ function registerTable(rows,lens){
    const subtotal=rows.filter(v=>v.parent===prior).reduce((s,v)=>s+v.extendedMassKg,0);
    body+='<tr class="mel-group"><th colspan="'+headings.length+'" scope="rowgroup"><span>'+esc(prior)+'</span> '+esc(r.subsystem)+'<small>'+mass(subtotal)+' kg</small></th></tr>';
   }
-  const name='<th scope="row"><span class="mel-number">'+r.wbs+'</span><b>'+esc(r.item)+'</b><small>'+esc(r.classification)+'</small></th>';
+  const materialNames=r.bulkMaterial?[r.bulkMaterial.name]:(r.materials||[]).map(material=>material.name);
+  const name='<th scope="row"><span class="mel-number">'+r.wbs+'</span><b>'+esc(r.item)+'</b><small>'+esc(r.classification)+'</small>'+(lens==='mass'&&materialNames.length?'<small class="mel-material-summary" title="Selection evidence is listed in Materials &amp; finishes">Materials · '+esc(materialNames.join(' · '))+'</small>':'')+'</th>';
   const basisRef=(note,url,title)=>'<p>'+esc(note)+'</p><a href="'+esc(url)+'" target="_blank" rel="noopener">'+esc(title)+' ↗</a>';
   const metric=n=>Number.isFinite(n)?mass(n)+' W':'Unallocated';
   if(maturity)body+='<tr>'+name+'<td>'+evidenceBadge(r)+link(r)+'</td><td><strong>'+esc(r.maturity.installedMaturity)+'</strong><p>'+esc(r.maturity.heritageApplicability)+'</p></td><td>'+(r.classification==='Hardware'?'<strong>Unassessed</strong><p>'+esc(r.maturity.mgaBasis)+'</p>':'<strong>Separate resource boundary</strong><p>Outside spacecraft dry-hardware MGA. Carry the loading or launch-interface basis separately.</p>')+'</td><td><p>'+esc(r.maturity.fabricationStatus)+'</p><small>'+esc(r.maturity.owner)+' · '+esc(r.maturity.due)+'</small></td></tr>';
@@ -154,34 +208,37 @@ function registerTable(rows,lens){
 export function renderEquipmentList(h,s=null){
  const list=buildEquipmentList(h,s),t=list.totals;
  const cards=[['Equipment',t.hardwareKg,'Dry hardware before growth'],['Dry spacecraft',t.dryKg,'Hardware plus '+mass(t.growthKg)+' kg growth'],['Wet spacecraft',t.wetKg,'Dry vehicle, liquids and helium'],['Launched mass',t.launchKg,'Wet vehicle plus adapter']];
- return '<section class="mel" data-mel><header class="mel-header"><div><div class="mel-eyebrow">Engineering reference / mass properties</div><h2>Master equipment list</h2><p>Inspect the installed mass, electrical loads, physical envelopes and supplier references for this build.</p></div><div class="mel-files"><a data-file="csv" class="btn" download="spacecraft-equipment-list.csv" title="Download every equipment row with mass basis, tags and sources">Full CSV ↓</a><a data-file="json" class="btn" download="spacecraft-equipment-list.json" title="Download the structured hierarchy and totals for this design">Full JSON ↓</a></div></header>'
+ return '<section class="mel" data-mel><header class="mel-header"><div><div class="mel-eyebrow">Engineering reference / installed configuration</div><h2>Master equipment list</h2><p>'+esc(list.reference?list.reference.name+(list.reference.modified?' · modified study variant':' · study configuration'):'Custom study configuration')+'. Installed mass, electrical loads, physical envelopes, materials and their evidence follow this active build.</p></div><div class="mel-files"><a data-file="csv" class="btn" download="spacecraft-equipment-list.csv" title="Download every equipment allocation with materials, mass basis and sources">Full CSV ↓</a><a data-file="json" class="btn" download="spacecraft-equipment-list.json" title="Download the structured hierarchy, material details and totals for this design">Full JSON ↓</a><a data-file="materials" class="btn" download="spacecraft-material-details.csv" title="Download material and texture assignments with their parent mass boundaries and selection evidence">Materials CSV ↓</a></div></header>'
  +'<div class="mel-cards">'+cards.map(([title,value,note])=>'<div><small>'+title+'</small><strong>'+mass(value)+' <em>kg</em></strong><span>'+note+'</span></div>').join('')+'</div>'
- +'<div class="mel-controls"><div role="group" aria-label="Equipment list view" class="mel-views"><button type="button" data-lens="mass" aria-pressed="true">Mass register</button><button type="button" data-lens="power" aria-pressed="false">Electrical loads</button><button type="button" data-lens="dimensions" aria-pressed="false">Dimensions</button><button type="button" data-lens="heritage" aria-pressed="false">Heritage &amp; sources</button><button type="button" data-lens="maturity" aria-pressed="false">Maturity &amp; margins</button></div>'
- +'<label>Find equipment<input data-mel-search type="search" placeholder="Component, part number, supplier…" autocomplete="off"></label>'
+ +'<div class="mel-controls"><div role="group" aria-label="Equipment list view" class="mel-views"><button type="button" data-lens="mass" aria-pressed="true">Mass register</button><button type="button" data-lens="materials" aria-pressed="false">Materials &amp; finishes</button><button type="button" data-lens="power" aria-pressed="false">Electrical loads</button><button type="button" data-lens="dimensions" aria-pressed="false">Dimensions</button><button type="button" data-lens="heritage" aria-pressed="false">Heritage &amp; sources</button><button type="button" data-lens="maturity" aria-pressed="false">Maturity &amp; margins</button></div>'
+ +'<label>Find equipment or material<input data-mel-search type="search" placeholder="Component, material, texture, supplier…" autocomplete="off"></label>'
  +'<label>Subsystem<select data-mel-sub>'+option('','All subsystems')+subs.map(s=>option(s,s)).join('')+'</select></label>'
- +'<label>Reference evidence<select data-mel-evidence>'+option('','All references')+[flight,product,ground].map(s=>option(s,s)).join('')+'</select></label></div>'
- +'<div class="mel-caption"><button type="button" class="textbutton" data-page="mission">Mission margin policy ↗</button><span data-mel-status role="status">'+list.rows.length+' rows · '+mass(t.launchKg-t.growthKg)+' kg shown</span><button type="button" data-mel-clear hidden>Clear filters</button></div>'
+ +'<label data-mel-reference-filter>Reference evidence<select data-mel-evidence>'+option('','All references')+[flight,product,ground,concept,analytical].map(s=>option(s,s)).join('')+'</select></label>'
+ +'<label data-mel-material-filter hidden>Material selection<select data-mel-material-evidence>'+option('','All selection bases')+['documented','inferred','allocated','unresolved'].map(status=>option(status,materialEvidenceLabels[status]||status)).join('')+'</select></label></div>'
+ +'<div class="mel-material-note" data-mel-material-note hidden><div><b>From the assembly to its visible layers</b><p>'+list.surfaceDetails.length+' material details identify the structure, surface finish and texture within the equipment above. Each names its evidence and parent mass allocation. General material heritage does not establish a provider’s choice; rendered appearance does not certify a finish or its thermal properties.</p></div><button type="button" data-page="materials" class="btn">Open material library ↗</button></div>'
+ +'<div class="mel-caption"><div class="mel-caption-links"><button type="button" class="textbutton" data-page="mission">Mission margin policy ↗</button><button type="button" class="textbutton" data-page="materials">Material library ↗</button></div><span data-mel-status role="status">'+list.rows.length+' rows · '+mass(t.launchKg-t.growthKg)+' kg shown</span><button type="button" data-mel-clear hidden>Clear filters</button></div>'
  +'<div class="mel-scroll" role="region" tabindex="0" aria-label="Equipment table">'+registerTable(list.rows,'mass')+'</div>'
- +'<footer><a href="https://www.nasa.gov/centers-and-facilities/glenn/compass-lab/" target="_blank" rel="noopener">NASA Compass study products ↗</a> · <a href="https://ntrs.nasa.gov/api/citations/20200013062/downloads/TP-2020-220152.pdf" target="_blank" rel="noopener">Example master and power equipment lists, §§3.1.1–3.1.3 ↗</a><br>Design powers describe individual operating modes. Select Electrical loads for simultaneous values at the mission instant. Masses use the installed design at launch loading. Unit kg is the average for each listed quantity. A published mass describes the cited article and its stated boundary. Flight history and supplier TRL apply to that reference article only.</footer></section>';
+ +'<footer><a href="https://www.nasa.gov/centers-and-facilities/glenn/compass-lab/" target="_blank" rel="noopener">NASA Compass study products ↗</a> · <a href="https://ntrs.nasa.gov/api/citations/20200013062/downloads/TP-2020-220152.pdf" target="_blank" rel="noopener">Example master and power equipment lists, §§3.1.1–3.1.3 ↗</a><br>Design powers describe individual operating modes. Select Electrical loads for simultaneous values at the mission instant. Masses use the installed design at launch loading. Unit kg is the average for each listed quantity. Material and finish details describe their parent equipment; their masses are not added again. A published mass describes the cited article and its stated boundary. Flight history and supplier TRL apply to that reference article only.</footer></section>';
 }
 export function bindEquipmentList(container,h,s=null){
  const el=container?.matches?.('[data-mel]')?container:container?.querySelector?.('[data-mel]');
  if(!el||el.dataset.melBound)return;
  el.dataset.melBound='1';
- const list=buildEquipmentList(h,s),find=sel=>el.querySelector(sel),search=find('[data-mel-search]'),sub=find('[data-mel-sub]'),evidence=find('[data-mel-evidence]'),clear=find('[data-mel-clear]');
+ const list=buildEquipmentList(h,s),find=sel=>el.querySelector(sel),search=find('[data-mel-search]'),sub=find('[data-mel-sub]'),evidence=find('[data-mel-evidence]'),materialEvidence=find('[data-mel-material-evidence]'),clear=find('[data-mel-clear]');
  let lens='mass';
- for(const [ext,type,content] of [['csv','text/csv;charset=utf-8',equipmentCsv(list.rows)],['json','application/json',JSON.stringify(list,null,2)]]){
-  const name='spacecraft-equipment-list.'+ext;
-  find('[data-file="'+ext+'"]').href=retainFile('equipment-list-'+ext,new Blob([content],{type}),name).url;
+ for(const [key,type,content,name] of [['csv','text/csv;charset=utf-8',equipmentCsv(list.rows),'spacecraft-equipment-list.csv'],['json','application/json',JSON.stringify(list,null,2),'spacecraft-equipment-list.json'],['materials','text/csv;charset=utf-8',materialAssignmentsCsv(list.surfaceDetails),'spacecraft-material-details.csv']]){
+  const control=find('[data-file="'+key+'"]');if(control)control.href=retainFile('equipment-list-'+key,new Blob([content],{type}),name).url;
  }
  const refresh=()=>{
-  const rows=filterEquipmentRows(list.rows,{query:search.value,subsystem:sub.value,evidence:evidence.value});
-  const count=rows.length,total=rows.reduce((a,r)=>a+r.extendedMassKg,0);
-  find('[data-mel-status]').textContent=count+' of '+list.rows.length+' rows · '+mass(total)+' kg shown';
-  find('.mel-scroll').innerHTML=registerTable(rows,lens);clear.hidden=!search.value&&!sub.value&&!evidence.value;
+  const isMaterial=lens==='materials',selectedMaterialEvidence=isMaterial?materialEvidence?.value||'':'';
+  const rows=filterEquipmentRows(list.rows,{query:search.value,subsystem:sub.value,evidence:isMaterial?'':evidence.value,materialEvidence:selectedMaterialEvidence});
+  const count=rows.length,total=rows.reduce((a,r)=>a+r.extendedMassKg,0),details=rows.flatMap(row=>row.materialAssignments||[]).filter(detail=>!selectedMaterialEvidence||detail.evidence?.status===selectedMaterialEvidence);
+  find('[data-mel-status]').textContent=isMaterial?details.length+' details in '+count+' equipment allocations · mass counted once':count+' of '+list.rows.length+' rows · '+mass(total)+' kg shown';
+  for(const [selector,hidden] of [['[data-mel-material-note]',!isMaterial],['[data-mel-material-filter]',!isMaterial],['[data-mel-reference-filter]',isMaterial]]){const control=find(selector);if(control)control.hidden=hidden}
+  find('.mel-scroll').innerHTML=registerTable(rows,lens,{materialEvidence:selectedMaterialEvidence});clear.hidden=!search.value&&!sub.value&&!(isMaterial?selectedMaterialEvidence:evidence.value);
  };
- search.addEventListener('input',refresh);sub.addEventListener('change',refresh);evidence.addEventListener('change',refresh);
- clear.addEventListener('click',()=>{search.value='';sub.value='';evidence.value='';refresh();search.focus()});
+ search.addEventListener('input',refresh);sub.addEventListener('change',refresh);evidence.addEventListener('change',refresh);materialEvidence?.addEventListener('change',refresh);
+ clear.addEventListener('click',()=>{search.value='';sub.value='';evidence.value='';if(materialEvidence)materialEvidence.value='';refresh();search.focus()});
  el.querySelectorAll('[data-lens]').forEach(btn=>btn.addEventListener('click',()=>{
   lens=btn.dataset.lens;el.querySelectorAll('[data-lens]').forEach(b=>b.setAttribute('aria-pressed',String(b===btn)));refresh();
  }));

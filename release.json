@@ -1,14 +1,14 @@
 {
-  "release": "v45",
+  "release": "v56",
   "source_host": "boiler",
-  "source_path": "/home/johnb/Downloads/orbital-data-center-v45.zip.part01 + orbital-data-center-v45.zip.part02",
-  "archive_sha256": "9c3cd1dd5108b0ed94b5de34059da118552614fdbc415ff9cbb7e92118faebcb",
+  "source_path": "/home/johnb/Downloads/orbital-data-center-v56.zip.part01 + orbital-data-center-v56.zip.part02",
+  "archive_sha256": "44eb50af6152b4df67dce50dbae383cc374c6022c953c600e368c2f6e3340363",
   "static_directory": "dist",
   "checks_passed": [
-    "2312 asset manifest entries",
-    "164 JavaScript syntax checks",
+    "2441 asset manifest entries",
+    "192 JavaScript syntax checks",
     "16 import and assembly regression tests",
-    "2424 upstream files match the archive",
+    "2585 upstream files match the archive",
     "All application files fit the Cloudflare Pages file-size limit",
     "Desktop and mobile startup, 3D rendering, fixed footer and Blender OG metadata; no browser errors or failed assets"
   ],
@@ -19,14 +19,14 @@
   ],
   "source_parts": [
     {
-      "source_path": "/home/johnb/Downloads/orbital-data-center-v45.zip.part01",
+      "source_path": "/home/johnb/Downloads/orbital-data-center-v56.zip.part01",
       "size": 419430400,
-      "sha256": "4aac3a5c5732afb25599952497d336ac0459399743c45052a4e6d564248e89b6"
+      "sha256": "90386867ced49a126edf40f4d0c76eccd9b79d09e7babf7f6bbc00693f0772b0"
     },
     {
-      "source_path": "/home/johnb/Downloads/orbital-data-center-v45.zip.part02",
-      "size": 386721761,
-      "sha256": "3cba49a0a29784a785b6b8a3935a7d20bb9e8c57dd872361604c37702d12400c"
+      "source_path": "/home/johnb/Downloads/orbital-data-center-v56.zip.part02",
+      "size": 409574647,
+      "sha256": "08b8e6e2b37b714ed61d1ec4f6e9d5e27125dad7c791e7d3bfabf9587a0abbee"
     }
   ]
 }

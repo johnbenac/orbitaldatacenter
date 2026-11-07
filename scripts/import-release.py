@@ -13,7 +13,10 @@ ROOT_DOCS = {'DESIGN.md', 'ENGINE.md', 'SCENE.md', 'requirements.txt', 'package.
 UPSTREAM_TOOLS = {'tools/build-identity.py', 'earth-gpu-checks.py',
                   'scripts/generate-launch-surfaces.py', 'scripts/prepare-earth-assets.py',
                   'scripts/prepare-earth-cloud-details.py', 'scripts/prepare-earth-day-detail.py',
-                  'scripts/prepare-earth-detail-night.py', 'tools/build-launch-geography.py'}
+                  'scripts/prepare-earth-detail-night.py', 'tools/build-launch-geography.py',
+                  'scripts/generate-spacecraft-materials.py',
+                  'scripts/launch-elevation-integrity.json',
+                  'scripts/package-launch-elevation.py', 'scripts/package-material-library.mjs'}
 MAPPED = {'README.md': 'upstream-docs/README.md',
           '.openai/hosting.json': 'upstream-docs/hosting.json',
           'VALIDATION-v21.0.md': 'upstream-docs/VALIDATION-v21.0.md',
@@ -23,6 +26,12 @@ MAPPED = {'README.md': 'upstream-docs/README.md',
           'validation-ui-work.jpg': 'upstream-docs/validation-ui-work.jpg',
           'validation-facility-labels.jpg': 'upstream-docs/validation-facility-labels.jpg',
           'validation-processing-workbench.jpg': 'upstream-docs/validation-processing-workbench.jpg'}
+MAPPED.update({name: 'upstream-docs/' + name for name in (
+    'artifacts/spacecraft-texture-bank.zip',
+    'docs/architecture-differentiation-r2.md', 'docs/architecture-r2-ai1-review.jpg',
+    'docs/focus-auto-review.jpg', 'docs/material-evidence-notes.md',
+    'docs/material-library-review.jpg', 'docs/orbital-camera-default-20261107.jpg',
+    'docs/spacecraft-materials-r1.md', 'docs/unified-orbital-leaders-20261107.jpg')})
 
 
 def digest(data):

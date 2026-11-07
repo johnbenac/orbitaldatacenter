@@ -214,14 +214,26 @@ try{
 console.log('Adapter-to-integration handoff, reversible payload milestones, follow camera and replay stay on one mission clock.');
 
 await fire({phase:'C'});await fire({camera:'spacecraft'});await fire({attitudeTime:'6402'});
-const orbitBefore=await snapshot();assert.equal(orbitBefore.view.lighting,'studio');
+const orbitBefore=await snapshot();assert.equal(orbitBefore.view.lighting,'auto');
 assert.equal(el('orbit-lighting').hidden,false);
+assert.equal(el('lighting-auto').getAttribute('aria-pressed'),'true');
+assert.equal(el('lighting-realistic').getAttribute('aria-pressed'),'false');
+assert.equal(el('lighting-studio').getAttribute('aria-pressed'),'false');
+assert.match(el('light-environment').textContent,/^Auto → (Studio · Eclipse|Realistic · Sunlit)$/);
 assert.equal(orbitBefore.view.orbitVectors,true);assert.equal(el('flight-vector-toggle').getAttribute('aria-pressed'),'true');
 await fire({action:'flightvectors'});
 const hiddenVectors=await snapshot();
 assert.equal(hiddenVectors.view.orbitVectors,false);assert.equal(el('flight-vector-key').hidden,true);
 assert.deepEqual(hiddenVectors.design,orbitBefore.design);assert.equal(hiddenVectors.view.t,orbitBefore.view.t);
 await fire({lighting:'realistic'});assert.equal((await snapshot()).view.lighting,'realistic');
+assert.equal(el('lighting-auto').getAttribute('aria-pressed'),'false');
+assert.equal(el('lighting-realistic').getAttribute('aria-pressed'),'true');
+await fire({lighting:'auto'});const automaticView=await snapshot();assert.equal(automaticView.view.lighting,'auto');
+assert.deepEqual(automaticView.design,orbitBefore.design);assert.equal(automaticView.view.t,orbitBefore.view.t);
+await fire({action:'share'});const autoLink=el('dialogbody').innerHTML.match(/#design=[A-Za-z0-9_-]+/)[0];await fire({action:'close'});
+globalThis.location=new URL(autoLink,'https://example.test');await imp('app.js?shared-auto-lighting');
+assert.equal((await snapshot()).view.lighting,'auto','Scenario restoration preserves an explicit Auto selection');
+assert.equal(el('lighting-auto').getAttribute('aria-pressed'),'true');
 await fire({lighting:'studio'});await change('camera-exposure',1);const studioView=await snapshot();
 assert.deepEqual(studioView.design,orbitBefore.design);assert.equal(studioView.view.t,orbitBefore.view.t);
 assert.equal(studioView.view.camera,orbitBefore.view.camera);assert.equal(studioView.view.lighting,'studio');
@@ -230,4 +242,4 @@ await fire({action:'share'});const studioLink=el('dialogbody').innerHTML.match(/
 globalThis.location=new URL(studioLink,'https://example.test');await imp('app.js?shared-orbital-lighting');
 const sharedLighting=await snapshot();assert.equal(sharedLighting.view.orbitVectors,false,'Shared view preserves the vector switch');assert.equal(sharedLighting.view.lighting,'studio');assert.equal(sharedLighting.view.exposureEV,1);await fire({phase:'D'});
 assert.equal(el('orbit-lighting').hidden,true);
-console.log('Lighting defaults, camera continuity, fixed mission time and design, shared studio view, and ground-view scope passed.');
+console.log('Auto lighting default and effective-state indicator, explicit overrides, camera continuity, fixed mission time and design, shared Auto/Studio views, and ground-view scope passed.');

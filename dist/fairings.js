@@ -1,6 +1,7 @@
 import {starshipCargoFit} from './starship-cargo.js';
 import {adapterEnvelopeM,spacecraftInterface} from './payload-interface.js';
-import {deploymentLayout,terminalLayout,terminalStations} from './deployment.js';
+import {deploymentLayout,terminalLayout,terminalStations,leafPose,leafAxes,leafCorners,mechanismPose} from './deployment.js';
+import {architectureFamily,architectureTerminalStations} from './architecture-families.js';
 // Coordinates are metres from the payload adapter interface plane, positive forward.
 const terran = {
  outerDiameterM:5.4,basis:'Planning estimate',source:'Relativity Space · Terran R architecture',
@@ -70,6 +71,8 @@ export function radiusAt(profile,z){
 }
 
 export function packedSections(g){
+ const family=architectureFamily(g);
+ if(family.id!=='protected-core'||family.kaTerminalCount!==1||family.sPatchCount!==2)return familyPackedSections(g);
  const {bodyWidthM:w,bodyHeightM:h,bodyLengthM:l,wingLengthM,wingWidthM,radiatorLengthM,radiatorWidthM,kaDishM}=g;
  let z=0;
  const sections=[];
@@ -88,7 +91,7 @@ export function packedSections(g){
   Math.hypot(w*.20+a*.89,h*.5+term.opticalHeight+Math.max(.05*a,1.04*a-term.opticalPin)));
  const k=deploymentLayout(g),spoolRadius=k.packedRollM+.019;
  const drumEnvelope=Math.hypot(k.rootX,k.packedRollM)+spoolRadius;
- const radHalfWidth=Math.max(k.rw/2+.025,k.rw*.32+.24),radHalfHeight=k.rootY+k.hingeStand+.115;
+ const radHalfWidth=Math.max(k.rw/2+.025,k.rw*.32+.24),radHalfHeight=k.rootY+(2*k.panelCount-3)*k.hingeStand+.115;
  const bodyBase=z,bodyCenter=bodyBase+l/2;
  // Each hardware group has its own axial interval. A radius is measured from
  // the vehicle axis, so a side-mounted package consumes the circular segment
@@ -113,6 +116,49 @@ export function packedSections(g){
  const kaZ=.62*kaDishM+.035,opZ=1.05*a+.025;
  feature('Parked terminal heads',Math.min(ka[1]-kaZ,optical[1]-opZ),Math.max(ka[1]+kaZ,optical[1]+opZ),2*Math.max(Math.abs(ka[0])+kaZ,Math.abs(optical[0])+opZ),
   2*(h*.5+Math.max(term.kaHeight+.5*kaDishM,term.opticalHeight+1.04*a)),dishEdge);
+ return sections;
+}
+
+// Use the actual restrained poses for each architecture. Source-specific stack
+// interfaces are still preliminary allocations, but a flat spacecraft no longer
+// inherits the four-cassette / two-side-bank cylindrical proxy.
+function familyPackedSections(g){
+ const w=g.bodyWidthM,h=g.bodyHeightM,l=g.bodyLengthM,d=g.input||g,f=architectureFamily(g),k=deploymentLayout(g),pose=mechanismPose(k,0,d.solarTiltDeg||0);
+ const nozzles=g.propulsion?.engines||[],adapterWidth=adapterEnvelopeM(d.launcher||g.launcher||'terran');
+ const stand=Math.max(.30,...nozzles.map(e=>-e.z-l/2+.14)),bodyBase=.36+stand,bodyCenter=bodyBase+l/2;
+ const sections=[{part:'Separation adapter',widthM:adapterWidth,heightM:adapterWidth,lengthM:.36,radiusM:adapterWidth/2,z0M:0,z1M:.36},
+  {part:f.launchInterface==='aft-circular'?'Launch service stand-off':'Allocated '+f.launchInterface+' interface cradle',widthM:Math.max(adapterWidth,w*.8),heightM:Math.max(adapterWidth,h*.8),lengthM:stand,radiusM:Math.max(adapterWidth/2,Math.hypot(w*.8,h*.8)/2),z0M:.36,z1M:bodyBase}];
+ function feature(part,points,pad=.025){
+  const min=[0,1,2].map(a=>Math.min(...points.map(p=>p[a]))-pad),max=[0,1,2].map(a=>Math.max(...points.map(p=>p[a]))+pad);
+  const radiusM=Math.max(...points.map(p=>Math.hypot(p[0],p[1])))+pad;
+  sections.push({part,widthM:max[0]-min[0],heightM:max[1]-min[1],lengthM:max[2]-min[2],radiusM,z0M:bodyCenter+min[2],z1M:bodyCenter+max[2],bodyBoundsM:{min,max}});
+ }
+ const corners=(center,axes,dims)=>[-.5,.5].flatMap(x=>[-.5,.5].flatMap(y=>[-.5,.5].map(z=>center.map((v,i)=>v+axes[0][i]*x*dims[0]+axes[1][i]*y*dims[1]+axes[2][i]*z*dims[2]))));
+ const identity=[[1,0,0],[0,1,0],[0,0,1]];
+ feature('Insulated bus',corners([0,0,0],identity,[w,h,l]),0);
+ feature('Frame and insulation allowance',corners([0,0,0],identity,[w,h,l]),.035);
+ for(const [i,e] of nozzles.entries())feature('Engine bell '+(i+1),corners([e.x,e.y,(e.z+e.throatZ)/2],identity,[2*e.exitRadiusM,2*e.exitRadiusM,e.throatZ-e.z]));
+ for(const [i,m] of pose.wings.entries()){
+  const axes=m.axes||leafAxes({pitch:m.pitch}),center=m.root.map((v,j)=>v+axes[1][j]*m.rollRadius),points=[];
+  // Bound the full cylinder, including flange thickness and the remaining roll.
+  for(const end of [-1,1])for(let n=0;n<32;n++){const a=n*Math.PI/16,r=m.rollRadius+.022;points.push(center.map((v,j)=>v+axes[2][j]*end*(k.ww/2+.09)+r*(axes[0][j]*Math.cos(a)+axes[1][j]*Math.sin(a))));}
+  feature('Stowed solar cassette '+(i+1),points);
+ }
+ for(const [i,s] of k.descriptors.filter(s=>s.type==='rad').entries()){
+  const p=leafPose(k,s,0,d.solarTiltDeg||0),a=leafAxes(p),points=corners([p.x,p.y,p.z],a,[s.width,s.thickness+.04,s.depth]);
+  feature(f.payloadLocation==='radiator'?'Folded compute / radiator platform':'Folded radiator leaf '+(i+1),points);
+  if(f.payloadLocation==='radiator'){
+   const rack=g.rackLayout,slots=rack?.slots||[{x:0,y:.12,z:0}],dims=rack?.slotDimensionsM||[1,.20,1];
+   for(const [j,s] of slots.entries())feature('Platform compute package '+(j+1),corners([p.x,p.y,p.z].map((v,i)=>v+a[0][i]*s.x+a[1][i]*(s.y+.06)+a[2][i]*s.z),a,dims));
+  }
+ }
+ const terms=architectureTerminalStations(g),term=terminalLayout(w,h,d.kaDishM??g.kaDishM??.5,d.opticalApertureM??g.opticalApertureM??.12);
+ for(const t of terms){
+  if(t.kind==='s'){feature('TT&C patch '+t.id,corners(t.positionM,identity,[.12,.12,.12]));continue;}
+  const size=t.kind==='ka'?(d.kaDishM??g.kaDishM??.5):(d.opticalApertureM??g.opticalApertureM??.12),height=t.kind==='ka'?term.kaHeight:term.opticalHeight,radius=(t.kind==='ka'?.64:1.08)*size+.025;
+  const center=t.positionM.map((v,i)=>v+t.normalBody[i]*height);
+  feature('Parked '+t.kind+' terminal '+t.id,corners(center,identity,[2*radius,2*radius,2*radius]));
+ }
  return sections;
 }
 

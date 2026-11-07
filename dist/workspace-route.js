@@ -2,7 +2,7 @@
 // Query parameters describe a starting point. A tab checkpoint restores the actual design.
 import {chapters} from './flight-chapters.js';
 import {phases,chapterPhase} from './lifecycle.js';
-import {domains} from './domain-analysis.js';
+import {domains,canonicalDomainId} from './domain-analysis.js';
 import {DEPLOY_START_S} from './commissioning-clock.js';
 import {DAY} from './orbit.js';
 
@@ -10,9 +10,9 @@ export function entryRoute(query){
  // A fresh visit opens the operating mission; explicit links retain their own starting point.
  if(!query.toString())return {phase:'E',domain:'conops',chapter:'operations'};
  const selected=chapters.find(item=>item.id===query.get('chapter'));
- const domain=query.get('domain')||query.get('subsystem');
+ const domain=canonicalDomainId(query.get('domain')||query.get('subsystem'));
  const requestedPhase=(query.get('phase')||'').toUpperCase();
- const phase=Object.hasOwn(phases,requestedPhase)?requestedPhase:selected?chapterPhase(selected.id):'A';
+ const phase=Object.hasOwn(phases,requestedPhase)?requestedPhase:selected?chapterPhase(selected.id):query.has('center')?'E':'A';
  const compatible=selected&&(!['D','E','F'].includes(phase)||phase===chapterPhase(selected.id));
  const chapter=compatible?selected.id:({D:'integration',F:'deorbit'}[phase]||'operations');
  return {phase,domain:Object.hasOwn(domains,domain)?domain:'conops',chapter};
@@ -29,6 +29,17 @@ export function entryClock(view,query,sim){
  if(view.phase==='D')return view.chapter==='pad'?-8:stage.start;
  if(view.phase==='F'||view.chapter==='commissioning')return stage.start;
  return stage?.instant??3438;
+}
+
+// Dynamic chapters search simulated events. Warm the first operating window
+// before resolving them so a fresh reference link does not integrate on the UI
+// thread merely to choose its initial clock. Explicit times and fixed launch
+// chapters already have cheap, deterministic clocks.
+export function entryPreparationClock(view,query,sim){
+ const met=query.get('met');
+ if(met!==null&&met.trim()&&Number.isFinite(Number(met)))return entryClock(view,query,sim);
+ if(['integration','pad','ascent','insertion','commissioning'].includes(view.chapter))return entryClock(view,query,sim);
+ return view.phase==='F'?sim.ignition:Math.min(sim.duration,3438);
 }
 
 // Keep the visitor's study interval until the cursor crosses its boundary.

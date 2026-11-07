@@ -3,6 +3,7 @@
 // Satellite/aerial pixels and DEM samples are bundled with their provenance.
 import * as T from './vendor/three.module.js';
 import {geographyForSite} from './launch-geography.js';
+import {fetchJsonAsset} from './json-asset.js';
 
 const DEG=Math.PI/180,EARTH_M=6378137,clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));
 const smooth=(a,b,v)=>{const f=clamp((v-a)/(b-a));return f*f*(3-2*f);};
@@ -360,7 +361,7 @@ export function buildLaunchEnvironment(site,{parent,grade,aperture,repaint=()=>{
   const jobs=[loadImage(record.image,regionalMaterial,record,false)];
   if(detail)jobs.push(loadImage(detail.image,detailMaterial,detail,true));
   if(record.waterMask?.url)jobs.push(loadWaterMask(record.waterMask).catch(error=>{if(alive)warnings.push(error.message);}));
-  if(record.elevation?.url)jobs.push(fetch(record.elevation.url,{signal:abort?.signal}).then(response=>{if(!response.ok)throw new Error('Unable to load elevation');return response.json();}).then(grid=>{
+  if(record.elevation?.url)jobs.push(fetchJsonAsset(record.elevation.url,{signal:abort?.signal}).then(grid=>{
    if(!alive)return;if(!(grid.width>1&&grid.height>1)||grid.values?.length!==grid.width*grid.height||!grid.values.every(finite))throw new Error('Invalid geographic elevation grid');
    heightGrid={...grid,bounds:grid.bounds||record.elevation.bounds||bounds};refreshHeights();repaint();
   }));

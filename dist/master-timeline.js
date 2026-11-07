@@ -1,9 +1,10 @@
 // One bounded, chronological record per spacecraft design and accepted audit revision.
 import {DAY} from './orbit.js';
+import {referenceAssociation} from './reference-configurations.js';
 import {INSERTION_MET} from './launch-effects-state.js';
 import {attitudeModes} from './attitude-guidance.js';
-import {DEPLOYMENT_STAGES,deploymentGuides} from './deployment.js';
-import {DEPLOY_START_S,DEPLOY_END_S,deploymentMET} from './commissioning-clock.js';
+import {deploymentStages,deploymentGuide} from './deployment.js';
+import {DEPLOY_START_S,DEPLOY_END_S,commissioningClock,deploymentMET} from './commissioning-clock.js';
 import {terminalRuns} from './terminal-activity.js';
 import {masterLaunchEvents,launchHold} from './master-launch-events.js';
 
@@ -11,7 +12,7 @@ const cache=new WeakMap();
 const format=(v,d=2)=>v.toLocaleString('en-US',{maximumFractionDigits:d});
 const bytes=gb=>gb>=1?format(gb)+' GB':gb>=.001?format(gb*1000)+' MB':gb>0?format(gb*1e6)+' kB':'0 bytes';
 const phaseAt=t=>t<DEPLOY_START_S?'D':'E';
-const stageAt=t=>t<DEPLOY_START_S?'insertion':t<DEPLOY_END_S?'commissioning':'operations';
+const stageAt=(t,h)=>t<DEPLOY_START_S?'insertion':t<commissioningClock(h).endS?'commissioning':'operations';
 function row(id,start,title,owner,description,domain,extra={}){
  const segment=stageAt(start);
  return {id,start,title,owner,description,segment,basis:'Integrated flight log',major:false,
@@ -19,6 +20,7 @@ function row(id,start,title,owner,description,domain,extra={}){
 }
 
 function initialWindow(sim){
+ const DEPLOY_END_S=commissioningClock(sim.hardware).endS;
  const horizon=Math.min(sim.ignition,sim.duration,DEPLOY_END_S+DAY);
  let until=Math.min(horizon,DAY);
  let events=sim.events(0,until);
@@ -39,16 +41,16 @@ function initialWindow(sim){
  return {events:events.filter(e=>e.start<end&&e.end>INSERTION_MET),trace,end,endReason,pass,lost:!!lost};
 }
 
-function deployRows(limit){
- const rows=[];
- for(const [i,s] of DEPLOYMENT_STAGES.entries()){
-  const start=deploymentMET(s.at);if(start>limit)break;
-  const next=DEPLOYMENT_STAGES[i+1];
+function deployRows(limit,h){
+ const rows=[],stages=deploymentStages(h);
+ for(const [i,s] of stages.entries()){
+  const start=deploymentMET(s.at,h);if(start>limit)break;
+  const next=stages[i+1];
   const solar=['hold','release','rollout','tension','tracking'].includes(s.id);
-  rows.push(row('deploy-'+s.id,start,s.title,solar?'Electrical power & mechanisms':'Thermal control & mechanisms',deploymentGuides[s.id],solar?'power':'thermal',{
+  rows.push(row('deploy-'+s.id,start,s.title,solar?'Electrical power & mechanisms':'Thermal control & mechanisms',deploymentGuide(s.id,h),solar?'power':'thermal',{
    segment:'commissioning',chapter:'commissioning',basis:'Modeled deployment sequence',
    major:['hold','rollout','upper-root','lower-root','deployed'].includes(s.id),
-   ...(next?{end:Math.min(limit,deploymentMET(next.at))}:{})
+   ...(next?{end:Math.min(limit,deploymentMET(next.at,h))}:{})
   }));
  }
  return rows;
@@ -83,10 +85,10 @@ export function stationTransfers(trace,station,start,end){
  return amounts;
 }
 const terminalName={'Ka':'Ka reflector','S-band':'S-band patches','Optical':'Optical terminal'};
-function appendPass(rows,e,trace,limit){
+function appendPass(rows,e,trace,limit,h){
  const station=e.station,close=Math.min(e.end,limit);
  const contact=trace.filter(s=>s.station===station&&s.start<close&&s.end>e.start);
- const chapter=stageAt(e.start)==='operations'?'contact':stageAt(e.start);
+ const chapter=stageAt(e.start,h)==='operations'?'contact':stageAt(e.start,h);
  const suffix='-'+e.id,owner='Ground network';
  rows.push(row('aos'+suffix,e.start,station+' enters the contact schedule',owner,
   'The ground network selects '+station+' above the configured elevation mask. The terminal can now attempt acquisition.',
@@ -94,12 +96,12 @@ function appendPass(rows,e,trace,limit){
  const lock=contact.find(s=>s.directPayloadLock);
  if(lock)rows.push(row('lock'+suffix,lock.start,(terminalName[lock.payloadTerminal]||'Direct payload terminal')+' · link acquired with '+station,'Communications',
   'The terminal has met its acquisition, pointing and power requirements. Transfer intervals identify the data that crosses the link.','comm',
-  {chapter:stageAt(lock.start)==='operations'?'contact':stageAt(lock.start),station,seek:(lock.start+lock.end)/2,basis:'Integrated terminal state'}));
+  {chapter:stageAt(lock.start,h)==='operations'?'contact':stageAt(lock.start,h),station,seek:(lock.start+lock.end)/2,basis:'Integrated terminal state'}));
  const transfers=stationTransfers(contact,station,e.start,close),delivered=transfers.direct_payload_gb,uploaded=transfers.received_commands_gb;
  if(e.end<=limit){
   rows.push(row('los'+suffix,e.end,station+' contact window closes',owner,
    'During this station window the spacecraft received '+bytes(uploaded)+' of command traffic and delivered '+bytes(delivered)+' of payload over the direct link. The S-band patches returned '+bytes(transfers.downlinked_telemetry_gb)+' of housekeeping telemetry.',
-   'comm',{chapter:stageAt(e.end)==='operations'?'contact':stageAt(e.end),station,major:true,basis:'Integrated station ledger',measurements:transfers}));
+   'comm',{chapter:stageAt(e.end,h)==='operations'?'contact':stageAt(e.end,h),station,major:true,basis:'Integrated station ledger',measurements:transfers}));
  }
 }
 
@@ -108,7 +110,7 @@ export function terminalMeasures({gb,mbps,services}){
   telemetry_gb:services.telemetry||0,customer_input_gb:services.input||0};
 }
 const serviceNames={command:'commands',input:'customer input',telemetry:'housekeeping telemetry',payload:'payload data'};
-function appendTransfers(rows,trace,events){
+function appendTransfers(rows,trace,events,h){
  const usedIds=new Set(),keyLanes=new Set(),passes=events.filter(e=>e.type==='contact');
  for(const run of terminalRuns(trace)){
   const {terminal,direction,route,peer,services,start,end,seek}=run;
@@ -128,18 +130,19 @@ function appendTransfers(rows,trace,events){
   const description=(receive?'The spacecraft receives '+detail+' from ':'The spacecraft sends '+detail+' to ')+where+' during this interval.'+
    (relay?' The relay schedule supplies the connection. Its orbital position is unspecified.':'');
   rows.push(row(id,start,title,'Communications',description,'comm',{
-   end,seek,major,phase:phaseAt(seek),chapter:stageAt(seek)==='operations'?'contact':stageAt(seek),station:relay?null:peer,
+   end,seek,major,phase:phaseAt(seek),chapter:stageAt(seek,h)==='operations'?'contact':stageAt(seek,h),station:relay?null:peer,
    transfer:{terminal,direction,route,peer},basis:'Integrated terminal traffic',measurements:terminalMeasures(run)
   }));
  }
 }
 
 function operationalRows(sim,window){
- const {events,trace,end}=window,rows=deployRows(end);
+ const DEPLOY_END_S=commissioningClock(sim.hardware).endS;
+ const {events,trace,end}=window,rows=deployRows(end,sim.hardware);
  appendModes(rows,trace);
  for(const e of events){
   const close=Math.min(end,e.end);
-  if(e.type==='contact'){appendPass(rows,e,trace,end);continue;}
+  if(e.type==='contact'){appendPass(rows,e,trace,end,sim.hardware);continue;}
   if(e.type==='eclipse'){
    const early=e.start<=INSERTION_MET+.025;
    rows.push(row('shadow-'+e.id,e.start,early?'Insertion in Earth’s shadow':'Eclipse entry','Electrical power',
@@ -165,7 +168,7 @@ function operationalRows(sim,window){
     'The duty schedule permits a compute burst. Execution also requires staged input, resident model state and electrical power.','compute',{end:close}));
   }
  }
- appendTransfers(rows,trace,events);
+ appendTransfers(rows,trace,events,sim.hardware);
  const firstWork=trace.find(s=>s.aiUnitRate>0);
  if(firstWork)rows.push(row('first-useful-work',firstWork.start,'First useful compute begins','Compute payload',
   'The installed payload begins processing staged work under the selected AI mission profile.','compute',{major:true,basis:'Integrated compute ledger'}));
@@ -184,7 +187,7 @@ export function masterTimeline(sim){
  if(previous&&previous.audit===sim.audit)return previous.timeline;
  const h=sim.hardware,window=initialWindow(sim);
  const hold=launchHold(h);
- const orbitalRows=operationalRows(sim,window);
+ const clock=commissioningClock(h),orbitalRows=operationalRows(sim,window).map(r=>{const segment=r.start<clock.startS?'insertion':r.start<clock.endS?'commissioning':'operations';return {...r,segment,phase:r.start<clock.startS?'D':'E',chapter:segment!=='operations'?segment:r.station?'contact':r.chapter==='commissioning'?'operations':r.chapter};});
  if(hold)for(const r of orbitalRows)r.status='conditional';
  const launchRows=masterLaunchEvents(h).filter(r=>r.start<=window.end).map(r=>{
   if(r.end>window.end)return {...r,end:window.end,seek:r.seek==null?r.seek:Math.min(r.seek,window.end),description:r.description+' The review boundary interrupts this sequence.'};
@@ -192,6 +195,6 @@ export function masterTimeline(sim){
  });
  const rows=[...launchRows,...orbitalRows].sort((a,b)=>a.start-b.start);
  const sources=[...new Map(rows.filter(r=>r.sourceUrl).map(r=>[r.sourceUrl,{title:r.sourceTitle,url:r.sourceUrl}])).values()];
- const timeline={rows,firstOperationsPassId:window.pass?.id??null,start:rows[0].start,end:window.end,endReason:window.endReason,sources,launchHold:hold};
+ const timeline={reference:referenceAssociation(h),rows,firstOperationsPassId:window.pass?.id??null,start:rows[0].start,end:window.end,endReason:window.endReason,sources,launchHold:hold};
  cache.set(sim,{audit:sim.audit,timeline});return timeline;
 }

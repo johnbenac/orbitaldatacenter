@@ -71,6 +71,13 @@ Each region includes a 257 × 257 grid of actual sampled elevation, approximatel
 93.75 m between samples. All samples are finite metres, ordered north to south
 in row-major order. Grid vertices include the exact bounding edges.
 
+Elevation grids are delivered as single-file `*-elevation.json.zip` archives.
+They contain the exact original JSON bytes: no sample, coordinate, decimal
+precision, or provenance is rounded or removed. The viewer lazily loads its
+existing ZIP decoder before parsing the grid; plain JSON remains supported.
+`scripts/package-launch-elevation.py` reproduces the archives, and
+`launch-elevation-checks.mjs` verifies their original-byte hashes and values.
+
 US regions use the USGS 3D Elevation Program ImageServer. Its sparse floating
 point TIFF format includes empty ocean tiles; the builder explicitly decodes
 those as no-data/zero rather than interpreting TIFF headers as elevations.

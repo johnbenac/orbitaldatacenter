@@ -8,10 +8,9 @@ const defs={
  software:{label:'Flight Software',camera:'spacecraft',parts:['avionics','solar','radiator','communications','cmg','propulsion']},
  avionics:{label:'Command & Data Handling',camera:'core',close:true,parts:['avionics','communications']},
  conops:{label:'Mission operations',camera:'spacecraft',parts:[]},
- purpose:{label:'AI Data Center Purpose',camera:'core',parts:['compute','storage','avionics','communications'],close:true},
  environment:{label:'Environmental coupling',camera:'spacecraft',parts:['solar','radiator','structure'],vectors:['sun','albedo','ir','ram']},
  orbit:{label:'Orbit & eclipse',camera:'orbit',parts:[]},
- compute:{label:'Compute & storage',camera:'core',parts:['compute','storage'],close:true},
+ compute:{label:'Payload Operations',camera:'core',parts:['compute','storage','avionics','communications'],close:true},
  data:{label:'Data & delivery',camera:'core',parts:['storage','avionics','communications'],close:true},
  comm:{label:'Communications',camera:'spacecraft',parts:['communications'],close:true},
  power:{label:'Electrical Power',camera:'spacecraft',parts:['solar','battery']},
@@ -22,6 +21,7 @@ const defs={
  launch:{label:'Launch & insertion',camera:'launch',parts:['fairing','adapter','payload','solar','radiator','structure']},
  launcher:{label:'Launch vehicle',camera:'launch',parts:['launcher','booster','fairing']}
 };
+Object.defineProperty(defs,'purpose',{value:defs.compute,enumerable:false});
 export const domainSceneSpecs=defs;
 export function recommendedDomainCamera(phase,domain){
  if(phase==='F')return 'orbit';
@@ -44,6 +44,7 @@ export function routeRates(h,s){
  return {text,bulk,offered:s.offeredMbps||0,write:Math.min(Math.max(0,s.offeredMbps||0),Math.max(0,h.diskWriteGBs)*8000),down:Math.max(0,s.goodputMbps||0),up:Math.max(0,s.commandGoodputKbps||0)/1000};
 }
 export function domainInstruments(key,h,s,{view='spacecraft',reference=false}={}){
+ key=key==='purpose'?'compute':key;
  const rd=routeRates(h,s),stage=s.flightPhase||'operations',inLaunch=['integration','pad','ascent','insertion'].includes(stage);
  const flows=s.terminalActivity||[],payload=flows.find(f=>f.direction==='tx'&&f.services.payload>0);
  const down=flows.filter(f=>f.route==='direct'&&f.direction==='tx').reduce((n,f)=>n+f.mbps,0);
@@ -78,7 +79,6 @@ export function domainInstruments(key,h,s,{view='spacecraft',reference=false}={}
   {...item('storage','storage','Payload recorder',bytes(s.queueGB)+' queued','left'),detail:'Text '+bytes(s.textQueueGB)+' · bulk '+bytes(s.bulkQueueGB)},
   {...item('activeTerminal','communications',payload?.peer||s.station||'Downlink terminal',link,'right'),detail:bytes(s.deliveredGB)+' delivered to ground'}
  ];
- case 'compute':if(h.ai&&purposeId(h)!=='text')return [item('compute','compute',purposeInfo(h).name,met(s.aiUnitRate,h.ai.unit+'/s',2),'left'),item('storage','storage','Customer input staged',bytes(s.aiInputBufferGB),'right')];return [item('compute','compute','Accelerator trays',fmtI(s.tokensPerSec,'tok/s')+' · '+met(s.itKW,'kW'),'left'),item('storage','storage','Persistent media',met(s.freeTB,'TB free',2),'right')];
  case 'power':return [item('solar','solar',(s.pvDeployment??s.deployment)===0?'Stowed solar array':s.eclipse?'Array · eclipse':'Array generation',met(s.solarKW,'kW',2),'left'),item('battery','battery','Battery pack',met(s.socPct,'%')+' · '+(s.chargeKW>.001?met(s.chargeKW,'kW in'):s.dischargeKW>.001?met(s.dischargeKW,'kW out'):'standby'),'right')];
  case 'thermal':return [item('compute','compute','Junction',met(s.junctionK,'K'),'left'),item('coolant','radiator','Coolant loop',met(s.coolantK,'K'),'right'),item(view==='core'?'battery':'radiator',view==='core'?'battery':'radiator',view==='core'?'Battery':'Radiator',met(view==='core'?s.batteryK:s.radiatorK,'K'),'right')];
  case 'comm':return [['S-band','patch','S-band patch','#74e3cf'],['Ka','dish','Ka reflector','#ffd18c'],['Optical','optic','Optical terminal','#c4b2ff']].map(([terminal,anchor,name,color],i)=>{
@@ -104,11 +104,11 @@ export function domainInstruments(key,h,s,{view='spacecraft',reference=false}={}
   item('shroud','fairing','Payload enclosure',met(h.input.fairingM,'m usable diameter',2),'right'),
   item('thrustDeck','booster',fleet?.boosters?'Side boosters':'Launch architecture',(fleet?.stages||0)+' axial stage'+(fleet?.stages===1?'':'s')+' · '+(fleet?.boosters||0)+' side boosters','left')
  ]:[item('body','payload','Launched stack',fmtI(h.launchKg,'kg'),'right')];}
- case 'purpose':case 'conops':{const q=h.ai||{},info=purposeInfo(h);
+ case 'compute':case 'conops':{const q=h.ai||{},info=purposeInfo(h);
   if(view==='launch')return [item('payload','payload',info.name,reference?'Stowed reference':stage+' · '+met(100*(s.deployment||0),'% deployed',0),'right')];
   const execution=item('compute','compute',info.name,met(s.aiUnitRate,(q.unit||'work units')+'/s',2),'left');
-  if(key==='purpose'&&q.training)return [execution,item('storage','storage','Training inputs',bytes(s.aiInputBufferGB)+' staged','left'),item('activeTerminal','communications','Artifact received on Earth',bytes(s.aiProductDeliveredGB)+' / '+bytes(q.artifactGB),'right')];
-  if(key==='purpose'&&q.purposeId==='agents')return [execution,item('avionics','avionics','Onboard agent exchange',met(s.aiPeerMbps,'Mbit/s')+' · '+met(q.agentWaves,'waves/stage',0),'left'),item('activeTerminal','communications','Research product received',bytes(s.aiProductDeliveredGB),'right')];
+  if(key==='compute'&&q.training)return [execution,item('storage','storage','Training inputs',bytes(s.aiInputBufferGB)+' staged','left'),item('activeTerminal','communications','Artifact received on Earth',bytes(s.aiProductDeliveredGB)+' / '+bytes(q.artifactGB),'right')];
+  if(key==='compute'&&q.purposeId==='agents')return [execution,item('avionics','avionics','Onboard agent exchange',met(s.aiPeerMbps,'Mbit/s')+' · '+met(q.agentWaves,'waves/stage',0),'left'),item('activeTerminal','communications','Research product received',bytes(s.aiProductDeliveredGB),'right')];
   return [execution,item('storage','storage',info.output,bytes(s.aiProductQueueGB)+' queued','left'),item('activeTerminal','communications','Product delivered to Earth',bytes(s.aiProductDeliveredGB),'right')];}
  case 'orbit':return [item('body','structure','Flight state',fmtI(s.altitudeKm,'km')+' · '+(s.eclipse?'eclipse':'sunlit'),'right')];
  default:return [];

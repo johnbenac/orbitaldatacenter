@@ -64,7 +64,7 @@
     "processing": "Reprojected to EPSG:4326; bilinear display sampling; JPEG encoding. Open-ocean Sentinel colors balanced to aerial water and blended beyond a buffered source shoreline, removing rectangular aerial-coverage seams. Classified offshore white no-data is filled with actual Sentinel pixels. Land coordinates and pixels retained."
   },
   "elevation": {
-    "url": "assets/launch-sites/kourou-elevation.json",
+    "url": "assets/launch-sites/kourou-elevation.json.zip",
     "width": 257,
     "height": 257,
     "bounds": [

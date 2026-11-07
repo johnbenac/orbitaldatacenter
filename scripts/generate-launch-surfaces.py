@@ -16,7 +16,11 @@ RNG = np.random.default_rng(41956)
 def save(name, albedo, height, roughness):
     albedo.convert('RGB').save(OUT / (name + '-albedo.webp'), quality=92, method=6)
     data = Image.merge('RGB', (height.convert('L'), roughness.convert('L'), Image.new('L', albedo.size, 128)))
-    data.save(OUT / (name + '-surface.png'), optimize=True)
+    path = OUT / (name + '-surface.webp')
+    data.save(path, lossless=True, method=6)
+    # Height and roughness are data channels. Validate their decoded bytes,
+    # rather than accepting a visually similar lossy format conversion.
+    assert Image.open(path).convert('RGB').tobytes() == data.tobytes()
 
 def grain(width, height, rgb, amount=1.5, long_grain=False):
     noise = RNG.normal(0, amount, (height, width))

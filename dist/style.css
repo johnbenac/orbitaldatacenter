@@ -9,7 +9,7 @@
 .quicksolver{display:flex;align-items:center;gap:7px;margin:11px 0 1px}.quicksolver label{font:8px var(--mono);text-transform:uppercase;color:var(--muted);letter-spacing:.6px;white-space:nowrap}.quicksolver select{font-size:10px;color:#dbe2e9;width:0;flex:1;padding:3px 5px;border-color:#35404a;background:#161b22}.quicksolver+.qrow{margin-top:9px}@media(max-width:720px){.quicksolver{grid-column:1/-1}}
 
 /* This screen is in the initial HTML so it can paint before the simulation runs. */
-body[data-starting] > :not(#startup){display:none!important}
+body[data-starting] > :not(#startup):not(#work-status){display:none!important}
 #startup{min-height:100vh;min-height:100svh;display:grid;align-content:center;justify-items:center;box-sizing:border-box;background:#10232e;color:#f5ecd9}
 #startup[hidden]{display:none}
 .startup-art{display:block;width:min(100%,1050px);line-height:0}
@@ -23,6 +23,7 @@ body[data-starting] > :not(#startup){display:none!important}
 
 .orbit-lighting{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;padding:6px 12px;border-bottom:1px solid #34434c;background:#182129;color:#ccd7d9;font-size:12px}
 .orbit-lighting[hidden]{display:none}.lighting-label{font-weight:550}
+.viewer-control{display:inline-flex;align-items:center;gap:7px;flex:none}.lighting-choices button{white-space:nowrap}
 .lighting-choices{display:inline-flex;align-items:center;gap:2px;padding:2px;border:1px solid #46545e;border-radius:6px;background:#111a21}
 .lighting-choices button{min-height:26px;border:1px solid transparent;border-radius:4px;background:transparent;color:#b9c6cd;padding:2px 9px;font:inherit;font-weight:500}
 .lighting-choices button[aria-pressed=true]{background:#314344;border-color:#688983;color:#e1f2e9}.lighting-choices button:focus-visible{outline:2px solid #d4eee7;outline-offset:0}

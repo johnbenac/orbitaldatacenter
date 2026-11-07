@@ -1,5 +1,5 @@
 import {acceptsArtifact} from './ai-purpose.js';
-import {DEPLOY_END_S} from './commissioning-clock.js';
+import {commissioningClock} from './commissioning-clock.js';
 // Customer work is admitted at Earth, then replayed against the selected vehicle's
 // acquisition-, power- and activity-limited service opportunities. Resources are
 // reserved in chronological FCFS order. One clock covers ingress, work and egress.
@@ -56,7 +56,7 @@ function rates(d,h,raw){
   const cuts=d.serviceRoute!=='direct'?[seg.start,...relayBoundaries(seg.start,seg.end,d),seg.end]:[seg.start,seg.end];
   for(let i=1;i<cuts.length;i++){
    const start=cuts[i-1],end=cuts[i],n=end-start,relay=d.serviceRoute!=='direct'&&relayGate((start+end)/2,d);
-   const commissioned=seg.commissioned??seg.serviceAvailable??(start>=DEPLOY_END_S);
+   const commissioned=seg.commissioned??seg.serviceAvailable??(start>=commissioningClock(h).endS);
    const ref=seg.routePoweredFraction??seg.poweredSupport??1,routePowered=commissioned&&Number.isFinite(ref)&&ref>=1-1e-6;
    const selectedRelay=relay&&(seg.relayOn??true),useRelay=selectedRelay&&routePowered,allowDirect=routePowered&&(d.serviceRoute==='direct'||d.serviceRoute==='hybrid'&&!selectedRelay);
    // Supplied intervals can reduce installed capacity, never enlarge it. A

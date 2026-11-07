@@ -105,14 +105,14 @@ function testSeparation(){
 function cylinderEnd(mesh,upper){return V(0,upper?.5:-.5,0).applyMatrix4(mesh.matrixWorld);}
 function connections(banks){
  let hinge=0,hose=0,developed=0;
- for(const {rootPin,rootSocket,elbowPin,elbowSocket,hoses} of banks){
-  for(const [pin,socket] of [[rootPin,rootSocket],[elbowPin,elbowSocket]]){
+ for(const {rootPin,rootSocket,elbowPin,elbowSocket,foldJoints,hoses} of banks){
+  for(const [pin,socket] of [[rootPin,rootSocket],[elbowPin,elbowSocket],...(foldJoints?foldJoints.map(j=>[j.pin,j.socket]):[])]){
    assert.notEqual(pin.parent,socket.parent,'Each half-hinge must belong to its own rigid body');
    hinge=Math.max(hinge,world(pin).distanceTo(world(socket)));
    const a=V(1,0,0).transformDirection(pin.matrixWorld),b=V(1,0,0).transformDirection(socket.matrixWorld);
    assert(a.dot(b)>1-1e-8,'Coaxial hinge axes');
   }
-  assert.equal(hoses.length,4,'Supply and return hoses at both hinges');
+  assert.equal(hoses.length,2*(1+(foldJoints?.length??1)),'Supply and return hoses at every installed hinge');
   for(const {seg,restLength,fromPort,toPort} of hoses){
    let last=world(fromPort),length=0;
    for(const tube of seg){

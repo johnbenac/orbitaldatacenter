@@ -10,7 +10,7 @@ const freeze = value => {
 
 export const missionBaseline = freeze({
   id: 'ODC-MB-001', revision: 'B', date: '2026-11-06',
-  title: 'Mission Baseline · Design approach and rules',
+  title: 'Design rules & margins · Shared engineering approach',
   review: 'Preliminary Design Review target', lifecycle: 'End of Phase B',
   status: 'Preliminary design basis; PDR readiness remains open',
   authority: 'Voluntary project adoption of NASA practices. No NASA approval, flight qualification or completed PDR is asserted.',
@@ -20,7 +20,7 @@ export const missionBaseline = freeze({
   reviewDecision: 'The independent panel reports readiness, findings and closure conditions against agreed criteria. The accountable project authority and funder record their proceed and investment decisions from that evidence.',
   scope: 'One uncrewed orbital data center delivering AI services to customers on Earth, including its ground service, communications, launch interfaces, commissioning, operations and disposal.',
   actors: ['Earth customer', 'Ground service / operations', 'Vehicle', 'Launch interface'],
-  architecture: 'Four hinged solar wings, two radiator banks, an enclosed compute core, two internal liquid-propellant tanks, a helium bottle, paired chemical engines and CMG attitude control. The integrated reference uses 120 V main, 48 V payload and 28 V service rails; two isolatable ammonia-loop branches share a duty/standby pump station. Repeatable compute trays, a bounded payload fabric and explicit Earth-service interfaces complete the design. A 550 km / 53° / five-year live-text case anchors matched architecture comparisons. Sizing varies within this topology and its stated study bounds.',
+  architecture: 'Each design reference selects an explicit physical family: a local compute/radiator platform, paired inline appendages, a broad-wing cross, a rack spacecraft, or an allocated protected-core study. Installed blanket and radiator counts, payload placement, launch attachments and deployment sequences follow that family. Thermal paths distinguish passive local transport, shared or independent pumped loops, and an analytical powered heat-lift stage. Common project allocations for propulsion, CMGs, equipment and service interfaces remain identified separately from supplier evidence. Source-matched orbit cases and a 550 km / 53° / five-year common comparison evaluate the same installed hardware. Mission edits do not resize it. Margins and PDR gates apply across all families; the legacy protected-core matched trade retains its narrower original study bounds.',
   serviceProfiles: ['Live text inference', 'Live voice inference', 'Batch inference', 'Agentic research and engineering', 'Fine-tuning', 'Training'],
   fidelity: 'Use coupled preliminary analyses and bounding cases sufficient to establish feasibility, allocations, interfaces and risk. Carry unresolved detail as an owned action with a closure date and verification method.',
   simulationScope: 'Nominal operation, scheduled maneuvers and gradual degradation. Engineering safety, reliability and recovery assessments remain part of the review evidence.',

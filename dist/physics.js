@@ -1,3 +1,5 @@
+import {resolvedSurfaces} from './architecture-surfaces.js';
+import {installedCommunications} from './communications-packages.js';
 import {terminalPattern} from './terminal-activity.js';
 import {energySolarDelivery} from './energy-system.js';
 import {attitudeGuidance} from './attitude-guidance.js';
@@ -33,6 +35,7 @@ export function earthDiskView(cosNormalToRadial, sinRadius){
  return clip(k*k*c*(1-2*phi/Math.PI)+2*(limb-h*s*k*Math.sin(phi))/Math.PI,0,1);
 }
 export function surfaces(h,g,deployment,fluxOnly=false,burnDirection=0,guidance=null){
+ if(h.input?.architectureFamily&&h.input.architectureFamily!=='protected-core')return resolvedSurfaces(h,g,deployment,fluxOnly,burnDirection,guidance??attitudeGuidance(h,g,{deployment,burnDirection}),earthDiskView);
  const motion=deployment<=0?stowed:deployment>=1?deployed:deploymentSchedule(deployment);
  const d=h.input,att=guidance??attitudeGuidance(h,g,{deployment,burnDirection}),rad=att.bodyXECI,bodyUp=att.bodyUpECI,bodyZ=att.bodyZECI;
  const pv=att.pvNormalECI,upperNormal=att.upperRadiatorNormalECI,lowerNormal=att.lowerRadiatorNormalECI;
@@ -43,12 +46,13 @@ export function surfaces(h,g,deployment,fluxOnly=false,burnDirection=0,guidance=
  const upperSun=Math.abs(dot(upperNormal,g.sunECI)),lowerSun=Math.abs(dot(lowerNormal,g.sunECI));
  const view=n=>earthDiskView(dot(n,g.radial),sinRadius),upperView=view(upperNormal),lowerView=view(lowerNormal);
  // Fluid admission and exposure are distinct. Each bank has one outward face
- // in the restrained four-face stack, two outer faces after root clearance,
- // and all four after tip unfolding. This bounded geometric approximation
+ // in the restrained stack, two outer faces after root clearance,
+ // and every installed panel face after unfolding. This bounded approximation
  // does not resolve partial-deployment self-shadowing or interpanel gradients.
  const upper=motion.upperFlow,lower=motion.lowerFlow,total=upper+lower;
  const externalExposure=g.carrierAttached===true?0:1;
- const upperExposureFraction=externalExposure*(.25+.25*motion.upperRoot+.5*motion.upperTip),lowerExposureFraction=externalExposure*(.25+.25*motion.lowerRoot+.5*motion.lowerTip),exposureTotal=upperExposureFraction+lowerExposureFraction;
+ const panelCount=h.radiatorPanelsPerBank||d.radiatorPanelsPerBank||2,foldedFraction=1/(2*panelCount),unfoldedFraction=1-1/panelCount;
+ const upperExposureFraction=externalExposure*(foldedFraction+foldedFraction*motion.upperRoot+unfoldedFraction*motion.upperTip),lowerExposureFraction=externalExposure*(foldedFraction+foldedFraction*motion.lowerRoot+unfoldedFraction*motion.lowerTip),exposureTotal=upperExposureFraction+lowerExposureFraction;
  const mean=(a,b)=>exposureTotal>0?(upperExposureFraction*a+lowerExposureFraction*b)/exposureTotal:0;
  const radSunCos=mean(upperSun,lowerSun),earthView=mean(upperView,lowerView),albedoScale=1361*.30*Math.max(0,g.sunRadial),albedo=albedoScale*earthView,earthIR=237*earthView;
  const radiatorCoupledM2=h.radiatorM2*total*.5,radiatorExposedM2=h.radiatorM2*exposureTotal*.5;
@@ -61,15 +65,18 @@ export function surfaces(h,g,deployment,fluxOnly=false,burnDirection=0,guidance=
  const earthFraction=(h.bodyHeightM*h.bodyLengthM*view(rad)+h.bodyWidthM*h.bodyLengthM*view(bodyUp)+h.bodyWidthM*h.bodyHeightM*view(bodyZ))/boxArea,enclosureIRWm2=237*earthFraction,enclosureSolarWm2=1361*(sunlit*boxProjection(g.sunECI)/boxArea+.30*Math.max(0,g.sunRadial)*earthFraction);
  if(fluxOnly)return {enclosureSolarWm2,enclosureIRWm2,solarIncidenceCos:normalCos,radiatorSunCos:radSunCos};
  const source=energySolarDelivery(h,solarArrayInputKW),solarKW=source.busKW;
- return {...att,radiatorDirectSolarKW:radiatorExposedM2*alpha*1.361*sunlit*radSunCos,radiatorAlbedoKW:radiatorExposedM2*alpha*albedo/1000,radiatorEarthIRKW:radiatorExposedM2*eps*earthIR/1000,upperEarthView:upperView,lowerEarthView:lowerView,spaceViewFactor:1-earthView*.5,bodyXECI:rad,bodyUpECI:bodyUp,bodyZECI:bodyZ,burnDirection,solarDeployedM2,radiatorCoupledM2,radiatorExposedM2,upperExposureFraction,lowerExposureFraction,radiatorExposureBasis:g.carrierAttached===true?'Carrier shroud boundary; no external radiator exposure.':deployment<1?'Geometric exposure approximation: one of four faces restrained, two after root clearance, four after tip unfolding. Partial shadowing and interpanel temperatures remain unverified.':'Fully deployed two-face radiator geometry.',upperRadiatorNormalECI:upperNormal,lowerRadiatorNormalECI:lowerNormal,upperRadiatorFlow:upper,lowerRadiatorFlow:lower,upperAbsorbedKW,lowerAbsorbedKW,pvDeployment:motion.pv,radiatorDeployment:motion.radiator,deploymentStep:motion.step,deploymentTitle:motion.title,enclosureSolarWm2,enclosureIRWm2,pvNormalECI:pv,radiatorNormalECI:upperNormal,ramBody,ramAreaM2:ramArea,solarIncidenceCos:normalCos,radiatorSunCos:radSunCos,earthView,solarKW,solarArrayInputKW,solarConversionLossKW:source.mpptLossKW,solarHarnessLossKW:source.arrayHarnessLossKW,solarHardwareCurtailedKW:source.curtailedKW,generationKW:solarKW,emissivity:eps,absorptivity:alpha,solarIrradiance:1361*sunlit,albedoIrradiance:albedo,earthIRIrradiance:earthIR,absorbedKW:upperAbsorbedKW+lowerAbsorbedKW,emissionCoeff:radiatorExposedM2*2*eps*SIGMA/1000};
+ return {...att,radiatorDirectSolarKW:radiatorExposedM2*alpha*1.361*sunlit*radSunCos,radiatorAlbedoKW:radiatorExposedM2*alpha*albedo/1000,radiatorEarthIRKW:radiatorExposedM2*eps*earthIR/1000,upperEarthView:upperView,lowerEarthView:lowerView,spaceViewFactor:1-earthView*.5,bodyXECI:rad,bodyUpECI:bodyUp,bodyZECI:bodyZ,burnDirection,solarDeployedM2,radiatorCoupledM2,radiatorExposedM2,upperExposureFraction,lowerExposureFraction,radiatorExposureBasis:g.carrierAttached===true?'Carrier shroud boundary; no external radiator exposure.':deployment<1?`Geometric exposure approximation: one of ${2*panelCount} faces restrained per bank, two after root clearance, all ${2*panelCount} after unfolding. Partial shadowing and interpanel temperatures remain unverified.`:'Fully deployed two-face radiator geometry.',upperRadiatorNormalECI:upperNormal,lowerRadiatorNormalECI:lowerNormal,upperRadiatorFlow:upper,lowerRadiatorFlow:lower,upperAbsorbedKW,lowerAbsorbedKW,pvDeployment:motion.pv,radiatorDeployment:motion.radiator,deploymentStep:motion.step,deploymentTitle:motion.title,enclosureSolarWm2,enclosureIRWm2,pvNormalECI:pv,radiatorNormalECI:upperNormal,ramBody,ramAreaM2:ramArea,solarIncidenceCos:normalCos,radiatorSunCos:radSunCos,earthView,solarKW,solarArrayInputKW,solarConversionLossKW:source.mpptLossKW,solarHarnessLossKW:source.arrayHarnessLossKW,solarHardwareCurtailedKW:source.curtailedKW,generationKW:solarKW,emissivity:eps,absorptivity:alpha,solarIrradiance:1361*sunlit,albedoIrradiance:albedo,earthIRIrradiance:earthIR,absorbedKW:upperAbsorbedKW+lowerAbsorbedKW,emissionCoeff:radiatorExposedM2*2*eps*SIGMA/1000};
 }
 export function selectedTerminal(d,available){
- let mode=String(d.link||'auto').toLowerCase();
+ let mode=String(d.link||'auto').toLowerCase();const installed=installedCommunications(d);
  let name=/optic|laser/.test(mode)?'Optical':/sband|s-band|^s$/.test(mode)?'S-band':'Ka';
  if(/auto/.test(mode))name=available>1e4?'Optical':available>1?'Ka':'S-band';
+ if(/auto/.test(mode)&&(name==='Ka'&&!installed.kaInstalled||name==='S-band'&&!installed.sBandInstalled))name=installed.kaInstalled?'Ka':'Optical';
  return name;
 }
 export function linkBudget(d,g,pointingDeg,available,acquisitionResidualDeg=0,patchOffAxisDeg=0,name=selectedTerminal(d,available)){
+ const installed=installedCommunications(d),terminalInstalled=name==='Optical'||name==='Ka'&&installed.kaInstalled||name==='S-band'&&installed.sBandInstalled;
+ if(!terminalInstalled)return {groundLink:null,terminalInstalled:false,unavailableReason:name+' terminal is not installed in the selected communications package.',patchOffAxisDeg,patchLossDb:0,contact:false,lineMbps:0,uplinkMbps:0,linkMarginDb:0,antennaGainDbi:0,beamwidthDeg:0,footprintKm:0,bandwidthMHz:0,rxPowerDbm:0,acquisitionSec:0,terminalKW:0};
  const active=!!g.station, range=Math.max(1,g.rangeKm)*1000,atmos=2/Math.max(.20,Math.sin(g.elevationDeg*DEG));
  const width=terminalPattern(d,name).fullWidthRad/DEG,patchLossDb=12*(patchOffAxisDeg/80)**2;
  let line,gain=0,margin=0,draw=0,bandwidth,required=5,rxPowerDbm=0;
@@ -83,5 +90,5 @@ export function linkBudget(d,g,pointingDeg,available,acquisitionResidualDeg=0,pa
  }
  const freqUp=2.05e9,lossUp=20*Math.log10(4*Math.PI*range*freqUp/299792458),upCNo=47+5-patchLossDb-10*Math.log10(500)-lossUp-3+228.6;
  const uplinkRate=Math.min(2e6,10**((upCNo-5)/10))/1e6;
- return {groundLink:active?name:null,patchOffAxisDeg,patchLossDb,contact:active,lineMbps:active?line/1e6:0,uplinkMbps:active?uplinkRate:0,linkMarginDb:active?margin:0,antennaGainDbi:gain,beamwidthDeg:width,footprintKm:active?2*g.rangeKm*Math.tan(width*DEG/2):0,bandwidthMHz:bandwidth/1e6,rxPowerDbm,acquisitionSec:name==='Optical'?35:name==='Ka'?20:5,terminalKW:active?draw:.015};
+ return {groundLink:active?name:null,terminalInstalled:true,unavailableReason:null,patchOffAxisDeg,patchLossDb,contact:active,lineMbps:active?line/1e6:0,uplinkMbps:active&&installed.sBandInstalled?uplinkRate:0,linkMarginDb:active?margin:0,antennaGainDbi:gain,beamwidthDeg:width,footprintKm:active?2*g.rangeKm*Math.tan(width*DEG/2):0,bandwidthMHz:bandwidth/1e6,rxPowerDbm,acquisitionSec:name==='Optical'?35:name==='Ka'?20:5,terminalKW:active?draw:.015};
 }

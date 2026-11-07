@@ -7,14 +7,18 @@ import {performance} from 'node:perf_hooks';
 import {defaults,sizeDesign,inverseSolve} from './dist/design.js';
 import {createSimulation} from './dist/model.js';
 import {chronologicalAudit} from './dist/mission-worker.js';
-import {makePacket,restoreFile,packetIdentity} from './dist/exports.js';
+import {makePacket,restoreFile,packetIdentity,scenarioRecord,referenceDossier} from './dist/exports.js';
 import {designIdentity} from './dist/design-contract.js';
 import {pdrDomainOrder} from './dist/pdr-assessment.js';
 import {goldRules,reservedRules} from './dist/mission-gold-rules.js';
-import {deploymentInterfaces} from './dist/architecture-trades.js';
+import {deploymentInterfacesFor} from './dist/architecture-trades.js';
+import {buildReferenceDesign} from './dist/reference-configurations.js';
+import {sampledSourceEnvironmentalCase} from './dist/reference-missions.js';
+import {spacecraftMaterialRecord} from './dist/spacecraft-materials.js';
 
 const started=performance.now(),plain=v=>JSON.parse(JSON.stringify(v));
-const study={...defaults,missionYears:.003,serviceRoute:'relay',relayDownMbps:100,initialQueueGB:10000};
+const referenceId=process.argv[2],starter=referenceId?buildReferenceDesign(referenceId):defaults;
+const study={...starter,missionYears:.003,serviceRoute:'relay',relayDownMbps:100,initialQueueGB:10000};
 const hardware=sizeDesign(study),sim=createSimulation(hardware);
 assert.equal(hardware.input.missionYears,.003);
 assert.ok(sim.duration<2*86400,'Never run the long default mission in this export test');
@@ -25,8 +29,8 @@ const module={exports:{}};
 function require(name){throw Error('Unexpected bundled JSZip dependency '+name);}
 runInNewContext(readFileSync(new URL('./dist/vendor/jszip.min.js',import.meta.url),'utf8'),{module,exports:module.exports,require,Buffer,Promise,setImmediate,clearImmediate,setTimeout,clearTimeout,ArrayBuffer,Uint8Array,Blob,TextEncoder,TextDecoder});
 globalThis.JSZip=module.exports;
-const event=sim.story('contact'),t=event.instant,view={page:'overview',chapter:'contact',domain:'orbit',phase:'B',camera:'spacecraft',preset:'reference',t,start:0,event};
-const scenario={schema:'odc-scenario/1',modelVersion:'21.0',design:study,view};
+const event=sim.story('contact'),t=Number.isFinite(event.instant)?event.instant:Math.min(10000,sim.duration/2),view={page:'overview',chapter:Number.isFinite(event.instant)?'contact':'operations',domain:'orbit',phase:'B',camera:'spacecraft',preset:'reference',t,start:0,event};
+const scenario={schema:'odc-scenario/1',modelVersion:'22.0',design:study,view};
 const packet=await makePacket({scenario,hardware,sim,result:inverseSolve(study),snap:sim.at(t),day:sim.daySummary(0),events:sim.events(0,86400),audit});
 const bytes=new Uint8Array(await packet.arrayBuffer());
 const zip=await JSZip.loadAsync(bytes),files=Object.keys(zip.files).filter(path=>!zip.files[path].dir);
@@ -36,7 +40,7 @@ const json=async path=>JSON.parse(await text(path));
 // Exercise the application's ZIP-import branch with a named byte container.
 bytes.name='ODC-short-PDR.zip';bytes.size=bytes.length;
 const restored=await restoreFile(bytes);
-assert.deepEqual(restored,plain(scenario));
+assert.deepEqual(restored,plain(scenarioRecord(scenario)));
 const rebuilt=sizeDesign(restored.design);
 assert.deepEqual(rebuilt.input,hardware.input,'ZIP import must recover every normalized design input');
 
@@ -71,17 +75,18 @@ assert.deepEqual(baseline.configuration.designInputs,plain(hardware.input));
 assert.deepEqual(record.configuration,plain(hardware.input));
 assert.deepEqual(record,baseline.domainAssessments);
 assert.deepEqual(identity,record.identity);assert.deepEqual(identity,plain(designIdentity(rebuilt)));
-assert.deepEqual({...identity.installed.inputs,...identity.mission,...identity.analysisBasis,...identity.controlledAllowances},plain(hardware.input),'Configuration contract must reconstruct all input groups exactly');
+const referenceInputs=identity.reference?{referenceCenterId:identity.reference.id,referenceCenterRevision:identity.reference.revision}:{};
+assert.deepEqual({...identity.installed.inputs,...identity.mission,...identity.analysisBasis,...identity.controlledAllowances,...referenceInputs},plain(hardware.input),'Configuration contract and separate reference association must reconstruct all inputs exactly');
 const groupedKeys=[...Object.keys(identity.installed.inputs),...Object.keys(identity.mission),...Object.keys(identity.analysisBasis),...Object.keys(identity.controlledAllowances)];
 assert.equal(new Set(groupedKeys).size,groupedKeys.length,'No input can appear in two configuration groups');
 assert.equal(revision.revision,packetIdentity(scenario,sim.duration).revision);
 assert.equal(revision.mission_baseline_id,baseline.baseline.id);assert.equal(revision.mission_baseline_revision,baseline.baseline.revision);
 assert.equal(record.scope.instantSeconds,t);assert.equal(record.scope.windowStartSeconds,0);assert.equal(record.scope.missionYears,.003);
 
-assert.deepEqual(record.domains.map(r=>r.id),pdrDomainOrder);assert.equal(record.domains.length,17);
+assert.deepEqual(record.domains.map(r=>r.id),pdrDomainOrder);assert.equal(record.domains.length,pdrDomainOrder.length);
 const domainJson=files.filter(path=>/^domains\/[^/]+\/design-assessment\.json$/.test(path));
 const graphics=files.filter(path=>/^domains\/[^/]+\/design-graphic\.svg$/.test(path));
-assert.equal(domainJson.length,17);assert.equal(graphics.length,17);
+assert.equal(domainJson.length,pdrDomainOrder.length);assert.equal(graphics.length,pdrDomainOrder.length);
 let checks=0;
 for(const report of record.domains){
  assert.deepEqual(await json(`domains/${report.id}/design-assessment.json`),report);
@@ -121,14 +126,49 @@ for(const report of record.domains)for(const check of report.checks){
 
 const program=await json('mission-baseline/architecture-program.json');
 assert.deepEqual(program,baseline.architectureProgram);assert.equal(program.graphics.length,7);assert.equal(program.gaps.length,12);assert.equal(program.workProducts.length,6);
-assert.deepEqual(program.deploymentInterfaces,plain(deploymentInterfaces),'Architecture export must preserve every commissioning stage, authority, gate and evidence product');
+assert.deepEqual(program.deploymentInterfaces,plain(deploymentInterfacesFor(hardware)),'Architecture export must preserve the selected family commissioning stages, authorities, gates and evidence products');
 for(const graphic of program.graphics)assert.equal(await text(`interfaces/${graphic.id}.svg`),graphic.svg);
 assert.deepEqual(await json('design/energy-system.json'),plain(hardware.energySystem));
 assert.deepEqual(await json('design/service-architecture.json'),plain(hardware.serviceArchitecture));
 assert.deepEqual(await json('design/architecture-trade.json'),plain(hardware.architecture));
 assert.deepEqual(await json('design/applicability.json'),plain(hardware.applicability));
+assert.deepEqual(await json('design/physical-architecture.json'),plain(hardware.physicalArchitecture));
+assert.deepEqual(await json('design/source-environment.json'),plain(sampledSourceEnvironmentalCase(hardware)));
+assert.deepEqual(await json('design/architecture-assessment.json'),plain(hardware.assemblyChecks));
+const dossier=await json('design/design-reference.json');
+assert.deepEqual(dossier,plain(referenceDossier(hardware)));
+assert.equal(dossier.activeStudy.assessment.qualificationStatus,'open');
+assert.deepEqual(dossier.activeStudy.physicalArchitecture,plain(hardware.physicalArchitecture));
+assert.deepEqual(dossier.activeStudy.launchInterface,plain(hardware.payloadInterface));
+if(referenceId){
+ assert.equal(dossier.association.id,referenceId);
+ assert.ok(dossier.activeStudy.fieldEvidence.length>0);
+ assert.ok(dossier.activeStudy.sourceEnvironment.samples.length>0);
+ assert.ok(dossier.activeStudy.assessment.sourceEnvironmentChecks.length>0);
+ assert.deepEqual((await json('reference/design-reference-comparison.json')).activeStudy,dossier.activeStudy);
+}
+if(dossier.activeStudy.sourcePointComparison)assert.deepEqual(await json('reference/source-thermal-comparison.json'),dossier.activeStudy.sourcePointComparison);
 const mel=await json('design/master-equipment-list.json');assert.ok(Math.abs(mel.totals.closureKg)<1e-8);
 assert.equal(mel.rows.find(r=>r.wbs==='02.03').interfaceDefinition.family.primaryV,hardware.energySystem.electrical.family.primaryV);
+const materialRecord=await json('reference/spacecraft-material-library.json'),surfaceDetails=await json('design/material-surface-assignments.json');
+assert.deepEqual(materialRecord,plain(spacecraftMaterialRecord(hardware)),'Standalone material register must preserve this exact spacecraft and evidence boundary');
+assert.equal(materialRecord.revision,mel.materialLibraryRevision);assert.deepEqual(surfaceDetails,mel.surfaceDetails);
+const surfaceCsv=csvRows(await text('design/material-surface-assignments.csv')),materialSourcesCsv=csvRows(await text('reference/material-sources.csv'));
+assert.equal(surfaceCsv.length,surfaceDetails.length);assert.equal(materialSourcesCsv.length,materialRecord.sources.length);
+const materialById=new Map(materialRecord.materials.map(material=>[material.id,material])),materialSourceById=new Map(materialRecord.sources.map(source=>[source.id,source]));
+assert.equal(materialRecord.assignments.length,surfaceDetails.length);
+for(const detail of surfaceDetails){
+ const parent=mel.rows.find(row=>row.wbs===detail.parentWbs),csvRow=surfaceCsv.find(row=>row.id===detail.id),raw=materialRecord.assignments.find(row=>row.id===detail.id);
+ assert(parent&&parent.surfaceDetailIds.includes(detail.id),'Each material detail must link to an additive MEL parent');
+ assert.equal(detail.massAccounting,'included-in-parent');assert(!Object.hasOwn(detail,'extendedMassKg'),'A finish must not become an extra additive mass row');
+ assert.equal(materialById.get(detail.materialId)?.textureId,detail.textureId);
+ assert.equal(raw?.materialId,detail.materialId);assert.equal(csvRow?.materialId,detail.materialId);
+ assert.deepEqual(JSON.parse(csvRow.evidence),detail.evidence);assert.deepEqual(JSON.parse(csvRow.accountedInWbs),detail.accountedInWbs);
+ assert.deepEqual(JSON.parse(csvRow.selectionSourceUrls),detail.selectionSourceUrls);
+ assert(detail.evidence.sourceIds.every(id=>materialSourceById.has(id)),'Export must retain all assignment evidence sources');
+}
+for(const source of materialRecord.sources){const row=materialSourcesCsv.find(item=>item.id===source.id);assert.equal(row.url,source.url);assert.equal(row.boundary,source.boundary);}
+for(const row of mel.rows)assert(row.materialDescription,'Material identity must survive the full equipment export');
 assert.match(await text('mission-baseline/architecture-program.html'),/Architecture and engineering interfaces/);
 const illumination=await json('operations/seasonal-illumination.json');assert.equal(illumination.samples.length,50);assert.equal(illumination.continuousSunClaim,false);
 
@@ -139,6 +179,8 @@ assert.ok(embedded);assert.deepEqual(JSON.parse(embedded[1]),record);
 const main=await text('PDR.html');
 assert.ok(main.includes('href="domains/preliminary-designs.html"'));
 assert.ok(main.includes('href="mission-baseline/mission-baseline.html"'));
+assert.ok(main.includes('href="design/material-surface-assignments.csv"'),'The printable review must link to its material detail register');
+assert.ok(main.includes('href="reference/spacecraft-material-library.json"'),'The printable review must link to material selection evidence');
 assert.match(main,/does not record flight qualification or independent PDR acceptance/);
 assert.match(record.reviewStatus,/^Open/);assert.match(baseline.reviewStatus,/^Open/);
 const qualification=await json('thermal/qualification.json');

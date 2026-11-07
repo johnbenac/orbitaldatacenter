@@ -52,8 +52,10 @@ five original surface families, flag SVGs and the geometric Terran R motif:
 | Ceramic tiles | individual hex tiles and narrow dark gaps | R: tile relief; G: roughness; B: reserved | 1,024 × 2,048 |
 | Carbon composite | subtle weave | R: weave relief; G: roughness; B: reserved | 512 × 1,024 |
 
-Albedo uses sRGB and WebP; linear material data uses PNG with no color-space
-conversion. Lighting, reflections and shadows are computed by the renderer rather
+Albedo uses sRGB and WebP; linear material data uses lossless WebP with no color-space
+conversion. The five surface-data maps retain exactly the decoded pixel values and
+resolutions of their previous PNG versions. The generator verifies a byte-for-byte
+RGB round trip before accepting each lossless surface map. Lighting, reflections and shadows are computed by the renderer rather
 than painted into these maps. Values are visual estimates; the rendering maps do
 not change the engineering model's thermal or optical properties. No mass,
 performance, readiness or qualification assumptions are derived from a texture.

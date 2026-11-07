@@ -65,9 +65,12 @@ export function createLaunchRendering(renderer,gpu){
     if(o.userData.landscape||o.userData.noLaunchShadow||o.userData.noShadow){o.castShadow=false;}
    });
   },
-  update(scene,{active=false,environment,lighting='studio',region,horizonRadiusM,cameraHeightM=0}={}){
+  update(scene,{active=false,environment,lighting='studio',studioSpacecraft=false,region,horizonRadiusM,cameraHeightM=0}={}){
    const outdoor=active&&['ground','sky'].includes(environment),interior=active&&environment==='hangar';
-   const illuminated=active&&(outdoor||interior||lighting==='studio');
+   // Studio reflections give material finishes a neutral lighting reference in
+   // the foreground craft view as well as the launch facility. Realistic orbit
+   // keeps its physical Sun/Earth lighting and has no studio environment.
+   const illuminated=outdoor||interior||(active||studioSpacecraft)&&lighting==='studio';
    if(outdoor)sky??=daylightTexture();
    scene.background=outdoor?sky:null;
    if(gpu){

@@ -1,3 +1,5 @@
+import {architectureFamily} from './architecture-families.js';
+import {installedCommunications} from './communications-packages.js';
 // ODC payload and Earth-service interfaces. All installation quantities below
 // depend on installed inputs only; mission demand is evaluated in placement/route.
 // Mass, power and 80% usable-rate factors are controlled preliminary allocations.
@@ -146,16 +148,19 @@ export function serviceArchitecture(h={}){
    {id:'fabric-cable',label:'Core length within routing allocation',actual:finite(h.bodyLengthM)?h.bodyLengthM:null,limit:b.maxCoreLengthM,unit:'m',within:finite(h.bodyLengthM)?h.bodyLengthM<=b.maxCoreLengthM:null}
   ]
  };
+ const family=architectureFamily(h),communications=installedCommunications(h),starcloud=family.id==='starcloud-inline',terminalCount=communications.opticalTerminalCount,lineMbps=starcloud?25000:b.opticalModemLineMbps,customerCap=starcloud?lineMbps*b.usableLineFraction:b.opticalCustomerAllocationMbps;
  const terminal={
-  id:'ODC-COM-ICD-01',payloadOpticalTerminals:1,payloadRFReflectors:1,flightPatchLocations:2,singlePayloadRoute:true,
-  opticalModemLineMbps:b.opticalModemLineMbps,relayUpCapMbps:b.opticalCustomerAllocationMbps,relayDownCapMbps:b.opticalCustomerAllocationMbps,
-  gatewayCapMbps:b.gatewayLineMbps*b.usableLineFraction,directUpLineMbps:2,directSLineMbps:4,directKaLineMbps:500,directOpticalLineMbps:b.opticalModemLineMbps,
+  id:'ODC-COM-ICD-01',installedPackage:communications.id,installedPackageLabel:communications.label,payloadOpticalTerminals:terminalCount,payloadRFReflectors:communications.kaTerminalCount,flightPatchLocations:communications.sPatchCount,kaInstalled:communications.kaInstalled,sBandInstalled:communications.sBandInstalled,installedMassKg:communications.terminalMassKg,installedPeakKW:communications.peakKW,singlePayloadRoute:terminalCount===1,
+  opticalModemLineMbps:lineMbps,relayUpCapMbps:customerCap,relayDownCapMbps:customerCap,
+  gatewayCapMbps:b.gatewayLineMbps*b.usableLineFraction,directUpLineMbps:communications.sBandInstalled?2:0,directSLineMbps:communications.sBandInstalled?4:0,directKaLineMbps:communications.kaInstalled?500:0,directOpticalLineMbps:b.opticalModemLineMbps,
+  directOpticalBasis:'The direct-Earth optical link retains the separate allocated 2 Gbit/s ground receiver model. An intersatellite terminal line rating does not establish ground compatibility or the direct-link rate.',
   duplex:'Full-duplex relay is a required interface allocation; terminal/provider demonstration is open.',
   pointing:'Body pointing, coarse terminal steering and fine-pointing residual are separate allocations. Relay receiver ephemeris and field-of-regard proof remain open.',
-  hardwareBasis:'2 Gbit/s optical modem and 1.6 Gbit/s customer allocation per direction are selected project interfaces. They are not a Starlink service claim.',
+  hardwareBasis:(starcloud?'Two terminals with up-to-25 Gbit/s published line capability; customer fraction, gateway and physical placement remain project allocations. Procurement applicability, waveform and flight interface remain open.':'2 Gbit/s optical modem and 1.6 Gbit/s customer allocation per direction are selected project interfaces. They are not a Starlink service claim.')+' Installed RF package: '+communications.label+'. Omitted equipment has no mass or service credit.',
+  rfCommandBasis:communications.commandPath,kaFunction:'The current Ka model is a payload downlink. It does not implement or qualify a backup Ka command/telemetry channel.',
   protocol:'Buffered payload objects with sequence, integrity check and acknowledged custody; provider waveform, beacon and link protocol unselected.',
   externalProvider:'Unselected; no contracted capacity or compatible optical-terminal certification',
-  makeBeforeBreak:'Unassessed: one payload optical terminal cannot be credited with simultaneous independently pointed links.',
+  makeBeforeBreak:terminalCount>1?'Two installed terminals permit a simultaneous-link trade. Provider support and receiver fields of regard remain unassessed; no continuous-service credit is added.':'Unassessed: one payload optical terminal cannot be credited with simultaneous independently pointed links.',
   directWeather:'Clear-sky propagation reference only. No site-weather or statistical availability credit is assigned.'
  };
  const timing=relayTiming(d),requestedUp=nn(d.relayUpMbps),requestedDown=nn(d.relayDownMbps);
@@ -164,9 +169,9 @@ export function serviceArchitecture(h={}){
  const opticalDirect=direct&&(d.link==='optical'||d.link==='auto');
  const route={
   id:d.serviceRoute||'unselected',label:d.serviceRoute==='relay'?'Allocated optical relay':d.serviceRoute==='hybrid'?'Relay with scheduled direct fallback':d.serviceRoute==='direct'?'Direct ground contacts':'Unselected route',
-  usesRelay,direct,opticalDirect,requestedUpMbps:requestedUp,requestedDownMbps:requestedDown,effectiveUpMbps,effectiveDownMbps,
+  usesRelay,direct,opticalDirect,directPayloadTerminalInstalled:d.link==='ka'?communications.kaInstalled:d.link==='s'?communications.sBandInstalled:true,requestedUpMbps:requestedUp,requestedDownMbps:requestedDown,effectiveUpMbps,effectiveDownMbps,
   acquisitionS:timing.acquisitionS,configuredHandoverS:timing.configuredHandoverS,effectiveHandoverS:timing.onS,cycleS:timing.cycleS,
-  scheduledAvailability:timing.scheduledAvailability,effectiveAvailability:timing.usableFraction,longestScheduledOutageS:timing.longestOutageS,
+  handoverSensitivity:{installedTerminals:terminalCount,assessed:false,credited:false,possibleUsableFraction:terminalCount>1?timing.scheduledAvailability:timing.usableFraction,remainingScheduledGapS:timing.cycleS*(1-timing.scheduledAvailability),basis:'Conditional upper bound if independent pointing and make-before-break support are verified; hardware count alone gives no service credit.'},scheduledAvailability:timing.scheduledAvailability,effectiveAvailability:timing.usableFraction,longestScheduledOutageS:timing.longestOutageS,
   meanRelayUpMbps:effectiveUpMbps*timing.usableFraction,meanRelayDownMbps:effectiveDownMbps*timing.usableFraction,
   relayRoundTripMs:finite(d.relayRttMs)?d.relayRttMs:null,gatewayOneWayMs:finite(d.groundEdgeMs)?d.groundEdgeMs:null,
   directCustomerUplinkCapMbps:Math.min(nn(d.customerUplinkMbps),terminal.directUpLineMbps*Math.max(0,Math.min(1,nn(d.codingEff)))),
@@ -181,7 +186,8 @@ export function serviceArchitecture(h={}){
   withinReferenceLife:finite(d.missionYears)?d.missionYears<=b.referenceLifeYears:null,
   lifeBasis:'Five-year design-reference allocation. A different mission duration is evaluated; component life and environment qualification remain open at every duration.',
   commandHoldRequirementH:b.commandHoldRequirementH,engineeringHistoryRequirementH:b.engineeringHistoryRequirementH,
-  flightBoundary:'Flight computer, S-band command/telemetry and protected electrical priorities are independent of the customer payload.',
+  flightBoundary:communications.sBandInstalled?'Flight computer, installed S-band command/telemetry and protected electrical priorities are independent of the customer payload.':'The flight computer and protected electrical priorities remain installed, but this package has no independent RF command/telemetry implementation. Removing S-band creates an explicit assurance gap; an optical or Ka replacement is not assumed.',
+  independentTTCInstalled:communications.sBandInstalled,commandPathStatus:communications.sBandInstalled?'allocated':'unassessed',
   payloadRecovery:'Per-tray power isolation, supervised restart and acknowledged object/checkpoint recovery. No uninterrupted service credit is assumed for an isolated tray or a fabric loss.',
   bootUpdate:'Watchdog-supervised flight restart, two retained boot-image banks, integrity-checked update and explicit rollback authority. Memory/timing sizing and representative-platform verification remain open.',
   dataCustody:'A complete verified checkpoint is retained until its successor commits. Earth receipt requires a complete integrity-checked artifact and acknowledgement; partial bytes do not transfer custody.',
@@ -190,7 +196,7 @@ export function serviceArchitecture(h={}){
    {item:'Flight command/control chain',selection:'Single selected processor allocation with watchdog and recovery architecture',disposition:'Critical single-point review and independent survival implementation remain open.'},
    {item:'Payload compute trays',selection:'Individually isolatable repeated units; no dedicated spare is silently added',disposition:'Checkpoint/restart and degraded-throughput requirements require representative tests.'},
    {item:'Payload fabric',selection:'One active switched plane',disposition:'Common-fabric service interruption retained in the assurance register.'},
-   {item:'Payload optical terminal',selection:'One active terminal shared by selected payload routes',disposition:'No simultaneous-relay or make-before-break availability credit.'}
+   {item:'Payload optical terminal',selection:terminalCount+' installed optical terminal'+(terminalCount===1?'':'s')+'; selected route uses the declared access schedule',disposition:'No simultaneous-relay or make-before-break availability credit.'}
   ],
   verification:['Representative tray/fabric application, memory, collective and I/O tests','Radiation and data-integrity evidence for selected parts and shielding','Autonomous survival, reboot/update, checkpoint and custody procedure tests','Component-life evidence for mission duration and operating environment'],
   simulationScope:'Nominal service and gradual degradation; assurance decisions do not add off-nominal events to playback.'
@@ -280,7 +286,7 @@ export function renderEarthServiceRoute(h={},snapshot={}){
  const a=serviceArchitecture(h),d=h.input||{},r=a.route,t=a.terminal;
  const relay=r.usesRelay,routeDetail=relay?'Allocated relay; provider unselected':'Geometric contacts; operator open';
  const capacityText=relay?fmt(r.effectiveUpMbps,0)+' up / '+fmt(r.effectiveDownMbps,0)+' down Mbit/s':'Range / pointing set rate';
- const interfaceTitle=relay?'One optical payload terminal':d.link==='optical'?'Optical downlink + S-band up':d.link==='s'?'S-band payload service':'Ka payload downlink + S-band up';
+ const interfaceTitle=relay?t.payloadOpticalTerminals+' optical payload terminal'+(t.payloadOpticalTerminals===1?'':'s'):!r.directPayloadTerminalInstalled?'Selected terminal not installed':d.link==='optical'?'Optical payload downlink':d.link==='s'?'S-band payload service':d.link==='auto'?'Installed terminal selection':'Ka payload downlink';
  const wait=relay?(r.longestScheduledOutageS===null?'No usable scheduled access':fmt(r.longestScheduledOutageS,1)+' s maximum scheduled gap'):'Ground access sets transfer windows';
  let body=txt(28,59,r.label+' · rates are allocated goodput; service commitment remains open',12,col.muted);
  body+=block(28,82,245,'Earth customer endpoint',[
@@ -300,10 +306,10 @@ export function renderEarthServiceRoute(h={},snapshot={}){
  ],col.gold);
  body+=block(28,248,245,'Mission control',[
   fmt(d.commandKbps,1)+' kbit/s command offering',
-  'Direct S-band access',
-  'Independent of customer routing'
- ],col.blue);
- body+=arrow(273,299,301,299,col.blue)+block(301,248,245,'Flight control and health',[
+  t.sBandInstalled?'Direct S-band access':'Independent RF TT&C not installed',
+  t.sBandInstalled?'Independent of customer routing':'Replacement command path unresolved'
+ ],t.sBandInstalled?col.blue:col.red);
+ body+=(t.sBandInstalled?arrow(273,299,301,299,col.blue):'')+block(301,248,245,'Flight control and health',[
   'Dedicated flight computer / recorder',
   fmt(a.autonomy.commandHoldRequirementH,0)+' h command-hold requirement',
   fmt(a.autonomy.engineeringHistoryRequirementH,0)+' h history requirement'
@@ -314,8 +320,8 @@ export function renderEarthServiceRoute(h={},snapshot={}){
   'Receipt requires the complete object'
  ],col.teal)+arrow(698,184,698,248,col.teal);
  body+=txt(28,390,'Current accepted route: '+(snapshot.aiActiveRoute||'not evaluated at a mission instant'),13,col.teal);
- body+=txt(28,418,relay?'Requested relay: '+fmt(r.requestedUpMbps,0)+' up / '+fmt(r.requestedDownMbps,0)+' down Mbit/s; hardware cap 1,600 each.':'Direct terminal capacity is evaluated with the actual range, pointing, acquisition and command priority.',12,col.muted);
+ body+=txt(28,418,relay?'Requested relay: '+fmt(r.requestedUpMbps,0)+' up / '+fmt(r.requestedDownMbps,0)+' down Mbit/s; installed customer cap '+fmt(t.relayDownCapMbps,0)+' each.':'Direct terminal capacity is evaluated with the actual range, pointing, acquisition and command priority.',12,col.muted);
  body+=txt(28,445,relay?'Receiver ephemeris, optical compatibility, gateway outages and service terms need provider evidence.':r.opticalDirect?'Clear-sky output carries no weather availability credit; cloud outages and site diversity require cases.':'Ground-network access, site environment, gateway interruptions and service terms require operator evidence.',12,col.gold);
  body+=txt(28,473,'Survival and disposal stay with the flight executive. Checkpoint / restart does not imply uninterrupted service.',12,col.muted);
- return frame('odc-earth-service', 'Earth service, optical handover and independent flight control','Customer requests and acknowledged result custody use the selected terminal and gateway allocation. Mission command and health traffic use independent S-band flight control. Relay acquisition consumes access time, and provider compatibility and direct optical weather remain unverified.',500,body);
+ return frame('odc-earth-service', 'Earth service, optical handover and flight control','Customer requests and acknowledged result custody use the installed terminal and gateway allocation. '+(t.sBandInstalled?'Mission command and health traffic use the independent S-band installation.':'No independent RF command/telemetry installation is modeled in this package; a replacement remains unresolved.')+' Relay acquisition consumes access time, and provider compatibility and direct optical weather remain unverified.',500,body);
 }

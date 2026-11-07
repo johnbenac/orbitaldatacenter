@@ -9,6 +9,7 @@ import {launchSites} from './dist/launch-sites.js';
 import {geographyForSite} from './dist/launch-geography.js';
 import {buildLaunchEnvironment,geographicUV,localGeography,sampleElevation,civilSurfaceMaterial} from './dist/launch-environment.js';
 import {canvas} from './render-test-canvas.mjs';
+import {readJsonResponse} from './dist/json-asset.js';
 
 const dist=resolve('dist'),assets=new Set(),aerialDetails=new Set(),regionHashes=new Map(),grids=new Map();
 function localFile(url){
@@ -59,7 +60,7 @@ for(const site of Object.values(launchSites)){
  if(g.detail){checkImage(g.detail.image,g.detail.bounds);assert(contains(g.detail.bounds,site.lon,site.lat),site.id+' outside detailed image');}
  if(g.waterMask?.url){const path=localFile(g.waterMask.url);assert.deepEqual(imageSize(readFileSync(path)),[g.waterMask.width,g.waterMask.height]);validBounds(g.waterMask.bounds);assert(g.waterMask.attribution&&g.waterMask.license);}
  assert(g.elevation?.url&&g.elevation.attribution,site.id+' missing elevation provenance');
- const path=localFile(g.elevation.url),grid=JSON.parse(readFileSync(path,'utf8'));validBounds(grid.bounds);
+ const path=localFile(g.elevation.url),grid=await readJsonResponse(new Response(readFileSync(path)),g.elevation.url);validBounds(grid.bounds);
  assert(grid.width>16&&grid.height>16);assert.equal(grid.values.length,grid.width*grid.height);assert(grid.values.every(Number.isFinite));assert(grid.values.every(v=>v>=-440&&v<9000));assert(contains(grid.bounds,site.lon,site.lat));
  assert.equal(grid.width,g.elevation.width);assert.equal(grid.height,g.elevation.height);grids.set(g.id,grid);
  if(g.features?.url){const features=JSON.parse(readFileSync(localFile(g.features.url),'utf8'));assert.equal(features.type,'FeatureCollection');assert(Array.isArray(features.features));assert(g.features.attribution&&g.features.license);}
@@ -101,19 +102,25 @@ globalThis.Image=class{
  get src(){return this._src;}
 };
 globalThis.fetch=(url,options={})=>new Promise((resolve,reject)=>{
- const item={url,resolve:json=>resolve({ok:true,json:()=>Promise.resolve(json)}),reject};fetchQueue.push(item);
+ // Release real compressed response bytes so the delayed-resource test also
+ // exercises the production lazy ZIP extraction path.
+ const item={url,resolve:json=>resolve(new Response(/\.json\.zip$/.test(url)?readFileSync(localFile(url)):JSON.stringify(json))),reject};fetchQueue.push(item);
  options.signal?.addEventListener('abort',()=>reject(new Error('Aborted')),{once:true});
 });
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
+async function settled(environment){
+ for(let n=0;n<200&&environment.status==='loading';n++)await new Promise(resolve=>setTimeout(resolve,2));
+ assert.notEqual(environment.status,'loading','Deferred resource decoding did not settle.');
+}
 let paints=0;
 const active=buildLaunchEnvironment(site,{parent:new T.Group(),grade:25,aperture,repaint:()=>paints++});active.ensureLoaded();assert.equal(active.status,'loading');assert(imageQueue.length>=2);
 imageQueue.shift().onload();await flush();assert.equal(active.status,'loading','Regional image alone is not a complete environment.');
 fetchQueue.shift().resolve(grids.get('space-coast'));await flush();assert.equal(active.status,'loading','Detail image must finish before ready.');
-while(imageQueue.length)imageQueue.shift().onload();await flush();assert.equal(active.status,'ready');
+while(imageQueue.length)imageQueue.shift().onload();await settled(active);assert.equal(active.status,'ready');
 while(fetchQueue.length)fetchQueue.shift().resolve({type:'FeatureCollection',features:[]});await flush();
 assert.equal(active.heightAt(0,0),25,'Absolute DEM height must be registered to local launch grade.');active.dispose();
 
-const failed=buildLaunchEnvironment(site,{parent:new T.Group(),grade:25,aperture});failed.ensureLoaded();imageQueue.shift().onload();imageQueue.shift().onerror();while(imageQueue.length)imageQueue.shift().onload();fetchQueue.shift().resolve(grids.get('space-coast'));await flush();assert.equal(failed.status,'error');assert(failed.errors.length);failed.dispose();while(fetchQueue.length)fetchQueue.shift().resolve({type:'FeatureCollection',features:[]});await flush();
+const failed=buildLaunchEnvironment(site,{parent:new T.Group(),grade:25,aperture});failed.ensureLoaded();imageQueue.shift().onload();imageQueue.shift().onerror();while(imageQueue.length)imageQueue.shift().onload();fetchQueue.shift().resolve(grids.get('space-coast'));await settled(failed);assert.equal(failed.status,'error');assert(failed.errors.length);failed.dispose();while(fetchQueue.length)fetchQueue.shift().resolve({type:'FeatureCollection',features:[]});await flush();
 
 const removed=buildLaunchEnvironment(site,{parent:new T.Group(),grade:25,aperture,repaint:()=>paints++});removed.ensureLoaded();const staleImages=imageQueue.splice(0),before=paints;removed.dispose();
 for(const image of staleImages){assert.equal(image.onload,null);assert.equal(image.src,'');}await flush();assert.equal(paints,before,'A disposed environment caused a late repaint.');

@@ -118,7 +118,7 @@ group('perf dgx',estimate,[
  ['chipTF','Enter the peak BF16 arithmetic throughput per accelerator using consistent dense/sparse counting. The workload-efficiency input converts the ceiling into an estimate.'],
  ['chipGB','Enter accessible accelerator memory per chip in decimal GB. Include weights, reserved runtime memory and KV cache before counting replicas.'],
  ['chipBW','Enter per-chip memory bandwidth in decimal GB/s. Apply the separate realized-bandwidth factor when modeling decode under the selected batch.'],
- ['trayKg','Weigh the complete tray boundary used for the mass ledger, including host and cold-plate allocation. External switches and the pumped loop are separately budgeted.'],
+ ['trayKg','Weigh the complete tray boundary used for the mass ledger, including host and cold-plate allocation. External switches and the selected heat-transport hardware are separately budgeted.'],
  ['computeEfficiency','Calibrate useful model work against a measured prefill workload at the selected context and precision. Kernel and scheduling losses reduce the attainable peak.'],
  ['bwEfficiency','Infer sustained bandwidth from a decode trace or hardware counters at the intended batch size. Larger batches reuse weights but add KV traffic.']
 ]);
@@ -179,6 +179,7 @@ group('thermosphere radioflux fluxarchive',assume,[
  ['f107Ceiling','Set the active end of the nominal radio-flux envelope using an observed or scenario-defined solar cycle. Compare annual drag impulse across the range.']
 ]);
 group('rf ground',assume,[
+ ['communicationsPackage','Select installed optical and optional RF hardware. Omitted Ka or S-band equipment is removed from mass, geometry and service. Removing S-band leaves the independent command/telemetry implementation unresolved; an optical or Ka replacement is not assumed.','AI1 starts with optical + S-band TT&C as a project allocation. The large Ka payload reflector is optional, not a source identity feature.'],
  ['kaDishM','Size the Ka-band reflector clear aperture and include its stowed envelope. A larger dish raises gain and tightens the pointing tolerance.'],
  ['opticalApertureM','Choose the transmit telescope’s clear aperture. Compare the resulting divergence, jitter loss and acquisition time with the selected station geometry.','For the model wavelength of 1,550 nm and D = 0.12 m, 1.22λ/D is about 15.8 µrad.'],
  ['opticalJitterUrad','Enter fine pointing residual in microradians. Use the same angular convention as the modeled beam divergence and budget tracking error during acquisition.'],
@@ -225,7 +226,7 @@ group('shield mech',hardware,[
  ['shieldKgM2','Choose added shielding mass per covered wall area from a mission-specific dose/transport study and component tolerance. This input adds hardware mass.','At 2,700 kg/m³ density, a uniform 1 mm aluminium layer adds 2.7 kg/m² before fasteners and cutouts.']
 ]);
 group('margin seh',assume,[
- ['structureMargin','Read the carried top-down dry growth assumption used by this saved design. It is locked while item-specific mass growth evidence is established under the Mission Baseline. Imported values remain part of the reproducible study calculation.','A carried 15% factor adds 300 kg to 2,000 kg of modeled dry hardware; this arithmetic does not establish bottom-up MGA or mission mass-margin compliance.'],
+ ['structureMargin','Read the carried top-down dry growth assumption used by this saved design. It is locked while item-specific mass growth evidence is established under the shared design rules. Imported values remain part of the reproducible study calculation.','A carried 15% factor adds 300 kg to 2,000 kg of modeled dry hardware; this arithmetic does not establish bottom-up MGA or mission mass-margin compliance.'],
  ['launchAllowanceKg','Enter the accepted mission-specific stack allowance for the target insertion and recovery mode, including the launch-only adapter on the same mass boundary.'],
  ['referenceKg','Use the provider’s specified reference orbit, mass boundary and recovery configuration when interpreting the published performance point.']
 ]);
@@ -421,7 +422,7 @@ for(const [key,[title,advice,ids]] of Object.entries(specials))catalog[key]={tit
 for(const [key,title,advice,ids,example] of [
  ['conceptCompute','Installed active IT power','Read the installed tray count multiplied by active electrical input per tray. This rating describes simultaneous active compute before separate storage, pump, communications and platform loads.','dgx perf power','12 trays × 2 kW/tray = 24 kW installed active IT power.'],
  ['conceptMass','Launched stack mass','Add dry hardware and its engineering growth allowance, liquid fuel, oxidizer, pressurant and the launch-only adapter. Compare this predicted total with the mission allowance and the selected launcher reference.','margin mech clear','A 2,400 kg dry spacecraft plus 450 kg of liquids, 2 kg pressurant and a 180 kg adapter totals 3,032 kg on the launch manifest.'],
- ['conceptSolar','Installed solar wing planform','Read the total physical planform across all four solar wings in the current design. Electrical output also depends on active cell coverage, cell efficiency, illumination, incidence, elapsed age and delivery losses.','power pvtest','Four equal 47.5 m² wings provide 190 m² total planform.'],
+ ['conceptSolar','Installed solar wing planform','Read the total physical planform across the selected family’s solar blankets. Electrical output also depends on active cell coverage, cell efficiency, illumination, incidence, elapsed age and delivery losses.','power pvtest','Two 2 × 20 m blankets provide 80 m² total planform. Counts and dimensions follow the selected family.'],
  ['conceptDecode','Estimated active aggregate decode capacity','Read estimated simultaneous output tokens per second across the installed accelerators. The estimator checks model memory fit, sustained bandwidth, arithmetic capacity and the share of time spent on prompt prefill. Ground delivery is reported separately.','perf llama gemma','A measured 50 output tok/s per user across 100 simultaneous users would yield 5,000 aggregate tok/s at those workload settings.']
 ])catalog[key]={title,advice,ids:ids.split(' '),basis:'Current installed-design result or explicit workload estimator. Published references describe the component or performance boundary.',example};
 catalog.epoch.title='Epoch (UTC)';catalog.kvKB.title='KV cache per token (decimal kB)';catalog.diskModuleKg.title='Installed storage module mass';catalog.referenceKg.title='Provider reference payload';
@@ -446,7 +447,7 @@ options('thermalScale',[
 opts.thermalNode=Object.fromEntries(thermalNodes.map(n=>[n.id,{advice:nodeAdvice[n.id],basis:'Modeled hardware temperature point.',ids:['thermal','gevst']}]));
 // Distinguish component assumptions from published verification and resource-margin practice.
 catalog.structureMargin.advice+=' The adopted GOLD PDR mission criterion is >10% of basic dry mass, after bottom-up item MGA. The carried factor does not establish either assessment.';
-catalog.solarM2.advice+=' The Mission Baseline adopts >15% EOL available-power margin for the PDR target in Phase B. Account for physical degradation and losses before applying that capacity-based criterion.';
+catalog.solarM2.advice+=' The shared design rules adopt >15% EOL available-power margin for the PDR target in Phase B. Account for physical degradation and losses before applying that capacity-based criterion.';
 catalog.reserveFraction.ids.push('margin');
 catalog.reserveFraction.advice+=' GOLD Table 1.06-1 calls for a 3σ variation basis and supplies no universal propellant percentage. A controlled maneuver / uncertainty assessment must resolve this legacy assumption.';
 for(const key of ['structureMargin','reserveFraction','thermalPadding','radialPaddingM','axialPaddingM']){catalog[key].readOnly=true;catalog[key].basis='Carried study assumption; read only. Mission-policy assessment remains open.';}

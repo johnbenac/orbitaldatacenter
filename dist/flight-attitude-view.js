@@ -1,6 +1,7 @@
 // Flight instruments only consume the physical snapshot. Camera and tab choices never command a joint.
 import {attitudeModes,attitudeLimits,guidanceReferences} from './attitude-guidance.js';
-import {DEPLOY_END_S} from './commissioning-clock.js';
+import {commissioningClock} from './commissioning-clock.js';
+import {architectureFamily} from './architecture-families.js';
 import {R,MU,TAU} from './orbit.js';
 const escape=x=>String(x??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;');
 const num=(n,unit='',p=1)=>Number.isFinite(n)?n.toFixed(p)+unit:'—';
@@ -8,23 +9,24 @@ const historyDomains=new Set(['conops','orbit','attitude','software','comm','the
 export function activePointing(v,s){
  return ['C','D','E','F'].includes(v.phase)&&s.t>=540&&!s.orbitLost&&!s.referenceBody&&!(s.spacecraftModelEndedAt!=null&&s.t>=s.spacecraftModelEndedAt);
 }
-const frameName=v=>v.camera==='orbit'?'Earth-centered view':v.camera==='spacecraft'&&!(v.chapter==='commissioning'&&v.deploymentLens!=='vehicle')?'Local orbital frame':v.camera==='launch'?'Launch camera':'Body-following camera';
+const frameName=v=>v.cameraTracking==='sun-velocity'?'Sun–velocity view':v.cameraTracking==='manual'?'Your view · follows spacecraft':v.camera==='orbit'?'Earth-centered view':v.camera==='spacecraft'&&!(v.chapter==='commissioning'&&v.deploymentLens!=='vehicle')?'Local orbital frame':v.camera==='launch'?'Launch camera':'Body-following camera';
 const gaugeIcons={
  solar:'<path d="M4 11h4m16 0h4M7 5l3 2m11 0 3-2"/><path d="M4 18h24v4H4zM9 18v4m5-4v4m5-4v4m5-4v4" class="pointer"/>',
  radiator:'<path d="M3 22h11l2-3"/><path d="M6 15h20v4H6zM10 15v4m4-4v4m4-4v4m4-4v4" class="pointer"/>',
  link:'<path d="M9 25h14m-7 0v-5"/><path d="M7 10q2 13 13 9L7 10zm7 4 6-7m-4 0h4v4" class="pointer"/>'
 };
 const gauge=(name,label,value,detail,angle,tip)=>`<div class="ad-gauge ad-${name}" data-tip="${escape(tip)}"><svg viewBox="0 0 32 32" aria-hidden="true" style="--joint:${Number.isFinite(angle)?angle:0}deg">${gaugeIcons[name]}</svg><div><small>${label}</small><b>${escape(value)}</b><span>${escape(detail)}</span></div></div>`;
-export function attitudeStrip(v,s){
+export function attitudeStrip(v,s,h={}){
+ const family=architectureFamily(h),fixedRadiator=family.radiatorTracking==='fixed-after-deployment';
  const shadow=s.eclipse?'Earth shadow':'Sunlight',mode=s.attitudeModeLabel||'Attitude solution pending',window=s.station?String(s.station):'No visible station';
  const residual=Number.isFinite(s.terminalErrorDeg)?num(s.terminalErrorDeg,'°',2)+' off target':window;
  const drive=[s.groundLink,s.terminalState].filter(Boolean).join(' · ')||'Parked',station=s.station?' · '+s.station:'';
  const boresight=s.groundLink==='Optical'?s.opticalBoresightBody:s.dishBoresightBody;
- const wingAngle=num(s.wingPitchDeg,'°'),radiatorAngle=num(s.upperRadiatorRollDeg,'°')+' / '+num(s.lowerRadiatorRollDeg,'°');
+ const wingAngle=num(s.wingPitchDeg,'°'),radiatorAngle=fixedRadiator?'Fixed after deployment':num(s.upperRadiatorRollDeg,'°')+' / '+num(s.lowerRadiatorRollDeg,'°');
  return `<div class="ad-title"><div><span class="ad-pip"></span><small>ATTITUDE MODE</small><strong>${escape(mode)}</strong></div><span class="ad-frame">${escape(frameName(v))} · ${shadow}</span></div>
  <p class="ad-objective">${escape(s.attitudeObjective)}</p><div class="ad-gauges">
  ${gauge('solar','Solar wings',wingAngle,num(s.solarKW,' kW')+' generated',s.wingPitchDeg,'Realized wing-root angle and electrical generation. Array incidence and shadow determine the sunlight reaching the blankets.')}
- ${gauge('radiator','Radiator banks',radiatorAngle,num(s.netRejectionKW,' kW')+' net rejection',s.upperRadiatorRollDeg,'Upper and lower trim encoders. Each bank rotates about its long axis. Net rejection subtracts absorbed sunlight, albedo and Earth infrared from thermal emission.')}
+ ${gauge('radiator',family.radiatorBankCount===1?'Radiator platform':fixedRadiator?'Inline radiators':'Radiator banks',radiatorAngle,num(s.netRejectionKW,' kW')+' net rejection',fixedRadiator?0:s.upperRadiatorRollDeg,fixedRadiator?'The selected family has fixed radiator geometry after deployment. No independent Sun-avoidance drive is credited. Net rejection subtracts absorbed sunlight, albedo and Earth infrared from emission.':'Upper and lower trim encoders. Each bank rotates about its long axis. Net rejection subtracts absorbed sunlight, albedo and Earth infrared from thermal emission.')}
  ${gauge('link','Earth terminal',drive+station,residual,Number.isFinite(s.terminalErrorDeg)?Math.atan2(boresight?.[2]||0,boresight?.[1]||0)*180/Math.PI:0,'Terminal state and angular distance from the line to the visible station. Useful traffic requires an acquired link.')}
  </div>`;
 }
@@ -40,7 +42,7 @@ export function responseWindow(sim,s,phase){
  // Anchor the plot to a fixed design-orbit interval so the same event stays under the cursor during playback.
  const period=TAU*Math.sqrt((R+sim.hardware.input.altitudeKm)**3/MU);
  const start=540+Math.floor((s.t-540)/period)*period,end=Math.min(start+period,sim.ignition,sim.duration);
- return {start:phase==='E'?Math.max(DEPLOY_END_S,start):start,end};
+ return {start:phase==='E'?Math.max(commissioningClock(sim.hardware).endS,start):start,end};
 }
 export function orbitResponse(sim,start,end){
  const samples=sim.window(start,end-start,81),events=sim.events(start,end-start);
@@ -66,16 +68,17 @@ export function refreshResponse(host,input,s,start,end){
 }
 
 export function pointingApproach(h,open=false){
- const l=attitudeLimits(h),nominal=attitudeModes[h.input.attitude]||attitudeModes.tracking;
+ const l=attitudeLimits(h),nominal=attitudeModes[h.input.attitude]||attitudeModes.tracking,family=architectureFamily(h),fixedRadiator=family.radiatorTracking==='fixed-after-deployment';
+ const radiators=fixedRadiator?'The radiator geometry remains fixed after deployment. Its actual normals determine absorbed sunlight and Earth infrared; the model gives it no independent Sun-avoidance or cold-protection rotation.':`The upper and lower radiator roots cant out to ${num(l.upperBankCantDeg,'°')} and ${num(l.bankCantDeg,'°')} for clearance on this build. Each bank then twists about its span at up to ${num(l.radiatorTrimRateDegS,'°/s')}. In sunlight it seeks grazing incidence. In shadow it adjusts Earth exposure using the thermal feedback and installed travel limits.`;
  const card=(name,body)=>`<article><b>${name}</b><p>${body}</p></article>`;
  return `<details class="ad-logic panel" ${open?'open':''}><summary>Flight pointing modes and actuator design</summary>
- <p>The two engines deliver thrust along +Z. The +Y deck carries the directional terminals. The four solar wings extend along ±X. The flight computer selects a reference attitude at each mission instant, and the CMGs slew the bus toward it.</p>
+ <p>The two allocated engines deliver thrust along +Z. Directional terminals occupy the mounting stations recorded for ${escape(family.label)}. Its ${family.solarWingCount} solar blankets extend from the selected family’s roots. The flight computer selects a reference attitude at each mission instant, and the CMGs slew the bus toward it.</p>
  <div class="ad-phases">
- ${card('01 · Commissioning','The spacecraft holds +Z along its velocity while the solar blankets extend and each radiator unfolds. The rotary drives enter tracking after the deployment interlocks release.')}
+ ${card('01 · Commissioning',`The spacecraft holds its commissioning attitude while the family’s release, deployment and latch sequence runs. ${family.payloadLocation==='radiator'?'The compute/radiator platform moves before the two solar blankets deploy.':'The installed blankets and radiator banks follow their declared mechanism order.'} Only installed tracking drives hand over after their interlocks release.`)}
  ${card('02 · Routine and eclipse',escape(nominal[1])+' In shadow the wing drives follow the predicted solar direction for sunlight return.')}
- ${card('03 · Ground pass','The CMGs turn the +Y deck toward Earth. The selected Ka or optical terminal aims along the spacecraft-to-station line. The terminal must acquire the link before customer data can leave.')}
- ${card('04 · Burn and unload','Before a planned chemical burn the CMGs align +Z and the radiator roots seek symmetric −45° and +45° parking angles to center their mass. Ignition checks the achieved alignment and torque. Between burns, magnetic rods can unload the CMGs against the local magnetic field while the spacecraft maintains its reference.')}
- </div><p>For this build the conservative worst-axis slew planning rate is ${num(l.bodyRateDegS,'°/s',3)}, based on inertia and installed control authority. Wing roots follow the Sun at up to ${num(l.wingRateDegS,'°/s')}. The upper and lower radiator roots cant out to ${num(l.upperBankCantDeg,'°')} and ${num(l.bankCantDeg,'°')} for clearance on this build. The upper bank also clears the moving communications terminals. Each bank then twists about its span at up to ${num(l.radiatorTrimRateDegS,'°/s')}. In sunlight it presents its edge to the Sun. In shadow it turns toward the warm Earth if the loop approaches its cold limit, and reduces Earth exposure when the loop needs cooling. Terminal steering is limited to a ${num(l.terminalConeDeg,'°',0)} half-cone about its deck normal. Realized slew rate depends on the rotation axis. The controller integrates body rotation with a full component-based inertia tensor and four rate-limited gimbals. Sensor feedback is ideal. Flexible-body modes, rotor imbalance and structural vibration require separate analysis.</p>
+ ${card('03 · Ground pass','The body reference and terminal steering use the selected family’s mounting normal. The Ka or optical terminal aims along the spacecraft-to-station line. The terminal must acquire the link before customer data can leave.')}
+ ${card('04 · Burn and unload',`Before a planned chemical burn the CMGs align +Z. ${fixedRadiator?'The fixed radiators remain in their deployed geometry.':'Articulated radiator roots seek symmetric −45° and +45° parking angles.'} Ignition checks the achieved alignment, mass properties and torque. Between burns, magnetic rods can unload the CMGs against the local magnetic field while the spacecraft maintains its reference.`)}
+ </div><p>For this build the conservative worst-axis slew planning rate is ${num(l.bodyRateDegS,'°/s',3)}, based on inertia and installed control authority. Wing roots follow the Sun at up to ${num(l.wingRateDegS,'°/s')}. ${radiators} Terminal steering is limited to a ${num(l.terminalConeDeg,'°',0)} half-cone about its mounting normal. Realized slew rate depends on the rotation axis. The controller integrates body rotation with a full component-based inertia tensor and four rate-limited gimbals. Sensor feedback is ideal. Flexible-body modes, rotor imbalance and structural vibration require separate analysis.</p>
  <button class="btn ad-physics-link" data-attitude-flight>Inspect flight pointing →</button><p>ISS flight references for rotary interfaces and thermal pointing</p>${guidanceReferences.map(([name,url])=>`<a href="${escape(url)}" target="_blank" rel="noopener">${escape(name)} ↗</a>`).join(' &nbsp; ')}
  </details>`;
 }

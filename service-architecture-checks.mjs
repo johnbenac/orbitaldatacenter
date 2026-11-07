@@ -185,17 +185,20 @@ check('partial checkpoints retain the prior complete state and commit only at fu
  assert.equal(start.writtenGB+second.writtenGB+finish.writtenGB,10,'The whole checkpoint crosses the write interface exactly once');
 });
 
-check('all six Earth purposes retain seven domains and two valid supplemental drawings',()=>{
+check('all six Earth purposes retain six service domains and their valid supplemental drawings',()=>{
  for(const purpose of ['text','voice','batch','agents','finetune','pretrain']){
   const h=sizeDesign(missionStarter(purpose)),reports=assessServiceDomains({h});
-  assert.deepEqual(Object.keys(reports),['conops','purpose','compute','data','comm','avionics','software']);
+  assert.deepEqual(Object.keys(reports),['conops','compute','data','comm','avionics','software']);
   for(const domain of ['compute','comm']){
-   assert.equal(reports[domain].supplementalGraphics.length,1);
-   const svg=reports[domain].supplementalGraphics[0].svg;
-   assert.match(svg,/^<svg\b/);assert.match(svg,/viewBox="0 0 850 (510|500)"/);
+   const graphics=reports[domain].supplementalGraphics;
+   assert.deepEqual(graphics.map(g=>g.id),domain==='compute'?['compute-fabric','payload-acceptance']:['earth-service-route']);
+   for(const graphic of graphics){
+   const svg=graphic.svg;
+   assert.match(svg,/^<svg\b/);assert.match(svg,/viewBox="0 0 850 (510|500|291)"/);
    assert.match(svg,/<title\b/);assert.match(svg,/<desc\b/);assert.match(svg,/<rect\b/);
    assert.doesNotMatch(svg,/\b(?:NaN|Infinity|undefined)\b/);
    assert.equal((svg.match(/<svg\b/g)||[]).length,1,'Supplemental diagram must not nest the original SVG');
+   }
   }
   assert.ok(reports.software.checks.every(c=>c.status==='unassessed'&&c.actual===null));
   assert.equal(find(reports,'comm','comm-provider').status,'unassessed');

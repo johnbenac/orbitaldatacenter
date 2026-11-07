@@ -9,6 +9,17 @@ export function orbitalLightingAvailable(camera,s){
  return s.t>=540&&['spacecraft','core','orbit'].includes(camera);
 }
 
+// Keep the user's selected mode separate from the light setup used this frame.
+// Auto consumes the same binary umbra flag as the engineering model; it never
+// modifies the mission snapshot or invents a separate visual eclipse boundary.
+export function normalizeLightingMode(value){
+ return value==='realistic'||value==='studio'?value:'auto';
+}
+export function effectiveLightingMode(value,s){
+ const mode=normalizeLightingMode(value);
+ return mode==='auto'?(s?.eclipse?'studio':'realistic'):mode;
+}
+
 // The camera uses half-stop increments and shares only valid exposure settings.
 export function cameraExposure(value){
  const level=Number(value);

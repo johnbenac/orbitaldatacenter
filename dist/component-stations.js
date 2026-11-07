@@ -1,26 +1,42 @@
+import {architectureFamily,architectureTerminalStations} from './architecture-families.js';
+import {installedCommunications} from './communications-packages.js';
 // Installed mass and body stations. Distances in m, masses in kg. Instance stations
 // for a group use equal unit masses unless its measured weight shares are supplied.
-import {deploymentLayout,leafPose,mechanismPose,terminalLayout} from './deployment.js';
+import {deploymentLayout,leafPose,mechanismPose,terminalLayout,leafAxes} from './deployment.js';
 
 const xyz=o=>[o.x,o.y,o.z];
 const mean=(points,weights=null)=>points.reduce((out,p,i)=>out.map((v,k)=>v+p[k]*(weights?weights[i]:1/points.length)),[0,0,0]);
+function jointStations(pose){
+ return [...pose.wings.map(w=>({id:`joint-wing-${w.side}-${w.end}`,centroidM:w.root,kind:'solar-drive'})),...pose.banks.flatMap(b=>b.panelRoots.map((p,j)=>({id:`joint-radiator-${b.end}-${j}`,centroidM:p,kind:j?'radiator-fold':'radiator-root'})))];
+}
+// Shared positions for the allocated compact drive/joint masses. A fixed root
+// has zero relative translation; an inline solar root follows its radiator arm.
+export function mechanismStations(h,deployment=1,attitude=null){
+ return jointStations(mechanismPose(deploymentLayout(h),deployment,h.input.solarTiltDeg,attitude));
+}
 // The terminal allocation separates the fixed radio/positioner allowance from
 // its aperture-scaled moving head. Head centroids are geometry surrogates.
 // Axes are right-handed local X/Y/Z expressed in the spacecraft body frame.
 export function terminalMassElements(h,attitude=null){
- const d=h.input,layout=terminalLayout(h.bodyWidthM,h.bodyHeightM,d.kaDishM,d.opticalApertureM);
+ const d=h.input,communications=installedCommunications(h),layout=terminalLayout(h.bodyWidthM,h.bodyHeightM,d.kaDishM,d.opticalApertureM);
  const definitions=[
   ['05.02','dish',10,10*d.kaDishM**2,d.kaDishM/2,.42*d.kaDishM,layout.kaHeight,-layout.kaPin+.21*d.kaDishM,attitude?.dishBoresightBody??attitude?.dish],
   ['05.03','optic',7,250*d.opticalApertureM**2,.8*d.opticalApertureM,d.opticalApertureM,layout.opticalHeight,-layout.opticalPin+.5*d.opticalApertureM,attitude?.opticalBoresightBody??attitude?.optic]
  ];
  return definitions.flatMap(([wbs,id,fixedKg,headKg,radiusM,lengthM,height,offset,direction])=>{
-  const foot=h.propulsion.stations[wbs],norm=direction?Math.hypot(...direction):0;
-  const n=norm>0?direction.map(v=>v/norm):[0,1,0],az=Math.atan2(n[0],n[2]),el=Math.atan2(Math.hypot(n[0],n[2]),n[1]);
+  const kind=id==='optic'?'optical':'ka',installed=architectureTerminalStations(h).filter(t=>t.kind===kind),count=kind==='optical'?communications.opticalTerminalCount:communications.kaTerminalCount;
+  if(count===0)return [];
+  const stations=installed.length?installed:Array.from({length:count},()=>({positionM:h.propulsion.stations[wbs],normalBody:[0,1,0]}));
+  return stations.flatMap((station,index)=>{
+  const foot=station.positionM,mountNormal=station.normalBody||[0,1,0];
+  const norm=direction&&index===0?Math.hypot(...direction):0;
+  const n=norm>0?direction.map(v=>v/norm):mountNormal,az=Math.atan2(n[0],n[2]),el=Math.atan2(Math.hypot(n[0],n[2]),n[1]);
   const axes=[[Math.cos(az),0,-Math.sin(az)],n,[Math.sin(az)*Math.cos(el),-Math.sin(el),Math.cos(az)*Math.cos(el)]];
   return [
-   {id:id+'-base',wbs,massKg:fixedKg,centroidM:foot,dimensionsM:[radiusM*.8,lengthM*.5,radiusM*.8],moving:false},
-   {id:id+'-head',wbs,massKg:headKg,centroidM:foot.map((v,i)=>v+(i===1?height:0)+offset*n[i]),radiusM,lengthM,axes,symmetryAxis:1,moving:true}
+   {id:id+(index?'-'+index:'')+'-base',wbs,massKg:fixedKg,centroidM:foot,dimensionsM:[radiusM*.8,lengthM*.5,radiusM*.8],moving:false},
+   {id:id+(index?'-'+index:'')+'-head',wbs,massKg:headKg,centroidM:foot.map((v,i)=>v+mountNormal[i]*height+offset*n[i]),radiusM,lengthM,axes,symmetryAxis:1,moving:true}
   ];
+  });
  });
 }
 export function heliumDistribution(p,remainingKg){
@@ -29,12 +45,12 @@ export function heliumDistribution(p,remainingKg){
  return [...inTanks,p.pressurantKg-inTanks[0]-inTanks[1]];
 }
 export function equipmentAllocations(h){
- const d=h.input,p=h.propulsion,m=p.massKg,by=Object.fromEntries(h.massLedger.map(v=>[v.id,v]));
+ const d=h.input,p=h.propulsion,m=p.massKg,communications=installedCommunications(h),by=Object.fromEntries(h.massLedger.map(v=>[v.id,v]));
  const specs=[
  ['01.01','compute'],['01.02','host'],['01.03','storage'],['01.04','switch',h.serviceArchitecture.fabric.massKg],
  ['02.01','array'],['02.02','battery'],['02.03','switch',h.energySystem.masses.electricalKg],['03.01','radiator'],['03.02','coolant'],['03.03','blanket'],
  ['04.01','cmg',by.cmg.kg-6-.0015*d.dipoleAm2],['04.02','cmg',.0015*d.dipoleAm2],['04.03','cmg',6],
- ['05.01','terminals',2],['05.02','terminals',10+10*d.kaDishM**2],['05.03','terminals',7+250*d.opticalApertureM**2],
+ ['05.01','terminals',communications.masses.sBandKg],['05.02','terminals',communications.masses.kaKg],['05.03','terminals',communications.masses.opticalKg],
  ['06.01','engine',m.engineHeads],['06.02','engine',m.feedAssembly],['06.03','tanks',m.fuelShell],
  ['06.04','tanks',m.oxidizerShell],['06.05','tanks',m.heliumShell],['06.06','fuel'],['06.07','oxidizer'],['06.08','pressurant'],
  ['07.01','structure'],['07.02','skin'],['07.03','shield'],['07.04','hinges'],['07.05','cables'],['08.01','switch',12],['09.01','adapter']
@@ -48,12 +64,12 @@ function leafGroups(h,deploy,attitude){
  const pv=pose.wings.map(w=>{
   const exposed=w.span/(w.span+w.rolledLength);
   const center=w.tip.map((v,i)=>v+(w.root[i]-v)*exposed/2);
-  center[1]+=(1-exposed)*w.rollRadius*Math.cos(w.pitch);
-  center[2]+=(1-exposed)*w.rollRadius*Math.sin(w.pitch);
+  const normal=w.axes?.[1]||[0,Math.cos(w.pitch),Math.sin(w.pitch)];
+  for(let k=0;k<3;k++)center[k]+=(1-exposed)*w.rollRadius*normal[k];
   return center;
  });
  const rad=pose.banks.map(b=>mean(g.descriptors.filter(d=>d.type==='rad'&&d.end===b.end).map(d=>xyz(leafPose(g,d,deploy,h.input.solarTiltDeg,attitude)))));
- const mechanisms=[...pose.wings.map(q=>q.root),...pose.banks.flatMap(q=>[q.root,q.elbow])];
+ const mechanisms=jointStations(pose).map(q=>q.centroidM);
  return {pv,rad,mechanisms};
 
 }
@@ -72,8 +88,23 @@ function partsAt(h,deploy,attitude){
   '09.01':[[0,0,adapter&&bus?(adapter.z0M+h.payloadInterface.upperFaceStationM-bus.z0M-bus.z1M)/2:-l*.5-.24]]
  };
  for(const row of rows){
+  if(h.payloadLocation==='radiator'&&['03.02','07.03'].includes(row.wbs)){
+   const g=deploymentLayout(h),desc=g.descriptors.find(d=>d.type==='rad'),pose=leafPose(g,desc,deploy,h.input.solarTiltDeg,attitude),axes=leafAxes(pose),q=h.energySystem.thermal.passive||{};
+   const localKg=Math.min(row.kg,row.wbs==='07.03'?(h.payloadShieldKg||0):(q.spreaderKg||0)+(q.heatPipeKg||0)+(q.mountKg||0));
+   const bus=supplied[row.wbs],busPoint=Array.isArray(bus?.[0])?mean(bus):bus||[0,0,0],local=[pose.x,pose.y,pose.z].map((v,k)=>v+axes[1][k]*.055);
+   row.stationsM=[local,busPoint];row.stationShares=row.kg>0?[localKg/row.kg,1-localKg/row.kg]:[0,1];row.movingStationCount=1;row.centroidM=mean(row.stationsM,row.stationShares);continue;
+  }
+  if(h.payloadLocation==='radiator'&&['01.01','01.02'].includes(row.wbs)){
+   const g=deploymentLayout(h),desc=g.descriptors.find(d=>d.type==='rad'),pose=leafPose(g,desc,deploy,h.input.solarTiltDeg,attitude),axes=leafAxes(pose);
+   const slots=h.rackLayout.slots,points=slots.map(s=>[pose.x,pose.y,pose.z].map((v,k)=>v+axes[0][k]*s.x+axes[1][k]*(s.y+.06)+axes[2][k]*s.z));
+   const extra=row.wbs==='01.02'?(h.serviceArchitecture.compute.extraHostMassKg||0):0,share=(row.kg-extra)/row.kg;
+   row.stationsM=points;row.movingStationCount=points.length;row.stationShares=points.map(()=>share/points.length);
+   if(extra>0){const bus=supplied[row.wbs];row.stationsM.push(Array.isArray(bus?.[0])?mean(bus):bus||[0,0,0]);row.stationShares.push(extra/row.kg);}
+   row.centroidM=mean(row.stationsM,row.stationShares);continue;
+  }
   if(row.wbs==='05.02'||row.wbs==='05.03'){
    const parts=terminals.filter(p=>p.wbs===row.wbs),total=parts.reduce((sum,p)=>sum+p.massKg,0);
+   if(!parts.length||total===0){row.stationsM=[[0,0,0]];row.stationShares=[1];row.centroidM=[0,0,0];continue;}
    row.stationsM=parts.map(p=>p.centroidM);row.stationShares=parts.map(p=>p.massKg/total);
    row.centroidM=mean(row.stationsM,row.stationShares);continue;
   }

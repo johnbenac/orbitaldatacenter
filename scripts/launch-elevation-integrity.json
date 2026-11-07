@@ -1,0 +1,66 @@
+{
+  "schema": "orbital-data-center/elevation-lossless/1",
+  "baseCommit": "9d3e3d386d5a46acb053f2f40ea0e14a11f0f3f9",
+  "files": [
+    {
+      "name": "kourou-elevation.json",
+      "source": "dist/assets/launch-sites/kourou-elevation.json",
+      "archive": "dist/assets/launch-sites/kourou-elevation.json.zip",
+      "sha256": "0684cc4d656669fa347341c95e4fe526a6734699812ebe92c46feb26916a5f70",
+      "sourceBytes": 299887,
+      "archiveBytes": 73462,
+      "width": 257,
+      "height": 257
+    },
+    {
+      "name": "pecan-island-elevation.json",
+      "source": "dist/assets/launch-sites/pecan-island-elevation.json",
+      "archive": "dist/assets/launch-sites/pecan-island-elevation.json.zip",
+      "sha256": "a038ad38699aabe03a72241af0e7c2b174376f02113f1dac217d2869eaf29bba",
+      "sourceBytes": 292949,
+      "archiveBytes": 25748,
+      "width": 257,
+      "height": 257
+    },
+    {
+      "name": "space-coast-elevation.json",
+      "source": "dist/assets/launch-sites/space-coast-elevation.json",
+      "archive": "dist/assets/launch-sites/space-coast-elevation.json.zip",
+      "sha256": "831f6f6bd748d160cc78870bcdd10e887abd4c8215547699b150a58b27f24e9a",
+      "sourceBytes": 277271,
+      "archiveBytes": 28466,
+      "width": 257,
+      "height": 257
+    },
+    {
+      "name": "starbase-elevation.json",
+      "source": "dist/assets/launch-sites/starbase-elevation.json",
+      "archive": "dist/assets/launch-sites/starbase-elevation.json.zip",
+      "sha256": "cf17ef8d0365fcd0b8b770c51f1f1c56af3d2ad02b4af995c3496e7b4b0cda1e",
+      "sourceBytes": 281664,
+      "archiveBytes": 19230,
+      "width": 257,
+      "height": 257
+    },
+    {
+      "name": "vandenberg-elevation.json",
+      "source": "dist/assets/launch-sites/vandenberg-elevation.json",
+      "archive": "dist/assets/launch-sites/vandenberg-elevation.json.zip",
+      "sha256": "6e2b7fbeee817d19a2d5c62f2acb573e80f693ba6b4cc0f5856aef5fb7efe058",
+      "sourceBytes": 311744,
+      "archiveBytes": 62847,
+      "width": 257,
+      "height": 257
+    },
+    {
+      "name": "wenchang-elevation.json",
+      "source": "dist/assets/launch-sites/wenchang-elevation.json",
+      "archive": "dist/assets/launch-sites/wenchang-elevation.json.zip",
+      "sha256": "a3a83d3285b2257fb1a7ed9f38e087d0d7a7d7d47f81ed0789516c96fffe490e",
+      "sourceBytes": 282627,
+      "archiveBytes": 48486,
+      "width": 257,
+      "height": 257
+    }
+  ]
+}

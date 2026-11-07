@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {defaults,missionStarter,sizeDesign} from './dist/design.js';
-import {componentMassProperties} from './dist/component-stations.js';
+import {componentMassProperties,mechanismStations} from './dist/component-stations.js';
 import {componentInertia,boxInertia,parallelAxisTensor,principalMoments,inverseTensor,tensorVector} from './dist/attitude-inertia.js';
 
 const close=(a,b,relative=1e-9)=>assert.ok(Math.abs(a-b)<=relative*Math.max(1,Math.abs(a),Math.abs(b)),`${a} differs from ${b}`);
@@ -35,13 +35,14 @@ for(const options of poses){
  close(result.massKg,props.massKg);equalVector(result.cm,props.cm);
  close(result.contributions.reduce((sum,row)=>sum+row.massKg,0),result.massKg);
  equalVector(result.contributions.reduce((sum,row)=>add(sum,row.tensorKgM2),Array(9).fill(0)),result.tensorKgM2);
- for(const wbs of ['02.01','03.01']){
+ for(const wbs of ['02.01','03.01','07.04']){
   const parts=result.movingElements.filter(p=>p.wbs===wbs),row=result.contributions.find(r=>r.wbs===wbs),mass=parts.reduce((sum,p)=>sum+p.massKg,0);
   close(mass,row.massKg);
   const center=parts.reduce((sum,p)=>add(sum,p.centroidM.map(v=>v*p.massKg/mass)),[0,0,0]);
   equalVector(center,row.centroidM);
  }
- assert.equal(new Set(result.movingElements.map(p=>p.id)).size,14);
+ assert.equal(new Set(result.movingElements.map(p=>p.id)).size,result.movingElements.length,'Every articulated mass element has a unique identity');
+ assert.equal(result.movingElements.length,14+mechanismStations(hardware,options.deployment,options.attitude).length,'Original surface/head elements plus the installed compact joint masses');
  assert.ok(result.contributions.every(r=>r.basis.length>20));
  positiveTensor(result.tensorKgM2);
 }

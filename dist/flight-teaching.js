@@ -1,4 +1,5 @@
 // Interpret existing flight-model channels. The lesson never advances the clock.
+import {architectureFamily} from './architecture-families.js';
 const standard=new Intl.NumberFormat('en-US',{maximumFractionDigits:2});
 const fine=new Intl.NumberFormat('en-US',{maximumSignificantDigits:3});
 const format=x=>Number.isFinite(x)?(x!==0&&Math.abs(x)<.01?fine:standard).format(x):'—';
@@ -101,19 +102,20 @@ function operating(id,h,s){
 }
 
 function commissioning(id,h,s){
+ const family=architectureFamily(h),passive=family.thermalTopology==='passive-local',heatlift=family.thermalTopology==='heat-lift';
  if(['conops','purpose','compute','data','comm','avionics'].includes(id))return card('Why wait before admitting the first customer job?',
   'The spacecraft computer sequences the releases while the AI payload waits. A visible array or radiator can still be moving toward its commanded position. The work schedule opens after commissioning.',
   [fact('Current operation',s.deploymentTitle),fact('Spacecraft computer draw',s.cdhServedKW*1000,'W'),fact('AI work rate',s.aiUnitRate,rate(h))],link('Follow the power handoff','power'));
- if(['thermal','environment'].includes(id))return card('When does a radiator start carrying heat?','Opening a panel exposes its surface. Opening the coolant path connects that surface to the spacecraft’s heat source. Watch the connected area grow as each bank latches.',
-  [fact('Connected panel area',s.radiatorCoupledM2,'m²'),fact('Installed panel area',h.radiatorM2,'m²'),fact('Served pump draw',s.servedPumpKW*1000,'W')],link('Follow the deployment mechanism','mechanical'));
+ if(['thermal','environment'].includes(id))return card('When does a radiator start carrying heat?',passive?'Compute and its local spreader move with the radiator platform. Heat pipes provide the allocated local path; no remote pump or fluid crossing is installed. Deployment exposes the emitting faces.':heatlift?'Deployment exposes the radiator. The analytical heat pump separately transfers heat from the cold equipment store to the hotter radiator, and its electrical demand enters both the power and heat balances.':'Opening a panel exposes its surface. Opening the coolant path connects that surface to the spacecraft’s heat source. Watch the connected area grow as each bank latches.',
+  [fact('Connected panel area',s.radiatorCoupledM2,'m²'),fact('Installed panel area',h.radiatorM2,'m²'),passive?fact('Local payload heat transport',s.payloadToRadiatorKW,'kW'):heatlift?fact('Served heat-pump draw',s.servedHeatPumpKW,'kW'):fact('Served pump draw',s.servedPumpKW*1000,'W')],link('Follow the deployment mechanism','mechanical'));
  if(id==='power')return card('Can a wing generate power before the others finish deploying?','A wing can begin contributing as its blanket unrolls. The illuminated fraction and angle to the Sun govern its output. Loads can still draw on the battery during the sequence.',
   [fact('Area unrolled',s.solarDeployedM2,'m²'),fact('Array output',s.solarKW,'kW'),fact('Battery to bus',s.dischargeKW,'kW')],link('Inspect the Sun geometry','environment'));
- return card('Why are the appendages released in sequence?','The four wings and two radiator banks have distinct swept paths. Sequencing them gives each mechanism room to move and lets the flight computer confirm a latch before the next operation.',
-  [fact('Current operation',s.deploymentTitle),fact('Deployment motor draw',s.deploymentJointKW*1000,'W')],link('Trace the coolant connection','thermal'));
+ return card('Why are the appendages released in sequence?',`This family has ${family.solarWingCount} solar blankets and ${family.radiatorBankCount} radiator ${family.radiatorBankCount===1?'platform':'banks'} with distinct swept paths. ${passive?'The compute platform deploys before the blankets. ':''}Sequencing lets the flight computer confirm each required latch before the next operation. The declared timing and mechanisms are preliminary allocations.`,
+  [fact('Current operation',s.deploymentTitle),fact('Deployment motor draw',s.deploymentJointKW*1000,'W')],link('Trace the thermal connection','thermal'));
 }
 
 function launch(id,h,s){
- const d=h.input,insertion=s.flightPhase==='insertion',ground=s.t<0;
+ const d=h.input,insertion=s.flightPhase==='insertion',ground=s.t<0,family=architectureFamily(h),passive=family.thermalTopology==='passive-local';
  if(['launcher','launch','conops'].includes(id)){
   if(s.flightPhase==='integration')return card('Which fit check can stop a lift?',!h.payloadInterface.passes?'The lower spacecraft deck or an engine bell conflicts with the fixed adapter geometry. The crane holds the spacecraft at checkout.':!h.fairing.fit?'The spacecraft can reach its adapter, but its folded outline crosses the allowed envelope. The rehearsal stops before enclosure closure.':'The adapter must clear the engine bells, and the folded vehicle must fit inside the enclosure at every height. Passing one screen leaves the other to check.',
    [fact('Clearance around bells',h.payloadInterface.boreClearanceM*1000,'mm'),fact('Closest radial fit',h.fairing.radialClearanceM*1000,'mm'),fact('Overhead fit',h.fairing.axialClearanceM*1000,'mm')],{label:'Inspect the adapter in Phase B',phase:'B',domain:'launcher'});
@@ -129,15 +131,15 @@ function launch(id,h,s){
  if(id==='mass')return card('Which parts cross the separation plane?','The launch allowance includes the mission adapter as well as the fueled spacecraft. At separation the lower adapter stays with the launcher, and the passive attachment ring stays with the spacecraft.',
   [fact('Launch stack',h.launchKg,'kg'),fact('Adapter allocation',d.adapterKg,'kg'),fact('Fueled spacecraft',h.wetKg,'kg')],{label:'Inspect both faces in Phase B',phase:'B',domain:'launcher'});
  if(['power','thermal','environment'].includes(id)){
-  if(ground)return card('What should the ground team reproduce?',id==='thermal'?'The coolant cart can impose a load and measure the heat carried away. The installed radiator area becomes available in orbit only after deployment and coolant admission.':'The folded spacecraft cannot use its full solar or radiator area in the bay. A ground trial supplies the electrical or thermal boundary conditions that flight hardware will later encounter.',
+  if(ground)return card('What should the ground team reproduce?',id==='thermal'?(passive?'A local thermal fixture can impose payload heat and measure the platform interface. The passive transport path needs representative conductance, heat-pipe startup and deployed exposure tests; a remote coolant cart is not its flight circuit.':'The thermal fixture must represent the selected transport architecture and measure carried heat. Deployment exposure and the installed connection gates determine when the flight radiator becomes useful.'):'The folded spacecraft cannot use its full solar or radiator area in the bay. A ground trial supplies the electrical or thermal boundary conditions that flight hardware will later encounter.',
    [fact('Solar area unrolled',s.solarDeployedM2,'m²'),fact('Connected radiator area',s.radiatorCoupledM2,'m²'),fact('Ground boundary assumption',d.launchBoundaryK,'K')],chapter('Compare with deployment','commissioning'));
-  return card('What powers the spacecraft before its arrays open?','The solar wings are restrained, and the battery supplies the spacecraft bus in the flight model. Opening arrays later changes the energy source. Circulating coolant through latched radiators changes the heat path.',
+  return card('What powers the spacecraft before its arrays open?','The solar wings are restrained, and the battery supplies the spacecraft bus in the flight model. Opening arrays later changes the energy source. '+(passive?'The compute platform exposes its passive heat-rejection surface as it deploys.':'The selected thermal connection and transport state set the heat path to the deployed radiators.'),
    [fact('Array generation',s.solarKW,'kW'),fact('Battery to bus',s.dischargeKW,'kW'),fact('Spacecraft bus served',s.servedLoadKW,'kW')],chapter('Watch deployment','commissioning'));
  }
  if(id==='comm'){
   if(s.flightPhase==='integration')return card('Which parts of the link does this setup exercise?',
-   'The command rack, conducted Ka receiver and shrouded optical head reproduce different parts of a ground contact. Select a bench to compare the sent stimulus with what its receiver can recover.',
-   [fact('S-band role','Command and telemetry'),fact('Ka role','Bulk downlink'),fact('Optical role','Fine-pointed transfer')],chapter('Review the pad configuration','pad'));
+   'Ground fixtures exercise the installed communication channels. A conducted RF receiver or shrouded optical head reproduces only its declared link boundary. Omitted flight hardware has no qualifying test result.',
+   [fact('S-band role',family.sPatchCount?'Command and telemetry allocation':'Not installed'),fact('Ka role',family.kaTerminalCount?'Payload downlink allocation':'Not installed'),fact('Optical heads',family.opticalTerminalCount)],chapter('Review the pad configuration','pad'));
   if(ground)return card('What carries checkout data once the fairing is closed?',
    'Couplers and the optical test head come off before the spacecraft moves. On the pad this study keeps spacecraft transmissions inhibited. Prelaunch status can travel through a launcher umbilical where the interface provides it.',
    [fact('Ground fixtures','Removed'),fact('Spacecraft flight link','Inhibited'),fact('Customer data sent',0,'bytes')],chapter('Follow liftoff','ascent'));
@@ -146,7 +148,7 @@ function launch(id,h,s){
    [fact('Spacecraft','Attached to launcher'),fact('Active spacecraft transfers',(s.terminalActivity||[]).length),fact('Payload goodput',s.goodputMbps,'Mbit/s')],chapter('Inspect separation','insertion'));
   const flows=s.terminalActivity||[],direction=dir=>flows.filter(x=>x.terminal==='S-band'&&x.direction===dir).reduce((sum,x)=>sum+x.mbps*1000,0);
   return card('Has the spacecraft established its own link?',
-   'Release permits the first independent radio contact. The fixed patches can accept commands and return health samples when a ground station is visible and the receiver acquires. Bulk service comes later in commissioning.',
+   family.sPatchCount?'Release permits the first independent radio contact. The installed patches can accept commands and return health samples when a ground station is visible and the receiver acquires. Bulk service comes later in commissioning.':'This package omits S-band. Separation does not create an independent command or housekeeping link; a replacement route remains unimplemented. The optical payload route still follows its commissioning and acquisition gates.',
    [fact('Visible ground station',s.station||'None'),fact('S-band receive',direction('rx'),'kbit/s'),fact('S-band send',direction('tx'),'kbit/s')],chapter('See communications during deployment','commissioning'));
  }
  if(id==='avionics')return card('How does a checkout differ from a customer transfer?','Engineers can command spacecraft electronics and read their health before the customer payload starts. In flight the housekeeping recorder and command channel remain separate from the AI product queue.',

@@ -1,8 +1,8 @@
-import {DEPLOY_END_S} from './commissioning-clock.js';
+import {commissioningClock} from './commissioning-clock.js';
 const esc=s=>String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
 const n=(x,d=1)=>Number.isFinite(x)?x.toLocaleString('en-US',{maximumFractionDigits:d}):'—';
-export function comparisonEvents(events,start,end){
- return events.filter(e=>(e.type==='contact'||e.type==='eclipse')&&e.start-1>=Math.max(start,DEPLOY_END_S)&&e.end+1<=end&&e.end>e.start);
+export function comparisonEvents(events,start,end,h){
+ return events.filter(e=>(e.type==='contact'||e.type==='eclipse')&&e.start-1>=Math.max(start,commissioningClock(h).endS)&&e.end+1<=end&&e.end>e.start);
 }
 export function chooseComparison(events,id,t,domain){
  if(!events.length)return null;

@@ -60,7 +60,7 @@
     "nativeResolutionBasis": "Nominal source acquisition, not bundled display sampling"
   },
   "elevation": {
-    "url": "assets/launch-sites/vandenberg-elevation.json",
+    "url": "assets/launch-sites/vandenberg-elevation.json.zip",
     "width": 257,
     "height": 257,
     "bounds": [

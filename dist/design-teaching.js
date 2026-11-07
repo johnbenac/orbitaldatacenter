@@ -4,7 +4,8 @@ import {R,MU} from './orbit.js';
 import {componentCentroid} from './component-stations.js';
 import {guidanceSources} from './input-guidance.js';
 import {integrationProfile} from './integration-profiles.js';
-import {spacecraftInterface} from './payload-interface.js';
+import {payloadInterfaceFor} from './payload-interface.js';
+import {architectureFamily} from './architecture-families.js';
 
 const references=new Map(guidanceSources.map(x=>[x.id,x]));
 const page=(label,domain,phase)=>({label,domain,phase});
@@ -154,22 +155,23 @@ export function designTeaching(phase,id,h,s){
    [reading(biggest.label,biggest.kg,'kg'),reading('Share of dry mass',100*biggest.kg/h.dryKg,'%')],page('Locate the mass in the vehicle','mechanical','B'),'margin');
  }
  case 'launch':{
-  const f=h.fairing;
+  const f=h.fairing,face=h.payloadInterface||payloadInterfaceFor(h),rectangular=face.attachmentShape==='rectangular-lugs';
   if(A)return lesson('Which protrusion comes closest to the launcher?','The enclosure can taper above its widest point. Compare spacecraft width at each height with available room at that same height, including the selected allowance for lateral motion.',
    [reading('Closest feature',f.limitingPart),reading('Height above adapter',f.limitingZM,'m'),reading('Radial clearance after motion allowance',1000*f.radialClearanceM,'mm')],edit('Inspect lateral motion allowance','radialPaddingM'),{title:f.source,url:f.sourceUrl});
-  return lesson('Could the folded vehicle pass the fit check and still hit its adapter?','The spacecraft carries its engine bells through the central opening of the upper fitting. Check both the side gap and the space under the bell tips. A negative value means the modeled hardware overlaps.',
-   [reading('Bell-to-bore gap',1000*h.payloadInterface.boreClearanceM,'mm'),reading('Room under tips',1000*h.payloadInterface.bellTipClearanceM,'mm')],page('Inspect both adapter faces','launcher','B'),'clear');
+  return lesson('Could the folded vehicle pass the fit check and still hit its adapter?',(rectangular?'Four allocated corner attachments leave a cradle opening around the engine exits. Check the gap to each attachment pad and the space under the bell tips.':'The spacecraft carries its engine bells through the central opening of the circular fitting. Check the side gap and the space under the bell tips.')+' A positive static clearance still needs tolerance, motion and provider acceptance evidence.',
+   [reading(rectangular?'Bell-to-attachment gap':'Bell-to-bore gap',1000*face.boreClearanceM,'mm'),reading('Room under tips',1000*face.bellTipClearanceM,'mm')],page('Inspect both adapter faces','launcher','B'),'clear');
  }
  case 'launcher':{
-  const native=integrationProfile(d.launcher,d.launchSite).interface;
+  const native=integrationProfile(d.launcher,d.launchSite).interface,face=h.payloadInterface||payloadInterfaceFor(h),rectangular=face.attachmentShape==='rectangular-lugs';
   if(A)return lesson('Which capacity figure applies to this launch?',h.launchKg>Math.min(d.referenceKg,d.launchAllowanceKg)?'The stack exceeds at least one mass allowance. Check the reference orbit and the mission-specific allocation together before examining the fairing.':'The reference payload rating belongs to a stated orbit and launch configuration. The mission-specific allowance captures the actual ride being studied. A positive mass margin still leaves the geometry to check.',
    [reading('Published or study reference',d.referenceKg,'kg'),reading('Mission-specific allowance',d.launchAllowanceKg,'kg'),reading('Launched stack',h.launchKg,'kg')],edit('Inspect the mission allowance','launchAllowanceKg'),'trade');
-  return lesson('Why does changing rockets leave the spacecraft bolt circle alone?',
-   'The adapter bridges the launcher attachment and the fixed spacecraft interface. '+(native.status==='study'?'The lower attachment shown for this launcher is a workbench assumption.':'The lower attachment uses the provider’s published reference.'),
-   [reading('Spacecraft bolt circle',1000*spacecraftInterface.pcdM,'mm'),reading(native.diameterMeaning,native.diameterMm,'mm')],page('Watch this payload being loaded','launcher','D'),native.source);
+  return lesson('Why does changing rockets preserve the spacecraft attachment?',
+   'The adapter bridges the chosen launcher and the installed family’s attachment. '+(rectangular?'This family carries four preliminary corner attachments; fastener drilling and dispenser acceptance are unresolved. ':'The legacy circular interface has its own project bolt-circle allocation. ')+(native.status==='study'?'The lower launcher attachment is a workbench assumption.':'The lower attachment uses the provider’s published reference.'),
+   [reading('Spacecraft interface',face.id),...(rectangular?[reading('Open cradle width × height',face.openWidthM.toFixed(2)+' × '+face.openHeightM.toFixed(2),'m')]:[reading('Project spacecraft bolt circle',1000*face.pcdM,'mm')]),reading(native.diameterMeaning,native.diameterMm,'mm')],page('Watch this payload being loaded','launcher','D'),native.source);
  }
  case 'mechanical':{
-  if(A)return lesson('What must fold to fit this spacecraft into its ride?','Each wing rolls beside the bus. Each radiator bank folds onto its hinges. The flat side walls carry the appendages. Look down the launch axis to see the room between the rectangular body and the circular payload envelope. Then check clearance where the fairing narrows along the stack.',
+  const family=architectureFamily(h);
+  if(A)return lesson('What must deploy from this spacecraft’s launch package?',`${family.label} carries ${family.solarWingCount} solar wings and ${family.radiatorBankCount} radiator ${family.radiatorBankCount===1?'platform':'banks'}. `+(family.payloadLocation==='radiator'?'The compute equipment moves with the passive radiator platform before the two solar blankets roll out. ':family.id==='starcloud-inline'?'Each opposed deployment line carries the allocated radiator segments and its photovoltaic blanket. ':'The selected deployment graph controls array and radiator release. ')+'Inspect the actual folded envelope, moving-equipment clearance and provider keep-in profile; a drawing alone does not verify deployment.',
    [reading('Enclosed bus length',h.bodyLengthM,'m'),reading('Stowed stack with adapter',h.stowedLengthM,'m')],page('Inspect the limiting clearance','launch','A'),'mech');
   const wet=componentCentroid(h,h.propellantKg,0,true),empty=componentCentroid(h,0,0,true);
   return lesson('How far could the mass center shift as the tanks empty?','Hold the spacecraft folded and the adapter attached in both cases, then remove the liquid propellant. Comparing their mass-weighted centers isolates the effect of propellant inventory on balance.',

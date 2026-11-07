@@ -1,4 +1,4 @@
-import {DEPLOY_END_S} from './commissioning-clock.js';
+import {commissioningClock} from './commissioning-clock.js';
 import {deployedPlan} from './propulsion-drawing.js';
 import {icon} from './icons.js';
 import {sizingLabel} from './design.js';
@@ -18,14 +18,14 @@ export const phases={
  F:{label:'Decommissioning',title:'Decommission the spacecraft',sub:'Review the selected disposal trajectory, expended propellant and achieved endpoint.',native:'Closeout'}
 };
 export const chapterPhase=id=>['integration','pad','ascent','insertion'].includes(id)?'D':id==='deorbit'?'F':'E';
-export function phaseFromView(v){
+export function phaseFromView(v,h){
  if(Object.hasOwn(phases,v.phase))return v.phase;
  if(v.page&&Object.hasOwn(cfg,v.page))return 'B';
- return chapterPhase(v.chapter|| (v.t<DEPLOY_END_S?'integration':'operations'));
+ return chapterPhase(v.chapter|| (v.t<commissioningClock(h).startS?'integration':v.t<commissioningClock(h).endS?'commissioning':'operations'));
 }
 export function lifecycleNav(phase){return Object.entries(phases).map(([id,p])=>`<button class="phase-tab ${phase===id?'current':''}" data-phase="${id}" aria-current="${phase===id?'step':'false'}" data-tip="${esc(p.sub)}"><i>${id}</i><span><small>PHASE ${id}</small><strong>${esc(p.label)}</strong></span></button>`).join('')}
 export const lifecycleLink='<a href="https://www.nasa.gov/wp-content/uploads/2018/09/nasa_systems_engineering_handbook_0.pdf#page=27" target="_blank" rel="noopener">NASA Systems Engineering Handbook ↗</a>';
-export function sourceNote(){return '<p class="phase-source">The mission targets PDR near the end of Phase B. The six workspace phases support design and previews of later integration, flight and closeout. Lifecycle acceptance is recorded in the Mission Baseline. '+lifecycleLink+'</p>'}
+export function sourceNote(){return '<p class="phase-source">The mission targets PDR near the end of Phase B. The six workspace phases support design and previews of later integration, flight and closeout. Lifecycle evidence and acceptance requirements are recorded under shared Design rules &amp; margins. '+lifecycleLink+'</p>'}
 export function designOutput(h,v,result){
  return `<div class="concept-top"><span class="guideflag">CURRENT DESIGN</span><strong>${esc(designName(v))}</strong></div>${deployedPlan(h)}<div class="concept-readings">${[['Compute',n(h.itKw,1),'kW IT','conceptCompute'],['Launch stack',n(h.launchKg/1000,2),'t','conceptMass'],['Array area',n(h.solarM2,0),'m²','conceptSolar'],h.ai&&h.input.aiPurpose!=='text'?['Active '+h.ai.unit+' capacity',n(h.ai.activeUnitsPerSec,3),h.ai.unit+'/s','aiPurpose']:['Decode capacity',n(h.tokensPerSec,0),'tok/s','conceptDecode']].map(([l,x,u,key])=>`<div><small>${l} ${helpButton(key,l)}</small><strong>${x} <em>${u}</em></strong></div>`).join('')}</div><p class="concept-fit">${icon(h.launchScreenFeasible?'check':'ruler',14)} ${h.launchScreenFeasible?'Within the selected single-launch envelope':'Exceeds a selected single-launch constraint'} · ${esc(h.launcherLabel)}</p><button class="textbutton concept-deploy" data-chapter="commissioning">Preview spacecraft deployment →</button>${v.solve==='installed'?'':`<p class="concept-fit">${esc(sizingLabel(result.binding))} · ${n(result.achieved,2)} ${esc(result.unit)}</p>`}`;
 }

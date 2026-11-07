@@ -14,6 +14,12 @@ export const thermalNodes=specs.map(([id,label,tempKey,lo,hi,slo,shi],index)=>({
  keys:{operating:{min:id+'OpMinK',max:id==='junction'?'junctionLimitK':id+'OpMaxK'},survival:{min:id+'SurvivalMinK',max:id+'SurvivalMaxK'}},
  assumptions:{operating:{min:lo,max:hi},survival:{min:slo,max:shi}}
 }));
+export function thermalNodeLabel(input,id){
+ const d=input?.input||input||{},family=d.architectureFamily;
+ if(family==='redwire-platform')return ({coldPlate:'Platform cold plate',coolant:'Local spreader',radiator:'Compute/radiator platform'})[id]||thermalNodes.find(n=>n.id===id)?.label||id;
+ if(family==='heatlift-study')return ({coldPlate:'Payload cold plate',coolant:'Cold-side thermal store',radiator:'Hot-side radiator'})[id]||thermalNodes.find(n=>n.id===id)?.label||id;
+ return thermalNodes.find(n=>n.id===id)?.label||id;
+}
 export const thermalControls=thermalNodes.flatMap(n=>thermalStates.flatMap(state=>['min','max'].map(side=>({
  key:n.keys[state][side],label:n.label+' · '+state+' '+(side==='min'?'minimum':'maximum'),group:'Thermal limits',unit:'K',min:3,max:1500,step:.1,value:n.assumptions[state][side]
 }))));
@@ -30,6 +36,8 @@ export function thermalActivityMask(t,itKw,pumpKw,deploy,chargeKw,dischargeKw,ex
   (t>=0&&deploy>1e-7?8:0)|(t>=0&&Math.max(chargeKw,dischargeKw)>POWER_THRESHOLD?16:0)|(exposed?32:0);
 }
 function activity(n,s,op){
+ if(s.thermalTopology==='passive-local'&&(n.id==='coldPlate'||n.id==='coolant'))return op?'Local passive payload heat path in service':'Local passive path; payload unpowered';
+ if(s.thermalTopology==='heat-lift'&&(n.id==='coldPlate'||n.id==='coolant'))return op?'Heat pump removing cold-side heat':'Cold-side store; heat pump off';
  switch(n.id){
  case 'junction':return op?s.burst?'Powered compute burst':'Powered idle':'Accelerators unpowered';
  case 'coldPlate':return op?'Cold plate on circulating loop':'Loop in standby';
@@ -42,11 +50,11 @@ function activity(n,s,op){
 export function qualifyNow(s,d){
  const mask=s.thermalActivityMask??thermalActivityMask(s.t,s.itKW,s.servedPumpKW,s.radiatorDeployment??s.deployment,s.chargeKW,s.dischargeKW,s.carrierAttached===undefined?undefined:!s.carrierAttached);
  return thermalNodes.map(n=>{const op=!!(mask&(1<<n.index)),state=op?'operating':'survival',k=n.keys[state],minK=d[k.min],maxK=d[k.max],temperatureK=s[n.tempKey],observable=!s.referenceBody&&Number.isFinite(temperatureK)&&(s.terminatedAt==null||s.t<=s.terminatedAt+1e-7);
-  return {id:n.id,label:n.label,tempKey:n.tempKey,temperatureK,state,activity:observable?activity(n,s,op):'Outside propagated mission',minK,maxK,marginK:observable?Math.min(temperatureK-minK,maxK-temperatureK):null,status:!observable?'unassessed':temperatureK<minK?'cold':temperatureK>maxK?'hot':'pass'};});
+  return {id:n.id,label:thermalNodeLabel(d,n.id),tempKey:n.tempKey,temperatureK,state,activity:observable?activity(n,s,op):'Outside propagated mission',minK,maxK,marginK:observable?Math.min(temperatureK-minK,maxK-temperatureK):null,status:!observable?'unassessed':temperatureK<minK?'cold':temperatureK>maxK?'hot':'pass'};});
 }
 export function newThermalSummary(d,start,end,provenance,log=false){
  return {start,end,coveredSeconds:0,provenance,firstViolation:null,...(log?{excursions:[]}:{}),rows:thermalNodes.flatMap(n=>thermalStates.map(state=>{
-  const k=n.keys[state];return {id:n.id,label:n.label,state,minLimitK:d[k.min],maxLimitK:d[k.max],durationS:0,minK:null,maxK:null,minTime:null,maxTime:null,lowCount:0,lowSeconds:0,highCount:0,highSeconds:0,firstLowTime:null,firstHighTime:null,lastLowEnd:null,lastHighEnd:null,firstViolation:null};
+  const k=n.keys[state];return {id:n.id,label:thermalNodeLabel(d,n.id),state,minLimitK:d[k.min],maxLimitK:d[k.max],durationS:0,minK:null,maxK:null,minTime:null,maxTime:null,lowCount:0,lowSeconds:0,highCount:0,highSeconds:0,firstLowTime:null,firstHighTime:null,lastLowEnd:null,lastHighEnd:null,firstViolation:null};
  }))};
 }
 function record(summary,row,side,from,to,limitK,tempK){

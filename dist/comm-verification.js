@@ -1,4 +1,5 @@
 import {terminalPattern} from './terminal-activity.js';
+import {installedCommunications} from './communications-packages.js';
 
 // Bench settings and acceptance limits are illustrative project choices. Each
 // test exercises an isolated article; the flight clock and recorder stay live
@@ -115,10 +116,16 @@ export function runCommVerification(h,id,setting){
  const spec=commTestCases.find(test=>test.id===id);
  if(!spec)throw RangeError('Unknown communications test: '+id);
  const control=spec.control,x=Math.min(control.max,Math.max(control.min,Number.isFinite(setting)?setting:control.initial));
+ const installed=installedCommunications(h),applicable=id==='sband'?installed.sBandInstalled:id==='ka'?installed.kaInstalled:installed.opticalTerminalCount>0;
+ if(!applicable){
+  const summary=spec.terminal+' flight equipment is not installed in this communications package. This bench is not applicable and provides no test or qualification credit.';
+  const assumptions=[metric('Installed package',installed.label,''),metric('Installed test articles',0,'count')],requirements=[measure('installed-article','Installed flight equipment',null,'=',1,'count')];
+  return {id,setting:x,applicable:false,passed:null,summary,measurements:[metric('Flight article','Not installed','')],stages:spec.stages.map(label=>({label,status:'not_applicable',detail:'No installed flight article; no stimulus or result is credited.'})),trace:null,evidence:{schema:'odc-ground-communications-test/1',id,title:spec.title,method:'Installed-equipment applicability check',setting:metric(control.label,x,control.unit),assumptions,requirements,outcome:'not_applicable',source:spec.source},signature:JSON.stringify([id,x,installed.id,'not-installed'])};
+ }
  const {requirements,marginAt,assumptions,measurements,stages,summary}=benches[id](h,x);
  const passed=requirements.every(row=>row.passed===true);
  const samples=Array.from({length:33},(_,i)=>{const v=control.min+(control.max-control.min)*i/32;return {x:v,y:marginAt(v)}});
  const trace={samples,limit:0,current:{x,y:marginAt(x)},xLabel:control.label,xUnit:control.unit,yLabel:'Margin',yUnit:'dB',unit:'dB'};
  const evidence={schema:'odc-ground-communications-test/1',id,title:spec.title,method:'Deterministic simulated ground test',setting:metric(control.label,x,control.unit),assumptions,requirements,outcome:passed?'pass':'fail',source:spec.source};
- return {id,setting:x,passed,summary,measurements,stages:stages.map((s,i)=>({...s,label:spec.stages[i]})),trace,evidence,signature:JSON.stringify([id,x,assumptions.map(a=>a.value)])};
+ return {id,setting:x,applicable:true,passed,summary,measurements,stages:stages.map((s,i)=>({...s,label:spec.stages[i]})),trace,evidence,signature:JSON.stringify([id,x,assumptions.map(a=>a.value)])};
 }

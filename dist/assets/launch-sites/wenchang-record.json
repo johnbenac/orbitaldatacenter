@@ -47,7 +47,7 @@
     "nativeResolutionBasis": "Nominal source acquisition, not bundled display sampling"
   },
   "elevation": {
-    "url": "assets/launch-sites/wenchang-elevation.json",
+    "url": "assets/launch-sites/wenchang-elevation.json.zip",
     "width": 257,
     "height": 257,
     "bounds": [

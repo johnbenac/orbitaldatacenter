@@ -7,6 +7,7 @@ const anchor=ref=>`<a href="${esc(ref.url)}" target="_blank" rel="noopener noref
 const metric=(name,value)=>`<div><dt>${name}</dt><dd>${value}</dd></div>`;
 
 export function interfaceDrawing(h,flightOnly=false){
+ if(h.payloadInterface.attachmentShape==='rectangular-lugs')return allocatedInterfaceDrawing(h,flightOnly);
  const native=integrationProfile(h.input.launcher,h.input.launchSite).interface;
  const scale=65/(face.outerM/2);
  const holeMarks=interfaceHoles().map(([x,y],i)=>`<circle cx="${(x*scale).toFixed(2)}" cy="${(-y*scale).toFixed(2)}" r="1.15" fill="${i===0?'#ffe59c':'#20302d'}"/>`).join('');
@@ -35,6 +36,7 @@ export function launcherFaceDrawing(h){
 }
 
 export function renderInterface(h,flightOnly=false){
+ if(h.payloadInterface.attachmentShape==='rectangular-lugs')return renderAllocatedInterface(h,flightOnly);
  const datum=integrationProfile(h.input.launcher,h.input.launchSite).interface,m=h.payloadInterface;
  const edge=(m)=>m<0?`${mm(-m,1)} overlap`:`${mm(m,1)} clearance`;
  const facts=metric('Pitch circle',mm(face.pcdM))+metric('Holes',`${face.holes} × Ø${mm(face.holeM)}`)+metric('Fastener',face.fastener+' nominal')+metric('Ring OD / thickness',`${n(face.outerM*1000)} / ${mm(face.thicknessM)}`);
@@ -50,4 +52,23 @@ export function renderInterface(h,flightOnly=false){
  <details><summary>Load path, separation and dimensional basis</summary><p>The bolts carry launch loads from the thrust deck into the upper fitting. A clamp below that joint opens for separation. The passive ring flies with the spacecraft. The active clamp, stand-off and lower adapter stay with the launcher.</p><p>ODC specifies the hole pattern, ring dimensions, open stand-off and transition geometry for this study. The cited flight example documents the bolted upper ring and release principle. Bolt preload, strength, release shock and provider acceptance require a mission interface agreement.</p><p>${anchor(face.reference)}</p></details>
  ${flightOnly?'':'<button class="btn iface-watch" data-watch-loading>Watch payload loading →</button>'}
  </div></section>`;
+}
+
+function allocatedInterfaceDrawing(h,flightOnly){
+ const m=h.payloadInterface,w=flightOnly?420:650,k=128/Math.max(h.bodyWidthM,h.bodyHeightM),X=x=>100+x*k,Y=y=>94-y*k;
+ const pads=m.lugPositionsBodyM.map((p,i)=>`<rect x="${X(p[0])-m.lugSizeM*k/2}" y="${Y(p[1])-m.lugSizeM*k/2}" width="${m.lugSizeM*k}" height="${m.lugSizeM*k}" fill="#f1ba72"/><text x="${X(p[0])}" y="${Y(p[1])-10}" text-anchor="middle" font-size="10">${i+1}</text>`).join('');
+ const bells=h.propulsion.engines.map(e=>`<circle cx="${X(e.x)}" cy="${Y(e.y)}" r="${e.exitRadiusM*k}" fill="#344b58" stroke="#aac2cb"/>`).join('');
+ const bus=`<rect x="${X(-h.bodyWidthM/2)}" y="${Y(h.bodyHeightM/2)}" width="${h.bodyWidthM*k}" height="${h.bodyHeightM*k}" fill="#1d343b" stroke="#83cbbd"/>`;
+ let side='';
+ if(!flightOnly){const lower=integrationProfile(h.input.launcher,h.input.launchSite).interface.diameterMm/2000,sk=Math.min(70/Math.max(lower,.4*h.bodyWidthM),90/Math.max(.1,m.upperFaceStationM)),top=145-m.upperFaceStationM*sk,upper=.4*h.bodyWidthM*sk,base=lower*sk;
+  side=`<g transform="translate(548 0)"><text x="0" y="22" text-anchor="middle" font-size="12">Open adapter cradle</text><path d="M${-upper} ${top}L${-base} 145M${upper} ${top}L${base} 145" fill="none" stroke="#91abb9" stroke-width="5"/><path d="M${-base-5} 145H${base+5}" stroke="#8cb9d2" stroke-width="6"/><path d="M${-upper-7} ${top}h14M${upper-7} ${top}h14" stroke="#f1ba72" stroke-width="7"/><path d="M${-base-4} 136H${base+4}" stroke="#f1ba72" stroke-dasharray="4 3"/><text x="0" y="180" text-anchor="middle" font-size="11">Provider lower attachment</text></g>`;
+ }
+ return `<svg class="iface-diagram" viewBox="0 0 ${w} 200" role="img" aria-label="Four allocated spacecraft attachment pads and open launch cradle"><rect width="${w}" height="200" rx="8" fill="#14232a"/><g font-family="system-ui,sans-serif" fill="#dce9e6">${bus}${pads}${bells}<text x="100" y="184" text-anchor="middle" font-size="11">+X right · +Y up</text><text x="198" y="54" font-size="13">Four allocated corner attachments</text><text x="198" y="81" font-size="12">${n(.8*h.bodyWidthM,2)} × ${n(.8*h.bodyHeightM,2)} m centers</text><text x="198" y="108" font-size="12">Open space for the engine bells</text><text x="198" y="137" font-size="11" fill="#b1c4c6">Fasteners and release design remain open.</text>${side}</g></svg>`;
+}
+
+function renderAllocatedInterface(h,flightOnly){
+ const m=h.payloadInterface,datum=integrationProfile(h.input.launcher,h.input.launchSite).interface;
+ const lower=flightOnly?'':`<div class="iface-lower"><h4>${esc(h.launcherLabel)} side</h4>${launcherFaceDrawing(h)}<p><strong>${esc(datum.name)}</strong> · ${esc(datum.diameterMeaning)} Ø${n(datum.diameterMm,3)} mm.</p><small>${esc(datum.basis)} · ${anchor(datum.source)}</small></div>`;
+ const facts=metric('Upper interface',m.kind.replaceAll('-',' '))+metric('Attachment centers',`${n(.8*h.bodyWidthM,2)} × ${n(.8*h.bodyHeightM,2)} m`)+metric('Allocated pad size',mm(m.lugSizeM))+metric('Fastener / separation ICD','Open');
+ return `<section class="panel iface-panel"><div class="panelhead"><h2>${flightOnly?'Spacecraft launch interface':'How this architecture attaches'}</h2><span class="arch-stamp">ALLOCATED CRADLE</span></div><div class="arch-pad"><p>The ${esc(m.kind.replaceAll('-',' '))} uses four corner load-transfer attachments on its aft structure. The open adapter carries those loads to the selected launch vehicle’s lower attachment.</p>${allocatedInterfaceDrawing(h,flightOnly)}<div class="iface-columns"><div><h4>Spacecraft side</h4><dl class="iface-facts">${facts}</dl><small>${esc(m.id)} · ${esc(m.basis)}</small></div>${lower}</div><p class="iface-fit ${m.passes?'':'iface-negative'}"><strong>${m.passes?'Allocated attachment geometry clears the modeled engine bells.':'Attachment geometry has a clearance shortfall.'}</strong><br>Minimum bell-to-pad clearance · ${mm(m.boreClearanceM,1)}. Pad-to-deck edge · ${mm(m.deckClearanceM,1)}. Axial space below bells · ${mm(m.bellTipClearanceM,1)}.</p><details><summary>Load path and interface evidence</summary><p>Four allocated upper attachments transfer the stowed spacecraft loads through the open cradle into the provider-side interface. Separation hardware, preload, stiffness, release shock, service disconnects and the provider’s accepted load cases require a mission interface agreement. The geometric screen does not establish compatibility or qualification.</p><p>Cradle mass remains within the declared launch-adapter allocation. No supplier fastener pattern or dispenser arrangement has been assumed to be published.</p></details>${flightOnly?'':'<button class="btn iface-watch" data-watch-loading>Watch payload loading →</button>'}</div></section>`;
 }

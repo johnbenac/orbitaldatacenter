@@ -57,7 +57,7 @@
     "nativeResolutionBasis": "Nominal source acquisition, not bundled display sampling"
   },
   "elevation": {
-    "url": "assets/launch-sites/space-coast-elevation.json",
+    "url": "assets/launch-sites/space-coast-elevation.json.zip",
     "width": 257,
     "height": 257,
     "bounds": [

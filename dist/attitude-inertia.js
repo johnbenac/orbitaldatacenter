@@ -1,7 +1,7 @@
 // Composite-body inertia about the instantaneous vehicle center of mass.
 // Matrices are symmetric, row-major, in kg m². Off-diagonal entries are
 // -integral(x y dm), -integral(x z dm), and -integral(y z dm).
-import {componentMassProperties,equipmentAllocations,terminalMassElements} from './component-stations.js';
+import {componentMassProperties,equipmentAllocations,terminalMassElements,mechanismStations} from './component-stations.js';
 import {equipmentResources} from './equipment-resources.js';
 import {deploymentLayout,mechanismPose,leafPose,leafAxes} from './deployment.js';
 
@@ -125,23 +125,38 @@ function fixedShape(h,row){
 function movingSurfaces(h,rows,deploy,attitude){
  const g=deploymentLayout(h),pose=mechanismPose(g,deploy,h.input.solarTiltDeg,attitude),solar=rows.find(r=>r.wbs==='02.01'),radiator=rows.find(r=>r.wbs==='03.01'),elements=[];
  for(const [i,wing] of pose.wings.entries()){
-  const mass=solar.predictedKg*solar.stationShares[i],fraction=wing.span/(wing.span+wing.rolledLength),axes=leafAxes({pitch:wing.pitch});
+  const mass=solar.predictedKg*solar.stationShares[i],fraction=wing.span/(wing.span+wing.rolledLength),axes=wing.axes||leafAxes({pitch:wing.pitch});
   const flat=wing.root.map((v,k)=>(v+wing.tip[k])/2),rolled=wing.tip.map((v,k)=>v+wing.rollRadius*axes[1][k]);
   const prefix='wing-'+wing.side+'-'+wing.end;
   elements.push({...intrinsicElement(prefix+'-sheet',mass*fraction,flat,boxInertia(mass*fraction,[wing.span,g.blanketGaugeM,g.ww],axes),axes),wbs:'02.01',kind:'solarSheet'});
   elements.push({...intrinsicElement(prefix+'-roll',mass*(1-fraction),rolled,cylinderInertia(mass*(1-fraction),wing.rollRadius,g.ww,axes,2,g.coreRadiusM),axes),wbs:'02.01',kind:'solarRoll',symmetryAxis:2,spinAngleRad:wing.rollAngle});
  }
  for(const d of g.descriptors.filter(d=>d.type==='rad')){
-  const p=leafPose(g,d,deploy,h.input.solarTiltDeg,attitude),axes=leafAxes(p),mass=radiator.predictedKg/4;
+  const p=leafPose(g,d,deploy,h.input.solarTiltDeg,attitude),axes=leafAxes(p),mass=radiator.predictedKg*(d.width*d.depth)/g.descriptors.filter(q=>q.type==='rad').reduce((a,q)=>a+q.width*q.depth,0);
   elements.push({...intrinsicElement('radiator-'+d.end+'-'+d.j,mass,[p.x,p.y,p.z],boxInertia(mass,[d.width,d.thickness,d.depth],axes),axes),wbs:'03.01',kind:'radiatorLeaf'});
  }
  return elements;
+}
+function payloadElements(h,rows,deploy,attitude){
+ if(h.payloadLocation!=='radiator')return [];
+ const g=deploymentLayout(h),d=g.descriptors.find(d=>d.type==='rad'),p=leafPose(g,d,deploy,h.input.solarTiltDeg,attitude),axes=leafAxes(p);
+ return rows.filter(r=>['01.01','01.02','03.02','07.03'].includes(r.wbs)).flatMap(row=>row.stationsM.map((center,i)=>{
+  const kg=row.predictedKg*row.stationShares[i],moving=i<(row.movingStationCount??h.rackLayout.slots.length),dims=['03.02','07.03'].includes(row.wbs)?(moving?[1,.06,1]:[h.bodyWidthM,h.bodyHeightM,h.bodyLengthM]):h.rackLayout.slotDimensionsM;
+  return {...intrinsicElement(row.wbs+'-platform-'+i,kg,center,boxInertia(kg,dims,moving?axes:BODY_AXES),moving?axes:BODY_AXES),wbs:row.wbs,kind:moving?'radiatorPayload':'busHost',moving};
+ }));
 }
 function terminalElements(h,attitude){
  const growth=1+(h.input.structureMargin??0);
  return terminalMassElements(h,attitude).map(part=>{
   const mass=part.massKg*growth;
   return {...part,massKg:mass,intrinsicTensorKgM2:part.moving?cylinderInertia(mass,part.radiusM,part.lengthM,part.axes,1):boxInertia(mass,part.dimensionsM),kind:part.moving?'terminalHead':'terminalBase'};
+ });
+}
+function jointElements(h,rows,deploy,attitude){
+ const row=rows.find(r=>r.wbs==='07.04'),stations=mechanismStations(h,deploy,attitude);
+ return stations.map((station,i)=>{
+  const mass=row.predictedKg*(row.stationShares?.[i]??1/stations.length),center=row.stationsM?.[i]||station.centroidM;
+  return {...intrinsicElement(station.id,mass,center,boxInertia(mass,[.16,.16,.20])),wbs:'07.04',kind:'mechanismJoint'};
  });
 }
 const movingMassCache=new WeakMap();
@@ -152,10 +167,12 @@ export function movingMassElements(h,{deployment=1,attitude=null}={}){
  let rows=movingMassCache.get(h);
  if(!rows){
   const growth=1+(h.input.structureMargin??0);
-  rows=equipmentAllocations(h).filter(r=>r.wbs==='02.01'||r.wbs==='03.01').map(r=>({...r,predictedKg:r.kg*growth,stationShares:r.wbs==='02.01'?[.25,.25,.25,.25]:[.5,.5]}));
+  const pose=mechanismPose(deploymentLayout(h),1),counts={'02.01':pose.wings.length,'03.01':pose.banks.length,'07.04':mechanismStations(h).length};
+  rows=equipmentAllocations(h).filter(r=>Object.hasOwn(counts,r.wbs)).map(r=>({...r,predictedKg:r.kg*growth,stationShares:Array(counts[r.wbs]).fill(1/counts[r.wbs])}));
   movingMassCache.set(h,rows);
  }
- return [...movingSurfaces(h,rows,Math.max(0,Math.min(1,deployment)),attitude),...terminalElements(h,attitude).filter(p=>p.moving)];
+ const u=Math.max(0,Math.min(1,deployment)),payload=h.payloadLocation==='radiator'?payloadElements(h,componentMassProperties(h,h.propellantKg,u,false,true,attitude).rows,u,attitude).filter(p=>p.moving):[];
+ return [...movingSurfaces(h,rows,u,attitude),...payload,...terminalElements(h,attitude).filter(p=>p.moving),...jointElements(h,rows,u,attitude)];
 }
 function liquidShape(h,row){
  const tank=h.propulsion.tanks[Number(row.wbs.slice(3))-6],density=row.wbs==='06.06'?h.input.fuelDensity:h.input.oxidizerDensity;
@@ -182,12 +199,14 @@ export function componentInertia(h,{remainingKg=h.propellantKg,deployment=1,adap
  let cache=recent.get(h);if(!cache){cache=new Map();recent.set(h,cache)}
  if(cache.has(key))return cache.get(key);
  const properties=componentMassProperties(h,left,deploy,adapterAttached,true,attitude),{rows,cm}=properties;
- const surfaces=movingSurfaces(h,rows,deploy,attitude),terminals=terminalElements(h,attitude),tensorKgM2=zero(),contributions=[];
+ const surfaces=movingSurfaces(h,rows,deploy,attitude),payload=payloadElements(h,rows,deploy,attitude),terminals=terminalElements(h,attitude),joints=jointElements(h,rows,deploy,attitude),tensorKgM2=zero(),contributions=[];
  for(const row of rows){
   let tensor,basis;
   if(row.wbs==='02.01'||row.wbs==='03.01'){
    tensor=aboutPoint(surfaces.filter(p=>p.wbs===row.wbs),cm);
-   basis=row.wbs==='02.01'?'Uniform wing mass split by paid-out length between each exposed blanket and its annular tip roll. Positions and axes follow the deployment geometry.':'Four uniform radiator leaf volumes at their actual folding, cant and trim poses.';
+   basis=row.wbs==='02.01'?'Uniform wing mass split by paid-out length between each exposed blanket and its annular tip roll. Positions and axes follow the deployment geometry.':'Area-weighted radiator leaf volumes at their actual family deployment and operating poses; mass sums to the equipment allocation.';
+  }else if(h.payloadLocation==='radiator'&&['01.01','01.02','03.02','07.03'].includes(row.wbs)){
+   tensor=aboutPoint(payload.filter(p=>p.wbs===row.wbs),cm);basis='Compute packages follow the deployable local radiator platform; auxiliary host allocation remains in the bus.';
   }else if(row.wbs==='05.02'||row.wbs==='05.03'){
    tensor=aboutPoint(terminals.filter(p=>p.wbs===row.wbs),cm);
    basis='Fixed radio and positioner allowance at the pedestal foot. The aperture-scaled moving head is an axisymmetric cylinder at the rendered elevation pivot and geometric head centroid.';
@@ -198,8 +217,8 @@ export function componentInertia(h,{remainingKg=h.propellantKg,deployment=1,adap
    tensor=aboutPoint(pressurantShape(h,row,left),cm);
    basis='Uniform helium gas in the central bubbles of both liquid vessels and in the pressure bottle. The pressure-regulated inventory determines each mass share.';
   }else if(row.wbs==='07.04'){
-   tensor=aboutPoint(row.stationsM.map((center,i)=>intrinsicElement('drive-'+i,row.predictedKg*row.stationShares[i],center,boxInertia(row.predictedKg*row.stationShares[i],[.16,.16,.20]))),cm);
-   basis='Equal mechanism mass shares at the four solar roots and radiator root/elbow stations, with compact uniform motor-envelope proxies.';
+   tensor=aboutPoint(joints,cm);
+   basis='Mechanism mass shares at the installed family solar and radiator joints. Compact body-aligned motor envelopes follow their actual joint centers; their relative translations also enter articulation momentum.';
   }else{
    const fixed=fixedShape(h,row);tensor=fixed.specificTensor.map(v=>v*row.predictedKg);basis=fixed.basis;
    sumInto(tensor,parallelAxisTensor(row.predictedKg,difference(row.centroidM,cm)));
@@ -208,7 +227,7 @@ export function componentInertia(h,{remainingKg=h.propellantKg,deployment=1,adap
   contributions.push({wbs:row.wbs,massKg:row.predictedKg,equipmentKg:row.massKg,centroidM:row.centroidM,tensorKgM2:tensor,diagonalKgM2:diagonal(tensor),basis});
  }
  const result={massKg:properties.massKg,equipmentKg:properties.equipmentKg,allocatedGrowthKg:properties.allocatedGrowthKg,cm,tensorKgM2,diagonalKgM2:diagonal(tensorKgM2),principalKgM2:principalMoments(tensorKgM2),contributions,
-  movingElements:[...surfaces,...terminals.filter(p=>p.moving)],
+  movingElements:[...surfaces,...payload.filter(p=>p.moving),...terminals.filter(p=>p.moving),...joints],
   basis:'Equipment-ledger masses and installed stations with uniform shape proxies. Every component tensor is translated to the current center of mass. Liquid is a centered wetting-shell surrogate. Internal structural flexibility and fluid slosh require additional models.'};
  cache.set(key,result);if(cache.size>4)cache.delete(cache.keys().next().value);return result;
 }

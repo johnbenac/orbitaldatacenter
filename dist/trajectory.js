@@ -1,4 +1,4 @@
-import {DEPLOY_END_S} from './commissioning-clock.js';
+import {DEPLOY_END_S,commissioningClock} from './commissioning-clock.js';
 import {entrySolution,surfacePoint,distanceKm} from './entry.js';
 import {R,MU,DEG,TAU,dot,cross,unit,clip,geometry} from './orbit.js';
 
@@ -14,7 +14,7 @@ function nominalApogee(d,duration){
  const period=TAU*Math.sqrt((R+d.altitudeKm)**3/MU),firstApogee=540+(Math.PI-d.meanAnomalyDeg*DEG)/TAU*period;
  // Select the last nominal apogee allowing a full transfer half-period and burn margin.
  const latest=duration-period,cycle=Math.floor((latest-firstApogee)/period);
- return Math.max(DEPLOY_END_S,firstApogee+cycle*period);
+ return Math.max(commissioningClock(d).endS,firstApogee+cycle*period);
 }
 function elements(p,v){
  const r=Math.hypot(...p),h=cross(p,v),eVec=cross(v,h).map((q,i)=>q/MU-p[i]/r);

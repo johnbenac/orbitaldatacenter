@@ -15,7 +15,8 @@ import {flightInterfaceGeometry} from './payload-interface-mesh.js';
 import {spacecraftInterface} from './payload-interface.js';
 import {integrationLayout,bayHandlingPose} from './integration-rig.js';
 import {launchFleet} from './launch-fleet.js';
-import {deploymentLayout,mechanismPose,leafPose} from './deployment.js';
+import {deploymentLayout,mechanismPose,leafPose,leafAxes,terminalLayout} from './deployment.js';
+import {architectureFamily,architectureTerminalStations} from './architecture-families.js';
 import {thermalMesh} from './thermal-view.js';
 import {fitOutBay,payloadFinishes} from './launch-art.js';
 import {createLaunchLivery} from './launch-livery.js';
@@ -89,20 +90,27 @@ export function makeLaunch(h,repaint){
  // The vehicle-side adapter stays with the carrier at spacecraft separation.
  const fitting=group(stage,'adapter'),adapter=stack[0],spacer=stack[1],record=integrationProfile(d.launcher,d.launchSite);
  const access=star?(f.cargoAccess??starshipCargoFit(stack,d)):null,canLoad=!star||h.payloadInterface.passes&&f.fit&&access.fits;
- const lowerR=record.interface.diameterMm/2000,upperR=spacecraftInterface.pcdM/2;
+ const lowerR=record.interface.diameterMm/2000,upperR=spacecraftInterface.pcdM/2,af=architectureFamily(h);
+ const rectangular=(h.payloadInterface.attachmentShape||(['flat-stack','flat-dispenser','rack-cradle'].includes(af.launchInterface)?'rectangular-lugs':'circular-ring'))==='rectangular-lugs';
+ const lugPoints=rectangular?(h.payloadInterface.lugPositionsBodyM||[-1,1].flatMap(x=>[-1,1].map(y=>[x*hw*.4,y*hh*.4,-bl/2]))):[];
+ const lugSize=h.payloadInterface.lugSizeM||.14,lugThickness=h.payloadInterface.thicknessM||.04;
  function annulus(parent,outer,inner,y0,y1,material){
   return mesh(parent,shellBands([[outer,y0],[outer,y1],[inner,y1],[inner,y0],[outer,y0]],0,Math.PI*2,72),material,0,0,0,'adapter');
  }
  annulus(fitting,lowerR+.04,lowerR-.04,0,.08,steel).name='Carrier attachment ring';
  const seatY=h.payloadInterface.upperFaceStationM;
- annulus(fitting,spacecraftInterface.outerM/2,spacecraftInterface.boreM/2,seatY-.035,seatY,steel).name='Adapter upper mating flange';
- for(let j=0;j<12;j++){
-  const a=j*Math.PI/6,b=a+Math.PI/6;
-  for(const t of [a,b])tube(fitting,v(lowerR*Math.cos(t),.07,lowerR*Math.sin(t)),v(upperR*Math.cos(a),seatY-.035,upperR*Math.sin(a)),.022,steel,'adapter');
+ if(rectangular){
+  for(const point of lugPoints){
+   const x=point[0],z=-point[1],a=Math.atan2(z,x);box(fitting,x,seatY-lugThickness/2,z,lugSize*1.2,lugThickness,lugSize*1.2,steel,'adapter').name='Allocated cradle mating pad';
+   for(const offset of [-.20,.20])tube(fitting,v(lowerR*Math.cos(a+offset),.07,lowerR*Math.sin(a+offset)),v(x,seatY-lugThickness,z),.028,steel,'adapter');
+  }
+ }else{
+  annulus(fitting,spacecraftInterface.outerM/2,spacecraftInterface.boreM/2,seatY-.035,seatY,steel).name='Adapter upper mating flange';
+  for(let j=0;j<12;j++){const a=j*Math.PI/6,b=a+Math.PI/6;for(const t of [a,b])tube(fitting,v(lowerR*Math.cos(t),.07,lowerR*Math.sin(t)),v(upperR*Math.cos(a),seatY-.035,upperR*Math.sin(a)),.022,steel,'adapter');}
  }
  const lifters=[];
- if(star)for(let i=0;i<3;i++){
-  const a=(i+.5)*2*Math.PI/3,px=Math.cos(a)*.675,pz=Math.sin(a)*.675;
+ if(star)for(const point of rectangular?lugPoints:Array.from({length:3},(_,i)=>{const a=(i+.5)*2*Math.PI/3;return [Math.cos(a)*.675,-Math.sin(a)*.675,0];})){
+  const px=point[0],pz=-point[1];
   cylinder(fitting,px,seatY*.72,pz,.042,.054,seatY*.48,dark,'adapter');
   const rod=cylinder(fitting,px,seatY*.88,pz,.025,.025,1,gold,'adapter');
   rod.name='Guided separation plunger';lifters.push(rod);
@@ -110,7 +118,7 @@ export function makeLaunch(h,repaint){
  // The stud circle bolts a flight flange to a separation fitting. Retracting
  // latches and pilots release the flange; fixed structural fasteners stay put.
  const shoes=[],clamps=[];
- if(star){
+ if(star&&!rectangular){
   for(const z of [-.28,.28]){
    const rim=Math.sqrt((spacecraftInterface.outerM/2)**2-z*z),slide=group(fitting,'adapter');
    slide.name='Two-axis separation shoe';
@@ -129,8 +137,12 @@ export function makeLaunch(h,repaint){
    box(latch,0,.044,-sign*.036,.12,.025,.12,gold,'adapter');clamps.push({latch,sign});
   }
  }
- const fixedRing=mesh(payload,flightInterfaceGeometry(T),rib,0,seatY,0,'structure');fixedRing.rotation.x=-Math.PI/2;
- fixedRing.name='Spacecraft aft interface · ODC-LI-01';
+ if(star&&rectangular)for(const point of lugPoints){
+  const sign=Math.sign(point[0])||1,latch=group(fitting,'adapter');latch.name='Allocated flat-package release clamp';latch.position.set(point[0]+sign*(lugSize*.60),seatY,-point[1]);
+  box(latch,0,-.015,0,lugSize*.5,.11,lugSize*.9,dark,'adapter');box(latch,-sign*lugSize*.30,.04,0,lugSize,.025,lugSize*.8,gold,'adapter');clamps.push({latch,sign,axis:'x',closedAt:latch.position.x});
+ }
+ if(rectangular)for(const point of lugPoints){box(payload,point[0],seatY+lugThickness/2,-point[1],lugSize,lugThickness,lugSize,rib,'structure').name='Spacecraft allocated flight lug';}
+ else{const fixedRing=mesh(payload,flightInterfaceGeometry(T),rib,0,seatY,0,'structure');fixedRing.rotation.x=-Math.PI/2;fixedRing.name='Spacecraft aft interface · ODC-LI-01';}
  const finish=payloadFinishes();
  {const bus=stack.find(s=>s.part==='Insulated bus'),z0=bus.z0M,H=bl,y=z0+H*.5,name='bus';
   if(/bus|body|core|chassis/.test(name)){
@@ -151,14 +163,29 @@ export function makeLaunch(h,repaint){
  // Low-detail parked hardware uses the flight model's physical hardpoints.
  const kin=deploymentLayout(h),parked=group(liveMount,'payload'),mechanism=mechanismPose(kin,0);
  for(const q of mechanism.wings){
-  const [x,y,z]=q.root,rad=q.rollRadius,roll=cylinder(parked,x,y+rad,z,rad,rad,kin.ww+.04,blue,'solar',32);
-  roll.rotation.x=Math.PI/2;
+  const rad=q.rollRadius,axes=q.axes||leafAxes({pitch:q.pitch}),center=q.root.map((v,i)=>v+axes[1][i]*rad),roll=cylinder(parked,...center,rad,rad,kin.ww+.04,blue,'solar',32);
+  roll.quaternion.setFromUnitVectors(v(0,1,0),v(...axes[2]));
   for(const side of [-1,1]){
-   const cheek=cylinder(parked,x,y+rad,z+side*(kin.ww/2+.055),rad+.009,rad+.009,.035,steel,'solar',32);cheek.rotation.x=Math.PI/2;
+   const p=center.map((x,i)=>x+axes[2][i]*side*(kin.ww/2+.055)),cheek=cylinder(parked,...p,rad+.009,rad+.009,.035,steel,'solar',32);cheek.quaternion.copy(roll.quaternion);
   }
  }
  for(const d of kin.descriptors.filter(d=>d.type==='rad')){
-  const q=leafPose(kin,d,0),panel=thermalMesh(box(parked,q.x,q.y,q.z,d.width,d.thickness,d.depth,fin,'radiator'),'radiator');panel.rotation.x=q.pitch;
+  const q=leafPose(kin,d,0),axes=leafAxes(q),panel=thermalMesh(box(parked,q.x,q.y,q.z,d.width,d.thickness,d.depth,fin,'radiator'),'radiator');panel.quaternion.setFromRotationMatrix(new T.Matrix4().makeBasis(v(...axes[0]),v(...axes[1]),v(...axes[2])));
+  if(h.payloadLocation==='radiator'){
+   const platform=group(parked,'compute');platform.position.set(q.x,q.y,q.z);platform.quaternion.copy(panel.quaternion);
+   thermalMesh(box(platform,0,.06,0,1,.05,1,gold,'compute'),'coldPlate');for(const slot of h.rackLayout.slots)thermalMesh(box(platform,slot.x,slot.y+.06,slot.z,...h.rackLayout.slotDimensionsM,blue,'compute'),'junction');
+  }
+ }
+ if(af.id!=='protected-core'||af.kaTerminalCount!==1||af.sPatchCount!==2){
+  const term=terminalLayout(hw,hh,d.kaDishM,d.opticalApertureM);
+  for(const s of architectureTerminalStations(h)){
+   const mount=group(parked,'communications');mount.position.set(...s.positionM);mount.quaternion.setFromUnitVectors(v(0,1,0),v(...s.normalBody));
+   if(s.kind==='s'){box(mount,0,.012,0,.17,.024,.17,gold,'communications');continue;}
+   const optical=s.kind==='optical',a=optical?d.opticalApertureM:d.kaDishM,height=optical?term.opticalHeight:term.kaHeight;
+   cylinder(mount,0,height/2,0,a*.12,a*.18,height,steel,'communications',20);
+   if(optical){cylinder(mount,0,height,0,a*.68,a*.8,a,ivory,'communications',24);cylinder(mount,0,height+a*.52,0,a*.5,a*.5,.02,blue,'communications',24);}
+   else cylinder(mount,0,height,0,a*.5,a*.12,a*.18,ivory,'communications',32);
+  }
  }
  // Side-panel fittings share the exact fastener stations of the flight model.
  for(const mount of kin.mounts)for(const {foot,seat,role} of mount.supports){
@@ -257,7 +284,7 @@ export function makeLaunch(h,repaint){
     slide.position.y=seatY+.009+lift;piston.scale.x=.19+kick;piston.position.x=.095-kick*.5;stop.position.x=.018-kick;
    }
    const closed=working?pose.lift>=1:!insert||cargo.clamped;
-   for(const {latch,sign} of clamps)latch.position.z=sign*(closed?.71:.83);
+   for(const {latch,sign,axis,closedAt} of clamps)if(axis==='x')latch.position.x=closedAt+(closed?0:sign*.12);else latch.position.z=sign*(closed?.71:.83);
 
   }
 halves.forEach(({g,side})=>{

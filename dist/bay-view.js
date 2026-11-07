@@ -51,7 +51,7 @@ export function facilityNotes(h){
  <h3>Launcher attachment</h3><p>${esc(p.interface.basis)} <a href="${esc(p.interface.source.url)}" target="_blank" rel="noopener noreferrer">${esc(p.interface.source.title)} ↗</a></p>
  ${p.kind==='ship-bay'?p.evidence.filter(e=>e.label==='Site-specific basis').map(e=>`<p>${esc(e.text)} <a href="${esc(e.source.url)}" target="_blank" rel="noopener noreferrer">${esc(e.source.title)} ↗</a></p>`).join(''):''}
  <h3>Facility documents</h3><div class="facility-sources">${f.sources.map(s=>`<p>${sourceLink(s)}<small>${esc(s.section)}</small></p>`).join('')}</div><p>${f.limitations.map(esc).join(' ')}</p>
- <button class="btn" data-page="mission">Open Mission Baseline · ground processing plan</button></details>`;
+ <button class="btn" data-page="mission">Open design rules · ground processing plan</button></details>`;
 }
 export function bayEvidence(h,s,v){
  const l=bayLesson(v.domain,h,v.commBench),facts=l.facts||[],ids=Object.keys(domains),idx=ids.indexOf(v.domain),next=ids[(idx+1)%ids.length];

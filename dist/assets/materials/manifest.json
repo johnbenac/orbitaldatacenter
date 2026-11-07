@@ -1,0 +1,392 @@
+{
+  "schema": "orbital-data-center/material-textures/1",
+  "revision": "spacecraft-materials-2026-11-r1",
+  "source": "scripts/generate-spacecraft-materials.py",
+  "license": "Original project procedural assets; no third-party raster source.",
+  "maps": {
+    "aluminum-structure": {
+      "id": "texture-aluminum-structure",
+      "resolutionPx": [
+        256,
+        256
+      ],
+      "tileSizeM": [
+        0.25,
+        0.25
+      ],
+      "baseColorPath": "assets/materials/aluminum-structure-base.webp",
+      "normalPath": "assets/materials/aluminum-structure-normal.webp",
+      "roughnessPath": "assets/materials/aluminum-structure-roughness.webp",
+      "previewPath": "assets/materials/aluminum-structure-preview.webp",
+      "representation": "Deterministic illustrative PBR tile; pattern dimensions are visual allocations, not supplier specifications."
+    },
+    "aluminum-anodized": {
+      "id": "texture-aluminum-anodized",
+      "resolutionPx": [
+        256,
+        256
+      ],
+      "tileSizeM": [
+        0.25,
+        0.25
+      ],
+      "baseColorPath": "assets/materials/aluminum-anodized-base.webp",
+      "normalPath": "assets/materials/aluminum-anodized-normal.webp",
+      "roughnessPath": "assets/materials/aluminum-anodized-roughness.webp",
+      "previewPath": "assets/materials/aluminum-anodized-preview.webp",
+      "representation": "Deterministic illustrative PBR tile; pattern dimensions are visual allocations, not supplier specifications."
+    },
+    "black-anodized-aluminum": {
+      "id": "texture-black-anodized-aluminum",
+      "resolutionPx": [
+        256,
+        256
+      ],
+      "tileSizeM": [
+        0.25,
+        0.25
+      ],
+      "baseColorPath": "assets/materials/black-anodized-aluminum-base.webp",
+      "normalPath": "assets/materials/black-anodized-aluminum-normal.webp",
+      "roughnessPath": "assets/materials/black-anodized-aluminum-roughness.webp",
+      "previewPath": "assets/materials/black-anodized-aluminum-preview.webp",
+      "representation": "Deterministic illustrative PBR tile; pattern dimensions are visual allocations, not supplier specifications."
+    },
+    "titanium-tank": {
+      "id": "texture-titanium-tank",
+      "resolutionPx": [
+        256,
+        256
+      ],
+      "tileSizeM": [
+        0.35,
+        0.35
+      ],
+      "baseColorPath": "assets/materials/titanium-tank-base.webp",
+      "normalPath": "assets/materials/titanium-tank-normal.webp",
+      "roughnessPath": "assets/materials/titanium-tank-roughness.webp",
+      "previewPath": "assets/materials/titanium-tank-preview.webp",
+      "representation": "Deterministic illustrative PBR tile; pattern dimensions are visual allocations, not supplier specifications."
+    },
+    "stainless-tube": {
+      "id": "texture-stainless-tube",
+      "resolutionPx": [
+        256,
+        256
+      ],
+      "tileSizeM": [
+        0.12,
+        0.12
+      ],
+      "baseColorPath": "assets/materials/stainless-tube-base.webp",
+      "normalPath": "assets/materials/stainless-tube-normal.webp",
+      "roughnessPath": "assets/materials/stainless-tube-roughness.webp",
+      "previewPath": "assets/materials/stainless-tube-preview.webp",
+      "representation": "Deterministic illustrative PBR tile; pattern dimensions are visual allocations, not supplier specifications."
+    },
+    "refractory-nozzle": {
+      "id": "texture-refractory-nozzle",
+      "resolutionPx": [
+        256,
+        256
+      ],
+      "tileSizeM": [
+        0.25,
+        0.25
+      ],
+      "baseColorPath": "assets/materials/refractory-nozzle-base.webp",
+      "normalPath": "assets/materials/refractory-nozzle-normal.webp",
+      "roughnessPath": "assets/materials/refractory-nozzle-roughness.webp",
+      "previewPath": "assets/materials/refractory-nozzle-preview.webp",
+      "representation": "Deterministic illustrative PBR tile; pattern dimensions are visual allocations, not supplier specifications."
+    },
+    "copper-thermal": {
+      "id": "texture-copper-thermal",
+      "resolutionPx": [
+        256,
+        256
+      ],
+      "tileSizeM": [
+        0.15,
+        0.15
+      ],
+      "baseColorPath": "assets/materials/copper-thermal-base.webp",
+      "normalPath": "assets/materials/copper-thermal-normal.webp",
+      "roughnessPath": "assets/materials/copper-thermal-roughness.webp",
+      "previewPath": "assets/materials/copper-thermal-preview.webp",
+      "representation": "Deterministic illustrative PBR tile; pattern dimensions are visual allocations, not supplier specifications."
+    },
+    "gold-plated-contact": {
+      "id": "texture-gold-plated-contact",
+      "resolutionPx": [
+        256,
+        256
+      ],
+      "tileSizeM": [
+        0.08,
+        0.08
+      ],
+      "baseColorPath": "assets/materials/gold-plated-contact-base.webp",
+      "normalPath": "assets/materials/gold-plated-contact-normal.webp",
+      "roughnessPath": "assets/materials/gold-plated-contact-roughness.webp",
+      "previewPath": "assets/materials/gold-plated-contact-preview.webp",
+      "representation": "Deterministic illustrative PBR tile; pattern dimensions are visual allocations, not supplier specifications."
+    },
+    "rf-dielectric": {
+      "id": "texture-rf-dielectric",
+      "resolutionPx": [
+        256,
+        256
+      ],
+      "tileSizeM": [
+        0.12,
+        0.12
+      ],
+      "baseColorPath": "assets/materials/rf-dielectric-base.webp",
+      "normalPath": "assets/materials/rf-dielectric-normal.webp",
+      "roughnessPath": "assets/materials/rf-dielectric-roughness.webp",
+      "previewPath": "assets/materials/rf-dielectric-preview.webp",
+      "representation": "Deterministic illustrative PBR tile; pattern dimensions are visual allocations, not supplier specifications."
+    },
+    "radiator-white-paint": {
+      "id": "texture-radiator-white-paint",
+      "resolutionPx": [
+        256,
+        256
+      ],
+      "tileSizeM": [
+        0.16,
+        0.16
+      ],
+      "baseColorPath": "assets/materials/radiator-white-paint-base.webp",
+      "normalPath": "assets/materials/radiator-white-paint-normal.webp",
+      "roughnessPath": "assets/materials/radiator-white-paint-roughness.webp",
+      "previewPath": "assets/materials/radiator-white-paint-preview.webp",
+      "representation": "Deterministic illustrative PBR tile; pattern dimensions are visual allocations, not supplier specifications."
+    },
+    "coverglass": {
+      "id": "texture-coverglass",
+      "resolutionPx": [
+        256,
+        256
+      ],
+      "tileSizeM": [
+        0.08,
+        0.08
+      ],
+      "baseColorPath": "assets/materials/coverglass-base.webp",
+      "normalPath": "assets/materials/coverglass-normal.webp",
+      "roughnessPath": "assets/materials/coverglass-roughness.webp",
+      "previewPath": "assets/materials/coverglass-preview.webp",
+      "representation": "Deterministic illustrative PBR tile; pattern dimensions are visual allocations, not supplier specifications."
+    },
+    "optical-glass": {
+      "id": "texture-optical-glass",
+      "resolutionPx": [
+        256,
+        256
+      ],
+      "tileSizeM": [
+        0.12,
+        0.12
+      ],
+      "baseColorPath": "assets/materials/optical-glass-base.webp",
+      "normalPath": "assets/materials/optical-glass-normal.webp",
+      "roughnessPath": "assets/materials/optical-glass-roughness.webp",
+      "previewPath": "assets/materials/optical-glass-preview.webp",
+      "representation": "Deterministic illustrative PBR tile; pattern dimensions are visual allocations, not supplier specifications."
+    },
+    "harness-polyimide": {
+      "id": "texture-harness-polyimide",
+      "resolutionPx": [
+        256,
+        256
+      ],
+      "tileSizeM": [
+        0.06,
+        0.06
+      ],
+      "baseColorPath": "assets/materials/harness-polyimide-base.webp",
+      "normalPath": "assets/materials/harness-polyimide-normal.webp",
+      "roughnessPath": "assets/materials/harness-polyimide-roughness.webp",
+      "previewPath": "assets/materials/harness-polyimide-preview.webp",
+      "representation": "Deterministic illustrative PBR tile; pattern dimensions are visual allocations, not supplier specifications."
+    },
+    "solar-blanket-backing": {
+      "id": "texture-solar-blanket-backing",
+      "resolutionPx": [
+        256,
+        256
+      ],
+      "tileSizeM": [
+        0.16,
+        0.16
+      ],
+      "baseColorPath": "assets/materials/solar-blanket-backing-base.webp",
+      "normalPath": "assets/materials/solar-blanket-backing-normal.webp",
+      "roughnessPath": "assets/materials/solar-blanket-backing-roughness.webp",
+      "previewPath": "assets/materials/solar-blanket-backing-preview.webp",
+      "representation": "Deterministic illustrative PBR tile; pattern dimensions are visual allocations, not supplier specifications."
+    },
+    "unresolved-dielectric": {
+      "id": "texture-unresolved-dielectric",
+      "resolutionPx": [
+        256,
+        256
+      ],
+      "tileSizeM": [
+        0.1,
+        0.1
+      ],
+      "baseColorPath": "assets/materials/unresolved-dielectric-base.webp",
+      "normalPath": "assets/materials/unresolved-dielectric-normal.webp",
+      "roughnessPath": "assets/materials/unresolved-dielectric-roughness.webp",
+      "previewPath": "assets/materials/unresolved-dielectric-preview.webp",
+      "representation": "Deterministic illustrative PBR tile; pattern dimensions are visual allocations, not supplier specifications."
+    },
+    "mli-aluminized-polyimide": {
+      "id": "texture-mli-aluminized-polyimide",
+      "resolutionPx": [
+        1024,
+        1024
+      ],
+      "tileSizeM": [
+        0.8,
+        0.8
+      ],
+      "baseColorPath": "assets/materials/mli-aluminized-polyimide-base.webp",
+      "normalPath": "assets/materials/mli-aluminized-polyimide-normal.webp",
+      "roughnessPath": "assets/materials/mli-aluminized-polyimide-roughness.webp",
+      "previewPath": "assets/materials/mli-aluminized-polyimide-preview.webp",
+      "representation": "Deterministic illustrative PBR tile; pattern dimensions are visual allocations, not supplier specifications."
+    },
+    "white-beta-cloth": {
+      "id": "texture-white-beta-cloth",
+      "resolutionPx": [
+        512,
+        512
+      ],
+      "tileSizeM": [
+        0.04,
+        0.04
+      ],
+      "baseColorPath": "assets/materials/white-beta-cloth-base.webp",
+      "normalPath": "assets/materials/white-beta-cloth-normal.webp",
+      "roughnessPath": "assets/materials/white-beta-cloth-roughness.webp",
+      "previewPath": "assets/materials/white-beta-cloth-preview.webp",
+      "representation": "Deterministic illustrative PBR tile; pattern dimensions are visual allocations, not supplier specifications."
+    },
+    "cfrp-boom": {
+      "id": "texture-cfrp-boom",
+      "resolutionPx": [
+        512,
+        512
+      ],
+      "tileSizeM": [
+        0.08,
+        0.32
+      ],
+      "baseColorPath": "assets/materials/cfrp-boom-base.webp",
+      "normalPath": "assets/materials/cfrp-boom-normal.webp",
+      "roughnessPath": "assets/materials/cfrp-boom-roughness.webp",
+      "previewPath": "assets/materials/cfrp-boom-preview.webp",
+      "representation": "Deterministic illustrative PBR tile; pattern dimensions are visual allocations, not supplier specifications."
+    },
+    "copv-carbon": {
+      "id": "texture-copv-carbon",
+      "resolutionPx": [
+        512,
+        512
+      ],
+      "tileSizeM": [
+        0.18,
+        0.18
+      ],
+      "baseColorPath": "assets/materials/copv-carbon-base.webp",
+      "normalPath": "assets/materials/copv-carbon-normal.webp",
+      "roughnessPath": "assets/materials/copv-carbon-roughness.webp",
+      "previewPath": "assets/materials/copv-carbon-preview.webp",
+      "representation": "Deterministic illustrative PBR tile; pattern dimensions are visual allocations, not supplier specifications."
+    },
+    "aluminum-honeycomb": {
+      "id": "texture-aluminum-honeycomb",
+      "resolutionPx": [
+        512,
+        512
+      ],
+      "tileSizeM": [
+        0.024,
+        0.02771
+      ],
+      "baseColorPath": "assets/materials/aluminum-honeycomb-base.webp",
+      "normalPath": "assets/materials/aluminum-honeycomb-normal.webp",
+      "roughnessPath": "assets/materials/aluminum-honeycomb-roughness.webp",
+      "previewPath": "assets/materials/aluminum-honeycomb-preview.webp",
+      "representation": "Deterministic illustrative PBR tile; pattern dimensions are visual allocations, not supplier specifications."
+    },
+    "radiator-osr": {
+      "id": "texture-radiator-osr",
+      "resolutionPx": [
+        1024,
+        1024
+      ],
+      "tileSizeM": [
+        0.32,
+        0.32
+      ],
+      "baseColorPath": "assets/materials/radiator-osr-base.webp",
+      "normalPath": "assets/materials/radiator-osr-normal.webp",
+      "roughnessPath": "assets/materials/radiator-osr-roughness.webp",
+      "previewPath": "assets/materials/radiator-osr-preview.webp",
+      "representation": "Deterministic illustrative PBR tile; pattern dimensions are visual allocations, not supplier specifications."
+    },
+    "pv-multijunction": {
+      "id": "texture-pv-multijunction",
+      "resolutionPx": [
+        1024,
+        1024
+      ],
+      "tileSizeM": [
+        0.64,
+        0.32
+      ],
+      "baseColorPath": "assets/materials/pv-multijunction-base.webp",
+      "normalPath": "assets/materials/pv-multijunction-normal.webp",
+      "roughnessPath": "assets/materials/pv-multijunction-roughness.webp",
+      "previewPath": "assets/materials/pv-multijunction-preview.webp",
+      "representation": "Deterministic illustrative PBR tile; pattern dimensions are visual allocations, not supplier specifications."
+    },
+    "pv-silicon": {
+      "id": "texture-pv-silicon",
+      "resolutionPx": [
+        1024,
+        1024
+      ],
+      "tileSizeM": [
+        0.64,
+        0.64
+      ],
+      "baseColorPath": "assets/materials/pv-silicon-base.webp",
+      "normalPath": "assets/materials/pv-silicon-normal.webp",
+      "roughnessPath": "assets/materials/pv-silicon-roughness.webp",
+      "previewPath": "assets/materials/pv-silicon-preview.webp",
+      "representation": "Deterministic illustrative PBR tile; pattern dimensions are visual allocations, not supplier specifications."
+    },
+    "electronics-board": {
+      "id": "texture-electronics-board",
+      "resolutionPx": [
+        512,
+        512
+      ],
+      "tileSizeM": [
+        0.24,
+        0.24
+      ],
+      "baseColorPath": "assets/materials/electronics-board-base.webp",
+      "normalPath": "assets/materials/electronics-board-normal.webp",
+      "roughnessPath": "assets/materials/electronics-board-roughness.webp",
+      "previewPath": "assets/materials/electronics-board-preview.webp",
+      "representation": "Deterministic illustrative PBR tile; pattern dimensions are visual allocations, not supplier specifications."
+    }
+  }
+}

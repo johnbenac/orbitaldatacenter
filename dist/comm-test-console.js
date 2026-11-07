@@ -42,7 +42,7 @@ function rigDrawing(id,running,r,step){
  return '<svg class="cv-rig'+(running?' cv-energized':'')+'" viewBox="0 0 492 98" role="img" aria-label="'+html(testNames[id]+' ground test signal path. '+rig.names.join(', ')+'. '+rig.paths.map(p=>p[0]).join(' and ')+'.')+'">'+paths+nodes+'</svg>';
 }
 
-const decisionName=(s,id)=>s.records[id]?(s.records[id].passed?'Pass':'Fail'):'Unrun';
+const decisionName=(s,id)=>s.records[id]?(s.records[id].applicable===false?'N/A':s.records[id].passed?'Pass':'Fail'):'Unrun';
 function recordBar(s){
  const complete=Object.keys(s.records).length,pass=Object.values(s.records).filter(r=>r.passed).length;
  return '<span class="cv-record-count"><i aria-hidden="true"></i>'+complete+' of '+commTestCases.length+' run'+(complete?' · '+pass+' passed':'')+'</span>';
@@ -88,7 +88,7 @@ function plotted(trace,id){
 function procedure(c,r,step){
  return '<ol class="cv-procedure" aria-label="Test procedure">'+c.stages.map((label,i)=>{
   const reviewed=r&&i<=step,item=reviewed?r.stages[i]:null,status=item?.status||'pending';
-  return '<li data-stage="'+status+'"><span class="cv-step-no">'+(i+1)+'</span><div><b>'+html(item?.label||label)+'</b>'+(reviewed?'<small>'+html(item.detail)+'</small>':'')+'</div><em>'+({pass:'Pass',fail:'Fail',blocked:'Held',pending:'Planned'}[status]||html(status))+'</em></li>';
+  return '<li data-stage="'+status+'"><span class="cv-step-no">'+(i+1)+'</span><div><b>'+html(item?.label||label)+'</b>'+(reviewed?'<small>'+html(item.detail)+'</small>':'')+'</div><em>'+({pass:'Pass',fail:'Fail',blocked:'Held',pending:'Planned',not_applicable:'N/A'}[status]||html(status))+'</em></li>';
  }).join('')+'</ol>';
 }
 
@@ -109,7 +109,7 @@ function render(host,s){
  const result=s.active?.result||s.records[c.id],running=!!s.active,step=running?s.active.step:result?c.stages.length:-1;
  host.innerHTML='<div class="cv-shell" data-cv-band="'+c.id+'"><header class="cv-header"><div><small class="cv-over">Phase D · integration facility</small><h2>Communications test bench</h2></div>'+recordBar(s)+'</header>'+selectors(s)+
  '<div class="cv-main"><div class="cv-illustration"><div class="cv-meta"><span>'+html(c.title)+'</span><small>Ground simulation</small></div><h3>'+html(c.question)+'</h3>'+rigDrawing(c.id,running,result,step)+(c.id==='optical'?spot(v,s.hardware):'')+'<p class="cv-setup">'+html(c.setup)+'</p><button type="button" class="cv-locate" data-cv-locate>Locate fixture in 3D ↗</button></div>'+
- '<div class="cv-control"><div class="cv-knob-title"><label for="cv-setting">'+html(u.label)+'</label><output for="cv-setting">'+html(digits(v)+' '+u.unit)+'</output></div><input id="cv-setting" type="range" min="'+u.min+'" max="'+u.max+'" step="'+u.step+'" value="'+v+'" aria-describedby="cv-help" aria-valuetext="'+html(v+' '+u.unit)+'"><p id="cv-help">'+html(u.help)+'</p><button class="cv-primary" type="button" '+(running?'data-cv-end':'data-cv-run')+'><span aria-hidden="true">'+(running?'»':'▷')+'</span> '+(running?'Show result now':result?'Run again':'Run test')+'</button><small class="cv-cue" data-cv-cue>'+html(running?'Stepping through the path…':result?(result.passed?'Last run passed.':'Last run missed a criterion.'):'Ready to run')+'</small></div></div>'+
+ '<div class="cv-control"><div class="cv-knob-title"><label for="cv-setting">'+html(u.label)+'</label><output for="cv-setting">'+html(digits(v)+' '+u.unit)+'</output></div><input id="cv-setting" type="range" min="'+u.min+'" max="'+u.max+'" step="'+u.step+'" value="'+v+'" aria-describedby="cv-help" aria-valuetext="'+html(v+' '+u.unit)+'"><p id="cv-help">'+html(u.help)+'</p><button class="cv-primary" type="button" '+(running?'data-cv-end':'data-cv-run')+'><span aria-hidden="true">'+(running?'»':'▷')+'</span> '+(running?'Show result now':result?'Run again':'Run test')+'</button><small class="cv-cue" data-cv-cue>'+html(running?'Stepping through the path…':result?(result.applicable===false?'Not applicable: flight equipment not installed.':result.passed?'Last run passed.':'Last run missed a criterion.'):'Ready to run')+'</small></div></div>'+
  '<div class="cv-plan"><div><h4>Acceptance criterion</h4><p>'+html(c.criterion)+'</p></div><div><h4>Test stimulus</h4><p>'+html(c.stimulus)+'</p></div></div>'+
  '<div class="cv-output" data-cv-output aria-live="polite" aria-atomic="false">'+evidence(c,result,step,running)+'</div>'+
  '<details class="cv-source"><summary>Test basis &amp; assumptions</summary><p>'+html(c.basis)+'</p><a href="'+html(c.source.url)+'" target="_blank" rel="noopener noreferrer">'+html(c.source.title)+' ↗</a><p>The acceptance limits are project assumptions. Flight teams record a baseline before environmental testing, repeat the relevant checks after vibration and thermal-vacuum exposure, and investigate changes before release. This bench supplies simulated evidence for the chosen condition.</p></details></div>';
@@ -117,7 +117,7 @@ function render(host,s){
 function evidence(c,r,step,running){
  if(!r)return '<details class="cv-preview"><summary>View the four-step procedure</summary>'+procedure(c,null,-1)+'</details>';
  const finished=!running;
- return '<div class="cv-result"><div class="cv-result-head"><h4>'+(!finished?'Procedure in progress':'Test evidence')+'</h4><span class="cv-verdict '+(finished?(r.passed?'good':'bad'):'')+'">'+(!finished?'Step '+(step+1)+' / '+r.stages.length:r.passed?'Criteria met':'Criteria missed')+'</span></div><p>'+html(finished?r.summary:r.stages[step]?.detail)+'</p></div>'+
+ return '<div class="cv-result"><div class="cv-result-head"><h4>'+(!finished?'Procedure in progress':'Test evidence')+'</h4><span class="cv-verdict '+(finished&&r.applicable!==false?(r.passed?'good':'bad'):'')+'">'+(!finished?'Step '+(step+1)+' / '+r.stages.length:r.applicable===false?'Not applicable':r.passed?'Criteria met':'Criteria missed')+'</span></div><p>'+html(finished?r.summary:r.stages[step]?.detail)+'</p></div>'+
  (finished?'<div class="cv-results-grid"><div>'+procedure(c,r,step)+'</div><div>'+plotted(r.trace,c.id)+'<dl class="cv-values">'+r.measurements.map(m=>'<div><dt>'+html(m.label)+'</dt><dd>'+html((typeof m.value==='number'?digits(m.value):m.value)+(m.unit?' '+m.unit:''))+'</dd></div>').join('')+'</dl></div></div>':procedure(c,r,step));
 }
 function stop(s){
@@ -150,6 +150,7 @@ function bind(host){
   if(el.hasAttribute('data-cv-run')){
    const r=runCommVerification(s.hardware,s.id,s.settings[s.id]);
    stop(s);s.active={step:0,result:r};
+   if(r.applicable===false){complete(host,s);return}
    if(globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches){complete(host,s);return}
    render(host,s);host.querySelector('[data-cv-end]')?.focus({preventScroll:true});s.timer=setTimeout(()=>progress(host,s),640);
   }

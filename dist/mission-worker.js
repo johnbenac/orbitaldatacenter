@@ -33,4 +33,19 @@ export function chronologicalAudit(design, progress = () => {}) {
  const terminal=seed?.plan?Object.fromEntries(Object.entries(seed.plan).filter(([k])=>k!=='samples')):null;
  finalState.projected=false;const result={terminal,payloadServiceSeconds:annual.reduce((sum,y)=>sum+y.payloadServiceSeconds,0),activeComputeSeconds:annual.reduce((sum,y)=>sum+y.activeComputeSeconds,0),days:totalDays,thermal,thermalQualifiedUntilS:thermal.firstViolation?.time??thermal.coveredSeconds,physicalLifetimeSeconds:Math.min(firstCrossing?.time??Infinity,thermal.coveredSeconds),annual,energyKWh,attitudeModeSeconds,eventTotals,...eventTotals,burnCount:(eventTotals.trimCount||0)+(eventTotals.reboostCount||0)+(eventTotals.disposalCount||0),desatCount:eventTotals.desatCount||0,minSocPct:minSoc,minSocTime,maxJunctionK:maxTemp,maxJunctionTime,peakQueueGB,firstCrossing,finalState,dayStats};return {seeds,dayStats,result};
 }
-if(typeof WorkerGlobalScope!=='undefined'&&self instanceof WorkerGlobalScope)self.onmessage=({data})=>{try{self.postMessage(chronologicalAudit(data,progress=>self.postMessage({progress})));}catch(e){self.postMessage({error:e.message});}};
+if(typeof WorkerGlobalScope!=='undefined'&&self instanceof WorkerGlobalScope){
+ let completed=null,model=null;
+ self.onmessage=async({data})=>{
+  try{
+   if(data.prepare&&completed){
+    const preparation=await model.prepareDisposalSnapshot({...data.prepare,audit:completed},{onProgress:preparing=>self.postMessage({preparing}),pause:()=>Promise.resolve()});
+    self.postMessage({...completed,preparation});return;
+   }
+   completed=chronologicalAudit(data,progress=>self.postMessage({progress}));
+   model=createSimulation(data);
+   // Ask for the latest selected closeout window after the long sweep. The
+   // user may have moved to Phase F while this worker was integrating.
+   self.postMessage({auditReady:true});
+  }catch(error){self.postMessage({error:error.message});}
+ };
+}

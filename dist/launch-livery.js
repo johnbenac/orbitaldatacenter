@@ -71,7 +71,7 @@ export function createLaunchLivery(id,repaint){
   const key=kind+'/'+tint;if(materials.has(key))return materials.get(key);
   const settings={paint:{metalness:.025,roughness:1,bumpScale:.008,fallback:'#e8e8e2'},aluminium:{metalness:.82,roughness:1,bumpScale:.006,fallback:'#bfc6cc'},stainless:{metalness:.88,roughness:1,bumpScale:.008,fallback:'#b8c0c4'},ceramic:{metalness:0,roughness:1,bumpScale:.012,fallback:'#30353a'},composite:{metalness:.03,roughness:1,bumpScale:.003,fallback:'#23292e'}}[kind]||{};
   const {fallback,...properties}=settings;
-  const map=imageMap(kind+'-albedo.webp',true,fallback),data=imageMap(kind+'-surface.png',false,'#80b080');
+  const map=imageMap(kind+'-albedo.webp',true,fallback),data=imageMap(kind+'-surface.webp',false,'#80b080');
   const material=new T.MeshStandardMaterial({color:tint,map,roughnessMap:data,bumpMap:data,envMapIntensity:.85,...properties});
   material.name=kind+' launch surface';material.userData.launchSurface=kind;materials.set(key,material);return material;
  }

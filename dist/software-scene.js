@@ -67,7 +67,7 @@ function paintBackground(target,map,camera,width,height){
  }
  backgrounds.set(map,{key,data});target.set(data);
 }
-const vec=new T.Vector3(),mvp=new T.Matrix4(),normMat=new T.Matrix3(),sun=new T.Vector3(-3,6,4).normalize(),rim=new T.Vector3(4,1,-3).normalize();
+const vec=new T.Vector3(),eye=new T.Vector3(),half=new T.Vector3(),mvp=new T.Matrix4(),normMat=new T.Matrix3(),sun=new T.Vector3(-3,6,4).normalize(),rim=new T.Vector3(4,1,-3).normalize();
 export function softRenderer(canvas){let width=1,height=1,depth,frame;const ctx=canvas.getContext('2d',{alpha:true}),aa=document.createElement('canvas'),raster=aa.getContext('2d',{alpha:true});return{getDrawingBufferSize(target){return target.set(width,height);},setSize(w,h){const samples=w*h<200000?1.4:1;canvas.width=Math.round(w);canvas.height=Math.round(h);width=aa.width=Math.max(1,Math.round(w*samples));height=aa.height=Math.max(1,Math.round(h*samples));depth=new Float64Array(width*height);frame=ctx.createImageData(width,height);},render(scene,camera,keepColor=false){if(!frame)return;let img=frame.data;if(!keepColor)img.fill(0);depth.fill(Infinity);scene.updateMatrixWorld(true);camera.updateMatrixWorld();const lighting=scene.userData.lightState;
 if(!keepColor&&scene.background?.isTexture)paintBackground(img,scene.background,camera,width,height);
 const ev=scene.userData.exposureEV,gain=Number.isFinite(ev)?(1.16/.6)*2**ev:0,encoded=[0,0,0];
@@ -111,7 +111,10 @@ function project(i,x,y,z){
  return clipZ+w;
 }
 for(let i=0;i<n;i++)if(project(i,p.getX(i),p.getY(i),p.getZ(i))<0)crossesNear=true;
-const ix=g.index?.array,total=ix?.length??n,color=mat.color??new T.Color('#78a9c9');if(o.isPoints){
+const ix=g.index?.array,total=ix?.length??n,baseTexture=o.isMesh?imageData(mat.map):null;
+// A missing/not-yet-decoded image must retain its material color, rather than
+// exposing the white multiplier used with a loaded sRGB base-color texture.
+const color=mat.map&&!baseTexture&&mat.userData.materialFallbackColor?mat.userData.materialFallbackColor:mat.color??new T.Color('#78a9c9');if(o.isPoints){
  const hex=color.getHex();
  let red=hex>>16,green=hex>>8&255,blue=hex&255;
  if(gain&&mat.toneMapped!==false){filmic(encoded,color.r,color.g,color.b,gain);[red,green,blue]=encoded;}
@@ -121,7 +124,7 @@ const ix=g.index?.array,total=ix?.length??n,color=mat.color??new T.Color('#78a9c
  const px=4*i;img[px]=red;img[px+1]=green;img[px+2]=blue;img[px+3]=(mat.opacity??1)*255;
  }return;}if(o.isLine){let step=o.isLineSegments?2:1;for(let j=g.drawRange.start,end=Math.min(total,g.drawRange.start+g.drawRange.count);j<end-1;j+=step){let k=(ix?ix[j]:j)*4,l=(ix?ix[j+1]:j+1)*4;if(a[k+3]>0&&a[l+3]>0)drawLine(a,k,l,color.getHex(),mat);}return;}
 const tintR=display(color.r)/255,tintG=display(color.g)/255,tintB=display(color.b)/255;
-const uv=g.attributes.uv,normal=g.attributes.normal,baseTexture=imageData(mat.map),opacity=mat.opacity??1,smoothMap=mat.map?.magFilter!==T.NearestFilter;
+const uv=g.attributes.uv,normal=g.attributes.normal,opacity=mat.opacity??1,smoothMap=mat.map?.magFilter!==T.NearestFilter;
 if(mat.map?.matrixAutoUpdate)mat.map.updateMatrix();const tm=mat.map?.matrix.elements;
 const wrap=(v,type)=>type===T.RepeatWrapping?v-Math.floor(v):type===T.MirroredRepeatWrapping?(Math.floor(v)%2?1-(v-Math.floor(v)):v-Math.floor(v)):Math.max(0,Math.min(1,v));
 const intensity=normal&&mat.isMeshStandardMaterial?scratch.intensity:null;
@@ -135,6 +138,19 @@ if(glow){const norm=new T.Vector3(),toEye=new T.Vector3();for(let i=0;i<n;i++){
 }}
 if(intensity)for(let i=0;i<n;i++){vec.fromBufferAttribute(normal,i).applyMatrix3(normMat).normalize();intensity[i]=(lighting?.ambient??.33)+(lighting?.direct??1.05)*Math.max(0,vec.dot(lighting?.sun??sun))+(lighting?.rim??.38)*Math.max(0,vec.dot(lighting?.rimDirection??rim));
  if(lighting?.softbox)intensity[i]+=1.12*Math.max(0,vec.dot(lighting.softbox))+.68*Math.max(0,vec.dot(lighting.bounce));
+ // The material library uses real metalness. Treating a 70%-metal surface as
+ // a full Lambertian diffuser washes aluminum almost white under the studio
+ // fills. A bounded vertex specular approximation retains diffuse/metal
+ // separation and roughness on Canvas devices. WebGL still uses full PBR;
+ // this branch does not change Earth, terrain, or legacy launch materials.
+ if(mat.userData.materialId&&mat.metalness>0){
+  const metal=Math.max(0,Math.min(1,mat.metalness)),power=8+64*(1-Math.max(.08,Math.min(1,mat.roughness??.5)))**2;
+  eye.fromBufferAttribute(p,i).applyMatrix4(o.matrixWorld);eye.subVectors(camera.position,eye).normalize();
+  const specular=(direction,strength)=>{half.copy(direction).add(eye).normalize();return strength*Math.max(0,vec.dot(direction))*Math.max(0,vec.dot(half))**power;};
+  let spec=specular(lighting?.sun??sun,lighting?.direct??1.05)+specular(lighting?.rimDirection??rim,lighting?.rim??.38);
+  if(lighting?.softbox)spec+=specular(lighting.softbox,1.12)+specular(lighting.bounce,.68);
+  intensity[i]=intensity[i]*(1-metal)+metal*((lighting?.ambient??.33)+.5*spec);
+ }
 }
 const physical=gain&&mat.toneMapped!==false&&(mat.isMeshStandardMaterial||glow||mat.userData.celestial);
 const texel=mat.map?.colorSpace===T.SRGBColorSpace?srgbBytes:linearBytes;

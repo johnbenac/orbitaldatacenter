@@ -8,7 +8,7 @@ const stations = {
 export const bayStationFor=domain=>stations[domain]??stations.conops;
 
 import {componentCentroid} from './component-stations.js';
-import {DEPLOY_END_S} from './commissioning-clock.js';
+import {DEPLOY_END_S,commissioningClock} from './commissioning-clock.js';
 import {MU,R,TAU} from './orbit.js';
 import {launchFleet} from './launch-fleet.js';
 import {terminalPattern} from './terminal-activity.js';
@@ -134,7 +134,7 @@ function readings(domain,h) {
   case 'conops':return result([
    fact('Wings to deploy',4,'wings','Four independent roll-out assemblies in the fixed architecture.',0),
    fact('Radiator banks to release',2,'banks','Each bank latches and admits coolant separately.',0),
-   fact('Planned end of deployment',DEPLOY_END_S/60,'min after liftoff','Nominal end of the commissioning sequence on the mission clock.',0)
+   fact('Planned end of deployment',commissioningClock(h).endS/60,'min after liftoff','Nominal end of the commissioning sequence on the mission clock.',0)
   ],'A released panel and a working cooling loop are two different milestones. The flight sequence waits for the latches before admitting coolant.');
   case 'environment':return result([
    fact('Optical aperture',d.opticalApertureM*100,'cm','Clear diameter selected for the flight optical terminal.'),

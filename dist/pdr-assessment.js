@@ -7,8 +7,8 @@ import {goldRules,goldInventory} from './mission-gold-rules.js';
 import {sizingEnvelope} from './design.js';
 import {architectureApplicability} from './architecture-trades.js';
 
-export const pdrDomainOrder=Object.freeze(['conops','purpose','environment','orbit','compute','data','comm','power','thermal','attitude','prop','mass','launch','launcher','mechanical','avionics','software']);
-const domainOwners={conops:'Mission / operations lead',purpose:'Mission / service lead',environment:'Environment / assurance lead',orbit:'Flight dynamics lead',compute:'Compute payload lead',data:'Data handling lead',comm:'Communications lead',power:'Electrical power lead',thermal:'Thermal lead',attitude:'Attitude control lead',prop:'Propulsion lead',mass:'Mass properties / systems lead',launch:'Launch interface lead',launcher:'Launch integration lead',mechanical:'Mechanical / structures lead',avionics:'Avionics / parts assurance lead',software:'Flight software lead'};
+export const pdrDomainOrder=Object.freeze(['conops','environment','orbit','compute','data','comm','power','thermal','attitude','prop','mass','launch','launcher','mechanical','avionics','software']);
+const domainOwners={conops:'Mission / operations lead',environment:'Environment / assurance lead',orbit:'Flight dynamics lead',compute:'Payload operations lead',data:'Data handling lead',comm:'Communications lead',power:'Electrical power lead',thermal:'Thermal lead',attitude:'Attitude control lead',prop:'Propulsion lead',mass:'Mass properties / systems lead',launch:'Launch interface lead',launcher:'Launch integration lead',mechanical:'Mechanical / structures lead',avionics:'Avionics / parts assurance lead',software:'Flight software lead'};
 const esc=value=>String(value??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
 const number=value=>value===Infinity?'Not limiting':Number.isFinite(value)?(value!==0&&Math.abs(value)<.001?value.toExponential(2):value.toLocaleString('en-US',{maximumFractionDigits:3})):typeof value==='string'?value:'Unassessed';
 const labels={meets:'Screen meets',shortfall:'Shortfall',unassessed:'Unassessed',not_applicable:'Not applicable'};
@@ -21,10 +21,9 @@ const electricalInterfaces=['energy-family','energy-mppt','energy-payload','ener
 const thermalInterfaces=['thermal-flow','thermal-velocity','thermal-pressure','thermal-expansion'];
 export const pdrApplicabilityMap=Object.freeze({
  conops:{architecture:allArchitecture,energy:[...electricalInterfaces,...thermalInterfaces],fabric:true,route:true},
- purpose:{architecture:['trays','electronics','core-length','mission-life'],energy:['energy-family','energy-payload'],fabric:true,route:true},
  environment:{architecture:['mission-life','drag-perigee','drag-apogee','drag-eccentricity']},
  orbit:{architecture:['mission-life','drag-perigee','drag-apogee','drag-eccentricity']},
- compute:{architecture:['trays','electronics','core-length','mission-life'],energy:['energy-family','energy-payload'],fabric:true,compute:true},
+ compute:{architecture:['trays','electronics','core-length','mission-life'],energy:['energy-family','energy-payload'],fabric:true,compute:true,route:true},
  data:{architecture:['trays','core-length','mission-life'],fabric:true,route:true},
  comm:{architecture:['core-length','mission-life'],energy:['energy-service'],route:true},
  power:{architecture:['electronics','wing-span','wing-width','core-length','mission-life'],energy:electricalInterfaces},
@@ -89,9 +88,9 @@ const statusBadge=(status,label=labels[status]||status)=>'<span class="pdr-statu
 
 export function assessPdrDomains(context){
   const h=context.h||context.hardware;if(!h)throw Error('An installed spacecraft is required for PDR assessment');
-  const ctx={...context,h,s:context.s||context.state||null,envelope:context.envelope||sizingEnvelope(h),view:context.view||{},day:context.day||null};
+  const requested=[...new Set((context.domainIds||pdrDomainOrder).map(id=>id==='purpose'?'compute':id))];
+  const ctx={...context,domainIds:requested,h,s:context.s||context.state||null,envelope:context.envelope||sizingEnvelope(h),view:context.view||{},day:context.day||null};
   const reports={...assessFlightDomains(ctx),...assessResourceDomains(ctx),...assessServiceDomains(ctx)},identity=designIdentity(h);
-  const requested=context.domainIds||pdrDomainOrder;
   if(requested.some(id=>!pdrDomainOrder.includes(id)))throw Error('Unknown PDR domain selection');
   const domains=pdrDomainOrder.filter(id=>requested.includes(id)).map(id=>{
     const report=reports[id];if(!report)throw Error('Missing PDR design domain: '+id);

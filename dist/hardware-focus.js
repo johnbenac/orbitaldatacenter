@@ -1,4 +1,4 @@
-import {deploymentLayout} from './deployment.js';
+import {deploymentLayout,leafPose,leafAxes} from './deployment.js';
 import * as T from './vendor/three.module.js';
 import {domainSceneSpecs,sceneColors,routeRates} from './domain-scene.js';
 const V=(x=0,y=0,z=0)=>new T.Vector3(x,y,z);
@@ -20,6 +20,9 @@ function focusColor(part,domain,o){
  if(!spec?.parts.includes(part))return null;
  if(domain==='launch'||domain==='launcher')return 'native';
  if(domain==='mass'&&part==='structure')return 'native';
+ // Retain source-linked finishes on the selected hardware. Domain guides and
+ // ghosted context still explain function; thermal/data overlays stay above.
+ if(o.userData.materialId)return 'native';
  if(o.isLine||part==='solar'&&o.material.map||part==='radiator'&&o.material.map||domain==='environment')return 'native';
  if(domain==='prop'&&['propellant','propulsion'].includes(part))return 'native';
  return sceneColors[part]||'native';
@@ -59,7 +62,7 @@ export function dataRoutes(craft,h){
  const P=(x,y,z)=>V(x*w,y*b*craft.internal.scale.y+craft.internal.position.y,z*l);
  const inBus=o=>craft.root.worldToLocal(o.getWorldPosition(V()));
  const chip=h.rackLayout.slots.at(-1),cpu=V(chip.x,chip.y,chip.z),bulk=P(-.44,-.13,-.27),sw=inBus(craft.avionics),ssd=inBus(craft.recorder),top=P(-.27,.54,-.35);
- const targets=[['Ka',craft.dish],['Optical',craft.optic],['S-band',craft.patches[0],0],['S-band',craft.patches[1],1]];
+ const targets=[['Ka',craft.dish],['Optical',craft.optic],['S-band',craft.patches?.[0],0],['S-band',craft.patches?.[1],1]].filter(([,object])=>object);
  const smoothPath=points=>new T.CatmullRomCurve3(points,false,'centripetal');
  function add(key,points,channel=key,terminal=null,patch=null){
   const path=smoothPath(points),color=materials[channel],tube=new T.Mesh(new T.TubeGeometry(path,28,w*.008,8,false),new T.MeshBasicMaterial({color,toneMapped:false}));tube.userData.sceneFlow=true;root.add(tube);
@@ -79,7 +82,9 @@ export function dataRoutes(craft,h){
  add('produce',[cpu,P(.23,.22,-.28),P(.09,.20,-.34),ssd],'write');
  add('relay',[ssd,P(.01,.25,-.38),sw],'down');
  return {root,routes,update(s,visible,kind='data'){
-  root.visible=visible;if(!visible)return;const rates=routeRates(h,s);
+  root.visible=visible;if(!visible)return;
+  if(h.payloadLocation==='radiator'){const endpoint=craft.root.worldToLocal(hardwareAnchor('compute',craft,h,s));if(endpoint.distanceTo(cpu)>1e-4){cpu.copy(endpoint);for(const r of routes)if(['text','consume','produce'].includes(r.key)){const at=r.key==='consume'?r.path.points.length-1:0;r.path.points[at].copy(cpu);r.path.updateArcLengths();r.tube.geometry.dispose();r.tube.geometry=new T.TubeGeometry(r.path,28,w*.008,8,false);}}}
+  const rates=routeRates(h,s);
   const payload=s.terminalActivity?.find(f=>f.direction==='tx'&&f.services.payload>0);
   const peer=payload?.route==='direct'?payload.terminal:null,patch=s.stationDirectionBody?.[0]>=0?1:0;
   for(const r of routes){let on;
@@ -96,16 +101,16 @@ export function dataRoutes(craft,h){
 }
 export function hardwareAnchor(id,c,h,s){
  const w=h.bodyWidthM,y=h.bodyHeightM,l=h.bodyLengthM,P=(x,yy,z)=>V(w*x,y*yy,l*z);
- const centre=o=>o?.getWorldPosition(V()),patch=c.apertures.patches[s.stationDirectionBody?.[0]>=0?1:0];
+ const centre=o=>o?.getWorldPosition(V())||null,patch=c.apertures.patches?.[s.stationDirectionBody?.[0]>=0?1:0];
  switch(id){
- case 'compute':{const p=h.rackLayout.slots.at(-1);return c.root.localToWorld(V(p.x,p.y,p.z));}
+ case 'compute':{const p=h.rackLayout.slots.at(-1);if(h.payloadLocation==='radiator'){const g=deploymentLayout(h),d=g.descriptors.find(d=>d.type==='rad'),pose=leafPose(g,d,s.deployment??1,h.input.solarTiltDeg,s),a=leafAxes(pose);return c.root.localToWorld(V(...[pose.x,pose.y,pose.z].map((v,k)=>v+a[0][k]*p.x+a[1][k]*(p.y+.06)+a[2][k]*p.z)));}return c.root.localToWorld(V(p.x,p.y,p.z));}
  case 'storage':return centre(c.recorder);case 'avionics':return centre(c.avionics);
  case 'dish':return centre(c.apertures.Ka);case 'optic':return centre(c.apertures.Optical);case 'patch':return centre(patch);
  case 'activeTerminal':{
   const t=s.terminalActivity?.find(a=>a.direction==='tx'&&a.services.payload>0)?.terminal||s.groundLink;
   return centre(t==='Optical'?c.apertures.Optical:t==='Ka'?c.apertures.Ka:patch);
  }
- case 'solarRoot':case 'radiatorRoot':{const kind=id==='solarRoot'?'solar':'radiator',m=deploymentLayout(h).mounts.find(m=>m.kind===kind&&m.side===1);return c.root.localToWorld(V(...m.root));}
+ case 'solarRoot':case 'radiatorRoot':{const kind=id==='solarRoot'?'solar':'radiator',m=deploymentLayout(h).mounts.find(m=>m.kind===kind&&m.side===1)||deploymentLayout(h).mounts.find(m=>m.kind===kind);return m?c.root.localToWorld(V(...m.root)):null;}
  case 'cmg':return centre(c.cmgs[0].g);case 'torquer':return centre(c.torquers[0]);
  case 'fuel':case 'oxidizer':case 'helium':return centre(c.tankMap[id]);case 'engine':return centre(c.engines[0]);
  case 'solar':case 'radiator':{const p=c.panels.find(v=>v.descriptor.type===(id==='solar'?'pv':'rad'));return p?.surface.getWorldPosition(V())||null;}

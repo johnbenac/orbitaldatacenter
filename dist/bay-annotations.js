@@ -1,5 +1,5 @@
-// Keep the expanded facility/pad annotation registry, with the original compact
-// pins beside their projected objects. Labels never migrate into reading rails.
+// Shared by facility, pad and orbital hardware annotations. Keep the original
+// compact facility pins beside their objects, never in viewport-side rails.
 export const bayAnnotationColors=Object.freeze({flight:'#a6d5e7',ground:'#e2b277',facility:'#a0b9c5',process:'#8fd5bd'});
 
 export function visibleBayObject(object){
@@ -15,8 +15,10 @@ export function layoutBayAnnotations(points,width,height){
   .sort((a,b)=>(b.priority||0)-(a.priority||0)||String(a.id).localeCompare(String(b.id)));
  for(const p of candidates){
   if(seen.has(p.id))continue;
-  // This is the old pin's local left/right choice, not a viewport-side lane.
-  const right=p.x<width*.64,side=right?'right':'left';
+  // Closely spaced mechanism anchors can request opposite local sides. Keep
+  // the facility's automatic choice otherwise, and flip only to fit the edge.
+  const preferredRight=p.labelSide?p.labelSide==='right':p.x<width*.64;
+  const right=preferredRight?width-p.x>=71:p.x<71,side=right?'right':'left';
   const available=Math.max(45,(right?width-p.x:p.x)-26);
   const labelWidth=Math.min(184,available,Math.max(45,String(p.title||'').length*6.3+16));
   const labelX=right?p.x+18:p.x-18-labelWidth,labelY=p.y-labelHeight/2;
@@ -34,16 +36,29 @@ export function layoutBayAnnotations(points,width,height){
 }
 
 export function drawBayAnnotations(parent,entries){
+ // Retain each button across scene redraws so native title tooltips and keyboard
+ // focus survive live telemetry, camera updates and background rendering.
+ const previous=new Map(Array.from(parent.children,card=>[card.dataset.annotationId,card]));
  for(const e of entries){
-  const card=document.createElement('button');card.type='button';card.className='bay-pin'+(e.side==='left'?' bay-pin-left':'');
+  let card=previous.get(e.id);previous.delete(e.id);
+  if(!card){
+   card=document.createElement('button');card.type='button';
+   const name=document.createElement('span');name.className='bay-pin-name';card.append(name);
+   parent.append(card);
+  }
+  card.className='bay-pin'+(e.side==='left'?' bay-pin-left':'');
   // A leader moves the current camera once. It never selects a persistent
   // inspection preset or changes the engineering service selection.
   card.dataset.sceneAnchor=e.id;card.setAttribute('aria-label','Center view on '+e.title.toLowerCase());
-  if(e.pad)card.dataset.padCallout=e.id;
+  if(e.pad)card.dataset.padCallout=e.id;else delete card.dataset.padCallout;
+  if(e.instrument)card.dataset.sceneInstrument=e.instrument;else delete card.dataset.sceneInstrument;
   card.dataset.annotationId=e.id;
   card.style.left=e.x+'px';card.style.top=e.y+'px';card.style.maxWidth=e.labelWidth+'px';
-  card.title=e.title+(e.detail?' · '+e.detail:'')+' · Click to center view';
-  const name=document.createElement('span');name.className='bay-pin-name';name.textContent=e.title;card.append(name);
-  parent.append(card);
+  const description=[e.value,e.detail,'Click to center view'].filter(Boolean).join(' · ');
+  const title=e.title+' · '+description;
+  if(card.title!==title)card.title=title;
+  card.setAttribute('aria-description',description);
+  if(card.children[0].textContent!==e.title)card.children[0].textContent=e.title;
  }
+ for(const card of previous.values())card.remove();
 }

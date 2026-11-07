@@ -1,5 +1,6 @@
 import {payloadFreeMET} from './launch-effects-state.js';
-import {DEPLOY_END_S} from './commissioning-clock.js';
+import {commissioningClock} from './commissioning-clock.js';
+import {architectureFamily} from './architecture-families.js';
 // Interactive engineering plates. Geometry is schematic except where dimensions are marked.
 import {aiPurposes} from './ai-purpose.js';
 import {purposeInfo,purposeId} from './purpose-display.js';
@@ -45,9 +46,10 @@ function glyph(type,x,y,size=1,level=.5){
  case 'ssd':out=each(3,i=>rect(-26,-21+i*14,52,11,'sd-metal',2)+circle(-17,-15+i*14,1.8,'sd-led')+X(`M-10 ${-15+i*14}h25`,'sd-line'));break;
  case 'rack':out=rect(-24,-29,48,56,'sd-metal',3)+each(4,i=>rect(-18,-24+i*12,36,9,'sd-device',1)+circle(-12,-19+i*12,1.5,'sd-led')+X(`M-5 ${-19+i*12}h16`,'sd-line'));break;
  case 'solar':out=X('M-34 -18L29 -23L34 12L-29 19Z','sd-array')+each(5,i=>X(`M${-23+i*10} ${-19-i*.75}l5 35`,'sd-cells'))+X('M-32 -6l63 -6m-61 17l63 -6','sd-cells')+X('M-4 18v7h20','sd-hardware');break;
+ case 'twoWings':
  case 'fourWings':{
-  out=X('M-35 -12H35M-35 12H35','sd-hardware')+rect(-7,-20,14,40,'sd-metal',3);
-  for(const sign of [-1,1])for(const y of [-18,5]){
+  out=X(type==='twoWings'?'M-35 0H35':'M-35 -12H35M-35 12H35','sd-hardware')+rect(-7,-20,14,40,'sd-metal',3);
+  for(const sign of [-1,1])for(const y of (type==='twoWings'?[-6.5]:[-18,5])){
    const x=sign<0?-49:13;
    out+=`<g data-solar-wing="true">${rect(x,y,36,13,'sd-array',1)}${each(2,i=>X(`M${x+12*(i+1)} ${y}v13`,'sd-trace'))}${X(`M${x} ${y+6.5}h36`,'sd-cells')}</g>`;
   }break;
@@ -69,11 +71,12 @@ function glyph(type,x,y,size=1,level=.5){
  return `<g transform="translate(${x} ${y}) scale(${size})">${out}</g>`;
 }
 function compute({h,d,s},id){
+ const family=architectureFamily(h),thermal=h.energySystem?.thermal;
  const parts=[
  P('compute','Accelerator trays','Prompt prefill and token decoding share accelerator time. The estimator checks both compute and memory bandwidth.','trayCount','compute',[row('Installed',h.trays+' trays / '+h.chips+' accelerators'),row('Model',tech(d,'workload')),row('Decode on board',val(s.tokensPerSec,'tok/s',0)),row('Aggregate memory',val(h.memoryGB,'GB',0))]),
  P('memory','High-bandwidth memory','Weights, context and KV cache occupy accelerator memory for every active model replica.','context','compute',[row('Weight precision',val(d.bits,'bit')),row('Weights per replica',val(h.modelGB,'GB')),row('KV per replica',val(h.kvGB,'GB')),row('Batch',d.batch+' streams / replica')]),
  P('storage','Solid-state recorder','Output text and bulk products share the recorder. Delivered bytes leave the queue when the terminal has a ground pass.','storageTB','storage',[row('Media',tech(d,'storage')),row('Installed / free',val(h.storageTB,'TB')+' / '+val(s.freeTB,'TB')),row('Queued text',val(s.textQueueGB,'GB')),row('Queued bulk data',val(s.bulkQueueGB,'GB'))]),
- P('cooling','Cold plate','Power dissipated in the trays enters a pumped loop through the cold plates.','thermalResistanceKPerKw','radiator',[row('Cold plate',val(s.coldPlateK,'K')),row('Tray resistance',val(d.thermalResistanceKPerKw,'K/kW')),row('Compute draw',val(s.itKW,'kW'))])];
+ P('cooling','Cold plate',`${thermal?.topology||'Payload cold plates connect to the selected heat-transport architecture'}. The cold-plate interface resistance sets the electronics’ temperature rise.`,'thermalResistanceKPerKw','radiator',[row('Cold plate',val(s.coldPlateK,'K')),row('Tray resistance',val(d.thermalResistanceKPerKw,'K/kW')),row('Compute draw',val(s.itKW,'kW'))])];
  if(h.ai&&purposeId(h)!=='text'){
   const q=h.ai,profile=purposeInfo(h);
   parts[0]=P('compute','Accelerator trays',profile.phases[2],'trayCount','compute',[row('Installed',h.trays+' trays / '+h.chips+' accelerators'),row('Workload',q.label),row('Onboard work rate',val(s.aiUnitRate,q.unit+'/s',2)),row('Fabric efficiency',val(q.fabricEfficiency*100,'%'))]);
@@ -81,7 +84,7 @@ function compute({h,d,s},id){
   parts[2]=P('storage','Staging and output','Customer inputs and returned products share the recorder with persistent model files.','storageTB','storage',[row('Staged customer input',val(s.aiInputBufferGB,'GB')),row('Queued customer product',val(s.aiProductQueueGB,'GB')),row('Earth receipt',val(s.aiProductDeliveredGB,'GB'))]);
  }
  parts[0].details.push(row('Geometric tray capacity',h.rackLayout.capacity+' positions'),row('Empty positions',h.rackLayout.spare));
- const art=path('M57 40H369V219H57Z','sd-boundary')+T(69,58,'COMPUTE ENCLOSURE','sd-over','start')+
+ const art=path('M57 40H369V219H57Z','sd-boundary')+T(69,58,family.payloadLocation==='radiator'?'RADIATOR-MOUNTED COMPUTE':'COMPUTE ENCLOSURE','sd-over','start')+
  flow(id,'M154 115H239','cyan',(s.aiUnitRate??s.tokensPerSec)>0)+flow(id,'M318 115H444','cyan',s.offeredMbps>0)+flow(id,'M279 146V183h77','amber',s.itKW>0)+
  pick(parts[1],65,70,113,109,glyph('chip',121,101,.7)+T(121,139,'High-bandwidth','sd-name')+T(121,153,'memory','sd-name')+T(121,169,val(h.memoryGB,'GB',0)))+
  pick(parts[0],218,66,115,100,glyph('rack',274,106,.94)+named(274,152,'Accelerators',h.trays+' trays'))+
@@ -92,14 +95,15 @@ function compute({h,d,s},id){
 }
 
 function power({h,d,s},id){
+ const family=architectureFamily(h);
  const parts=[
- P('array','Solar wings','The four wings feed the regulated bus. Generation depends on orientation, eclipse and elapsed cell age.','solarM2','solar',[row('Technology',tech(d,'pv')),row('Installed area',val(h.solarM2,'m²')),row('Generation',val(s.solarKW,'kW')),row('Curtailed',val(s.curtailedKW,'kW'))]),
+ P('array','Solar wings',`The ${family.solarWingCount} installed blankets feed the regulated bus. Generation depends on orientation, eclipse and elapsed cell age.`,'solarM2','solar',[row('Technology',tech(d,'pv')),row('Installed area',val(h.solarM2,'m²')),row('Generation',val(s.solarKW,'kW')),row('Curtailed',val(s.curtailedKW,'kW'))]),
  P('battery','Battery pack','Surplus generation charges the pack. During a deficit the pack supplies demand within its energy and discharge limits.','batteryKWh','battery',[row('Chemistry',tech(d,'battery')),row('Available / installed',val(s.availableKWh,'kWh')+' / '+val(h.batteryKWh,'kWh')),row('Bus charge',val(s.chargeKW,'kW')),row('Bus discharge',val(s.dischargeKW,'kW'))]),
  P('bus','Regulated bus','The bus balances solar generation, battery exchange and served electrical load.','socMin','battery',[row('Requested',val(s.loadKW,'kW')),row('Served',val(s.servedLoadKW,'kW')),row('Unserved',val(s.unmetKW,'kW')),row('Minimum SOC setting',val(d.socMin*100,'%'))]),
- P('loads','Load branches','IT, communications and platform hardware draw from the same bus at the current mission instant.','duty','compute',[row('IT',val(s.itKW,'kW')),row('Terminal',val(s.terminalKW,'kW')),row('Pump and storage',val(s.pumpKW+s.storageKW,'kW')),row('CMGs and torquers',val(s.cmgKW+s.coilKW,'kW'))])];
+ P('loads','Load branches','IT, communications and platform hardware draw from the same bus at the current mission instant.','duty','compute',[row('IT',val(s.itKW,'kW')),row('Terminal',val(s.terminalKW,'kW')),row('Transport and storage',val((s.pumpKW||0)+(s.heatPumpInputKW||0)+s.storageKW,'kW')),row('CMGs and torquers',val(s.cmgKW+s.coilKW,'kW'))])];
  const discharge=s.dischargeKW>.0001,charge=s.chargeKW>.0001;
  const art=flow(id,'M141 86H264','amber',s.solarKW>0)+flow(id,discharge?'M144 183H218V142H262':'M263 143H218V183H145','green',discharge||charge)+path('M277 65V195','sd-busbar')+
- pick(parts[0],39,43,130,102,glyph('fourWings',103,81,1.02)+named(103,121,'Four solar wings',val(s.solarKW,'kW'))) +
+ pick(parts[0],39,43,130,102,glyph(family.solarWingCount===2?'twoWings':'fourWings',103,81,1.02)+named(103,121,`${family.solarWingCount} solar wings`,val(s.solarKW,'kW'))) +
  pick(parts[1],52,151,109,93,glyph('battery',101,181,.83,s.socPct/100)+named(101,223,'Battery',val(s.socPct,'% SOC')))+
  pick(parts[2],239,43,78,165,rect(268,62,17,138,'sd-conductor',4)+T(278,32,'DC BUS','sd-over')+T(276,221,val(s.servedLoadKW,'kW'),'sd-value'))+
  pick(parts[3],412,39,125,177,[[71,'Compute',s.itKW],[129,'Terminal',s.terminalKW],[188,'Platform',Math.max(0,s.loadKW-s.itKW-s.terminalKW)]].map(([y,n,v])=>flow(id,`M287 ${y}H412`,'amber',v>.001)+circle(421,y,5,'sd-node')+T(435,y-2,n,'sd-name','start')+T(435,y+15,val(v,'kW'),'sd-value','start')).join(''))+T(179,172,discharge?'DISCHARGE':charge?'CHARGE':'IDLE','sd-over');
@@ -107,18 +111,19 @@ function power({h,d,s},id){
 }
 
 function comm({h,d,s,events},id){
+ const installed=h.serviceArchitecture.terminal,hasS=installed.sBandInstalled,missing=d.link==='ka'&&!installed.kaInstalled||d.link==='s'&&!hasS;
  const active=!!s.station,next=events.find(e=>e.type==='contact'&&e.end>=s.t)||events.find(e=>e.type==='contact');
  const direct=(s.terminalActivity||[]).filter(f=>f.route==='direct');
  const byService=key=>direct.reduce((a,f)=>a+(f.services[key]||0)*8000/f.seconds,0);
  const down=byService('payload'),up=byService('command')+byService('input'),hk=byService('telemetry');
  const antenna=direct.find(f=>f.services.payload>0)?.terminal||s.groundLink;
  const parts=[
- P('payload','Payload downlink','The queue feeds the selected payload terminal after acquisition. Line rate and application goodput have separate budgets.','link','communications',[row('Direct terminal',antenna||d.link),row('Line rate',val(s.lineMbps,'Mbit/s')),row('Payload to station',val(down,'Mbit/s')),row('Queued payload',val(s.queueGB,'GB'))]),
- P('command','Tracking, telemetry and command','Ground commands and customer uploads share the S-band uplink. The same radio returns live housekeeping samples on its downlink while the onboard recorder archives them.','network','communications',[row('Ground command demand',val(s.commandDemandKbps,'kbit/s')),row('Delivered commands',val(s.commandGoodputKbps,'kbit/s')),row('Uplink physical rate',val(s.uplinkMbps,'Mbit/s')),row('Queued commands',val(s.uplinkQueueMB,'MB')),row('Housekeeping to station',val(hk*1000,'kbit/s'))]),
+ P('payload','Payload downlink',missing?'The selected traffic policy requests a terminal omitted from the installed package. This route has no hardware capacity; choose an installed terminal or review a hardware package change.':'The queue feeds an installed payload terminal after acquisition. Line rate and application goodput have separate budgets.','link','communications',[row('Installed package',installed.installedPackageLabel),row('Direct terminal',missing?'Not installed':antenna||d.link),row('Line rate',val(s.lineMbps,'Mbit/s')),row('Payload to station',val(down,'Mbit/s')),row('Queued payload',val(s.queueGB,'GB'))]),
+ P('command','Tracking, telemetry and command',hasS?'Ground commands and customer uploads share the installed S-band uplink. The same radio returns live housekeeping samples while the onboard recorder archives them.':'S-band hardware is omitted from this package. No independent RF command, customer uplink or live housekeeping return is modeled. An optical or Ka replacement requires its own design and verification.','communicationsPackage','communications',[row('RF TT&C installation',hasS?'S-band pair and radio':'Not installed'),row('Ground command demand',val(s.commandDemandKbps,'kbit/s')),row('Delivered commands',val(s.commandGoodputKbps,'kbit/s')),row('Uplink physical rate',val(s.uplinkMbps,'Mbit/s')),row('Queued commands',val(s.uplinkQueueMB,'MB')),row('Housekeeping to station',val(hk*1000,'kbit/s'))]),
  P('station','Ground endpoint','The beam terminates at the visible station selected by the geometry solver. The elevation mask defines access.','elevationDeg','communications',[row('Network',tech(d,'network')),row('Current endpoint',s.station||'No contact'),row('Slant range',active?val(s.rangeKm,'km'):'—'),row('Elevation',active?val(s.elevationDeg,'°'):'—')],next)];
  const art=path('M40 38H215V212H40Z','sd-boundary')+T(52,58,'SPACE SEGMENT','sd-over','start')+
- pick(parts[0],49,66,157,71,glyph(antenna==='Optical'||(!active&&d.link==='optical')?'optic':antenna==='S-band'||(!active&&d.link==='s')?'patch':'dish',86,94,.68)+T(123,92,'Payload','sd-name','start')+T(123,112,antenna||'Standby','sd-value','start'))+
- pick(parts[1],49,139,168,68,glyph('patch',86,165,.66)+T(122,163,'S-band','sd-name','start')+T(122,180,'Tracking, telemetry','sd-over','start')+T(122,192,'and command','sd-over','start'))+
+ pick(parts[0],49,66,157,71,(missing?T(86,98,'—','sd-name'):glyph(antenna==='Optical'||(!active&&d.link==='optical')?'optic':antenna==='S-band'||(!active&&d.link==='s')?'patch':installed.kaInstalled?'dish':'optic',86,94,.68))+T(123,92,'Payload','sd-name','start')+T(123,112,missing?'Not installed':antenna||'Standby','sd-value','start'))+
+ pick(parts[1],49,139,168,68,(hasS?glyph('patch',86,165,.66):T(86,170,'—','sd-name'))+T(122,163,hasS?'S-band':'RF TT&C open','sd-name','start')+T(122,180,hasS?'Tracking, telemetry':'No installed','sd-over','start')+T(122,192,hasS?'and command':'command radio','sd-over','start'))+
  flow(id,'M211 87Q355 52 470 109','cyan',down>0)+flow(id,'M471 130Q363 188 213 180','violet',up>0)+flow(id,'M213 156Q353 134 470 120','amber',hk>0)+T(330,49,val(down,'Mbit/s'),'sd-value')+T(329,197,val(up*1000,'kbit/s'),'sd-value')+
  path('M400 190Q500 153 571 188','sd-horizon')+
  pick(parts[2],433,83,120,137,glyph('dish',498,125,1.0)+named(498,202,s.station||'Ground network',active?val(s.rangeKm,'km'):groundSites(d.network).length+' sites'));
@@ -127,14 +132,15 @@ function comm({h,d,s,events},id){
 
 function thermal({h,d,s,qualificationWindow,thermalScale},id){
  const assessments=s.thermalQualification||qualifyNow(s,d),scale=thermalScale==='full'?'full':'working',stops=thermalScales[scale];
- const nodes=[['junction','Junction','chip','junctionK','compute','junctionLimitK'],['coldPlate','Cold plate','cold','coldPlateK','radiator','thermalResistanceKPerKw'],['coolant','Coolant','pump','coolantK','radiator','thermalMode'],['radiator','Radiator','radiator','radiatorK','radiator','radiatorM2'],['battery','Battery','battery','batteryK','battery','batteryKWh'],['enclosure','Enclosure','blanket','enclosureOuterK','enclosure','blanketEffectiveEpsilon']];
+ const transport=h.energySystem?.thermal,passive=transport?.kind==='passive-local',heatlift=transport?.kind==='heat-lift';
+ const nodes=[['junction','Junction','chip','junctionK','compute','junctionLimitK'],['coldPlate','Cold plate','cold','coldPlateK','radiator','thermalResistanceKPerKw'],['coolant',passive?'Local transport':heatlift?'Cold interface':'Coolant',passive||heatlift?'cold':'pump','coolantK','radiator','thermalMode'],['radiator','Radiator','radiator','radiatorK','radiator','radiatorM2'],['battery','Battery','battery','batteryK','battery','batteryKWh'],['enclosure','Enclosure','blanket','enclosureOuterK','enclosure','blanketEffectiveEpsilon']];
  const positions=[[75,92],[222,92],[370,92],[510,92],[124,191],[389,191]];
  const parts=nodes.map(([key,label,,field,inspect,edit])=>{
   const q=assessments.find(q=>q.id===key),meta=thermalNodes.find(n=>n.id===key),bounds=meta.keys[q.state],exposure=qualificationWindow?.rows?.find(r=>r.id===key&&r.state===q.state);
-  const description={junction:'The compute junction is the hot end of the linked path. Heat generated in the trays crosses the cold-plate interface.',coldPlate:'The cold plate couples the electronics to the pumped loop. Interface resistance raises the junction above radiator temperature.',coolant:'The pump carries heat from the cold plates to the radiator. Electrical pump losses enter the bus and thermal ledgers.',radiator:'Both radiator faces emit thermal radiation and absorb environmental heat. Net rejection drives the thermal state.',battery:'The pack is assessed at its modeled temperature and current operating or survival state.',enclosure:'The outer blanket exchanges heat with space. Occupied feedthroughs also conduct heat across the insulation.'}[key];
+  const description={junction:'Heat generated by the compute junction crosses the cold-plate interface into the selected transport path.',coldPlate:'The cold plate couples the electronics to the selected transport interface. Contact resistance sets the junction-to-interface temperature rise.',coolant:passive?'The local spreader and allocated heat pipes carry payload heat directly to the moving radiator platform. No remote pumped-fluid circuit is installed.':heatlift?'The cold-side interface feeds an electrically driven heat pump. Radiator heat includes both the removed cold-side heat and served compressor power. Working fluid and component qualification are unresolved.':'The pump carries heat from the cold plates to the radiator. Electrical pump losses enter the bus and thermal ledgers.',radiator:'Both modeled radiator faces emit thermal radiation and absorb environmental heat. Net rejection drives the thermal state; source area conventions remain separately identified.',battery:'The pack is assessed at its modeled temperature and current operating or survival state.',enclosure:'The outer blanket exchanges heat with space. Occupied feedthroughs also conduct heat across the insulation.'}[key];
   return {...P(key,label,description,edit,inspect,[row('Temperature',q.status==='unassessed'?'Unassessed':val(q.temperatureK,'K')),row('State',q.state+' · '+q.status),row('Currently',q.activity),row('Permitted range',num(q.minK)+'–'+val(q.maxK,'K')),row('Signed margin',val(q.marginK,'K')),...(exposure?[row('Time outside limits in window',val(exposure.lowSeconds+exposure.highSeconds,'s'))]:[])]),editLabel:edit===bounds.max?'Edit maximum':undefined,range:q,extraEdits:[[bounds.min,'Edit minimum'],[bounds.max,'Edit maximum']]};
  });
- const art=flow(id,'M112 92H185','amber',s.heatInputKW>0)+flow(id,'M257 92H329','amber',s.heatInputKW>0)+flow(id,'M409 92H472','cyan',s.coolantKgPerSec>0)+
+ const art=flow(id,'M112 92H185','amber',s.heatInputKW>0)+flow(id,'M257 92H329','amber',s.heatInputKW>0)+flow(id,'M409 92H472','cyan',passive?s.payloadToRadiatorKW>0:heatlift?s.heatPumpColdRemovalKW>0:s.coolantKgPerSec>0)+
  path('M180 192H334','sd-boundary-line')+T(257,184,'BUS THERMAL NODE','sd-over')+
  nodes.map(([key,label,type],i)=>{
   const [x,y]=positions[i],q=assessments.find(q=>q.id===key),status=q.status;
@@ -145,10 +151,10 @@ function thermal({h,d,s,qualificationWindow,thermalScale},id){
   const flag=warning?`<g class="sd-limit-flag" aria-label="${status} excursion"><path d="M${x+21} ${y-15}l7 -12 7 12z" fill="#fff0c8" stroke="#18212a"/>${T(x+28,y-16,'!','sd-limit-symbol')}</g>`:'';
   return pick(parts[i],x-53,y-43,106,92,glyphMarkup+flag+named(x,y+36,label,color===null?'Unassessed':val(q.temperatureK,'K')));
  }).join('')+
- T(294,31,d.thermalMode==='applied'?'INDEPENDENT HEAT EXPERIMENT':'PUMPED HEAT TRANSPORT','sd-over');
+ T(294,31,d.thermalMode==='applied'?'INDEPENDENT HEAT EXPERIMENT':passive?'LOCAL PASSIVE HEAT TRANSPORT':heatlift?'ELECTRICALLY DRIVEN HEAT LIFT':'PUMPED HEAT TRANSPORT','sd-over');
  const violations=assessments.filter(q=>q.status==='hot'||q.status==='cold').length;
  const key=`<div class="sd-temp-key" aria-label="Fixed temperature scale"><span class="sd-caption">TEMPERATURE · ${scale.toUpperCase()} RANGE</span><div class="sd-temp-ramp"><i style="background:linear-gradient(to right,${stops.map(([k,color],i)=>color+' '+(100*i/(stops.length-1))+'%').join(',')})"></i><div>${stops.map(([k],i)=>`<span>${i===0?'≤':i===stops.length-1?'≥':''}${k}</span>`).join('')}</div></div><span class="sd-temp-unit">K</span><span class="sd-temp-flag"><b>⚠</b> Outside active limits</span><span class="sd-temp-neutral"><i></i> Unassessed</span></div>`;
- return {...info('Thermal circuit','Select a node to compare its temperature with the applicable design range',parts,art,[legend('amber','Equipment heat'),legend('cyan','Coolant transport')],violations?violations+' outside range':assessments.some(q=>q.status==='unassessed')?'Unassessed interval':'Within current ranges'),temperatureKey:key};
+ return {...info('Thermal circuit','Select a node to compare its temperature with the applicable design range',parts,art,[legend('amber','Equipment heat'),legend('cyan',passive?'Local heat transport':heatlift?'Heat-pump transfer':'Coolant transport')],violations?violations+' outside range':assessments.some(q=>q.status==='unassessed')?'Unassessed interval':'Within current ranges'),temperatureKey:key};
 }
 
 function orbit({d,s,day,events},id){
@@ -305,7 +311,7 @@ function conops({h,d,s,day,events},id){
  P('service',profile.name,profile.goal,q.training?'trainingBudgetDays':'serviceDeadlineS','compute',[row('Customer',profile.customer),...(q.purposeId==='agents'?[row('Parallel agents per assignment stage',val(d.agentFanout,'agents')),row('Internal peer traffic',val(s.aiPeerMbps,'Mbit/s')),row('Earth service concurrency',val(d.serviceConcurrency,'slots'))]:[]),row('Peak work estimate',val(q.activeUnitsPerSec,u+'/s',2)),row('Computed onboard',val(s.aiUnitsComputed,u)),row('Product returned',val(s.aiProductDeliveredGB,'GB',3))]),
  P('access','Transfer opportunity','Ground visibility and acquisition start a transfer from the queued recorder. The shareable clock preserves the event and design state.','network','communications',[row('Access mask',val(d.elevationDeg,'°')),row('Windows today',String(day.contactCount??'—')),row('Transfer backlog',val(s.queueGB,'GB')),row('Next scheduled event',next?.label||'Outside this window')],events.find(e=>e.type==='contact'&&e.end>=s.t)),
  P('retirement','Retirement plan','Chemical control protects disposal inventory. The selected retirement method sets the terminal maneuver and final state.','disposalDv','propulsion',[row('Disposal method',(d.disposalMethod||'reentry')),row('Protected stock',val(s.disposalProtectedKg,'kg')),row('Orbit-maintenance allocation',val(d.yearsSupply,'yr')),row('Mission state',s.disposalStatus||'Scheduled')])];
- const art=T(42,37,'NOMINAL SPACECRAFT SERVICE','sd-over','start')+flow(id,'M102 95H200','cyan',s.t>=DEPLOY_END_S)+flow(id,'M266 95H362','cyan',s.aiUnitRate>0)+flow(id,'M421 95H487','violet',s.t>=s.disposalStart)+
+ const art=T(42,37,'NOMINAL SPACECRAFT SERVICE','sd-over','start')+flow(id,'M102 95H200','cyan',s.t>=commissioningClock(h).endS)+flow(id,'M266 95H362','cyan',s.aiUnitRate>0)+flow(id,'M421 95H487','violet',s.t>=s.disposalStart)+
  pick(parts[0],34,57,105,115,circle(80,94,23,'sd-device')+path('M80 76v18l12 9','sd-hardware')+named(80,145,'Schedule',val(d.duty*100,'% duty')))+
  pick(parts[1],179,53,107,115,glyph('rack',233,94,.8)+named(233,145,'Compute',val(s.itKW,'kW')))+
  pick(parts[2],330,53,112,115,glyph('dish',386,91,.84)+named(386,145,'Transfer',val(s.goodputMbps,'Mbit/s')))+

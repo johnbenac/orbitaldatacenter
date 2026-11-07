@@ -1,36 +1,36 @@
 {
   "release": "site",
-  "source_commit": "0acb5c5cea5d7b86d17cd6b7e74abd7bc14c3880",
-  "index_sha256": "aa8e7ae9c3e411c30f78816e188253b44aa0fca0e86e8423ab02c0021fd91379",
+  "source_commit": "b7e68a28dc4126bda04f96328dfe810e0d51b6a0",
+  "index_sha256": "b0f0de140550c89c9e286ead52ef2390b5b2d02d38f6af48c8934021877a8e18",
   "project": "orbitaldatacenter",
   "deployment": {
-    "id": "dfda9ee3-cf94-4411-adf0-828dd44c29a1",
-    "short_id": "dfda9ee3",
+    "id": "ff589df8-4f0d-4499-ab95-ea1bcbcdfce8",
+    "short_id": "ff589df8",
     "project_id": "8cfed813-a5e3-48d5-9451-47e81b01d88f",
     "project_name": "orbitaldatacenter",
     "environment": "production",
-    "url": "https://dfda9ee3.orbitaldatacenter-2o2.pages.dev",
-    "created_on": "2026-11-06T21:54:07.052987Z",
-    "modified_on": "2026-11-06T21:54:08.480017Z",
+    "url": "https://ff589df8.orbitaldatacenter-2o2.pages.dev",
+    "created_on": "2026-11-07T07:13:19.580259Z",
+    "modified_on": "2026-11-07T07:13:21.233862Z",
     "latest_stage": {
       "name": "deploy",
       "started_on": null,
-      "ended_on": "2026-11-06T21:54:08.480017Z",
+      "ended_on": "2026-11-07T07:13:21.233862Z",
       "status": "success"
     },
     "deployment_trigger": {
       "type": "ad_hoc",
       "metadata": {
         "branch": "main",
-        "commit_hash": "0acb5c5cea5d7b86d17cd6b7e74abd7bc14c3880",
-        "commit_message": "feat(social): use Blender artwork in sharing previews\r\n\r\nCompose the orbital render into a 1200x630 social card with the approved feasibility copy.\r\nRetain artwork, font licenses and credits outside the upstream distribution.\r\n\r\nUpdate Open Graph, Twitter and structured-data imagery and improve the description.\r\nVersion the image URL so sharing services can fetch the updated previe\n\n[commit_message truncated]",
+        "commit_hash": "b7e68a28dc4126bda04f96328dfe810e0d51b6a0",
+        "commit_message": "feat(release): import upstream v45 from split archive\r\n\r\nJoin both supplied Downloads parts and record their checksums and combined provenance.\r\nPreserve the supplied application, asset tooling, local extensions and AGPLv3.\r\n\r\nExclude skipped history bundles from the importer source-size budget while retaining\r\nsource limits. Verify 16 integration tests, all assets, syntax and desk\n\n[commit_message truncated]",
         "commit_dirty": true
       }
     },
     "stages": [
       {
         "name": "queued",
-        "started_on": "2026-11-06T21:54:07.052987Z",
+        "started_on": "2026-11-07T07:13:19.580259Z",
         "ended_on": null,
         "status": "active"
       },
@@ -55,7 +55,7 @@
       {
         "name": "deploy",
         "started_on": null,
-        "ended_on": "2026-11-06T21:54:08.480017Z",
+        "ended_on": "2026-11-07T07:13:21.233862Z",
         "status": "success"
       }
     ],

@@ -5,6 +5,8 @@ import * as T from './vendor/three.module.js';
 import {missionPatchMaterial,mountMissionPatch} from './fairing-patch.js';
 import {buildLaunchGround,buildAscentWake,exhaustFactory,launchEffectsAt,launchRiseM} from './launch-ground.js';
 import {launchSiteFor,launchPropulsionFor} from './launch-sites.js';
+import {launchUmbilicalDesign} from './launch-umbilicals.js';
+import {buildLaunchUmbilicals} from './launch-umbilical-visuals.js';
 import {buildStarship,falconRecovery,launchNozzles,shipNose} from './launch-hardware.js';
 import {cargoBay,starshipCargoFit,starshipCargoFlight} from './starship-cargo.js';
 import {integrationState} from './integration-sequence.js';
@@ -16,28 +18,32 @@ import {launchFleet} from './launch-fleet.js';
 import {deploymentLayout,mechanismPose,leafPose} from './deployment.js';
 import {thermalMesh} from './thermal-view.js';
 import {fitOutBay,payloadFinishes} from './launch-art.js';
+import {createLaunchLivery} from './launch-livery.js';
 const v=(x=0,y=0,z=0)=>new T.Vector3(x,y,z),clamp=x=>Math.max(0,Math.min(1,x));
 const group=(p,name)=>{const g=new T.Group();g.userData.part=name;p.add(g);return g;};
 function shellBands(section,begin,angle,n=Math.ceil(64*angle/Math.PI)){
- const vertices=[],normals=[],indices=[];
+ const vertices=[],normals=[],indices=[],uv=[],ys=section.map(q=>q[1]),low=Math.min(...ys),height=Math.max(1e-8,Math.max(...ys)-low);
  for(let j=1;j<section.length;j++){
   const [a,y]=section[j-1],[b,z]=section[j],dr=b-a,dy=z-y,len=Math.hypot(dr,dy);if(!len)continue;
   const first=vertices.length/3;for(let k=0;k<=n;k++){const theta=begin+angle*k/n,si=Math.sin(theta),co=Math.cos(theta);
    vertices.push(a*si,y,a*co,b*si,z,b*co);for(let i=0;i<2;i++)normals.push(si*dy/len,-dr/len,co*dy/len);
+   uv.push(theta/(2*Math.PI),(y-low)/height,theta/(2*Math.PI),(z-low)/height);
    if(k<n){const i=first+k*2;indices.push(i,i+2,i+1,i+2,i+3,i+1);}
   }
  }
- const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(vertices,3));g.setAttribute('normal',new T.Float32BufferAttribute(normals,3));g.setIndex(indices);return g;
+ const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(vertices,3));g.setAttribute('normal',new T.Float32BufferAttribute(normals,3));g.setAttribute('uv',new T.Float32BufferAttribute(uv,2));g.setIndex(indices);return g;
 }
 export function makeLaunch(h,repaint){
  const root=new T.Group(), stage=group(root,'launcher'), lower=group(stage,'launcher'), upper=group(stage,'launcher'),
  payload=group(stage,'payload'), shell=group(stage,'fairing'), facility=group(root,'pad'), tower=group(root,'pad');
+ const livery=createLaunchLivery(h.input.launcher,repaint),bodyFinish=livery.surface(livery.record.finish),whiteFinish=livery.surface('paint'),compositeFinish=livery.surface('composite');
+ root.userData.launchLivery=livery.record;
  const mat=(c,m=.2,r=.53)=>new T.MeshStandardMaterial({color:c,metalness:m,roughness:r});
  const ivory=mat('#e3e4df'),rib=mat('#abb2ab'),steel=mat('#667b80',.48),dark=mat('#202e39'),blue=mat('#25445a'),gold=mat('#a98654'),red=mat('#a84d39'),foil=mat('#b99258',.57),black=mat('#111b22'),fin=mat('#d1d4c3');
  const cube=new T.BoxGeometry(1,1,1);
  function mesh(p,geom,material,x,y,z,id){const m=new T.Mesh(geom,material);m.position.set(x,y,z);if(id)m.userData.part=id;p.add(m);return m;}
  function box(p,x,y,z,w,b,l,m,id){const o=mesh(p,cube,m,x,y,z,id);o.scale.set(w,b,l);return o;}
- function cylinder(p,x,y,z,a,b,len,m,id,n=48){return mesh(p,new T.CylinderGeometry(a,b,len,n,1),m,x,y,z,id);}
+ function cylinder(p,x,y,z,a,b,len,m,id,n=80){return mesh(p,new T.CylinderGeometry(a,b,len,n,1),m,x,y,z,id);}
  function tube(p,a,b,r,m,id){const delta=b.clone().sub(a),mid=a.clone().add(b).multiplyScalar(.5),o=cylinder(p,mid.x,mid.y,mid.z,r,r,delta.length(),m,id,10);o.quaternion.setFromUnitVectors(v(0,1,0),delta.normalize());return o;}
  const f=h.fairing||{},d=h.input,L=f.heightM||d.fairingLengthM,D=f.outerDiameterM||d.fairingM*1.08,R=D/2;
  const profile=f.profile||[[0,d.fairingM/2],[.70*L,d.fairingM/2],[L,.26*d.fairingM]];
@@ -53,7 +59,7 @@ export function makeLaunch(h,repaint){
  const star=/starship/i.test(d.launcher), halves=[];
  if(!star)for(const side of [-1,1]){
   const g=group(shell,'fairing'),begin=side<0?Math.PI:0, angle=Math.PI;
-  const body=mesh(g,shellBands(outerProfile,begin,angle),ivory,0,0,0);
+  const body=mesh(g,shellBands(outerProfile,begin,angle),bodyFinish,0,0,0);
   mesh(g,shellBands(inside.slice().reverse(),begin,angle),mat('#a6a89b',.34),0,0,0).name='Fairing interior liner';
   for(const cap of [[outerProfile.at(-1),inside.at(-1)],[inside[0],outerProfile[0]]])mesh(g,shellBands(cap,begin,angle),rib,0,0,0);
   function radius(y){for(let j=1;j<outerProfile.length;j++)if(y<=outerProfile[j][1]){const[a,z]=outerProfile[j-1],[b,zz]=outerProfile[j];return a+(b-a)*(y-z)/(zz-z);}return .01;}
@@ -68,6 +74,7 @@ export function makeLaunch(h,repaint){
   body.name='Fairing half shell';g.userData.halfSide=side;
   const patchY=maxH*.48;
   mountMissionPatch(body,outerProfile,begin+.81,patchY,Math.min(radius(patchY)*1.42,maxH*.42),patch);
+  livery.fairing(body,outerProfile,begin,maxH,R);
   for(const phi of [begin,begin+angle]){
    const poly=new T.Shape();section.forEach(([x,y],i)=>i?poly.lineTo(x,y):poly.moveTo(x,y));
    const cap=new T.ShapeGeometry(poly);cap.rotateY(phi-Math.PI*.5);const desired=v(Math.cos(phi),0,-Math.sin(phi)).multiplyScalar(phi===begin?-1:1);
@@ -167,26 +174,20 @@ export function makeLaunch(h,repaint){
   stage2=single?0:star?fleet.shipLengthM-capH:bodyLength*(glenn?.26:.24),stage1=bodyLength-stage2,allH=bodyLength+capH,baseY=-bodyLength;
 
  const clock=launchClockFor(d.launcher),{stageSeparation:separationT,boosterSeparation:sideSeparationT,fairingJettison:fairingT}=clock;
- const ship=star?buildStarship({lower,upper,shell,baseY,stage1,stage2,patch}):null;
+ const ship=star?buildStarship({lower,upper,shell,baseY,stage1,stage2,patch,livery}):null;
  const fairingPatch=(star?shell:halves.find(half=>half.side===1).g).getObjectByName('Mission patch');
  fairingPatch.geometry.computeBoundingSphere();
  if(!star){
- cylinder(lower,0,baseY+stage1*.50,0,baseR,baseR*.985,stage1,star?rib:ivory);
- cylinder(lower,0,baseY+stage1*.095,0,baseR*1.006,baseR*.994,stage1*(parallel?.035:.185),parallel?rib:dark);
- cylinder(lower,0,baseY+stage1*.966,0,baseR*1.009,baseR*1.012,stage1*.068,parallel?dark:glenn?blue:steel);
- for(let i=1;i<8;i++)cylinder(lower,0,baseY+stage1*(.18+i*.086),0,baseR*1.001,baseR*1.001,baseR*.015,steel,undefined,64);
- if(!parallel)for(let i=0;i<12;i++){const a=2*Math.PI*i/12;box(lower,baseR*.991*Math.sin(a),baseY+stage1*.52,baseR*.991*Math.cos(a),baseR*.043,stage1*.66,baseR*.043,rib);}
- if(!single){cylinder(upper,0,-stage2*.5,0,R,baseR,stage2,star?rib:ivory);cylinder(upper,0,-stage2*.92,0,baseR*1.01,baseR*.998,stage2*.12,dark);}
+ cylinder(lower,0,baseY+stage1*.50,0,baseR,baseR*.985,stage1,bodyFinish).name='Textured first-stage barrel';
+ cylinder(lower,0,baseY+stage1*.055,0,baseR*1.006,baseR*.994,stage1*(parallel?.035:.105),parallel?rib:d.launcher.startsWith('terran')?bodyFinish:dark);
+ cylinder(lower,0,baseY+stage1*.966,0,baseR*1.009,baseR*1.012,stage1*.068,parallel?compositeFinish:glenn?blue:bodyFinish);
+ for(const portion of [.25,.53,.82])cylinder(lower,0,baseY+stage1*portion,0,baseR*1.001,baseR*1.001,baseR*.008,rib,undefined,80);
+ if(!single){cylinder(upper,0,-stage2*.5,0,R,baseR,stage2,bodyFinish).name='Textured upper-stage barrel';cylinder(upper,0,-stage2*.92,0,baseR*1.01,baseR*.998,stage2*.12,compositeFinish);}
  cylinder(upper,0,-skin,0,R*1.004,R*1.004,skin*3,steel);
- // Vehicle-family bands identify the stage without borrowing provider flight markings.
- const accent=glenn?blue:dark;
- if(!parallel){
- for(const yy of [.23,.252,.277])cylinder(lower,0,baseY+stage1*yy,0,baseR*1.009,baseR*1.009,baseR*(yy===.252?.11:.045),accent,undefined,72);
- for(let i=0;i<4;i++){const a=i*Math.PI/2,o=box(lower,baseR*.994*Math.sin(a),baseY+stage1*.78,baseR*.994*Math.cos(a),baseR*.37,baseR*1.0,baseR*.026,accent);o.rotation.y=a;}
-
+ if(parallel)falconRecovery(lower,baseR,baseY,stage1,livery);
  }
- if(parallel)falconRecovery(lower,baseR,baseY,stage1);
- }
+ livery.core(lower,baseR,baseY,stage1);
+ if(!star&&!single)livery.upper(upper,[[baseR,-stage2],[R,0]],stage2);
  const flames=[],boosters=[],makeExhaust=exhaustFactory(),fuel=launchPropulsionFor(d.launcher);
  const bellShell=shellBands([[1,-1.30],[.69,-.65],[.41,0],[.36,0],[.64,-.65],[.94,-1.30],[1,-1.30]],0,Math.PI*2,32);
  // Seen from directly aft, a hollow plume skin has no projected area at its
@@ -213,10 +214,10 @@ export function makeLaunch(h,repaint){
  for(let i=0;i<fleet.boosters;i++){
   const a=2*Math.PI*i/fleet.boosters+Math.PI/2,rb=baseR*(parallel?1:d.launcher==='vulcan6'?.30:.64),height=stage1*(parallel?1:d.launcher==='longMarch5B'?.72:.66);
   const br=group(stage,'booster');br.userData.radiusM=rb;br.userData.lengthM=height;const rad=baseR+rb*1.015,dx=Math.sin(a),dz=Math.cos(a);br.position.set(dx*rad,baseY,dz*rad);
-  cylinder(br,0,height*.44,0,rb,rb*.99,height*.88,ivory,'booster');cylinder(br,0,height*.94,0,rb*.043,rb,height*.12,ivory,'booster');
+  cylinder(br,0,height*.44,0,rb,rb*.99,height*.88,whiteFinish,'booster');cylinder(br,0,height*.94,0,rb*.043,rb,height*.12,whiteFinish,'booster');
   cylinder(br,0,height*.11,0,rb*1.008,rb*1.004,height*(parallel?.025:.20),rib,'booster');cylinder(br,0,height*.72,0,rb*1.008,rb*1.008,rb*.050,steel,'booster');
   cylinder(br,0,height*.80,0,rb*1.013,rb*1.013,rb*.09,parallel?dark:blue,'booster');
-  if(parallel)falconRecovery(br,rb,0,height);
+  if(parallel){falconRecovery(br,rb,0,height,livery);livery.core(br,rb,0,height,{booster:true});}
   engines(br,rb,0,parallel?fleet.coreEngines:d.launcher==='longMarch5B'?2:1);boosters.push({br,dx,dz,rad,rb});
  }
  const sideOutlines=[];stage.traverse(o=>{if(o.userData.sideOutline)sideOutlines.push(o)});
@@ -228,10 +229,13 @@ export function makeLaunch(h,repaint){
  const merged=star?makeExhaust(lower,0,baseY-4.8,0,baseR*.88,fuel.core,true):null;
  const wake=buildAscentWake([[lower,baseY,baseR,fuel.core,'ignition'],...boosters.map(({br,rb})=>[br,0,rb,fuel.booster,'boosterPower'])]);
  const coreMounts=[{x:0,z:0,r:baseR,part:lower,localBase:baseY},...boosters.map(({br,rb})=>({x:br.position.x,z:br.position.z,r:rb,part:br,localBase:0}))];
- const ground=buildLaunchGround(site,{tower,coreMounts,baseR,baseY,allH,fleet,box,tube,mesh,cylinder,mat,steel,rib,dark,gold,black});
+ const ground=buildLaunchGround(site,{tower,coreMounts,baseR,baseY,allH,fleet,box,tube,mesh,cylinder,mat,steel,rib,dark,gold,black,repaint});
  const layout=integrationLayout(h,record,single?stage1:stage2,capH);
  const bay=fitOutBay({facility,tower,halves,unit,R,baseR,baseY,maxH,h,profile,layout,box,tube,mesh,cylinder,mat,steel,rib,dark,gold,black});
- root.traverse(o=>{if(o.isMesh){o.receiveShadow=true;o.castShadow=o.geometry.type!=='PlaneGeometry'&&o.material.transparent!==true;}});
+ const umbilicals=buildLaunchUmbilicals({design:launchUmbilicalDesign(h),site,tower,parts:{lower,upper,boosters:boosters.map(q=>q.br),payload,shell,fitting},
+  geometry:{baseY,heightM:allH,lowerLengthM:stage1,upperLengthM:stage2,fairingRadiusM:R,fairingHeightM:maxH,baseRadiusM:baseR,payloadWidthM:hw,payloadHeightM:hh,payloadSeatM:seatY,flightRingRadiusM:upperR},
+  serviceFrame:ground.serviceFrame,serviceSources:ground.serviceSources});
+ root.traverse(o=>{if(o.isMesh){o.receiveShadow=o.userData.receiveShadow!==false;o.castShadow=!o.userData.noShadow&&o.geometry.type!=='PlaneGeometry'&&o.material.transparent!==true;}});
  function update(s,chapter,context={}){
   let phase=s.flightPhase||(s.t< -600?'integration':s.t<0?'pad':s.t<INSERTION_MET?'ascent':s.t<900?'insertion':s.t<1200?'commissioning':'operations');
   const reference=!['integration','pad','ascent','insertion','commissioning','deorbit','entry','infeasible'].includes(phase);
@@ -314,6 +318,10 @@ halves.forEach(({g,side})=>{
   }
   const cargoHeld=star&&!canLoad&&!working;
   if(cargoHeld)payload.visible=false;
+  if(Object.hasOwn(context,'padConnection'))umbilicals.setSelectedConnection(context.padConnection);
+  umbilicals.update(t,{pad,ascent:asc,integration,reference,vehicleStudy,cargoHeld});
+  const padCutaway=!!(context.padInspect&&umbilicals.getConnectionContext(umbilicals.selectedConnection)?.internal&&(pad||asc&&t<35));
+  if(padCutaway)shell.visible=false;
   root.visible=!directCraft;
   const center=v();let zoomH=integration?Math.max(maxH,h.stowedLengthM)*.76:insert?Math.max(maxH*.62,h.stowedLengthM*.82):asc&&t>220?Math.max(stage2+maxH,allH*.51)*.59:allH*.59;
   if(integration){center.y=maxH*.49;center.x=-unit*.047;}else if(insert)center.y=payload.position.y+h.stowedLengthM*.33;else if(asc&&t>220)center.y=(maxH-stage2)*.5;else center.y=(maxH+baseY)*.5;
@@ -341,7 +349,7 @@ halves.forEach(({g,side})=>{
    center.applyAxisAngle(v(0,0,1),stage.rotation.z);
   }
   const backdrop=integration?'hangar':pad||asc&&level<15?'ground':asc&&level<95?'sky':'space';
-  return {center,half:zoomH,environment:backdrop,cargoHeld,directCraft,reference,vehicleStudy,phase,opening:pose?.opening??opening,bayTime:working?t:null,launchFX:fx};
+  return {center,half:zoomH,environment:backdrop,cargoHeld,directCraft,reference,vehicleStudy,phase,opening:pose?.opening??opening,bayTime:working?t:null,launchFX:fx,padCutaway,padCutawayLabel:padCutaway?'Inspection cutaway · flight interface':null};
  }
- return {root,update,bay,faceLaunchClouds(camera){ground.faceClouds(camera);wake.faceClouds(camera);},geometry:{heightM:allH,diameterM:baseR*2,upperLengthM:stage2,lowerLengthM:stage1,stages:fleet.stages,sideBoosters:boosters.length},parts:{payload,fitting,liveMount,shell,fairingPatch,facility,tower,stage,lower,upper,boosterBase,sideOutlines,boosters:boosters.map(q=>q.br)}};
+ return {root,update,bay,ground,umbilicals,setPadConnection(id){umbilicals.setSelectedConnection(id);},faceLaunchClouds(camera){ground.faceClouds(camera);wake.faceClouds(camera);},geometry:{heightM:allH,diameterM:baseR*2,upperLengthM:stage2,lowerLengthM:stage1,stages:fleet.stages,sideBoosters:boosters.length},parts:{payload,fitting,liveMount,shell,fairingPatch,facility,tower,stage,lower,upper,boosterBase,sideOutlines,boosters:boosters.map(q=>q.br)}};
 }

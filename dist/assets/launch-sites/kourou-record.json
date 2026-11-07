@@ -1,0 +1,178 @@
+{
+  "id": "kourou",
+  "name": "Guiana Space Centre · French Guiana",
+  "center": [
+    -52.79,
+    5.26
+  ],
+  "spanM": [
+    24000,
+    24000
+  ],
+  "bounds": [
+    -52.898253201,
+    5.152202659,
+    -52.681746799,
+    5.367797341
+  ],
+  "projection": "EPSG:4326",
+  "description": "Atlantic mudflats, tropical forest, coastal savanna and tidal creeks. The public IGN layer is provider-blurred around the launch complex.",
+  "seawardBearingDeg": 45,
+  "image": {
+    "url": "assets/launch-sites/kourou-regional.jpg",
+    "previewUrl": "assets/launch-sites/kourou-regional-preview.jpg",
+    "width": 4096,
+    "height": 4096,
+    "resolutionM": 5.8594,
+    "projection": "EPSG:4326",
+    "bounds": [
+      -52.898253201,
+      5.152202659,
+      -52.681746799,
+      5.367797341
+    ],
+    "nativeResolutionM": 0.2,
+    "nativeResolutionBasis": "Nominal source acquisition, not bundled display sampling",
+    "acquired": "2022-09-26 (center-point metadata; regional mosaic dates vary)",
+    "attribution": "© IGN · BD ORTHO · Licence Ouverte 2.0; Contains modified Copernicus Sentinel data 2026, served by Microsoft Planetary Computer",
+    "sourceUrl": "https://geoservices.ign.fr/bdortho",
+    "license": "Licence Ouverte / Open Licence Etalab 2.0; Copernicus Sentinel free, full and open data",
+    "licenseUrl": "https://www.etalab.gouv.fr/licence-ouverte-open-licence/",
+    "requests": [
+      "https://data.geopf.fr/wms-r/wms?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=ORTHOIMAGERY.ORTHOPHOTOS&STYLES=&FORMAT=image%2Fpng&TRANSPARENT=TRUE&CRS=CRS%3A84&BBOX=-52.898253201%2C5.26%2C-52.790000000000006%2C5.367797341&WIDTH=2048&HEIGHT=2048",
+      "https://data.geopf.fr/wms-r/wms?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=ORTHOIMAGERY.ORTHOPHOTOS&STYLES=&FORMAT=image%2Fpng&TRANSPARENT=TRUE&CRS=CRS%3A84&BBOX=-52.790000000000006%2C5.26%2C-52.681746799%2C5.367797341&WIDTH=2048&HEIGHT=2048",
+      "https://data.geopf.fr/wms-r/wms?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=ORTHOIMAGERY.ORTHOPHOTOS&STYLES=&FORMAT=image%2Fpng&TRANSPARENT=TRUE&CRS=CRS%3A84&BBOX=-52.898253201%2C5.152202659%2C-52.790000000000006%2C5.26&WIDTH=2048&HEIGHT=2048",
+      "https://data.geopf.fr/wms-r/wms?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=ORTHOIMAGERY.ORTHOPHOTOS&STYLES=&FORMAT=image%2Fpng&TRANSPARENT=TRUE&CRS=CRS%3A84&BBOX=-52.790000000000006%2C5.152202659%2C-52.681746799%2C5.26&WIDTH=2048&HEIGHT=2048"
+    ],
+    "qualityLabel": "Provider-blurred imagery",
+    "qualityNote": "Public IGN imagery is blurred at the launch complex. Its 20 cm nominal acquisition metadata does not describe the visible detail in the restricted area.",
+    "effectiveDetail": "Provider-degraded around the launch complex; no submeter detail is claimed.",
+    "qualitySourceUrl": "https://remonterletemps.ign.fr/faq",
+    "gapFill": {
+      "sourceId": "sentinel-2",
+      "nativeResolutionM": 10,
+      "acquired": "2026-08-10",
+      "request": [
+        "https://planetarycomputer.microsoft.com/api/data/v1/item/bbox/-52.898253201,5.152202659,-52.681746799,5.367797341/2048x2048.png?collection=sentinel-2-l2a&item=S2A_MSIL2A_20260810T140111_R067_T22NBL_20260810T215710&assets=visual&dst_crs=EPSG%3A4326&coord_crs=EPSG%3A4326&resampling=bilinear&reproject=bilinear",
+        "https://planetarycomputer.microsoft.com/api/data/v1/item/bbox/-52.898253201,5.152202659,-52.681746799,5.367797341/2048x2048.png?collection=sentinel-2-l2a&item=S2A_MSIL2A_20260810T140111_R067_T22NCL_20260810T215710&assets=visual&dst_crs=EPSG%3A4326&coord_crs=EPSG%3A4326&resampling=bilinear&reproject=bilinear"
+      ],
+      "attribution": "Contains modified Copernicus Sentinel data 2026, served by Microsoft Planetary Computer"
+    },
+    "additionalLicenseUrls": [
+      "https://dataspace.copernicus.eu/terms-and-conditions"
+    ],
+    "processing": "Reprojected to EPSG:4326; bilinear display sampling; JPEG encoding. Open-ocean Sentinel colors balanced to aerial water and blended beyond a buffered source shoreline, removing rectangular aerial-coverage seams. Classified offshore white no-data is filled with actual Sentinel pixels. Land coordinates and pixels retained."
+  },
+  "elevation": {
+    "url": "assets/launch-sites/kourou-elevation.json",
+    "width": 257,
+    "height": 257,
+    "bounds": [
+      -52.898253201,
+      5.152202659,
+      -52.681746799,
+      5.367797341
+    ],
+    "sampleSpacingM": 93.75,
+    "minM": 0.0,
+    "maxM": 90.6,
+    "datum": "Source orthometric elevation; terrain is displayed relative to the selected pad sample",
+    "attribution": "Mapzen; USGS SRTM/GMTED; NOAA ETOPO1",
+    "sourceUrl": "https://registry.opendata.aws/terrain-tiles/",
+    "license": "U.S. public-domain source data; attribution retained",
+    "requests": [
+      "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/12/1446/1986.png",
+      "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/12/1447/1986.png",
+      "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/12/1448/1986.png",
+      "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/12/1446/1987.png",
+      "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/12/1447/1987.png",
+      "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/12/1448/1987.png",
+      "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/12/1446/1988.png",
+      "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/12/1447/1988.png",
+      "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/12/1448/1988.png",
+      "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/12/1446/1989.png",
+      "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/12/1447/1989.png",
+      "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/12/1448/1989.png"
+    ],
+    "licenseUrl": "https://github.com/tilezen/joerd/blob/master/docs/attribution.md"
+  },
+  "waterMask": {
+    "url": "assets/launch-sites/kourou-water.png",
+    "width": 1024,
+    "height": 1024,
+    "bounds": [
+      -52.898253201,
+      5.152202659,
+      -52.681746799,
+      5.367797341
+    ],
+    "resolutionM": 23.4375,
+    "nativeResolutionM": 20,
+    "classification": "Sentinel-2 SCL class 6 water, sampled without interpolation",
+    "sourceUrl": "https://planetarycomputer.microsoft.com/dataset/sentinel-2-l2a",
+    "attribution": "Contains modified Copernicus Sentinel data 2026, served by Microsoft Planetary Computer",
+    "license": "Copernicus Sentinel free, full and open data",
+    "licenseUrl": "https://dataspace.copernicus.eu/terms-and-conditions",
+    "requests": [
+      "https://planetarycomputer.microsoft.com/api/data/v1/item/bbox/-52.898253201,5.152202659,-52.681746799,5.367797341/1024x1024.png?collection=sentinel-2-l2a&item=S2A_MSIL2A_20260810T140111_R067_T22NBL_20260810T215710&assets=SCL&dst_crs=EPSG%3A4326&coord_crs=EPSG%3A4326&resampling=nearest&reproject=nearest",
+      "https://planetarycomputer.microsoft.com/api/data/v1/item/bbox/-52.898253201,5.152202659,-52.681746799,5.367797341/1024x1024.png?collection=sentinel-2-l2a&item=S2A_MSIL2A_20260810T140111_R067_T22NCL_20260810T215710&assets=SCL&dst_crs=EPSG%3A4326&coord_crs=EPSG%3A4326&resampling=nearest&reproject=nearest"
+    ]
+  },
+  "features": {
+    "url": "assets/launch-sites/kourou-geography.geojson",
+    "attribution": "© OpenStreetMap contributors",
+    "license": "ODbL 1.0",
+    "sourceUrl": "https://www.openstreetmap.org/api/0.6/map?bbox=-52.8170633,5.233050665,-52.7629367,5.286949335"
+  },
+  "landmarks": [
+    {
+      "name": "Crique Karouabo",
+      "lat": 5.237649,
+      "lon": -52.77981,
+      "kind": "waterway",
+      "sourceUrl": "https://www.openstreetmap.org/way/163980095"
+    },
+    {
+      "name": "Savane roche Nicole",
+      "lat": 5.258402,
+      "lon": -52.78225,
+      "kind": "landmark",
+      "sourceUrl": "https://www.openstreetmap.org/way/709055945"
+    }
+  ],
+  "sources": [
+    {
+      "id": "ign",
+      "title": "IGN Géoplateforme · BD ORTHO aerial imagery",
+      "url": "https://geoservices.ign.fr/bdortho",
+      "license": "Licence Ouverte / Open Licence Etalab 2.0",
+      "licenseUrl": "https://www.etalab.gouv.fr/licence-ouverte-open-licence/",
+      "attribution": "© IGN · BD ORTHO · Licence Ouverte 2.0"
+    },
+    {
+      "id": "terrain-tiles",
+      "title": "Mapzen Terrain Tiles · USGS SRTM/GMTED and NOAA ETOPO1",
+      "url": "https://registry.opendata.aws/terrain-tiles/",
+      "license": "U.S. public-domain source data; attribution retained",
+      "licenseUrl": "https://github.com/tilezen/joerd/blob/master/docs/attribution.md",
+      "attribution": "Mapzen; USGS SRTM/GMTED; NOAA ETOPO1"
+    },
+    {
+      "id": "sentinel-2",
+      "title": "Copernicus Sentinel-2 L2A true color",
+      "url": "https://planetarycomputer.microsoft.com/dataset/sentinel-2-l2a",
+      "license": "Copernicus Sentinel free, full and open data",
+      "licenseUrl": "https://dataspace.copernicus.eu/terms-and-conditions",
+      "attribution": "Contains modified Copernicus Sentinel data 2026, served by Microsoft Planetary Computer"
+    },
+    {
+      "id": "osm",
+      "title": "OpenStreetMap coastline and waterway geometry",
+      "url": "https://www.openstreetmap.org/copyright",
+      "license": "ODbL 1.0",
+      "licenseUrl": "https://opendatacommons.org/licenses/odbl/1-0/",
+      "attribution": "© OpenStreetMap contributors"
+    }
+  ],
+  "accessed": "2026-11-07"
+}

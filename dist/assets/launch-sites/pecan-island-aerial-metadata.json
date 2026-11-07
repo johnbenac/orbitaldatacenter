@@ -1,0 +1,209 @@
+[
+  {
+    "OBJECTID": 70045,
+    "Name": "m_2909212_se_15_030_20230422",
+    "Year": 2023,
+    "acquisition_date": 1682121600000,
+    "resolution_value": 0.3,
+    "resolution_units": "METER",
+    "agency": "USDA"
+  },
+  {
+    "OBJECTID": 70046,
+    "Name": "m_2909212_sw_15_030_20230422",
+    "Year": 2023,
+    "acquisition_date": 1682121600000,
+    "resolution_value": 0.3,
+    "resolution_units": "METER",
+    "agency": "USDA"
+  },
+  {
+    "OBJECTID": 70049,
+    "Name": "m_2909213_se_15_030_20230422",
+    "Year": 2023,
+    "acquisition_date": 1682121600000,
+    "resolution_value": 0.3,
+    "resolution_units": "METER",
+    "agency": "USDA"
+  },
+  {
+    "OBJECTID": 70050,
+    "Name": "m_2909213_sw_15_030_20230422",
+    "Year": 2023,
+    "acquisition_date": 1682121600000,
+    "resolution_value": 0.3,
+    "resolution_units": "METER",
+    "agency": "USDA"
+  },
+  {
+    "OBJECTID": 70054,
+    "Name": "m_2909214_sw_15_030_20230422",
+    "Year": 2023,
+    "acquisition_date": 1682121600000,
+    "resolution_value": 0.3,
+    "resolution_units": "METER",
+    "agency": "USDA"
+  },
+  {
+    "OBJECTID": 70074,
+    "Name": "m_2909220_ne_15_030_20230422",
+    "Year": 2023,
+    "acquisition_date": 1682121600000,
+    "resolution_value": 0.3,
+    "resolution_units": "METER",
+    "agency": "USDA"
+  },
+  {
+    "OBJECTID": 70075,
+    "Name": "m_2909220_nw_15_030_20230422",
+    "Year": 2023,
+    "acquisition_date": 1682121600000,
+    "resolution_value": 0.3,
+    "resolution_units": "METER",
+    "agency": "USDA"
+  },
+  {
+    "OBJECTID": 70076,
+    "Name": "m_2909220_se_15_030_20230422",
+    "Year": 2023,
+    "acquisition_date": 1682121600000,
+    "resolution_value": 0.3,
+    "resolution_units": "METER",
+    "agency": "USDA"
+  },
+  {
+    "OBJECTID": 70077,
+    "Name": "m_2909220_sw_15_030_20230422",
+    "Year": 2023,
+    "acquisition_date": 1682121600000,
+    "resolution_value": 0.3,
+    "resolution_units": "METER",
+    "agency": "USDA"
+  },
+  {
+    "OBJECTID": 70078,
+    "Name": "m_2909221_ne_15_030_20230422",
+    "Year": 2023,
+    "acquisition_date": 1682121600000,
+    "resolution_value": 0.3,
+    "resolution_units": "METER",
+    "agency": "USDA"
+  },
+  {
+    "OBJECTID": 70079,
+    "Name": "m_2909221_nw_15_030_20230422",
+    "Year": 2023,
+    "acquisition_date": 1682121600000,
+    "resolution_value": 0.3,
+    "resolution_units": "METER",
+    "agency": "USDA"
+  },
+  {
+    "OBJECTID": 70080,
+    "Name": "m_2909221_se_15_030_20230422",
+    "Year": 2023,
+    "acquisition_date": 1682121600000,
+    "resolution_value": 0.3,
+    "resolution_units": "METER",
+    "agency": "USDA"
+  },
+  {
+    "OBJECTID": 70081,
+    "Name": "m_2909221_sw_15_030_20230422",
+    "Year": 2023,
+    "acquisition_date": 1682121600000,
+    "resolution_value": 0.3,
+    "resolution_units": "METER",
+    "agency": "USDA"
+  },
+  {
+    "OBJECTID": 70083,
+    "Name": "m_2909222_nw_15_030_20230422",
+    "Year": 2023,
+    "acquisition_date": 1682121600000,
+    "resolution_value": 0.3,
+    "resolution_units": "METER",
+    "agency": "USDA"
+  },
+  {
+    "OBJECTID": 70085,
+    "Name": "m_2909222_sw_15_030_20230422",
+    "Year": 2023,
+    "acquisition_date": 1682121600000,
+    "resolution_value": 0.3,
+    "resolution_units": "METER",
+    "agency": "USDA"
+  },
+  {
+    "OBJECTID": 70096,
+    "Name": "m_2909228_ne_15_030_20230422",
+    "Year": 2023,
+    "acquisition_date": 1682121600000,
+    "resolution_value": 0.3,
+    "resolution_units": "METER",
+    "agency": "USDA"
+  },
+  {
+    "OBJECTID": 70097,
+    "Name": "m_2909228_nw_15_030_20230422",
+    "Year": 2023,
+    "acquisition_date": 1682121600000,
+    "resolution_value": 0.3,
+    "resolution_units": "METER",
+    "agency": "USDA"
+  },
+  {
+    "OBJECTID": 70098,
+    "Name": "m_2909229_ne_15_030_20230422",
+    "Year": 2023,
+    "acquisition_date": 1682121600000,
+    "resolution_value": 0.3,
+    "resolution_units": "METER",
+    "agency": "USDA"
+  },
+  {
+    "OBJECTID": 70099,
+    "Name": "m_2909229_nw_15_030_20230422",
+    "Year": 2023,
+    "acquisition_date": 1682121600000,
+    "resolution_value": 0.3,
+    "resolution_units": "METER",
+    "agency": "USDA"
+  },
+  {
+    "OBJECTID": 70100,
+    "Name": "m_2909229_se_15_030_20230422",
+    "Year": 2023,
+    "acquisition_date": 1682121600000,
+    "resolution_value": 0.3,
+    "resolution_units": "METER",
+    "agency": "USDA"
+  },
+  {
+    "OBJECTID": 70101,
+    "Name": "m_2909229_sw_15_030_20230422",
+    "Year": 2023,
+    "acquisition_date": 1682121600000,
+    "resolution_value": 0.3,
+    "resolution_units": "METER",
+    "agency": "USDA"
+  },
+  {
+    "OBJECTID": 70103,
+    "Name": "m_2909230_nw_15_030_20230422",
+    "Year": 2023,
+    "acquisition_date": 1682121600000,
+    "resolution_value": 0.3,
+    "resolution_units": "METER",
+    "agency": "USDA"
+  },
+  {
+    "OBJECTID": 70105,
+    "Name": "m_2909230_sw_15_030_20230422",
+    "Year": 2023,
+    "acquisition_date": 1682121600000,
+    "resolution_value": 0.3,
+    "resolution_units": "METER",
+    "agency": "USDA"
+  }
+]

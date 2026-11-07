@@ -18,19 +18,21 @@ export function configureObserver(camera,foreground,frame,s,aspect,launchStack){
  if(camera.aspect!==aspect){camera.aspect=aspect;camera.updateProjectionMatrix();}
  camera.updateMatrixWorld();
 }
-export function createEarthBackdrop(planet,atmosphere,onReady,compactTextures=false){
+export function createEarthBackdrop(planet,atmosphere,onReady,compactTextures=false,appearance=null){
  const scene=new T.Scene(),globe=planet.clone(),air=atmosphere.clone(),skyCam=new T.PerspectiveCamera(49,1,.0001,30);
  const sky=createCelestialSky(onReady,compactTextures);
  const sun=new T.DirectionalLight(0xfff3e1,2.65),fill=new T.AmbientLight(0x91adc2,.19);
  scene.add(sky.group,globe,air,sun,fill);
- function updateSky(s,atVehicle){
+ function updateSky(s,atVehicle,viewport){
   globe.visible=air.visible=atVehicle;
-  globe.rotation.y=s.earthRotationRad;sun.position.copy(eciScene(s.sunECI).normalize());
+  globe.rotation.y=air.rotation.y=s.earthRotationRad;sun.position.copy(eciScene(s.sunECI).normalize());
+  appearance?.update(sun.position,s.t);
+  if(atVehicle){globe.updateWorldMatrix(true,false);appearance?.prepare(skyCam,globe,viewport);}
   sky.update(skyCam,sun.position,!atVehicle||!s.eclipse);
   scene.userData.lightState={sun:sun.position,ambient:.095,direct:1.13,rim:0};
  }
- return {scene,camera:skyCam,dispose:()=>sky.dispose(),update(camera,frame,s,aspect,launchStack){
-  configureObserver(skyCam,camera,frame,s,aspect,launchStack);updateSky(s,true);
+ return {scene,camera:skyCam,dispose:()=>sky.dispose(),update(camera,frame,s,aspect,launchStack,viewport){
+  configureObserver(skyCam,camera,frame,s,aspect,launchStack);updateSky(s,true,viewport);
  },overview(camera,s,aspect){
   // The foreground orthographic pass draws Earth and its locator. Its
   // external camera can see the Sun while the spacecraft itself is eclipsed.

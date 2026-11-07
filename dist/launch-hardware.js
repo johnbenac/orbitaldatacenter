@@ -3,6 +3,7 @@
 // Local +Y is up. Surface detail and installation dimensions are visual estimates.
 import * as T from './vendor/three.module.js';
 import {mountMissionPatch} from './fairing-patch.js';
+import {mountLaunchDecal} from './launch-livery.js';
 const TAU=2*Math.PI,V=(...n)=>new T.Vector3(...n);
 const mat=(color,metalness=.2,roughness=.55)=>new T.MeshStandardMaterial({color,metalness,roughness});
 const add=(p,g,m,x=0,y=0,z=0)=>{const a=new T.Mesh(g,m);a.position.set(x,y,z);p.add(a);return a;};
@@ -10,7 +11,9 @@ function node(parent,name){const g=new T.Group();g.name=name;parent.add(g);retur
 function rod(p,a,b,r,m){const v=b.clone().sub(a),mid=b.clone().add(a).multiplyScalar(.5);const t=add(p,new T.CylinderGeometry(r,r,v.length(),9),m,...mid);t.quaternion.setFromUnitVectors(V(0,1,0),v.normalize());return t;}
 function block(p,x,y,z,w,h,l,m){return add(p,new T.BoxGeometry(w,h,l),m,x,y,z);}
 function plate(parent,points,depth,material){const shape=new T.Shape();points.forEach(([x,y],i)=>i?shape.lineTo(x,y):shape.moveTo(x,y));shape.closePath();
- const geom=new T.ExtrudeGeometry(shape,{depth,bevelEnabled:false});geom.translate(0,0,-depth/2);return add(parent,geom,material);}
+ const geom=new T.ExtrudeGeometry(shape,{depth,bevelEnabled:false});geom.translate(0,0,-depth/2);
+ if(material.userData.launchSurface){const pos=geom.attributes.position,uv=geom.attributes.uv;for(let i=0;i<pos.count;i++)uv.setXY(i,pos.getX(i)/(TAU*4.5),pos.getY(i)/72);}
+ return add(parent,geom,material);}
 function finish(kind){
  const c=document.createElement('canvas');c.width=768;c.height=1536;const ctx=c.getContext('2d');
  if(kind==='steel'){
@@ -51,8 +54,8 @@ function flap(p,theta,y,r,points,width,metal,black){
  for(let j=0;j<3;j++){const k=min+(max-min)*(j+.5)/3;rod(flap,V(0,k-.24,0),V(0,k+.24,0),width*.93,black);}
  return panel;
 }
-export function buildStarship({lower,upper,shell,baseY,stage1,stage2,patch}){
- const steel=finish('steel'),tile=finish('tile'),dark=mat('#344049',.35),nickel=mat('#b4bec2',.44),edge=mat('#697981',.39);
+export function buildStarship({lower,upper,shell,baseY,stage1,stage2,patch,livery}){
+ const steel=livery?.surface('stainless')??finish('steel'),tile=livery?.surface('ceramic')??finish('tile'),dark=mat('#344049',.35),nickel=mat('#b4bec2',.44),edge=mat('#697981',.39);
  const r=4.5,hot=baseY+stage1,skirt=.36,ventHeight=2.25;
  lower.name='Super Heavy V3';upper.name='Starship V3';shell.name='Integrated cargo bay';
  // The nozzles terminate at the lower face of the thrust plate. The engine
@@ -107,7 +110,12 @@ export function buildStarship({lower,upper,shell,baseY,stage1,stage2,patch}){
  for(const [a,b,finish] of [[first,last,tile],[last,a0,steel],[a1,first+TAU,steel]]){
   wall(shell,shipNose,a,b,finish,'Fixed cargo shell');
  }
- wall(shell,base,a0,a1,steel,'Sill structure');wall(shell,crown,a0,a1,steel,'Fixed nose crown');
+ wall(shell,base,a0,a1,steel,'Sill structure');const crownSkin=wall(shell,crown,a0,a1,steel,'Fixed nose crown');
+ if(livery){
+  const yy=Math.min(headerM+3.1,shipNose.at(-1)[1]-4.0),width=noseRadius(yy)*1.43;
+  mountLaunchDecal(crownSkin,shipNose,{azimuth:center,y:yy,width,height:width/8,material:livery.artwork('spacex.svg'),name:'SpaceX · Starship manufacturer'});
+  mountLaunchDecal(crownSkin,shipNose,{azimuth:center,y:yy+1.10,width:1.35,height:1.35/1.9,material:livery.artwork('flag-us.svg'),name:'United States flag'});
+ }
  for(const [y,fromInside] of [[sillM,false],[headerM,true]]){
   const r=noseRadius(y),prof=[[r,y],[r-inset,y]];skin(shell,fromInside?prof.reverse():prof,a0,a1,edge,stage2);
  }
@@ -158,8 +166,8 @@ export function buildStarship({lower,upper,shell,baseY,stage1,stage2,patch}){
  }};
 }
 
-export function falconRecovery(parent,r,base,height){
- const carbon=mat('#24292d',.14,.74),shoulder=mat('#3b4144',.17),pin=mat('#9aabb0',.49),rubber=mat('#181e22',.05),tubeMetal=mat('#737f84',.54);
+export function falconRecovery(parent,r,base,height,livery){
+ const carbon=livery?.surface('composite')??mat('#24292d',.14,.74),shoulder=mat('#3b4144',.17),pin=mat('#9aabb0',.49),rubber=mat('#181e22',.05),tubeMetal=mat('#737f84',.54);
  for(let i=0;i<4;i++){
   // Legs are clocked between side-core attach planes. Each is retained flush
   // against its own barrel for the whole ascent. Feet travel with that core.

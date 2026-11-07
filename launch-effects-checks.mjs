@@ -39,7 +39,7 @@ for(const id of ['starship','falconHeavy','ariane64','vulcan6','longMarch5B','gl
  }
  const ignition=sample(-2);assert(ignition.fx.ignition>0);assert(ignition.visible.includes(fuel.core));assert(!ignition.visible.includes('solid'));
  assert(jaws.every(j=>j.rotation.x===0));
- const lift=sample(4.5);assert(jaws.every(j=>j.rotation.x>.9));assert(lift.fx.water>.5);assert(lift.parcels.length>10);assert(Math.abs(lift.stage-lift.ground-launchRiseM(4.5,id))<1e-8);
+ const lift=sample(4.5);assert(jaws.every(j=>j.rotation.x>.9));if(lift.fx.waterEnabled){assert(lift.fx.water>.5);assert(lift.parcels.length>10)}else{assert.equal(lift.fx.water,0);assert.equal(lift.parcels.length,0);assert.equal(jets.visible,false)};assert(Math.abs(lift.stage-lift.ground-launchRiseM(4.5,id))<1e-8);
  if(fuel.booster)assert(lift.visible.includes(fuel.booster));
  const first=JSON.stringify(lift);sample(78);assert(!ground.visible);sample(-50);assert.equal(JSON.stringify(sample(4.5)),first);
  for(const p of cloud.children.filter(x=>x.visible))assert(Math.abs(p.getWorldQuaternion(new T.Quaternion()).dot(camera.quaternion))>1-1e-10);

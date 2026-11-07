@@ -10,14 +10,19 @@ from zipfile import BadZipFile, ZipFile
 
 MANIFEST = 'upstream-files.json'
 ROOT_DOCS = {'DESIGN.md', 'ENGINE.md', 'SCENE.md', 'requirements.txt', 'package.json'}
-UPSTREAM_TOOLS = {'tools/build-identity.py'}
+UPSTREAM_TOOLS = {'tools/build-identity.py', 'earth-gpu-checks.py',
+                  'scripts/generate-launch-surfaces.py', 'scripts/prepare-earth-assets.py',
+                  'scripts/prepare-earth-cloud-details.py', 'scripts/prepare-earth-day-detail.py',
+                  'scripts/prepare-earth-detail-night.py', 'tools/build-launch-geography.py'}
 MAPPED = {'README.md': 'upstream-docs/README.md',
           '.openai/hosting.json': 'upstream-docs/hosting.json',
           'VALIDATION-v21.0.md': 'upstream-docs/VALIDATION-v21.0.md',
           'VALIDATION-v32.md': 'upstream-docs/VALIDATION-v32.md',
           'validation-power-interface-1793995613763.jpg':
               'upstream-docs/validation-power-interface-1793995613763.jpg',
-          'validation-ui-work.jpg': 'upstream-docs/validation-ui-work.jpg'}
+          'validation-ui-work.jpg': 'upstream-docs/validation-ui-work.jpg',
+          'validation-facility-labels.jpg': 'upstream-docs/validation-facility-labels.jpg',
+          'validation-processing-workbench.jpg': 'upstream-docs/validation-processing-workbench.jpg'}
 
 
 def digest(data):
@@ -62,7 +67,7 @@ def read_drop(archive):
     files = {}
     with ZipFile(archive) as z:
         entries = z.infolist()
-        if len(entries) > 10000 or sum(item.file_size for item in entries) > 500_000_000:
+        if len(entries) > 10000:
             raise ValueError('Archive exceeds source-import limits; keep large assets outside Git.')
         names = [safe_name(item.filename) for item in entries]
         # Exports may wrap the complete release in one directory.
@@ -70,6 +75,7 @@ def read_drop(archive):
         prefix = next(iter(roots)) if len(roots) == 1 and all(len(p.parts) > 1 or item.is_dir()
                    for p, item in zip(names, entries)) else None
         seen = set()
+        source_bytes = 0
         for item, path in zip(entries, names):
             if stat.S_IFMT(item.external_attr >> 16) == stat.S_IFLNK:
                 raise ValueError(f'Symbolic link in archive: {item.filename}')
@@ -81,6 +87,9 @@ def read_drop(archive):
             seen.add(name)
             if name == 'history.bundle':
                 continue
+            source_bytes += item.file_size
+            if source_bytes > 500_000_000:
+                raise ValueError('Archive exceeds source-import limits; keep large assets outside Git.')
             target = destination(name)
             if target in files:
                 raise ValueError(f'Duplicate destination: {target}')
@@ -125,8 +134,10 @@ def plan_import(archive, repo):
     removed = sorted(set(previous) - set(files))
     changed = sorted(name for name in set(files) & set(previous)
                      if digest(files[name]) != previous[name])
+    with archive.open('rb') as stream:
+        archive_sha256 = hashlib.file_digest(stream, 'sha256').hexdigest()
     manifest = {'schema': 1, 'archive': archive.name,
-                'archive_sha256': digest(archive.read_bytes()),
+                'archive_sha256': archive_sha256,
                 'files': {name: digest(data) for name, data in sorted(files.items())}}
     return {'archive': archive.name, 'archive_sha256': manifest['archive_sha256'],
             'added': added, 'changed': changed, 'removed': removed,

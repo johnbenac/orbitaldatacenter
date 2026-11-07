@@ -1,0 +1,152 @@
+{
+  "id": "space-coast",
+  "name": "Space Coast · Florida",
+  "center": [
+    -80.58,
+    28.55
+  ],
+  "spanM": [
+    24000,
+    24000
+  ],
+  "bounds": [
+    -80.702720053,
+    28.442202659,
+    -80.457279947,
+    28.657797341
+  ],
+  "projection": "EPSG:4326",
+  "description": "Atlantic barrier coast, wetlands and Banana River lagoons.",
+  "seawardBearingDeg": 80,
+  "image": {
+    "url": "assets/launch-sites/space-coast-regional.jpg",
+    "previewUrl": "assets/launch-sites/space-coast-regional-preview.jpg",
+    "width": 4096,
+    "height": 4096,
+    "resolutionM": 5.8594,
+    "projection": "EPSG:4326",
+    "bounds": [
+      -80.702720053,
+      28.442202659,
+      -80.457279947,
+      28.657797341
+    ],
+    "nativeResolutionM": 0.3,
+    "acquired": "2023-01-09",
+    "attribution": "USDA NAIP / USGS, The National Map; Contains modified Copernicus Sentinel data 2026, served by Microsoft Planetary Computer",
+    "sourceUrl": "https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPPlus/ImageServer",
+    "license": "U.S. public domain; Copernicus Sentinel free, full and open data",
+    "licenseUrl": "https://www.usgs.gov/faqs/what-are-terms-uselicensing-map-services-and-data-national-map",
+    "requests": [
+      "https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPPlus/ImageServer/exportImage?f=image&bbox=-80.702720053%2C28.549999999999997%2C-80.58%2C28.657797341&bboxSR=4326&imageSR=4326&size=2048%2C2048&format=png32&noData=0&noDataInterpretation=esriNoDataMatchAll&adjustAspectRatio=false&interpolation=RSP_BilinearInterpolation&renderingRule=%7B%22rasterFunction%22%3A+%22NaturalColor%22%7D",
+      "https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPPlus/ImageServer/exportImage?f=image&bbox=-80.58%2C28.549999999999997%2C-80.457279947%2C28.657797341&bboxSR=4326&imageSR=4326&size=2048%2C2048&format=png32&noData=0&noDataInterpretation=esriNoDataMatchAll&adjustAspectRatio=false&interpolation=RSP_BilinearInterpolation&renderingRule=%7B%22rasterFunction%22%3A+%22NaturalColor%22%7D",
+      "https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPPlus/ImageServer/exportImage?f=image&bbox=-80.702720053%2C28.442202659%2C-80.58%2C28.549999999999997&bboxSR=4326&imageSR=4326&size=2048%2C2048&format=png32&noData=0&noDataInterpretation=esriNoDataMatchAll&adjustAspectRatio=false&interpolation=RSP_BilinearInterpolation&renderingRule=%7B%22rasterFunction%22%3A+%22NaturalColor%22%7D",
+      "https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPPlus/ImageServer/exportImage?f=image&bbox=-80.58%2C28.442202659%2C-80.457279947%2C28.549999999999997&bboxSR=4326&imageSR=4326&size=2048%2C2048&format=png32&noData=0&noDataInterpretation=esriNoDataMatchAll&adjustAspectRatio=false&interpolation=RSP_BilinearInterpolation&renderingRule=%7B%22rasterFunction%22%3A+%22NaturalColor%22%7D"
+    ],
+    "gapFill": {
+      "sourceId": "sentinel-2",
+      "nativeResolutionM": 10,
+      "acquired": "2026-03-28",
+      "request": "https://planetarycomputer.microsoft.com/api/data/v1/item/bbox/-80.702720053,28.442202659,-80.457279947,28.657797341/2048x2048.png?collection=sentinel-2-l2a&item=S2B_MSIL2A_20260328T155859_R097_T17RNM_20260328T200110&assets=visual&dst_crs=EPSG%3A4326&coord_crs=EPSG%3A4326&resampling=bilinear&reproject=bilinear",
+      "attribution": "Contains modified Copernicus Sentinel data 2026, served by Microsoft Planetary Computer"
+    },
+    "processing": "Reprojected to EPSG:4326; bilinear display sampling; JPEG encoding. Open-ocean Sentinel colors balanced to aerial water and blended beyond a buffered source shoreline, removing rectangular aerial-coverage seams. Land coordinates and pixels retained.",
+    "additionalLicenseUrls": [
+      "https://dataspace.copernicus.eu/terms-and-conditions"
+    ],
+    "nativeResolutionBasis": "Nominal source acquisition, not bundled display sampling"
+  },
+  "elevation": {
+    "url": "assets/launch-sites/space-coast-elevation.json",
+    "width": 257,
+    "height": 257,
+    "bounds": [
+      -80.702720053,
+      28.442202659,
+      -80.457279947,
+      28.657797341
+    ],
+    "sampleSpacingM": 93.75,
+    "minM": -10.0,
+    "maxM": 14.9,
+    "datum": "Source orthometric elevation; terrain is displayed relative to the selected pad sample",
+    "attribution": "Elevation: U.S. Geological Survey, National Geospatial Program",
+    "sourceUrl": "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer",
+    "license": "U.S. public domain",
+    "requests": [
+      "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage?f=image&bbox=-80.70319942820703%2C28.441781575636718%2C-80.45680057179297%2C28.65821842436328&bboxSR=4326&imageSR=4326&size=257%2C257&format=tiff&pixelType=F32&adjustAspectRatio=false&interpolation=RSP_BilinearInterpolation&renderingRule=%7B%22rasterFunction%22%3A+%22None%22%7D"
+    ],
+    "licenseUrl": "https://www.usgs.gov/faqs/what-are-terms-uselicensing-map-services-and-data-national-map"
+  },
+  "waterMask": {
+    "url": "assets/launch-sites/space-coast-water.png",
+    "width": 1024,
+    "height": 1024,
+    "bounds": [
+      -80.702720053,
+      28.442202659,
+      -80.457279947,
+      28.657797341
+    ],
+    "resolutionM": 23.4375,
+    "nativeResolutionM": 20,
+    "classification": "Sentinel-2 SCL class 6 water, sampled without interpolation",
+    "sourceUrl": "https://planetarycomputer.microsoft.com/dataset/sentinel-2-l2a",
+    "attribution": "Contains modified Copernicus Sentinel data 2026, served by Microsoft Planetary Computer",
+    "license": "Copernicus Sentinel free, full and open data",
+    "licenseUrl": "https://dataspace.copernicus.eu/terms-and-conditions",
+    "requests": [
+      "https://planetarycomputer.microsoft.com/api/data/v1/item/bbox/-80.702720053,28.442202659,-80.457279947,28.657797341/1024x1024.png?collection=sentinel-2-l2a&item=S2B_MSIL2A_20260328T155859_R097_T17RNM_20260328T200110&assets=SCL&dst_crs=EPSG%3A4326&coord_crs=EPSG%3A4326&resampling=nearest&reproject=nearest"
+    ]
+  },
+  "features": {
+    "url": "assets/launch-sites/space-coast-geography.geojson",
+    "attribution": "© OpenStreetMap contributors",
+    "license": "ODbL 1.0",
+    "sourceUrl": "https://www.openstreetmap.org/api/0.6/map?bbox=-80.610680013,28.523050665,-80.549319987,28.576949335"
+  },
+  "landmarks": [
+    {
+      "name": "Tea Creek",
+      "lat": 28.55722,
+      "lon": -80.608106,
+      "kind": "lagoon",
+      "sourceUrl": "https://www.openstreetmap.org/node/369137654"
+    }
+  ],
+  "sources": [
+    {
+      "id": "naip",
+      "title": "USDA NAIP / USGS National Map aerial imagery",
+      "url": "https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPPlus/ImageServer",
+      "license": "U.S. public domain",
+      "licenseUrl": "https://www.usgs.gov/faqs/what-are-terms-uselicensing-map-services-and-data-national-map",
+      "attribution": "USDA NAIP / USGS, The National Map"
+    },
+    {
+      "id": "3dep",
+      "title": "USGS 3D Elevation Program",
+      "url": "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer",
+      "license": "U.S. public domain",
+      "licenseUrl": "https://www.usgs.gov/faqs/what-are-terms-uselicensing-map-services-and-data-national-map",
+      "attribution": "Elevation: U.S. Geological Survey, National Geospatial Program"
+    },
+    {
+      "id": "sentinel-2",
+      "title": "Copernicus Sentinel-2 L2A true color",
+      "url": "https://planetarycomputer.microsoft.com/dataset/sentinel-2-l2a",
+      "license": "Copernicus Sentinel free, full and open data",
+      "licenseUrl": "https://dataspace.copernicus.eu/terms-and-conditions",
+      "attribution": "Contains modified Copernicus Sentinel data 2026, served by Microsoft Planetary Computer"
+    },
+    {
+      "id": "osm",
+      "title": "OpenStreetMap coastline and waterway geometry",
+      "url": "https://www.openstreetmap.org/copyright",
+      "license": "ODbL 1.0",
+      "licenseUrl": "https://opendatacommons.org/licenses/odbl/1-0/",
+      "attribution": "© OpenStreetMap contributors"
+    }
+  ],
+  "accessed": "2026-11-07"
+}

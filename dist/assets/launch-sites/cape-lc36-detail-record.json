@@ -1,0 +1,47 @@
+{
+  "id": "cape-lc36",
+  "regionId": "space-coast",
+  "center": [
+    -80.539,
+    28.476
+  ],
+  "spanM": [
+    4096,
+    4096
+  ],
+  "bounds": [
+    -80.559929532,
+    28.457602587,
+    -80.518070468,
+    28.494397413
+  ],
+  "projection": "EPSG:4326",
+  "image": {
+    "url": "assets/launch-sites/cape-lc36-detail.jpg",
+    "previewUrl": "assets/launch-sites/cape-lc36-detail-preview.jpg",
+    "width": 4096,
+    "height": 4096,
+    "resolutionM": 1.0,
+    "projection": "EPSG:4326",
+    "bounds": [
+      -80.559929532,
+      28.457602587,
+      -80.518070468,
+      28.494397413
+    ],
+    "nativeResolutionM": 0.3,
+    "acquired": "2023-01-09",
+    "attribution": "USDA NAIP / USGS, The National Map",
+    "sourceUrl": "https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPPlus/ImageServer",
+    "license": "U.S. public domain",
+    "licenseUrl": "https://www.usgs.gov/faqs/what-are-terms-uselicensing-map-services-and-data-national-map",
+    "requests": [
+      "https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPPlus/ImageServer/exportImage?f=image&bbox=-80.559929532%2C28.476%2C-80.539%2C28.494397413&bboxSR=4326&imageSR=4326&size=2048%2C2048&format=png32&noData=0&noDataInterpretation=esriNoDataMatchAll&adjustAspectRatio=false&interpolation=RSP_BilinearInterpolation&renderingRule=%7B%22rasterFunction%22%3A+%22NaturalColor%22%7D",
+      "https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPPlus/ImageServer/exportImage?f=image&bbox=-80.539%2C28.476%2C-80.518070468%2C28.494397413&bboxSR=4326&imageSR=4326&size=2048%2C2048&format=png32&noData=0&noDataInterpretation=esriNoDataMatchAll&adjustAspectRatio=false&interpolation=RSP_BilinearInterpolation&renderingRule=%7B%22rasterFunction%22%3A+%22NaturalColor%22%7D",
+      "https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPPlus/ImageServer/exportImage?f=image&bbox=-80.559929532%2C28.457602587%2C-80.539%2C28.476&bboxSR=4326&imageSR=4326&size=2048%2C2048&format=png32&noData=0&noDataInterpretation=esriNoDataMatchAll&adjustAspectRatio=false&interpolation=RSP_BilinearInterpolation&renderingRule=%7B%22rasterFunction%22%3A+%22NaturalColor%22%7D",
+      "https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPPlus/ImageServer/exportImage?f=image&bbox=-80.539%2C28.457602587%2C-80.518070468%2C28.476&bboxSR=4326&imageSR=4326&size=2048%2C2048&format=png32&noData=0&noDataInterpretation=esriNoDataMatchAll&adjustAspectRatio=false&interpolation=RSP_BilinearInterpolation&renderingRule=%7B%22rasterFunction%22%3A+%22NaturalColor%22%7D"
+    ],
+    "nativeResolutionBasis": "Nominal source acquisition, not bundled display sampling",
+    "processing": "Reprojected to EPSG:4326; bilinear display sampling; JPEG encoding. Source colors retained."
+  }
+}

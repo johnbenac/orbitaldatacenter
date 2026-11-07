@@ -7,6 +7,8 @@ import {DEPLOY_START_S} from './commissioning-clock.js';
 import {DAY} from './orbit.js';
 
 export function entryRoute(query){
+ // A fresh visit opens the operating mission; explicit links retain their own starting point.
+ if(!query.toString())return {phase:'E',domain:'conops',chapter:'operations'};
  const selected=chapters.find(item=>item.id===query.get('chapter'));
  const domain=query.get('domain')||query.get('subsystem');
  const requestedPhase=(query.get('phase')||'').toUpperCase();

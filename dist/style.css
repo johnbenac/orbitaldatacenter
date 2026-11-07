@@ -52,3 +52,6 @@ body[data-starting] > :not(#startup){display:none!important}
 #scene[data-free-orbit="true"]~.gesture .trackball-instruction{display:inline}
 .orbit-rotation-ring{box-sizing:border-box;position:absolute;z-index:1;pointer-events:none;left:50%;top:50%;transform:translate(-50%,-50%);border:1px dashed #aad8d185;border-radius:50%;text-align:center;color:#e1f7f3;text-shadow:0 1px 4px #07121d;font:10px/2 var(--mono);letter-spacing:.06em}
 .orbit-rotation-ring[data-motion="roll"]{border-style:solid}
+
+.earth-imagery-status{position:absolute;left:16px;top:35px;max-width:calc(100% - 120px);pointer-events:none;padding:4px 7px;border:1px solid #658da344;border-radius:4px;background:#081522d9;color:#c5e1ef;font:10px/1.4 var(--mono);box-shadow:0 2px 10px #0002}.earth-imagery-status:before{content:"";display:inline-block;width:5px;height:5px;margin-right:6px;border-radius:50%;background:#8dcdf6;animation:earth-load-pulse 1.2s ease-in-out infinite}@keyframes earth-load-pulse{50%{opacity:.3}}@media(prefers-reduced-motion:reduce){.earth-imagery-status:before{animation:none}}
+#viewer.fallbackfull{width:100vw;height:100dvh;max-width:none;border:0;border-radius:0;margin:0;background:#10171e;z-index:50}#viewer.fallbackfull #viewport{min-height:0}#viewer.fallbackfull .panelhead{flex:none}#viewer.fallbackfull .cameras{flex:none}

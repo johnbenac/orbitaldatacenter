@@ -31,7 +31,7 @@ export function createCelestialSky(onReady,compactTextures=false){
  field.renderOrder=-20;fieldMaterial.userData.celestial=true;fieldMaterial.userData.globeTexture=true;
  const survey=new T.TextureLoader().load(new URL(compactTextures?'./vendor/sky-equatorial-small.jpg':'./vendor/sky-equatorial.jpg',import.meta.url).href,texture=>{
   texture.colorSpace=T.SRGBColorSpace;texture.wrapS=T.RepeatWrapping;
-  fieldMaterial.color.setScalar(2.1);fieldMaterial.map=texture;fieldMaterial.needsUpdate=true;onReady?.();
+  fieldMaterial.color.setScalar(.18);fieldMaterial.map=texture;fieldMaterial.needsUpdate=true;onReady?.();
  });
  const glow=solarImage(),size=2*sunDistance*Math.tan(glareRadiusRad);
  const solarMaterial=new T.MeshBasicMaterial({map:glow,transparent:true,depthWrite:false});
@@ -43,6 +43,10 @@ export function createCelestialSky(onReady,compactTextures=false){
  return {group,source,field,update(observer,sunDirection,showSun){
   // Neither the annual orbit nor camera translation introduces stellar parallax.
   group.position.copy(observer.position);source.visible=showSun;
+  // The short exposure that retains a sunlit Earth reveals only a quiet star
+  // field. Keep the survey subordinate to the planet rather than blowing out
+  // its large sampled stars; the exposure control still applies to the scene.
+  fieldMaterial.color.setScalar(showSun?.18:.42);
   source.position.copy(sunDirection).normalize().multiplyScalar(sunDistance);
   towardEye.copy(source.position).negate().normalize();source.quaternion.setFromUnitVectors(forward,towardEye);
  },dispose(){

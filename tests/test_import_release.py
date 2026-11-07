@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 import warnings
 from zipfile import ZipFile, ZipInfo
 
@@ -100,6 +101,24 @@ class ImportTests(unittest.TestCase):
                          (self.repo / 'tools/build-identity.py').read_text())
         with self.assertRaisesRegex(ValueError, 'Unexpected developer file'):
             IMPORTER.plan_import(self.archive({'tools/unreviewed.py': b'unknown'}), self.repo)
+
+    def test_size_limit_excludes_skipped_history_but_limits_source(self):
+        archive = self.archive({'history.bundle': b'ignored history'})
+        for oversized in ['history.bundle', 'dist/new.js']:
+            with self.subTest(oversized=oversized):
+                def open_archive(path):
+                    z = ZipFile(path)
+                    for info in z.infolist():
+                        if info.filename.endswith('/' + oversized):
+                            info.file_size = 600_000_000
+                    return z
+                with patch.object(IMPORTER, 'ZipFile', open_archive):
+                    if oversized == 'history.bundle':
+                        plan = IMPORTER.plan_import(archive, self.repo)
+                        self.assertNotIn('history.bundle', plan['files'])
+                    else:
+                        with self.assertRaisesRegex(ValueError, 'source-import limits'):
+                            IMPORTER.plan_import(archive, self.repo)
 
     def test_existing_unowned_file_collision(self):
         (self.repo / 'dist/new.js').write_text('a local addition')

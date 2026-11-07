@@ -8,16 +8,18 @@ const sources={
  florida:ref('FAA · LC-39A environmental review, Vol. I, ES-8','https://www.faa.gov/space/stakeholder_engagement/spacex_starship_ksc/SpaceX-SSH-LC-39A-Final-EIS-Volume-I.pdf'),
  cape:ref('FAA · SLC-37 Starship proposal','https://www.faa.gov/space/stakeholder_engagement/spacex_starship_ccsfs'),
  louisiana:ref('Louisiana Economic Development · proposed Starbase Louisiana campus','https://www.opportunitylouisiana.gov/news/spacex-launches-new-era-of-commercial-spaceflight-with-100-billion-louisiana-campus'),
- falcon:ref('SpaceX · Falcon User’s Guide (2025), §4.1.5.1, §8 and Fig. A-1','https://www.spacex.com/assets/media/falcon-users-guide-2025-05-09.pdf'),
+ falcon:ref('SpaceX · Falcon User’s Guide (2025), §4.1.5.1, §§10.1–10.4 and Fig. A-1','https://www.spacex.com/assets/media/falcon-users-guide-2025-05-09.pdf'),
  falconWest:ref('U.S. Space Force · SLC-6 redevelopment decision','https://www.vandenberg.spaceforce.mil/News/Article-Display/Article/4323318/notice-of-availability-of-the-final-environmental-impact-statement-and-record-o/'),
  terran:ref('Relativity · LC-16 crane and cleanroom construction, July 2026 update','https://www.relativityspace.com/press-release/2026/8/11/july-2026-company-update'),
  terranSite:ref('Relativity · Cape Canaveral payload-processing plans','https://www.relativityspace.com/locations'),
  glenn:ref('Blue Origin · New Glenn Payload User’s Guide, rev. C (2018), §5.3.1 and Fig. 5-12, archived copy','https://yellowdragonblog.com/wp-content/uploads/2019/01/new_glenn_payload_users_guide_rev_c.pdf#page=68'),
  hybrid:ref('Blue Origin · horizontal/vertical integration plan, June 2026','https://www.blueorigin.com/news/new-glenn-return-to-flight'),
  cif:ref('Blue Origin · customer integration facility and LC-36 construction, October 2026','https://www.blueorigin.com/news/building-infrastructure-for-more-frequent-launches-in-florida'),
- vulcan:ref('ULA · Vulcan User’s Guide (2023), Table 4.2.2-1a and §5.3','https://www.ulalaunch.com/docs/default-source/rockets/2023_vulcan_user_guide.pdf'),
+ vulcan:ref('ULA · Vulcan User’s Guide (2023), Table 4.2.2-1a and §§5.1–5.3','https://www.ulalaunch.com/docs/default-source/rockets/2023_vulcan_user_guide.pdf'),
+ astrotech:ref('Astrotech · payload processing and ground services','https://www.astrotech.com/locations.html'),
  vulcanWest:ref('ULA · West Coast Vulcan construction','https://blog.ulalaunch.com/blog/west-coast-vulcan-construction-update'),
- ariane:ref('Arianespace · Ariane 6 User’s Manual, issue 2, §5.3.4, §5.4 and §6.2.3','https://www.arianespace.com/wp-content/uploads/2021/03/Mua-6_Issue-2_Revision-0_March-2021.pdf'),
+ ariane:ref('Arianespace · Ariane 6 User’s Manual, issue 2, §5.3.4, §5.4 and §§6.2.2–6.2.3','https://www.arianespace.com/app/uploads/sites/4/2024/10/Mua-6_Issue-2_Revision-0_March-2021.pdf'),
+ epcu:ref('CNES · EPCU spacecraft preparation and hazardous processing halls','https://centrespatialguyanais.cnes.fr/en/epcu'),
  arianeLift:ref('ESA · MTG-I2 encapsulation and gantry lift (2026)','https://www.esa.int/ESA_Multimedia/Images/2026/08/MTG-I2_inside_Ariane_6'),
  csg:ref('CNES · Ariane 6 encapsulation and final assembly','https://centrespatialguyanais.cnes.fr/en/ariane-6'),
  wenchang:ref('China Manned Space · Mengtian payload processing at Wenchang','https://en.cmse.gov.cn/news/202211/t20221106_51260.html'),
@@ -42,18 +44,18 @@ const star={
  ]
 };
 const falcon={
- family:'falcon',kind:'horizontal',facility:'Payload processing cleanroom',location:'Florida Space Coast · LC-39A campaign',
+ family:'falcon',kind:'horizontal',facility:'Falcon payload processing facility → LC-39A hangar',location:'Florida Space Coast · LC-39A campaign',
  handling:'An overhead crane lowers the upright spacecraft onto its adapter in the processing facility. Fairing halves close around the checked assembly.',
  mating:'The enclosed assembly goes to the LC-39A hangar. There it turns horizontal and joins the second stage before the full stack rolls to the pad.',
- provenance:'The Falcon guide defines the handling sequence. The rendered bay, lifting tooling and spacecraft-specific adapter are illustrative.',
+ provenance:'The Falcon guide defines the processing sequence; the mission selects the particular PPF and services. The rendered bay, lifting tooling and spacecraft-specific adapter are illustrative.',
  interface:face('Falcon standard payload attach fitting',1575.054,120,'published','Appendix A, figure A-1 specifies a 62.010 in bolt circle with 120 holes. This is the fixed fitting beneath the mission adapter. A separate release joint frees the spacecraft.',sources.falcon),
  evidence:[item('Provider sequence','SpaceX separates cleanroom encapsulation from horizontal mating to the launch vehicle. The enclosed spacecraft can be transferred between those facilities.',sources.falcon)]
 };
 const terran={
- family:'terran',kind:'horizontal',facility:'LC-16 cleanroom and integration hangar',location:'Cape Canaveral, Florida · LC-16',
+ family:'terran',kind:'horizontal',facility:'LC-16 cleanroom and integration hangar · development',location:'Cape Canaveral, Florida · LC-16',
  handling:'The study lowers the spacecraft onto its mission adapter beneath a bridge crane, then encloses it for transfer. Both Terran R recovery choices use the same handling study.',
  mating:'Relativity’s strongback receives the rocket stages in the horizontal integration hall. The enclosed payload’s path to the stages is a workbench assumption.',
- provenance:'Relativity reported a crane proof load, strongback delivery and cleanroom outfitting in 2026. Its public update establishes those building features. The payload lift path and mounting flange are proposed here.',
+ provenance:'Relativity reported a crane proof load, strongback delivery and cleanroom outfitting in 2026. Its locations page lists a future PPF expansion. Spacecraft hazardous-processing services, payload lift path and mounting flange remain to be established.',
  interface:face('Proposed Terran R payload fitting',1575,120,'study','This study borrows the nominal 1,575 mm class and 120-position layout from familiar launch interfaces. Relativity’s public site update gives no Terran R mounting drawing.',sources.terran),
  evidence:[item('Observed construction','Relativity reported proof-loading the bridge crane and receiving the transporter-erector upper strongback at LC-16. The company also describes planned customer payload-processing infrastructure.',sources.terran),item('Site plan','Relativity identifies LC-16 as its Terran R site and lists a payload-processing facility among the planned expansions.',sources.terranSite)]
 };
@@ -66,20 +68,20 @@ const glenn={
  evidence:[item('Provider operations plan','The June 2026 plan retains horizontal stage integration and adds crane-assisted vertical mating of the enclosed payload at the pad.',sources.hybrid),item('Facility under construction','In October 2026 Blue Origin described a customer facility with four payload bays and two encapsulation bays to serve both New Glenn variants.',sources.cif)]
 };
 const vulcan={
- family:'vulcan',kind:'vertical-transfer',facility:'Payload processing and encapsulation bay',location:'Florida Space Coast · SLC-41 campaign',
+ family:'vulcan',kind:'vertical-transfer',facility:'Astrotech Titusville → SLC-41 VIF',location:'Florida Space Coast · SLC-41 campaign',
  handling:'The crew joins the payload to its launch interface upright. Fairing halves meet around it, and the conditioned assembly moves onto a transporter.',
  mating:'The transporter carries the enclosed payload upright to SLC-41’s vertical integration facility. Its crane lifts the assembly into position above Centaur V.',
- provenance:'ULA publishes the two-facility sequence and interface drawings. The workbench supplies the spacecraft tooling and the bay layout.',
+ provenance:'ULA identifies Astrotech Titusville as its primary Vulcan PPF and publishes the two-facility sequence. ODC service acceptance and booking remain open. The workbench supplies spacecraft tooling and the schematic layout.',
  interface:face('Vulcan 1575 payload attach fitting',1575.05,120,'published','ULA Table 4.2.2-1a shows the 1,575.05 mm, 120-hole circle on the nonseparating spacer option. The selected mission adapter attaches at this forward plane.',sources.vulcan),
- evidence:[item('Provider sequence','ULA keeps environmental conditioning active during vertical transfer from the processing building to the East Coast vertical integration facility or West Coast mobile service tower.',sources.vulcan)]
+ evidence:[item('Provider sequence','ULA keeps environmental conditioning active during vertical transfer from the processing building to the East Coast vertical integration facility or West Coast mobile service tower.',sources.vulcan),item('Processing services','Astrotech describes controlled payload work areas, hazardous and non-hazardous processing, customer control rooms and GSE support. Mission compatibility remains to be agreed.',sources.astrotech)]
 };
 const ariane={
- family:'ariane',kind:'upper-composite',facility:'BAF-HE upper-composite encapsulation hall',location:'Guiana Space Centre, Kourou · ELA-4',
- handling:'The team installs the upright spacecraft and adapter on the launch vehicle adapter in the encapsulation hall. Following the MTG-I2 campaign, the crane lowers the already joined fairing over the upright spacecraft.',
+ family:'ariane',kind:'upper-composite',facility:'EPCU S5 preparation → BAF-HE encapsulation',location:'Guiana Space Centre, Kourou · ELA-4',
+ handling:'The campaign prepares the spacecraft in EPCU S5, with hazardous servicing allocated to S5A or S5B. The upright spacecraft and adapter then join the launch adapter in BAF-HE before fairing encapsulation.',
  mating:'A dedicated transporter takes the upper composite 8.5 km to ELA-4. A lifting arm inside the mobile gantry places it on the upper stage.',
- provenance:'CNES describes the transfer route and gantry. Arianespace supplies the nominal interface size. The workbench does not assign a bolt count to that size.',
+ provenance:'CNES distinguishes S5 preparation, BAF-HE encapsulation and the ELA-4 gantry. Arianespace supplies the nominal interface size. The workbench does not assign a bolt count to that size.',
  interface:face('Ariane 6 standard launch vehicle adapter',1780,null,'published','Section 5.3.4 references the 1,780 mm standard LVA interface and a separate 2,624 mm heavy option. The drawing uses 1,780 mm as a nominal diameter. Hole count and drilling geometry require a controlled drawing.',sources.ariane,'Nominal standard LVA interface diameter'),
- evidence:[item('Photographed encapsulation','For MTG-I2 the fairing halves had been joined before the crane lowered the cone over the satellite. The enclosed assembly was later hoisted onto Ariane 6 inside its mobile gantry.',sources.arianeLift),item('Flight facility','The encapsulation hall builds the upper composite separately from the launcher. CNES describes a dedicated trailer and final lifting arm at the mobile gantry.',sources.csg)]
+ evidence:[item('Spacecraft preparation','CNES describes non-hazardous work in S5C and hazardous processing in S5A / S5B, connected by controlled corridors.',sources.epcu),item('Photographed encapsulation','For MTG-I2 the fairing halves had been joined before the crane lowered the cone over the satellite. The enclosed assembly was later hoisted onto Ariane 6 inside its mobile gantry.',sources.arianeLift),item('Flight facility','The encapsulation hall builds the upper composite separately from the launcher. CNES describes a dedicated trailer and final lifting arm at the mobile gantry.',sources.csg)]
 };
 const cz5={
  family:'cz5',kind:'vertical-transfer',facility:'Wenchang technical-area integration hall',location:'Wenchang, Hainan · Launch Complex 101',
@@ -106,7 +108,7 @@ const glenn9={
  interface:face('Proposed 9×4 high-capacity fitting',3169.9,120,'study','This is an explicit carryover of the 2018 high-capacity 7×2 bolt pattern for comparison. Blue Origin’s 9×4 facility announcement does not establish this as the 9×4 attachment.',sources.glenn)
 };
 const shipsElsewhere={
- 'ksc-starship':['Florida ship high bay · study','Kennedy Space Center · LC-39A proposal','SpaceX describes a Florida Gigabay with elevated work platforms, cranes and work cells for integration and refurbishment. The carriage and loading station in this hall are the ODC concept.',ref('SpaceX · Future of Building Starship','https://www.spacex.com/updates')],
+ 'ksc-starship':['Florida ship high bay · study','Kennedy Space Center · LC-39A proposal','FAA documents proposed Starship infrastructure at LC-39A. The large-spacecraft preparation area, carriage, hazardous-servicing allocation and loading station in this hall are the ODC concept.',sources.florida],
  'cape-slc37':['Cape ship high bay · study','Cape Canaveral · SLC-37 proposal','The FAA review covers proposed SLC-37 operations. A Texas-derived high bay and local cargo transfer are workbench assumptions for this site.',sources.cape],
  'louisiana-study':['Louisiana ship high bay · study','Pecan Island · proposed campus','Louisiana announced a planned Pecan Island campus with vehicle processing and propellant infrastructure. The pictured hall, service decks and lateral loading equipment are study assumptions.',sources.louisiana]
 };
@@ -119,9 +121,9 @@ facilities['vandenberg-slc6']={...falcon,facility:'West Coast processing bay · 
  mating:'After vertical encapsulation, the study transfers the payload to the horizontal integration hangar authorized for SLC-6.',
  provenance:'The 2025 decision selected a new hangar south of SLC-6. The payload route and internal tooling shown here extrapolate the published Falcon process.',
  evidence:[...falcon.evidence,item('West Coast decision','The Department of the Air Force chose a new hangar south of the launch complex for the Falcon redevelopment.',sources.falconWest)]};
-facilities['vandenberg-slc3e']={...vulcan,kind:'mobile-tower',facility:'West Coast payload processing bay',location:'Vandenberg, California · SLC-3E',
+facilities['vandenberg-slc3e']={...vulcan,kind:'mobile-tower',facility:'Commercial Vandenberg PPF → SLC-3E MST',location:'Vandenberg, California · SLC-3E',
  mating:'ULA’s West Coast plan transports the enclosed payload upright to the mobile service tower at SLC-3E. The tower crane lifts it onto the rocket there.',
- provenance:'ULA’s guide specifies the West Coast mobile-tower mate. Local work area, service tooling and access platforms are schematic.',
+ provenance:'ULA’s guide specifies commercial West Coast PPF services and the mobile-tower mate. The ODC PPF operator and services remain to be selected; an Astrotech assignment is not assumed. Local work area, service tooling and access platforms are schematic.',
  evidence:[...vulcan.evidence,item('West Coast construction','ULA describes the Vulcan conversion of its SLC-3 West Coast complex.',sources.vulcanWest)]};
 
 for(const p of new Set([...Object.values(profiles),...Object.values(facilities)])){

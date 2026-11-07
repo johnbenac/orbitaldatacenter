@@ -1,0 +1,50 @@
+{
+  "id": "vandenberg-slc3e",
+  "regionId": "vandenberg",
+  "center": [
+    -120.59,
+    34.64
+  ],
+  "spanM": [
+    4096,
+    4096
+  ],
+  "bounds": [
+    -120.612361157,
+    34.621602587,
+    -120.567638843,
+    34.658397413
+  ],
+  "projection": "EPSG:4326",
+  "image": {
+    "url": "assets/launch-sites/vandenberg-slc3e-detail.jpg",
+    "previewUrl": "assets/launch-sites/vandenberg-slc3e-detail-preview.jpg",
+    "width": 4096,
+    "height": 4096,
+    "resolutionM": 1.0,
+    "projection": "EPSG:4326",
+    "bounds": [
+      -120.612361157,
+      34.621602587,
+      -120.567638843,
+      34.658397413
+    ],
+    "nativeResolutionM": 1.0,
+    "acquired": "2012",
+    "attribution": "USDA NAIP 2012 / California Department of Fish and Wildlife",
+    "sourceUrl": "https://gis.wildlife.ca.gov/images/rest/services/Base_Remote_Sensing/NAIP_2012/ImageServer",
+    "license": "U.S. public-domain NAIP imagery; California DFW attribution",
+    "licenseUrl": "https://wildlife.ca.gov/Data/GIS/Map-Services",
+    "requests": [
+      "https://gis.wildlife.ca.gov/images/rest/services/Base_Remote_Sensing/NAIP_2012/ImageServer/exportImage?f=image&bbox=-120.612361157%2C34.64%2C-120.59%2C34.658397413&bboxSR=4326&imageSR=4326&size=2048%2C2048&format=png32&noData=0&noDataInterpretation=esriNoDataMatchAll&adjustAspectRatio=false&interpolation=RSP_BilinearInterpolation",
+      "https://gis.wildlife.ca.gov/images/rest/services/Base_Remote_Sensing/NAIP_2012/ImageServer/exportImage?f=image&bbox=-120.59%2C34.64%2C-120.567638843%2C34.658397413&bboxSR=4326&imageSR=4326&size=2048%2C2048&format=png32&noData=0&noDataInterpretation=esriNoDataMatchAll&adjustAspectRatio=false&interpolation=RSP_BilinearInterpolation",
+      "https://gis.wildlife.ca.gov/images/rest/services/Base_Remote_Sensing/NAIP_2012/ImageServer/exportImage?f=image&bbox=-120.612361157%2C34.621602587%2C-120.59%2C34.64&bboxSR=4326&imageSR=4326&size=2048%2C2048&format=png32&noData=0&noDataInterpretation=esriNoDataMatchAll&adjustAspectRatio=false&interpolation=RSP_BilinearInterpolation",
+      "https://gis.wildlife.ca.gov/images/rest/services/Base_Remote_Sensing/NAIP_2012/ImageServer/exportImage?f=image&bbox=-120.59%2C34.621602587%2C-120.567638843%2C34.64&bboxSR=4326&imageSR=4326&size=2048%2C2048&format=png32&noData=0&noDataInterpretation=esriNoDataMatchAll&adjustAspectRatio=false&interpolation=RSP_BilinearInterpolation"
+    ],
+    "qualityLabel": "Historical aerial · 2012",
+    "qualityNote": "The available public 1 m aerial coverage is from 2012. It shows the landscape and historical buildings; current launch infrastructure is modeled separately.",
+    "effectiveDetail": "1 m historical aerial imagery, acquired 2012.",
+    "nativeResolutionBasis": "Nominal source acquisition, not bundled display sampling",
+    "processing": "Reprojected to EPSG:4326; bilinear display sampling; JPEG encoding. Source colors retained."
+  }
+}

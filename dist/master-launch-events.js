@@ -3,11 +3,13 @@
 import {DAY,R} from './orbit.js';
 import {entryDensity} from './entry.js';
 import {integrationProfile} from './integration-profiles.js';
+import {processingFacility} from './processing-facilities.js';
+import {processingSources} from './ground-processing-sources.js';
 import {INTEGRATION_TIMES} from './integration-sequence.js';
 import {loadingEnd,loadingHoldText,loadingStages} from './payload-loading.js';
 import {launchSiteFor,launchPropulsionFor} from './launch-sites.js';
 import {launchFleet} from './launch-fleet.js';
-import {launchClockFor,INSERTION_MET} from './launch-effects-state.js';
+import {launchClockFor,launchWaterSequence,INSERTION_MET} from './launch-effects-state.js';
 import {launchPath,ascentTrack} from './launch-path.js';
 
 const receiving={title:'NASA · GOES-U receipt and processing',url:'https://www.nasa.gov/directorates/smd/joint-agency-satellite-division/noaa/noaas-goes-u-arrives-in-florida-for-processing-ahead-of-launch/'};
@@ -58,7 +60,7 @@ function countdownCalls(id){
 
 export function masterLaunchEvents(h){
  const d=h.input,id=d.launcher,site=launchSiteFor(id,d.launchSite),fleet=launchFleet[id];
- const profile=integrationProfile(id,site.id),clock=launchClockFor(id),fuel=launchPropulsionFor(id);
+ const facility=processingFacility(h),profile=integrationProfile(id,site.id),clock=launchClockFor(id),fuel=launchPropulsionFor(id);
  const path=launchPath(d),rows=[],hold=launchHold(h),groundEnd=loadingEnd(h);
  const sourceForGround=profile.evidence[0]?.source??profile.interface.source;
  const star=id==='starship',single=fleet.stages===1;
@@ -73,13 +75,13 @@ export function masterLaunchEvents(h){
   rows.push(row);
  }
  const plan=(day,key,title,owner,description,source,major=false)=>add('ground',key,day*DAY,title,owner,description,{basis:planningBasis,precision:'day',seek:null,source,major});
- plan(-21,'receipt','Receive the spacecraft','Ground processing','Receive the shipped vehicle for processing at '+profile.facility+'. Inspect its shipping record and establish conditioned ground support.',receiving,true);
+ plan(-21,'receipt','Receive the spacecraft','Ground processing','Receive the verified spacecraft through '+facility.name+'. Review the pre-shipment verification release, transport history, cleanliness and limited health checks before servicing. This date is a planning allowance.',processingSources.gevs,true);
  add('ground','functional',-14*DAY,'Rehearse the spacecraft communications links','Communications and mission operations','Plan the end-to-end command and telemetry checkout, Ka data comparison and optical alignment check while the flight interfaces are accessible. The bench lets you rehearse these procedures on the selected design.',{
   basis:planningBasis,precision:'day',seek:null,domain:'comm',major:true,status:'planned',
   source:{title:'NASA · Ground Data Systems and Mission Operations, §11.7',url:'https://www.nasa.gov/smallsat-institute/sst-soa/ground-data-systems-and-mission-operations/'}
  });
- plan(-7,'service','Service and verify the propulsion system','Propulsion','Plan the load and leak checks for the spacecraft’s '+number(h.propellantKg)+' kg propellant inventory. The simulation begins with this inventory already aboard.',receiving);
- plan(-2,'payload-review','Review payload readiness for integration','Mission integration','Review mass, mating interfaces and the stowed envelope for '+fleet.family+' at '+site.name+'. Record any open items before releasing the payload to the integration team.',campaign,true);
+ plan(-7,'service','Service and verify the propulsion system','Propulsion','Plan compatible fuel and oxidizer equipment for the spacecraft’s '+number(h.propellantKg)+' kg propellant inventory, measured-load reconciliation and approved leak/isolation checks. Coolant servicing requires its own compatibility review. Battery charging and RF work occupy separate approved work windows. The flight model starts with the configured inventory aboard.',processingSources.propellant);
+ plan(-2,'payload-review','Review payload readiness for integration','Mission integration','Review mass properties, mating interfaces, charge and fluid records, inhibits, removed GSE and accepted verification evidence for '+fleet.family+' at '+site.name+'. Resolve or disposition open items before joint handover. Rehearsal completion does not release the spacecraft.',campaign,true);
 
  // Launch-control work can proceed while the payload team is still processing its spacecraft.
  // Keep these planning calls outside the accelerated facility/pad playback.
@@ -102,8 +104,8 @@ export function masterLaunchEvents(h){
   id==='falconHeavy'?' For Europa Clipper, the published Falcon Heavy countdown called for propellant-loading authorization at T−53 min and first-stage kerosene loading at T−50 min.':'';
  add('countdown','pad',-600,'Final countdown at '+site.name,'Launch control','The assembled vehicle stands on the launch mount at '+site.range+'. The workbench animates the final ten minutes of the count.'+launchDayReference,{basis:'Pad chapter boundary',major:true,source:(id==='glenn'||id==='glenn9')?glennCount:id==='falconHeavy'?falconCount:site.sources[0]});
  for(const [t,key,title,owner,description,basis,source] of countdownCalls(id))add('countdown',key,t,title,owner,description,{basis,source,major:key==='auto-sequence'||key==='commit'});
- const simultaneous=site.water!=='none'&&clock.waterStart===clock.engineStart;
- if(site.water!=='none'&&!simultaneous)add('countdown','water',clock.waterStart,'Activate pad water suppression','Ground systems','Water begins flowing through the selected pad’s exhaust works. Exhaust heats the water as the engines build thrust.',{basis:'Pad effects clock'});
+ const waterSequence=launchWaterSequence(id,site.id),simultaneous=waterSequence.enabled&&waterSequence.startMet===clock.engineStart;
+ if(waterSequence.enabled&&!simultaneous)add('countdown','water',waterSequence.startMet,'Activate pad water suppression','Ground systems','Water begins flowing through the selected pad’s exhaust works. Exhaust heats the water as the engines build thrust.',{basis:waterSequence.basis});
  const engineName=star?'Super Heavy engines':id==='falconHeavy'?'Merlin engines':id==='ariane64'?'Vulcain main engine':id==='glenn'||id==='glenn9'?'BE-4 engines':'core engines';
  add('countdown','ignition',clock.engineStart,(simultaneous?'Start water suppression and ':'Start ')+engineName,'Launch propulsion','The core ignition sequence starts while the launch mount still restrains the vehicle.'+(fuel.booster==='solid'?' The solid boosters ignite at liftoff.':''),{basis:'Engine and pad effects clock',major:true});
  add('ascent','liftoff',0,'Liftoff','Launch control','The hold-downs release at '+site.name+'. This physical release defines T zero for every clock in the workbench.'+(fuel.booster==='solid'?' The '+fleet.boosters+' solid motors ignite.':''),{basis:'Release datum',major:true});

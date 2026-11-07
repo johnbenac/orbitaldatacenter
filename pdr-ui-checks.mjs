@@ -234,6 +234,52 @@ assert.equal(restored.design.trayCount,imported.design.trayCount);
 assert.notEqual(restored.designIdentity.vehicleId,linked.designIdentity.vehicleId);
 for(const id of ['power-day-soc','power-day-unserved'])assert.equal(checkRow(id).status,'unassessed',id+' must not inherit the previous simulation summary');
 
+// Processing playback is a reversible visual rehearsal, separate from flight state.
+assert.equal(el('ground-processing').hidden,false);
+assert.match(el('ground-processing').innerHTML,/Return to (?:ground )?checkout|Return to the checkout stand/);
+await fire({processingOperation:'propellant'});
+const processingStart=await snapshot();
+assert.equal(processingStart.view.domain,'prop');assert.equal(processingStart.view.t,-3600);
+assert.equal(processingStart.view.processingOperation,'propellant');assert.equal(processingStart.view.processingProgress,0);
+assert.deepEqual(processingStart.design,restored.design,'Opening a service activity must retain all installed design inputs');
+const processingSeek=new Element('','INPUT');Object.assign(processingSeek,{dataset:{processingSeek:''},value:'62',valueAsNumber:62});
+listeners.get('input')({target:processingSeek});await listeners.get('change')({target:processingSeek});
+const processingSeeked=await snapshot();
+assert.equal(processingSeeked.view.processingProgress,.62);assert.equal(processingSeeked.view.t,-3600);
+assert.deepEqual(processingSeeked.designIdentity,processingStart.designIdentity,'Rehearsal progress must not alter mission or vehicle identity');
+await fire({processingPlay:''});const activeProcessingFrame=frameCount;
+assert.ok(frames.has(activeProcessingFrame),'Processing play must schedule a visual frame');
+await fire({domain:'thermal'});
+assert.equal(frames.has(activeProcessingFrame),false,'Changing station must cancel the previous rehearsal frame');
+const nextStation=await snapshot();
+assert.equal(nextStation.view.processingOperation,'coolant');assert.equal(nextStation.view.processingProgress,0);
+assert.equal(nextStation.view.t,-3600);assert.deepEqual(nextStation.design,restored.design);
+await fire({processingReset:''});
+await fire({phase:'C'});
+assert.equal(el('ground-processing').hidden,true);assert.equal(el('bay-processing-player').hidden,true,'The compact processing player must not persist in the integrated flight view');
+
+// The pad explorer uses the same mission clock and retains the configured design.
+await fire({padOpen:''});
+const padStart=await snapshot();
+assert.equal(padStart.view.phase,'D');assert.equal(padStart.view.domain,'launcher');
+assert.equal(padStart.view.launchLens,'site');assert.equal(padStart.view.t,-20);
+assert.equal(el('pad-systems').hidden,false);assert.equal(el('ground-processing').hidden,true);
+assert.ok(padStart.view.padConnection);
+assert.deepEqual(padStart.design,restored.design,'Exploring a pad must not resize or change the spacecraft');
+const {launchUmbilicalDesign}=await import('./dist/launch-umbilicals.js');
+const padDesign=launchUmbilicalDesign(padStart.design.launcher,padStart.design.launchSite);
+const otherConnection=padDesign.connections.find(c=>c.id!==padStart.view.padConnection).id;
+await fire({padConnection:otherConnection});
+assert.equal((await snapshot()).view.padConnection,otherConnection);
+await fire({padInspect:otherConnection});
+const inspectedPad=await snapshot();assert.equal(inspectedPad.view.launchLens,'services');
+assert.equal(inspectedPad.view.padConnection,otherConnection);assert.equal(inspectedPad.view.t,-20);
+await fire({padSeek:'3'});
+const releasedPad=await snapshot();assert.equal(releasedPad.view.t,3);assert.equal(releasedPad.view.chapter,'ascent');
+assert.deepEqual(releasedPad.design,padStart.design);assert.deepEqual(releasedPad.designIdentity,padStart.designIdentity);
+await fire({padSeek:'-20'});assert.equal((await snapshot()).view.chapter,'pad');
+await fire({phase:'E'});assert.equal(el('pad-systems').hidden,true,'Pad controls must not persist into orbital operations');
+
 console.log(JSON.stringify({status:'passed',seconds:Number(((performance.now()-started)/1000).toFixed(2)),missionYears:restored.design.missionYears,
   solarM2:sized.design.solarM2,vehicleBefore:initial.designIdentity.vehicleId,vehicleAfterSizing:sized.designIdentity.vehicleId,
   missionBefore:sized.designIdentity.missionId,missionAfterOrbit:orbited.designIdentity.missionId,

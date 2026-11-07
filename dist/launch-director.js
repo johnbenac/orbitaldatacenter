@@ -2,6 +2,7 @@ import {cargoSection,refreshCargoSection} from './starship-evidence.js';
 import {flightButtons} from './flight-transport.js';
 import {launchSitesFor,launchSiteFor,launchPropulsionFor} from './launch-sites.js';
 import {launchFleet} from './launch-fleet.js';
+import {geographyForSite} from './launch-geography.js';
 import {launchPath} from './launch-path.js';
 import {launchHold} from './master-launch-events.js';
 import {DEPLOY_START_S} from './commissioning-clock.js';
@@ -21,13 +22,23 @@ export const showLaunchDirector=v=>v.phase==='D'&&['conops','launch','launcher',
 function formatGround(site){return site.id==='starbase-pad2'?'Bidirectional flame diverter':exhaust[site.exhaust]||site.exhaust.replaceAll('-',' ')}
 function map(site){
  const label=coord(site.lat,'N','S')+' · '+coord(site.lon,'E','W');
+ const geography=geographyForSite(site.id),tile=geography?.detail||geography;
+ if(tile?.image){
+  const [west,south,east,north]=tile.bounds,x=(site.lon-west)/(east-west)*100,y=(north-site.lat)/(north-south)*100;
+  return `<div class="lp-map lp-local-map" style="aspect-ratio:${tile.image.width}/${tile.image.height}" role="img" aria-label="Aerial context for ${esc(site.range)}, ${esc(site.name)}"><img src="${esc(tile.image.url)}" width="${tile.image.width}" height="${tile.image.height}" alt="" loading="lazy" decoding="async"><i style="left:${x}%;top:${y}%"></i><small>${label}</small></div><small class="lp-map-credit">${esc(tile.image.acquired)} · <a href="${esc(tile.image.sourceUrl)}" target="_blank" rel="noopener noreferrer">${esc(tile.image.attribution)} ↗</a></small>`;
+ }
  return `<div class="lp-map" role="img" aria-label="${esc(site.range)}, ${esc(label)}"><i style="left:${(site.lon+180)/3.6}%;top:${(90-site.lat)/1.8}%"></i><small>${label}</small></div>`;
+}
+function geographyRecord(site){
+ const g=geographyForSite(site.id);if(!g)return '';
+ const detail=g.detail?.image||g.image,px=n=>Number.isFinite(n)?n.toFixed(n<2?1:0)+' m/px':'Recorded in data manifest';
+ return `<details class="lp-detail lp-geography"><summary>Landscape imagery, terrain & attribution</summary><div><dl><dt>Geographic setting</dt><dd>${esc(g.name)}</dd><dt>Local imagery</dt><dd>${esc(detail.acquired)} · ${px(detail.resolutionM)} bundled pixels</dd>${detail.qualityNote?`<dt>Image detail</dt><dd>${esc(detail.qualityNote)}</dd>`:""}<dt>Regional imagery</dt><dd>${esc(g.image.acquired)} · ${px(g.image.resolutionM)} bundled pixels</dd><dt>Relief</dt><dd>${esc(g.elevation?.attribution||'Elevation source pending')}</dd></dl><p>The landscape follows georeferenced imagery and sampled terrain. Pad hardware, vegetation, water highlights and sky support the PDR visualization. Older imagery may show an earlier site layout; proposed pads remain study geometry.</p><p class="lp-sources">${g.sources.map(s=>`<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title)} ↗</a>`).join(' ')}</p></div></details>`;
 }
 const links=s=>s.sources.slice(0,4).map(a=>`<a href="${esc(a.url)}" target="_blank" rel="noopener noreferrer">${esc(a.title)} ↗</a>`).join(' ');
 export function siteRecord(d,editable){
  const path=siteApproach(d),s=path.site,choices=launchSitesFor(d.launcher),props=launchPropulsionFor(d.launcher);
- const chooser=choices.length>1&&editable?`<label>Compatible launch facility<select class="forminput" data-param="launchSite" aria-label="Compatible launch facility">${choices.map(o=>`<option value="${o.id}" ${o.id===s.id?'selected':''}>${esc(o.name)} · ${esc(o.region)} · ${esc(o.statusLabel)}</option>`).join('')}</select></label>`:'';
- return `<article class="lp-record"><div>${map(s)}</div><div><span class="lp-kicker">LAUNCH SITE &nbsp; / &nbsp; ${esc(s.country)}</span><h3>${esc(s.range)} · ${esc(s.name)}</h3><span class="lp-status">${esc(s.statusLabel)}</span><p>${esc(s.siteNote)}</p>${chooser}<div class="lp-site-buttons">${editable?'<button class="btn" data-watch-loading>View payload loading →</button>':''}<button class="btn" data-watch-liftoff>View pad and liftoff →</button></div></div></article>
+ const chooser=choices.length>1&&editable?`<label>Compatible launch site<select class="forminput" data-param="launchSite" aria-label="Compatible launch site">${choices.map(o=>`<option value="${o.id}" ${o.id===s.id?'selected':''}>${esc(o.name)} · ${esc(o.region)} · ${esc(o.statusLabel)}</option>`).join('')}</select></label>`:'';
+ return `<article class="lp-record"><div>${map(s)}</div><div><span class="lp-kicker">LAUNCH SITE &nbsp; / &nbsp; ${esc(s.country)}</span><h3>${esc(s.range)} · ${esc(s.name)}</h3><span class="lp-status">${esc(s.statusLabel)}</span><p>${esc(s.siteNote)}</p>${chooser}<div class="lp-site-buttons">${editable?'<button class="btn" data-watch-loading>View payload loading →</button>':''}<button class="btn" data-watch-liftoff>View pad and liftoff →</button><button class="btn" data-pad-open>Explore pad services →</button><button class="btn" data-launch-surroundings>Explore surroundings →</button></div></div></article>${geographyRecord(s)}
  <details class="lp-detail"><summary>Ground systems, ascent geometry and sources</summary><div><p>${esc(s.pinBasis)}. Core propulsion uses ${esc(fuelName(d.launcher,props.core))}.${props.booster?' The strap-ons use '+esc(fuelName(d.launcher,props.booster))+'.':''}</p>
  <p>At this epoch the illustrative direct ascent departs on an inertial heading of ${number(path.headingDeg)}° clockwise from north. The requested orbit is ${number(path.planeErrorDeg)}° from that plane, with ${number(path.gapKm,0)} km separation at the modeled handoff. ${path.latitudeLimited?'The requested inclination is outside the direct-launch latitude range. ':''}Range safety corridors, doglegs and provider-specific guidance require a mission trajectory.</p>${editable&&path.gapKm>.02?'<button class="chip" data-match-launch>Review site-derived insertion angles</button>':''}<p class="lp-sources">${links(s)}</p></div></details>`;
 }
@@ -40,7 +51,7 @@ function lensAvailable(key,id,t){
  if(id==='starship'&&t>=INSERTION_MET)return key==='wide'||key==='ship';
  if(key==='engines')return shipEngineViewAvailable(id,t);
  if(key==='wide')return t<100||shipEngineViewAvailable(id,t);
- return t<(key==='pad'?35:100);
+ return t<(['pad','site','surroundings','services'].includes(key)?35:100);
 }
 function directorState(s,d){
  const t=s.t,c=launchClockFor(d.launcher),band=launchSegment(t);
@@ -81,14 +92,14 @@ export function launchGuide(h,s,v,playing){
  ${hold?'<small class="lp-mismatch"><b>Launch authorization held · conditional replay</b><br>'+esc(hold)+'</small>':''}
  <dl><div><dt>Mission clock</dt><dd id="lp-clock">${clock(s.t)}</dd></div>${readouts}</dl>
  ${band==='insertion'&&d.launcher==='starship'?cargoSection(h):''}
- ${live||d.launcher==='starship'&&band==='insertion'?`<div id="lp-lenses"${!lensAvailable('wide',d.launcher,s.t)?' hidden':''} class="lp-lenses" data-choice-group="launch-lenses" role="group" aria-label="Launch camera viewpoints">${[['wide',band==='insertion'?'Cargo mechanism':'Vehicle overview'],['fairing',d.launcher==='starship'?'Cargo door & patch':'Fairing & patch'],['pad','Pad works'],...(d.launcher==='starship'?[['ship',band==='insertion'?'Whole ship':'Ship & flaps'],['engines','Ship engine bay']]:[]),...(['falconHeavy','starship'].includes(d.launcher)?[['base',d.launcher==='falconHeavy'?'Landing legs':'Super Heavy base']]:[])].map(([key,label])=>`<button class="chip" data-launch-lens="${key}"${!lensAvailable(key,d.launcher,s.t)?' hidden':''} aria-pressed="${v.camera==='launch'&&v.launchLens===key}">${label}</button>`).join('')}</div>`:''}
- ${pathMismatch(h,s,phase)}
+ ${live||d.launcher==='starship'&&band==='insertion'?`<div id="lp-lenses"${!lensAvailable('wide',d.launcher,s.t)?' hidden':''} class="lp-lenses" data-choice-group="launch-lenses" role="group" aria-label="Launch camera viewpoints">${[['wide',band==='insertion'?'Cargo mechanism':'Vehicle overview'],['fairing',d.launcher==='starship'?'Cargo door & patch':'Fairing & patch'],['site','Launch site'],['surroundings','Surroundings'],['services','Umbilicals'],['pad','Pad works'],...(d.launcher==='starship'?[['ship',band==='insertion'?'Whole ship':'Ship & flaps'],['engines','Ship engine bay']]:[]),...(['falconHeavy','starship'].includes(d.launcher)?[['base',d.launcher==='falconHeavy'?'Landing legs':'Super Heavy base']]:[])].map(([key,label])=>`<button class="chip" data-launch-lens="${key}"${!lensAvailable(key,d.launcher,s.t)?' hidden':''} aria-pressed="${v.camera==='launch'&&v.launchLens===key}">${label}</button>`).join('')}</div>`:''}
+ ${band==='pad'?'<button type="button" class="textbutton" data-pad-panel>Site systems & umbilical register ↓</button>':''}${pathMismatch(h,s,phase)}
  <div class="flight-transport">${flightButtons(playing,s.t>=539.999&&s.t<540&&siteApproach(h.input).gapKm>.02?'Open requested orbit':band==='insertion'?'Play handover':'Play launch',{primary:'btn export'})}<select id="flight-rate" aria-label="Launch playback speed">${[1,10,30,120,600].map(n=>`<option value="${n}" ${n===v.speed?'selected':''}>${n}×</option>`).join('')}</select></div></aside>`;
 }
 export function launchSequence(h,s,timeline){
  const d=h.input,path=siteApproach(d),site=path.site,band=launchSegment(s.t);
  const fx=launchEffectsAt(0,d.launcher,site.id),c=launchClockFor(d.launcher);
- const pad=[[-20,'Countdown'],[fx.engineStart,fx.waterStart===fx.engineStart&&site.water!=='none'?'Water & engine start':'Engine start'],...(site.water==='none'||fx.waterStart===fx.engineStart?[]:[[fx.waterStart,'Water system']]),[0,'Liftoff'],[6,'Exhaust flow'],[14,'Tower clearance'],[35,'Climb']].sort((a,b)=>a[0]-b[0]);
+ const pad=[[-20,'Countdown'],[fx.engineStart,fx.waterStart===fx.engineStart&&fx.waterEnabled?'Water & engine start':'Engine start'],...(!fx.waterEnabled||fx.waterStart===fx.engineStart?[]:[[fx.waterStart,'Water system']]),[0,'Liftoff'],[6,'Exhaust flow'],[14,'Tower clearance'],[35,'Climb']].sort((a,b)=>a[0]-b[0]);
  const ascent=[[35,'Climb'],...(timeline?.rows||[]).filter(r=>r.segment==='ascent'&&r.start>35&&r.id!=='launch-strap-cutoff').map(r=>[r.start,r.title]),[INSERTION_MET,'Orbital insertion']];
  const insertion=d.launcher==='starship'?(s.cargoAccessHeld?[[c.doorOpen,'Cargo access held']]:
   [[c.doorOpen,'Open side hatch'],[c.hatchClear,'Extend carriage'],[c.release,'Lift off fitting'],[c.eject,'Release sideways'],[c.releaseClear,'Retract carriage'],[c.carriageHome,'Close hatch'],[c.hatchLatched,'Hatch latched']]):

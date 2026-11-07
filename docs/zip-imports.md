@@ -33,6 +33,10 @@ Developer `README.md` and `.openai/hosting.json` are imported as
 `upstream-docs/README.md` and `upstream-docs/hosting.json`; our root README and
 production deployment configuration are preserved. Bundled `history.bundle`
 files are skipped: a new drop never replaces this repository's Git history.
+For split ZIP drops, retain both numbered parts and concatenate them in order
+into the original `.zip` before importing. Record the combined checksum and each
+part's checksum in `release.json`. The import size limit counts source files,
+excluding the skipped history bundle; an oversized bundle need not enter Git.
 The reviewed `tools/build-identity.py` generator is also upstream-owned; its
 generated artwork ships in `dist/` and does not need rebuilding for deployment.
 All other incoming root paths must be recognized developer files. Unexpected
@@ -64,4 +68,6 @@ After review, merge into `main`, push each configured remote, and run
 successive drops to verify additions, deletions, repeat imports, preserved local
 features, and refusal of traversal, duplicate paths, symbolic links, missing
 assets, and ownership collisions. The importer limits imports to 10,000 entries
-and 500 MB uncompressed; distribute large assets through R2 instead of source Git.
+and 500 MB of imported source uncompressed, excluding skipped Git history.
+Individual deployment files must fit Pages' file-size limit; use R2 for assets
+that exceed it rather than committing oversized files.

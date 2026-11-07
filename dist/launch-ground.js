@@ -1,5 +1,7 @@
 import * as T from './vendor/three.module.js';
 import {launchEffectsAt,launchRiseM} from './launch-effects-state.js';
+import {buildPadInfrastructure} from './launch-pad-infrastructure.js';
+import {buildLaunchEnvironment,civilSurfaceMaterial} from './launch-environment.js';
 export {launchEffectsAt,launchRiseM};
 const V=(x,y,z)=>new T.Vector3(x,y,z),clamp=x=>Math.max(0,Math.min(1,x));
 const style={
@@ -80,76 +82,33 @@ export function buildAscentWake(mounts){
   }
  },faceClouds(camera){camera.getWorldQuaternion(q);for(const {root,particles} of parents){if(!root.visible)continue;root.getWorldQuaternion(inv).invert().multiply(q);for(const m of particles)m.quaternion.copy(inv);}}};
 }
-// Regional coastal scenery is illustrative. A single continuous georeferenced
-// surface avoids intersecting flat water and land cards at the horizon.
-function terrainMaterial(region){
- const dry=region==='texas'||region==='california',tropical=region==='guiana'||region==='hainan';
- const grass=dry?[123,135,102]:tropical?[69,101,75]:[91,119,91];
- const inverse=p=>{const k=Math.max(-.999,Math.min(.999,(p-.5)/.5));return 350*k/(1-Math.abs(k));};
- const map=generatedTexture(512,(out,i,u,v)=>{
-  const x=inverse(u),z=inverse(v),coast=-400+145*Math.sin(x/415)+86*Math.sin(x/133+1.9)+73*Math.sin(x/642-.41);
-  const broad=noise(x/75,z/58,47),patch=noise(x/17,z/28,85),grain=noise(x/4,z/7,15);
-  const wet=clamp((coast-z)/19),sand=clamp(1-Math.abs(z-coast-14)/35);
-  const marsh=clamp(.74*(.76-broad)+.43*(patch-.55));
-  const shallow=clamp(1-(coast-z)/340);
-  const haze=clamp((Math.hypot(x,z)-470)/3100)*.85;
-  const field=[grass[0]+42*marsh,grass[1]+16*marsh,grass[2]+13*marsh],beach=[178,174,145],water=[69+14*shallow,108+30*shallow,127+20*shallow];
-  const variation=.83+.22*broad+.15*patch+.06*grain;
-  for(let k=0;k<3;k++){
-   const land=(field[k]*(1-sand)+beach[k]*sand)*variation;
-   const c=land*(1-wet)+water[k]*(.95+.08*broad+.026*grain)*wet;
-   out[i+k]=c*(1-haze)+[167,185,190][k]*haze;
-  }
-  out[i+3]=255;
- });
- const m=new T.MeshBasicMaterial({map,toneMapped:false});m.userData.globeTexture=true;return m;
-}
-export function buildLaunchGround(site,{tower,coreMounts,baseR:r,baseY,allH:H,fleet,box,tube,mesh,cylinder,mat,steel,rib,dark,gold,black}){
+export function buildLaunchGround(site,{tower,coreMounts,baseR:r,baseY,allH:H,fleet,box,tube,mesh,cylinder,mat,steel,rib,dark,gold,black,repaint}){
  const deckY=baseY-r*.63-1,depth=site.exhaust==='split-trench'?Math.max(10,.15*H):Math.max(7,.10*H),grade=deckY-depth*.62;
  const w=Math.max(9,2.5*r+fleet.boosters*.38*r),length=site.exhaust==='split-trench'?4.8*w:3.8*w;
- const concrete=mat('#acaaa2',.10,.91),wall=mat('#989b98',.17,.87),burnt=mat('#494c4e',.14,.93),cool=mat('#aebfc0',.45,.6),pipe=mat('#b9ced1',.45),charcoal=mat('#4a5960',.46);
- const countryGround=terrainMaterial(site.terrain),asphalt=mat('#656d6e'),white=mat('#deded1'),signal=mat('#c68046'),mast=mat(site.tower==='catch'?'#4b575f':site.tower==='swing-arms'?'#b66857':'#849294');
+ const concrete=civilSurfaceMaterial('concrete'),wall=mat('#989b98',.17,.87),burnt=civilSurfaceMaterial('burnt'),cool=mat('#aebfc0',.45,.6),pipe=mat('#b9ced1',.45),charcoal=mat('#4a5960',.46);
+ const asphalt=civilSurfaceMaterial('asphalt'),white=mat('#deded1'),signal=mat('#c68046'),mast=mat(site.tower==='catch'?'#4b575f':site.tower==='swing-arms'?'#b66857':'#849294');
  const g=(p,name)=>{const o=new T.Group();o.name=name;p.add(o);return o;};
- const land=g(tower,'Graded launch site'),civil=g(tower,'Launch table and exhaust works'),gantry=g(tower,'Pad service tower');
+ const land=g(tower,'Graded launch site'),civil=g(tower,'Launch table and exhaust works'),gantry=g(tower,'Pad service tower'),siteStructures=[civil,gantry];
  const pad=(p,x,y,z,dx,dy,dz,m)=>box(p,x,y,z,dx,dy,dz,m,'pad');
  const shaft=(p,a,b,rad,m)=>tube(p,V(...a),V(...b),rad,m,'pad');
  const post=(p,x,z,bottom,h,rad,m)=>cylinder(p,x,bottom+h/2,z,rad,rad,h,m,'pad',14);
  const floorY=deckY-depth,channelStart=-(site.trenchOutlets>1?length:1.55*w),channelEnd=length;
+ const environment=buildLaunchEnvironment(site,{parent:land,grade,aperture:{x0:channelStart,x1:channelEnd,z0:-w,z1:w},repaint});
  // The grade has a real incision. Retaining walls and a sloped center
  // deflector are visible below the launch table from the open exhaust mouths.
  function tile(x,z,dx,dz,height,material){
-  const ground=material===countryGround,n=ground?80:32;
-  const geom=new T.PlaneGeometry(dx,dz,Math.max(2,Math.min(n,Math.ceil(dx/14))),Math.max(2,Math.min(n,Math.ceil(dz/14))));
-  if(ground){
-   const pos=geom.attributes.position,uv=geom.attributes.uv,project=p=>.5+.5*p/(Math.abs(p)+350);
-   for(let i=0;i<pos.count;i++){
-    const xx=x+pos.getX(i),zz=z-pos.getY(i);uv.setXY(i,project(xx),1-project(zz));
-    // Low topography beyond the pad, with the ocean side below the distant horizon.
-    const inland=clamp((zz+220)/320),dist=clamp((Math.hypot(xx,zz)-110)/850);
-    const hills=site.terrain==='california'?66:site.terrain==='hainan'?32:site.terrain==='guiana'?20:6;
-    pos.setZ(i,hills*dist*inland*(noise(xx/243,zz/135,47)-.3));
-   }
-   geom.computeVertexNormals();
-  }
+  const geom=new T.PlaneGeometry(dx,dz,Math.max(2,Math.min(32,Math.ceil(dx/14))),Math.max(2,Math.min(32,Math.ceil(dz/14))));
+  if(material.userData.civilSurface){const pos=geom.attributes.position,uv=geom.attributes.uv;for(let i=0;i<pos.count;i++)uv.setXY(i,(x+pos.getX(i))/5,(z-pos.getY(i))/5);}
   const o=mesh(land,geom,material,x,height,z,'pad');o.rotation.x=-Math.PI/2;return o;
  }
- // Subdivide the area nearest the camera separately, preserving the opening
- // in the launch apron and the same terrain UVs across all four boundaries.
- const near=235,far=4100;
- for(const s of [-1,1]){
-  tile(0,s*(near+w)/2,2*near,near-w,grade,countryGround);
-  tile(0,s*(far+near)/2,2*far,far-near,grade,countryGround);
-  tile(s*(far+near)/2,0,far-near,2*near,grade,countryGround);
- }
- tile((-near+channelStart)/2,0,near+channelStart,w*2,grade,countryGround);
- tile((near+channelEnd)/2,0,near-channelEnd,2*w,grade,countryGround);
+ // Geographic terrain preserves this opening around the modeled trench.
  tile(0,0,channelEnd-channelStart,2*w,floorY-.1,burnt).position.x=(channelEnd+channelStart)/2;
  for(const s of [-1,1]){
   tile(0,s*(w+16),2*(length+29),32,grade+.18,concrete);
   pad(civil,(channelEnd+channelStart)/2,(floorY+grade)/2,s*(w+.52),channelEnd-channelStart,grade-floorY+1,1.04,wall);
   pad(civil,0,(floorY+deckY)/2,s*(w+1.5),2.55*w,depth,3,wall);
   pad(civil,0,deckY-.36,s*(w+1.15),3.1*w,.72,3.7,cool);
-  shaft(civil,[channelStart+1,grade+.6,s*(w+1.2)],[channelEnd-1,grade+.6,s*(w+1.2)],.26,pipe);
+  if(site.infrastructure?.water?.visual?.render)shaft(civil,[channelStart+1,grade+.6,s*(w+1.2)],[channelEnd-1,grade+.6,s*(w+1.2)],.26,pipe);
  }
  // Elevated mount bears on piers around an open aperture. A low ridge of
  // water-cooled inclined steel beneath the engine plane turns exhaust sideways.
@@ -167,8 +126,9 @@ export function buildLaunchGround(site,{tower,coreMounts,baseR:r,baseY,allH:H,fl
  }
  // Pad service equipment. Its widths and offsets are illustrative. Families
  // preserve each site's support concept and mast/vehicle relationship.
- const mastX=-w*(site.tower==='catch'?1.22:1.35),mastZ=-w*.88,top=H*(site.tower==='strongback'?.84:1.04);
- const span=Math.max(3,site.tower==='catch'?H*.103:site.tower==='swing-arms'?H*.19:H*.074);
+ const strongback=site.tower==='strongback',falcon=fleet.family==='Falcon Heavy';
+ const mastX=strongback?0:-w*(site.tower==='catch'?1.22:1.35),mastZ=strongback?-r*2.2:-w*.88,top=H*(strongback?.84:1.04);
+ const span=Math.max(strongback?1.4:3,strongback?r*.68:site.tower==='catch'?H*.103:site.tower==='swing-arms'?H*.19:H*.074);
  const darkWing=site.tower==='catch',gantryColor=darkWing?charcoal:mast;
  for(const x of [-1,1])for(const z of [-1,1])pad(gantry,mastX+x*span/2,grade+top/2,mastZ+z*span/2,span*.135,top,span*.135,gantryColor);
  const levels=darkWing?11:8;
@@ -189,19 +149,37 @@ export function buildLaunchGround(site,{tower,coreMounts,baseR:r,baseY,allH:H,fl
   // reaches the ship. The main tower has an enclosed crown and a guide rail.
   pad(gantry,mastX,grade+top+span*.22,mastZ,span*1.04,span*.5,span*1.04,charcoal);
   for(const z of [-1,1]){const yy=baseY+H*.30;shaft(gantry,[mastX,yy,mastZ],[mastX+.4*w,yy,z*r*1.75],span*.13,charcoal);arm(yy,z*r*1.75,r*1.55,span*.24,charcoal);}
-  arm(baseY+H*.65,mastZ*.63,-r,span*.17,steel);
  }else if(site.tower==='swing-arms'){
-  for(const portion of [.23,.44,.66,.81])arm(baseY+H*portion,mastZ*.73,-r*.89,span*.25,mast);
+  for(const portion of [.23,.44,.66,.81]){const p=arm(baseY+H*portion,mastZ*.73,-r*.89,span*.25,mast);p.name='Withdrawn access platform';p.rotation.y=-.75;}
   pad(gantry,mastX,grade+top*.9,mastZ,span*1.65,top*.1,span*1.35,white);
  }else if(site.tower==='mobile-gantry'){
-  arm(baseY+H*.62,mastZ*.56,-r*.8,span*.17,signal);arm(baseY+H*.26,mastZ*.56,-r*.8,span*.15,signal);
   // Mobile building shown withdrawn for flight, beyond the launch apron.
   const p=g(land,'Retracted mobile service building');p.position.set(H*.89,grade,-H*.94);
+  siteStructures.push(p);
   for(const s of [-1,1])pad(p,s*H*.17,H*.50,0,H*.105,H,H*.49,white);
   pad(p,0,H*.96,0,H*.43,H*.13,H*.50,white);pad(p,0,H*.53,-H*.23,H*.40,H*.98,H*.04,steel);
  }else{
-  for(const portion of (site.tower==='strongback'?[.23,.65]:[.26,.59,.77]))arm(baseY+H*portion,mastZ*.65,-r*.93,span*.19,steel);
   if(site.tower==='fixed-service')pad(gantry,mastX,grade+top*.75,mastZ,span*1.4,top*.40,span*1.35,charcoal);
+ }
+ // Falcon's launch umbilicals ride the transporter-erector beside the cores;
+ // the historical fixed service structure is a different piece of hardware.
+ let serviceMastX=mastX,serviceMastZ=mastZ,serviceTopY=grade+top,movingSpine=null;
+ function addSpinePivot(object,pivotY){
+  const pivot=g(tower,'Transporter-erector tipback pivot');pivot.position.set(serviceMastX,pivotY,serviceMastZ);
+  object.parent.remove(object);pivot.add(object);object.position.set(-serviceMastX,-pivotY,-serviceMastZ);
+  pivot.userData.motionBasis='Illustrative 8° tipback over 4 seconds after model liftoff; not a provider operating sequence.';return pivot;
+ }
+ if(strongback)movingSpine=addSpinePivot(gantry,grade);
+ if(falcon&&site.tower==='fixed-service'){
+  serviceMastX=0;serviceMastZ=-r*2.2;
+  const te=g(tower,'Falcon transporter-erector'),hh=H*.79,ss=Math.max(1.4,r*.68);
+  siteStructures.push(te);serviceTopY=baseY+hh;
+  for(const side of [-1,1])pad(te,side*ss*.5,baseY+hh*.5,serviceMastZ,ss*.16,hh,ss*.18,steel);
+  for(let j=0;j<10;j++){
+   const y=baseY+j*hh/10;shaft(te,[-ss*.5,y,serviceMastZ],[ss*.5,y+hh/10,serviceMastZ],ss*.08,steel);
+   pad(te,0,y,serviceMastZ,ss,ss*.13,ss*.68,steel);
+  }
+  te.userData.schematic=true;movingSpine=addSpinePivot(te,baseY);
  }
  // The lift-off table transfers each aft-skirt interface to the concrete
  // trench walls. Its pierced steel deck has a separate open exhaust passage
@@ -247,27 +225,43 @@ export function buildLaunchGround(site,{tower,coreMounts,baseR:r,baseY,allH:H,fl
    pivot.userData.contactY=baseY+lugY+.07*size;restraints.push(pivot);
   }
  }
- // Cryogenic tank farm with spherical heads and a service road.
+ // Site data governs fixed utility installations. The representative vessel
+ // symbols allocate commodities; they do not assert surveyed tank counts.
  tile(-95,42,180,7,grade+.19,asphalt);
- for(let j=0;j<5;j++){const radius=3.6+j%2*.7,hh=radius*(2+j%3*.7),x=(j-2)*12+H*.30,z=-H*.92;
-  post(land,x,z,grade-2,2.25,radius*1.12,wall);post(land,x,z,grade+.18,hh,radius,white);const dome=mesh(land,new T.SphereGeometry(1,16,10),white,x,grade+hh,z,'pad');dome.scale.set(radius,radius*.60,radius);
-  shaft(land,[x,grade+.7,z],[x,grade+.7,z+.22*H],.23,pipe);}
- const waterTower=site.water!=='none'&&['guiana','florida'].includes(site.terrain);
- if(waterTower){const x=H*.94,z=-H*1.8,ht=site.terrain==='guiana'?90:H*.59;
-  post(land,x,z,grade-2,2.26,ht*.079,wall);post(land,x,z,grade+.19,ht,ht*.035,white);const tank=mesh(land,new T.SphereGeometry(1,20,14),white,x,grade+ht*.94,z,'pad');tank.scale.set(ht*.125,ht*.105,ht*.125);}
- // Lightning protection masts and cable stays are visually separate from the stack.
- for(const [xx,zz] of [[-1.3,-1.05],[1.25,-1.11]]){
-  const x=xx*H,z=zz*H,ht=H*.77;post(land,x,z,grade,ht,.47,white);post(land,x,z,grade+ht,ht*.17,.19,signal);
-  shaft(land,[x,grade+ht*.78,z],[x+H*.21,grade,z+H*.14],.09,steel);
- }
+ const infrastructure=buildPadInfrastructure(site,{tower,land,civil,grade,baseY,heightM:H,widthM:w,mast:{x:mastX,z:mastZ,top,span},box,tube,cylinder,mesh,mat,steel});
  const sprays=g(tower,'Water curtain'),jetMat=new T.MeshBasicMaterial({color:'#b4e1e7',transparent:true,opacity:.66,depthWrite:false});
- for(const sgn of [-1,1])for(let i=0;i<8;i++){
-  const x=(i-3.5)*w*.32,z=sgn*w*1.08,y=grade+.79;
-  post(civil,x,z,grade,.77,.20,cool);
-  let origin=[x,y,z];
-  for(let step=1;step<=4;step++){
-   const f=step/4,target=[x+.12*w*f,y+1.3*w*f-2.15*w*f*f,z-sgn*w*.85*f];
-   shaft(sprays,origin,target,.078+.13*f,jetMat);origin=target;
+ const application=site.infrastructure?.water?.visual?.application||'study';sprays.userData.application=application;sprays.userData.geometryBasis='Illustrative nozzles and water paths; no flow rate or surveyed nozzle count.';
+ function waterJet(origin,point){
+  const a=V(...origin),b=V(...point(.08));shaft(civil,a.toArray(),a.clone().lerp(b,.30).toArray(),.17,cool);
+  let start=origin;
+  for(let j=1;j<=5;j++){const f=j/5,end=point(f);shaft(sprays,start,end,.07+.11*f,jetMat);start=end;}
+ }
+ if(infrastructure.waterEnabled){
+  if(application==='deck-deflector'){
+   for(let i=0;i<16;i++){
+    const a=i*Math.PI/8,rr=r*1.39,x=rr*Math.sin(a),z=rr*Math.cos(a),y=deckY-.55;
+    waterJet([x,y,z],f=>[x*(1-.5*f),y-w*.68*f,z*(1-.5*f)]);
+   }
+  }else if(application==='tunnel-deluge'){
+   for(const dir of outlets)for(const side of [-1,1])for(let i=0;i<4;i++){
+    const x=dir*w*(1.5+i*.42),z=side*w*.94,y=grade-.25;
+    waterJet([x,y,z],f=>[x+dir*w*.15*f,y+.23*w*f-.70*w*f*f,z-side*w*.73*f]);
+   }
+  }else if(application==='duct-injection'||application==='exhaust-injection'){
+   for(const dir of outlets)for(const side of [-1,1])for(let i=0;i<5;i++){
+    const x=dir*w*(.3+i*.4),z=side*w*.91,y=grade-.32;
+    waterJet([x,y,z],f=>[x+dir*w*.44*f,y+.18*w*f-.58*w*f*f,z-side*w*.72*f]);
+   }
+  }else if(application==='deflector'){
+   for(const dir of outlets)for(const side of [-1,1])for(let i=0;i<5;i++){
+    const x=dir*w*(.20+i*.27),z=side*w*.78,y=deckY-2.0-depth*.15*i/4;
+    waterJet([x,y,z],f=>[x+dir*w*.30*f,y-depth*.45*f,z-side*w*.65*f]);
+   }
+  }else{
+   for(const side of [-1,1])for(let i=0;i<8;i++){
+    const x=(i-3.5)*w*.32,z=side*w*1.08,y=grade+.79;
+    waterJet([x,y,z],f=>[x+.12*w*f,y+.9*w*f-1.65*w*f*f,z-side*w*.85*f]);
+   }
   }
  }
  const clouds=g(tower,'Pad water and exhaust effluent'),mist=[];
@@ -278,12 +272,14 @@ export function buildLaunchGround(site,{tower,coreMounts,baseR:r,baseY,allH:H,fl
  }
  // Fixed pool with analytic particle age: replay or an arbitrary seek reconstructs identical parcels.
  function update(t,fx,enabled){
+  environment.update(t,tower.visible);
   const release=enabled?clamp(t/.45):0;for(const jaw of restraints)jaw.rotation.x=.97*release*release*(3-2*release);
-  const deploy=clamp((t+1)/5);
-  for(const a of swing)a.rotation.y=(darkWing?-.18:-.58)*deploy;
-  sprays.visible=enabled&&fx.water>.001;jetMat.opacity=.68*fx.water;
-  clouds.visible=enabled&&fx.water>.001;
-  if(!clouds.visible)return;
+  if(movingSpine){const f=enabled?clamp(t/4):0;movingSpine.rotation.x=-8*Math.PI/180*f*f*(3-2*f);}
+  // Catch arms are parked clear; access decks are already withdrawn. Service
+  // arms have their own interface-specific breakaway/retraction mechanism.
+  sprays.visible=infrastructure.waterEnabled&&enabled&&fx.water>.001;jetMat.opacity=.68*fx.water;
+  clouds.visible=infrastructure.waterEnabled&&enabled&&fx.water>.001;
+  if(!clouds.visible){for(const p of mist)p.visible=false;return;}
   const first=fx.steam>.012?1:0,split=outlets.length===2;
   for(let i=0;i<mist.length;i++){
    const p=mist[i],dir=split?outlets[i%2]:1,rand=noise(i+.32,2.4,17),life=5+rand*4;
@@ -302,5 +298,18 @@ export function buildLaunchGround(site,{tower,coreMounts,baseR:r,baseY,allH:H,fl
 
   }
  }
- return {update,faceClouds(camera){if(!tower.visible||!clouds.visible)return;const q=camera.getWorldQuaternion(new T.Quaternion());for(const p of mist)if(p.visible)p.quaternion.copy(q);},clouds,site};
+ const annotations=[...infrastructure.annotations],overviewAnchors=[];
+ function mark(id,title,detail,p,priority=85){const anchor=new T.Object3D();anchor.name=title+' annotation';anchor.position.set(...p);tower.add(anchor);annotations.push({id,title,detail,anchor,kind:'facility',priority});overviewAnchors.push(anchor);return anchor;}
+ mark('launch-table','Launch table and restraints','Vehicle-specific aft bearing interfaces',[0,deckY+.6,az],106);
+ mark('exhaust-path',site.trenchOutlets===2?'Opposed exhaust outlets':'Exhaust outlet',site.infrastructure?.exhaust?.label||site.exhaust,[length*.83,grade-.4,0],96);
+ const supportMark=mark('pad-support',site.infrastructure?.support?.label||'Pad service structure',(site.infrastructure?.support?.status||'Schematic structure')+(strongback?' · illustrative tipback':''),[mastX,grade+top*.74,mastZ],89);
+ if(infrastructure.waterEnabled)mark('deluge-header','Water suppression header',site.infrastructure?.water?.status+' · nozzles schematic',[0,grade+.8,w*1.08],92);
+ const teMark=falcon?mark('transporter-erector','Transporter-erector','Illustrative tipback · fixed tail services',[serviceMastX,baseY+H*.54,serviceMastZ],102):null;
+ const overviewBounds=new T.Box3(V(-r,baseY,-r),V(r,baseY+H,r));
+ tower.updateWorldMatrix(true,true);
+ for(const object of [...siteStructures,...infrastructure.overviewObjects])overviewBounds.union(new T.Box3().setFromObject(object));
+ if(movingSpine){if(strongback)movingSpine.attach(supportMark);if(teMark)movingSpine.attach(teMark);}
+ for(const corner of [overviewBounds.min,overviewBounds.max]){const a=new T.Object3D();a.position.copy(corner);a.name='Site framing extent';tower.add(a);overviewAnchors.push(a);}
+ return {update,faceClouds(camera){if(!tower.visible)return;environment.faceCamera(camera);if(!clouds.visible)return;const q=camera.getWorldQuaternion(new T.Quaternion());for(const p of mist)if(p.visible)p.quaternion.copy(q);},clouds,site,infrastructure,environment,annotations,overviewBounds,overviewAnchors,
+  serviceFrame:{mastX:serviceMastX,mastZ:serviceMastZ,mastTopY:serviceTopY,movingSpine,grade,baseY,heightM:H,widthM:w,deckY},serviceSources:infrastructure.serviceSources};
 }

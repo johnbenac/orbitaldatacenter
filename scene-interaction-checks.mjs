@@ -6,6 +6,7 @@ import {sizeDesign} from './dist/design.js';
 import {createSimulation} from './dist/model.js';
 import {makeCraft} from './dist/craft.js';
 import {makeLaunch} from './dist/launch-scene.js';
+import {groundProcessingState} from './dist/ground-processing.js';
 import {temperatureColor,thermalSkin,thermalScales} from './dist/thermal-view.js';
 import {createScene} from './dist/scene.js';
 
@@ -129,6 +130,20 @@ for(const [view,chapter,t,phase] of [['spacecraft','operations',6402,'E'],['spac
  assert.ok(Math.abs(rotated.radius/panned.radius-1)<1e-8,`${chapter}: drag changed the orbit radius`);
  assert.ok(rotated.pivot.distanceTo(panned.pivot)<1e-8,`${chapter}: drag moved the pan target`);
 }
+// A processing rehearsal must preserve the full Work area camera range. The
+// closeout station is the same hardware with and without its rehearsal enabled.
+scene.setDomain('launcher','D');scene.setChapter('integration');scene.setView('launch');scene.update(h,sim.at(-3599));
+scene.setProcessingState(null);scene.resetCamera();const fullBay=cameraFrame();
+scene.setProcessingState({...groundProcessingState(h,'closeout',0),enabled:true});const rehearsalBay=cameraFrame();
+assert(Math.abs(rehearsalBay.height/fullBay.height-1)<1e-8,'Processing shortened the Work area zoom range');
+assert(rehearsalBay.pivot.distanceTo(fullBay.pivot)<1e-8,'Processing moved the Work area target');
+for(let i=0;i<4;i++)canvas.events.wheel({deltaY:1000,preventDefault(){}});
+const distantBay=cameraFrame();
+assert.equal(scene.getCameraState().bay[2],.25,'Integration keeps the original finite zoom-out limit');
+assert(Math.abs(distantBay.height/fullBay.height-4)<1e-8,'Integration cannot reach its original maximum visible span');
+canvas.events.wheel({deltaY:-140,preventDefault(){}});assert(cameraFrame().height<distantBay.height,'Integration must zoom back in from its limit');
+scene.setProcessingState(null);scene.resetCamera();
+console.log('Processing preserves full Work area framing and the original finite integration zoom range.');
 // Drag the right-hand rim down to six o'clock. The physical canvas is resized
 // above, so derive the three pointer positions from the actual viewport.
 function rimDrag(){
@@ -202,6 +217,7 @@ scene.setView('spacecraft');scene.update(h,sim.at(6402));paintFrame();assert(!ve
 const shadow=sim.at(6402),original=structuredClone(shadow);
 assert.ok(shadow.eclipse);assert.equal(shadow.solarKW,0);
 scene.setDomain('conops','E');scene.setChapter('operations');scene.setView('spacecraft');scene.update(h,shadow);
+scene.setLightingMode('realistic');
 for(const view of ['spacecraft','core']){
  scene.setView(view);scene.resetCamera();
  const [earth,dark]=paintFrame(),camera=scene.getCameraState();

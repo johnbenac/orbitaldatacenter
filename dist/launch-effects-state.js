@@ -66,16 +66,22 @@ export function shipEngineViewAvailable(id,t){
 export function payloadFreeMET(id){
  const clock=launchClockFor(id);return clock.eject??clock.release;
 }
+export function launchWaterSequence(id,siteId){
+ const site=launchSiteFor(id,siteId),water=site?.infrastructure?.water;
+ const enabled=water?water.status!=='unknown'&&water.visual?.render!==false:!!site&&site.water!=='none';
+ return {enabled,startMet:Number.isFinite(water?.sequence?.startMet)?water.sequence.startMet:launchClockFor(id).waterStart,
+  status:water?.status||'study',basis:water?.sequence?.basis||'Illustrative water-system cue on the mission clock; provider operating sequence remains open.'};
+}
 export function launchEffectsAt(t,id,siteId){
  const site=launchSiteFor(id,siteId),fuel=launchPropulsionFor(id);
- const {waterStart,engineStart,coreCutoff,boosterCutoff,hotStage,upperIgnition,upperCutoff}=launchClockFor(id);
+ const {engineStart,coreCutoff,boosterCutoff,hotStage,upperIgnition,upperCutoff}=launchClockFor(id),waterSequence=launchWaterSequence(id,siteId),waterStart=waterSequence.startMet;
  const downselect=hotStage!==null&&t>=hotStage;
  const ignition=t<coreCutoff?(downselect?.13:smooth((t-engineStart)/-engineStart)):0;
  const boosterPower=fuel.booster&&t<boosterCutoff?(fuel.booster==='solid'?(t>=0?1:0):smooth((t-engineStart)/-engineStart)):0;
  const upperPower=upperIgnition!==null&&t>=upperIgnition&&t<upperCutoff?smooth((t-upperIgnition)/.85):0;
- const water=site.water!=='none'?smooth((t-waterStart)/1.5)*(1-smooth((t-17)/11)):0;
+ const water=waterSequence.enabled?smooth((t-waterStart)/1.5)*(1-smooth((t-17)/11)):0;
  const steam=water*smooth((t-engineStart)/2)*(1-smooth((t-9)/17));
- const phase=t<waterStart&&t<engineStart?'hold':t<engineStart?'deluge':t<0?'ignition':t<5?'release':t<13?'clearance':t<35?'climb':t<coreCutoff&&!downselect?'ascent':upperPower?'upper':'coast';
+ const phase=t<engineStart?waterSequence.enabled&&t>=waterStart?'deluge':'hold':t<0?'ignition':t<5?'release':t<13?'clearance':t<35?'climb':t<coreCutoff&&!downselect?'ascent':upperPower?'upper':'coast';
  const label={hold:'Stack restrained',deluge:'Water suppression starts',ignition:'Liquid engines starting',release:'Liftoff',clearance:'Clearing the tower',climb:'Climbing downrange',ascent:'Powered ascent',upper:'Upper stage firing',coast:'Stage transition'}[phase];
- return {water,steam,waterStart,engineStart,ignition,boosterPower,upperPower,liftoffHeightM:launchRiseM(t,id),phase,label,coreFuel:fuel.core,boosterFuel:fuel.booster,upperFuel:fuel.upper};
+ return {water,steam,waterStart,waterEnabled:waterSequence.enabled,waterBasis:waterSequence.basis,engineStart,ignition,boosterPower,upperPower,liftoffHeightM:launchRiseM(t,id),phase,label,coreFuel:fuel.core,boosterFuel:fuel.booster,upperFuel:fuel.upper};
 }

@@ -1,0 +1,92 @@
+[
+  {
+    "OBJECTID": 176476,
+    "Name": "m_2509706_ne_14_060_20220605",
+    "Year": 2022,
+    "acquisition_date": 1654387200000,
+    "resolution_value": 0.6,
+    "resolution_units": "METER",
+    "agency": "USDA"
+  },
+  {
+    "OBJECTID": 176478,
+    "Name": "m_2509706_se_14_060_20220605",
+    "Year": 2022,
+    "acquisition_date": 1654387200000,
+    "resolution_value": 0.6,
+    "resolution_units": "METER",
+    "agency": "USDA"
+  },
+  {
+    "OBJECTID": 176480,
+    "Name": "m_2509707_ne_14_060_20220610",
+    "Year": 2022,
+    "acquisition_date": 1654819200000,
+    "resolution_value": 0.6,
+    "resolution_units": "METER",
+    "agency": "USDA"
+  },
+  {
+    "OBJECTID": 176481,
+    "Name": "m_2509707_nw_14_060_20220610",
+    "Year": 2022,
+    "acquisition_date": 1654819200000,
+    "resolution_value": 0.6,
+    "resolution_units": "METER",
+    "agency": "USDA"
+  },
+  {
+    "OBJECTID": 176677,
+    "Name": "m_2609762_ne_14_060_20220605",
+    "Year": 2022,
+    "acquisition_date": 1654387200000,
+    "resolution_value": 0.6,
+    "resolution_units": "METER",
+    "agency": "USDA"
+  },
+  {
+    "OBJECTID": 176679,
+    "Name": "m_2609762_se_14_060_20220605",
+    "Year": 2022,
+    "acquisition_date": 1654387200000,
+    "resolution_value": 0.6,
+    "resolution_units": "METER",
+    "agency": "USDA"
+  },
+  {
+    "OBJECTID": 176681,
+    "Name": "m_2609763_ne_14_060_20220610",
+    "Year": 2022,
+    "acquisition_date": 1654819200000,
+    "resolution_value": 0.6,
+    "resolution_units": "METER",
+    "agency": "USDA"
+  },
+  {
+    "OBJECTID": 176682,
+    "Name": "m_2609763_nw_14_060_20220610",
+    "Year": 2022,
+    "acquisition_date": 1654819200000,
+    "resolution_value": 0.6,
+    "resolution_units": "METER",
+    "agency": "USDA"
+  },
+  {
+    "OBJECTID": 176683,
+    "Name": "m_2609763_se_14_060_20220610",
+    "Year": 2022,
+    "acquisition_date": 1654819200000,
+    "resolution_value": 0.6,
+    "resolution_units": "METER",
+    "agency": "USDA"
+  },
+  {
+    "OBJECTID": 176684,
+    "Name": "m_2609763_sw_14_060_20220610",
+    "Year": 2022,
+    "acquisition_date": 1654819200000,
+    "resolution_value": 0.6,
+    "resolution_units": "METER",
+    "agency": "USDA"
+  }
+]

@@ -1,21 +1,32 @@
 {
-  "release": "v36",
+  "release": "v45",
   "source_host": "boiler",
-  "source_path": "/home/johnb/Downloads/orbital-data-center-v36.zip",
-  "archive_sha256": "5100d0b6ff48cf96e6066287728793a62ee1bb563bf37c5d4ab868c583f9b99b",
+  "source_path": "/home/johnb/Downloads/orbital-data-center-v45.zip.part01 + orbital-data-center-v45.zip.part02",
+  "archive_sha256": "9c3cd1dd5108b0ed94b5de34059da118552614fdbc415ff9cbb7e92118faebcb",
   "static_directory": "dist",
   "checks_passed": [
-    "184 asset manifest entries",
-    "142 JavaScript syntax checks",
-    "15 import and assembly regression tests",
-    "input-guidance-test.mjs",
-    "Desktop and mobile startup, 3D rendering, footer links and social metadata; no browser errors or failed assets"
+    "2312 asset manifest entries",
+    "164 JavaScript syntax checks",
+    "16 import and assembly regression tests",
+    "2424 upstream files match the archive",
+    "All application files fit the Cloudflare Pages file-size limit",
+    "Desktop and mobile startup, 3D rendering, fixed footer and Blender OG metadata; no browser errors or failed assets"
   ],
   "validation_notes": [
-    "Unmodified interface-checks.mjs fails its agents payload-interface assertion at line 22; handed upstream.",
-    "Full numerical validation remains with the upstream team per user instruction.",
-    "Upstream application and tests deployed as supplied without patches.",
-    "Issue memo copied to boiler:/home/johnb/Downloads/orbital-data-center-v36-validation-memo.md."
+    "Split archive concatenated in numeric part order; original parts and combined archive retained outside Git.",
+    "Bundled Git history excluded from source import; upstream application and tests imported without patches.",
+    "Full numerical validation remains with the upstream team per user instruction."
   ],
-  "upstream_issue_memo": "docs/upstream-issues/v36-validation.md"
+  "source_parts": [
+    {
+      "source_path": "/home/johnb/Downloads/orbital-data-center-v45.zip.part01",
+      "size": 419430400,
+      "sha256": "4aac3a5c5732afb25599952497d336ac0459399743c45052a4e6d564248e89b6"
+    },
+    {
+      "source_path": "/home/johnb/Downloads/orbital-data-center-v45.zip.part02",
+      "size": 386721761,
+      "sha256": "3cba49a0a29784a785b6b8a3935a7d20bb9e8c57dd872361604c37702d12400c"
+    }
+  ]
 }

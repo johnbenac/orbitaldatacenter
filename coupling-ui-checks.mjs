@@ -214,13 +214,14 @@ try{
 console.log('Adapter-to-integration handoff, reversible payload milestones, follow camera and replay stay on one mission clock.');
 
 await fire({phase:'C'});await fire({camera:'spacecraft'});await fire({attitudeTime:'6402'});
-const orbitBefore=await snapshot();assert.equal(orbitBefore.view.lighting,'realistic');
+const orbitBefore=await snapshot();assert.equal(orbitBefore.view.lighting,'studio');
 assert.equal(el('orbit-lighting').hidden,false);
 assert.equal(orbitBefore.view.orbitVectors,true);assert.equal(el('flight-vector-toggle').getAttribute('aria-pressed'),'true');
 await fire({action:'flightvectors'});
 const hiddenVectors=await snapshot();
 assert.equal(hiddenVectors.view.orbitVectors,false);assert.equal(el('flight-vector-key').hidden,true);
 assert.deepEqual(hiddenVectors.design,orbitBefore.design);assert.equal(hiddenVectors.view.t,orbitBefore.view.t);
+await fire({lighting:'realistic'});assert.equal((await snapshot()).view.lighting,'realistic');
 await fire({lighting:'studio'});await change('camera-exposure',1);const studioView=await snapshot();
 assert.deepEqual(studioView.design,orbitBefore.design);assert.equal(studioView.view.t,orbitBefore.view.t);
 assert.equal(studioView.view.camera,orbitBefore.view.camera);assert.equal(studioView.view.lighting,'studio');

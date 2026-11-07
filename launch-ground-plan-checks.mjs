@@ -1,0 +1,40 @@
+import assert from 'node:assert/strict';
+import {defaults,sizeDesign,applyPreset} from './dist/design.js';
+import {launchFleet} from './dist/launch-fleet.js';
+import {launchSitesFor} from './dist/launch-sites.js';
+import {launchGroundPlan,launchGroundPlanHtml,launchConnectionRows,launchSiteCatalog} from './dist/launch-ground-plan.js';
+import {launchUmbilicalState} from './dist/launch-umbilicals.js';
+import {baselineRecord,baselineHtml} from './dist/mission-baseline.js';
+
+let routes=0;
+for(const id of Object.keys(launchFleet))for(const site of launchSitesFor(id)){
+ const input={...applyPreset(defaults,'launcher',id),launchSite:site.id};
+ const h=sizeDesign(input),before=JSON.stringify(h.input),plan=launchGroundPlan(h);
+ assert.equal(plan.launcher,id);assert.equal(plan.siteId,site.id);
+ assert.equal(plan.umbilicals.siteId,site.id);assert.equal(plan.umbilicals.launcherId,id);
+ assert.ok(plan.site.compatibleVehicles.includes(id));
+ assert.ok(plan.processingRoute.facilityId);assert.equal(plan.processingRoute.missionApproval,'open');
+ assert.ok(plan.compatibleSites.some(s=>s.id===site.id));
+ const rows=launchConnectionRows(plan);assert.equal(rows.length,plan.umbilicals.connections.length);
+ assert.ok(rows.length>0);assert.ok(rows.every(r=>r.interface_status==='open'&&r.path&&r.purpose));
+ assert.ok(rows.some(r=>r.category==='payload'&&r.physical_release==='Spacecraft separation'));
+ assert.ok(Object.values(plan.evidence).every(s=>s==='open'));
+ const record=JSON.stringify(plan);
+ for(const t of [-600,-20,-1,0,3,35,540,600])launchUmbilicalState(plan.umbilicals,t);
+ assert.equal(JSON.stringify(plan),record,'Playback must not alter the controlled launch-ground design');
+ assert.equal(JSON.stringify(h.input),before,'Generating pad documentation must not change the spacecraft or mission');
+ const html=launchGroundPlanHtml(plan);
+ assert.ok(!/(?:>\s*undefined\s*<|\bNaN\b)/.test(html),id+' export must not contain unresolved JavaScript values');
+ const embedded=JSON.parse(html.match(/<script type="application\/json" id="odc-launch-ground-plan">([\s\S]*?)<\/script>/)[1]);
+ assert.deepEqual(embedded,JSON.parse(record));
+ for(const source of plan.sources)assert.equal(new URL(source.url).protocol,'https:');
+ routes++;
+}
+const h=sizeDesign(defaults),plan=launchGroundPlan(h),baseline=baselineRecord(h);
+assert.deepEqual(baseline.launchGround,plan);
+assert.match(baselineHtml(baseline),/Two physical disconnect boundaries/);
+const catalog=launchSiteCatalog();
+assert.equal(catalog.sites.length,14);assert.equal(routes,15);
+assert.equal(new Set(catalog.sites.map(s=>s.id)).size,catalog.sites.length);
+assert.equal(catalog.sites.find(s=>s.id==='ksc-lc39a').complexId,catalog.sites.find(s=>s.id==='ksc-starship').complexId,'Separate mounts must share the actual LC-39A complex identity');
+console.log(JSON.stringify({status:'passed',routes,sites:catalog.sites.length,baseline:'controlled site, service record and evidence',exports:'complete HTML/JSON and connection register',playback:'no design or acceptance mutation'}));

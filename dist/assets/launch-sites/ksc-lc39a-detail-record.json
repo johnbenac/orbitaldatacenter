@@ -1,0 +1,56 @@
+{
+  "id": "ksc-lc39a",
+  "regionId": "space-coast",
+  "center": [
+    -80.602,
+    28.609
+  ],
+  "spanM": [
+    3072,
+    3072
+  ],
+  "bounds": [
+    -80.617716981,
+    28.59520194,
+    -80.586283019,
+    28.62279806
+  ],
+  "projection": "EPSG:4326",
+  "image": {
+    "url": "assets/launch-sites/ksc-lc39a-detail.jpg",
+    "previewUrl": "assets/launch-sites/ksc-lc39a-detail-preview.jpg",
+    "width": 4096,
+    "height": 4096,
+    "resolutionM": 0.75,
+    "projection": "EPSG:4326",
+    "bounds": [
+      -80.617716981,
+      28.59520194,
+      -80.586283019,
+      28.62279806
+    ],
+    "nativeResolutionM": 0.3,
+    "acquired": "2023-01-09",
+    "attribution": "USDA NAIP / USGS, The National Map; Contains modified Copernicus Sentinel data 2026, served by Microsoft Planetary Computer",
+    "sourceUrl": "https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPPlus/ImageServer",
+    "license": "U.S. public domain; Copernicus Sentinel free, full and open data",
+    "licenseUrl": "https://www.usgs.gov/faqs/what-are-terms-uselicensing-map-services-and-data-national-map",
+    "requests": [
+      "https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPPlus/ImageServer/exportImage?f=image&bbox=-80.617716981%2C28.609%2C-80.602%2C28.62279806&bboxSR=4326&imageSR=4326&size=2048%2C2048&format=png32&noData=0&noDataInterpretation=esriNoDataMatchAll&adjustAspectRatio=false&interpolation=RSP_BilinearInterpolation&renderingRule=%7B%22rasterFunction%22%3A+%22NaturalColor%22%7D",
+      "https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPPlus/ImageServer/exportImage?f=image&bbox=-80.602%2C28.609%2C-80.586283019%2C28.62279806&bboxSR=4326&imageSR=4326&size=2048%2C2048&format=png32&noData=0&noDataInterpretation=esriNoDataMatchAll&adjustAspectRatio=false&interpolation=RSP_BilinearInterpolation&renderingRule=%7B%22rasterFunction%22%3A+%22NaturalColor%22%7D",
+      "https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPPlus/ImageServer/exportImage?f=image&bbox=-80.617716981%2C28.59520194%2C-80.602%2C28.609&bboxSR=4326&imageSR=4326&size=2048%2C2048&format=png32&noData=0&noDataInterpretation=esriNoDataMatchAll&adjustAspectRatio=false&interpolation=RSP_BilinearInterpolation&renderingRule=%7B%22rasterFunction%22%3A+%22NaturalColor%22%7D",
+      "https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPPlus/ImageServer/exportImage?f=image&bbox=-80.602%2C28.59520194%2C-80.586283019%2C28.609&bboxSR=4326&imageSR=4326&size=2048%2C2048&format=png32&noData=0&noDataInterpretation=esriNoDataMatchAll&adjustAspectRatio=false&interpolation=RSP_BilinearInterpolation&renderingRule=%7B%22rasterFunction%22%3A+%22NaturalColor%22%7D"
+    ],
+    "gapFill": {
+      "sourceId": "sentinel-2",
+      "nativeResolutionM": 10,
+      "request": "https://planetarycomputer.microsoft.com/api/data/v1/item/bbox/-80.617716981,28.59520194,-80.586283019,28.62279806/512x512.png?collection=sentinel-2-l2a&item=S2B_MSIL2A_20260328T155859_R097_T17RNM_20260328T200110&assets=visual&dst_crs=EPSG%3A4326&coord_crs=EPSG%3A4326&resampling=bilinear&reproject=bilinear",
+      "attribution": "Contains modified Copernicus Sentinel data 2026, served by Microsoft Planetary Computer"
+    },
+    "additionalLicenseUrls": [
+      "https://dataspace.copernicus.eu/terms-and-conditions"
+    ],
+    "nativeResolutionBasis": "Nominal source acquisition, not bundled display sampling",
+    "processing": "Reprojected to EPSG:4326; bilinear display sampling; JPEG encoding. Source colors retained."
+  }
+}

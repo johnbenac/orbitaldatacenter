@@ -1,5 +1,6 @@
 import {buildBayEquipment} from './bay-equipment.js';
 import {buildIntegrationRig} from './integration-rig.js';
+import {processingFacility} from './processing-facilities.js';
 import * as T from './vendor/three.module.js';
 const v=(x,y,z)=>new T.Vector3(x,y,z);
 function painted(w,h,draw){
@@ -31,8 +32,9 @@ function wallTexture(name){return painted(1400,550,(g,w,h)=>{
 export function fitOutBay(ctx){
  const {facility,tower,halves,unit:u,R,baseR,baseY,maxH,h,profile,box,tube,mesh,cylinder,mat,steel,rib,dark,gold,black}=ctx;
  const layout=ctx.layout,floor=layout.floor,wx=layout.roomHalfX,wz=layout.roomHalfZ,wallH=layout.craneY+2.2-floor,fixtures=[],iron=mat('#4c6067',.45),mark=mat('#cc9760'),graphite=mat('#29383f'),glow=new T.MeshBasicMaterial({color:0xe9dfc5}),cool=new T.MeshBasicMaterial({color:0xc3dce7});
+ const facilityRecord=processingFacility(h),annotations=[],note=(id,title,detail,anchor,priority=65,lens=null)=>annotations.push({id,title,detail,anchor,kind:'facility',priority,lens});
  function plane(p,x,y,z,w,b,material,rotation=0){const m=mesh(p,new T.PlaneGeometry(w,b,rotation&&w>u*2?Math.min(128,Math.max(24,Math.ceil(w/u))):1,rotation&&b>u*2?Math.min(128,Math.max(20,Math.ceil(b/u))):1),material,x,y,z,'pad');m.rotation.x=rotation;return m;}
- const deck=plateTexture(),wall=wallTexture(layout.record.facility),walls=[];
+ const deck=plateTexture(),wall=wallTexture(facilityRecord.shortName+' · SCHEMATIC'),walls=[];
  const slab=plane(facility,0,floor,0,2*wx,2*wz,deck,-Math.PI/2);slab.name='High-bay floor';slab.userData.floorY=floor;
  function buildWall(x,z,width,yaw,name){
   const panel=new T.Group();panel.name=name;panel.position.set(x,0,z);panel.rotation.y=yaw;facility.add(panel);
@@ -75,15 +77,15 @@ export function fitOutBay(ctx){
     const z=end*depth*.84;
     cylinder(p,x,floor+footH/2,z,.115,.13,footH,dark);
     box(p,x,(bottom+postTop)/2,z,.115,postTop-bottom,.115,graphite);
-    if(cells){const puck=cylinder(p,x,postTop+cellH/2,z,.103,.103,cellH,mark);puck.name='Pedestal load cell';}
+    if(cells){const puck=cylinder(p,x,postTop+cellH/2,z,.103,.103,cellH,mark);puck.name='Pedestal load cell';if(side===1&&end===1)note('stand-load-cells','Stand load cells','Four-point weighing support',puck,88,'interface');}
    }
    tube(p,v(x,bottom,-depth*.84),v(x,postTop,depth*.84),.036,steel);
    tube(p,v(cx-width*.85,bottom,side*depth*.84),v(cx+width*.85,postTop,side*depth*.84),.036,steel);
   }
   return plate;
  }
- stand(facility,0,pedestalWidth,pedestalWidth*.74,0,true).name='Checkout bearing plate';
- if(!layout.star)stand(facility,layout.ringX,pedestalWidth,pedestalWidth*.74,0,false).name='Adapter bearing plate';
+ const checkPlate=stand(facility,0,pedestalWidth,pedestalWidth*.74,0,true);checkPlate.name='Checkout bearing plate';note('checkout-stand','Checkout stand','Ground handling / service support',checkPlate,96,'interface');
+ if(!layout.star){const adapterPlate=stand(facility,layout.ringX,pedestalWidth,pedestalWidth*.74,0,false);adapterPlate.name='Adapter bearing plate';note('adapter-stand','Adapter assembly stand','Separate flight-interface work area',adapterPlate,76);}
  // Removable checkout standoffs bypass the engine bells.
  const H=h.payloadInterface?.upperFaceStationM??h.fairing.stack.find(q=>q.part==='Insulated bus').z0M;
  for(const a of [.25,1.82,3.39,4.96]){const rr=.66;cylinder(facility,rr*Math.cos(a),H*.5,rr*Math.sin(a),.038,.055,H,steel).name='Checkout hardpoint support';}
@@ -98,14 +100,35 @@ export function fitOutBay(ctx){
    stand(f,side*.87*rim,.18*rim,.72*rim,-.12,false);
    for(const a of [.9,Math.PI/2,Math.PI-.9]){
     const shoe=box(f,side*Math.sin(a)*rim,-.06,Math.cos(a)*rim,.19,.12,.19,dark);
-    shoe.name='Fairing rim shoe';
+    shoe.name='Fairing rim shoe';if(a===Math.PI/2)note('fairing-carrier-'+side,'Fairing half carrier','Three-point ground support',shoe,75);
    }
   }
  }
  // Off-axis service cabinets and a grated platform at the hall wall give the floor physical scale.
- for(let j=0;j<4;j++){const x=(j*.16+.57)*u,z=-u*.67;box(facility,x,floor+u*.086,z,u*.12,u*.17,u*.094,graphite);box(facility,x,floor+u*.085,z+u*.052,u*.104,u*.142,u*.011,steel);box(facility,x,floor+u*.115,z+u*.064,u*.088,u*.024,u*.006,black);box(facility,x-.029*u,floor+u*.11,z+u*.068,u*.016,u*.007,u*.005,glow);}
+ for(let j=0;j<4;j++){const x=(j*.16+.57)*u,z=-u*.67,casework=box(facility,x,floor+u*.086,z,u*.12,u*.17,u*.094,graphite);casework.name=['Portable electrical GSE storage','Cleanroom support cabinet','Portable test instrumentation','Ground service equipment storage'][j];box(facility,x,floor+u*.085,z+u*.052,u*.104,u*.142,u*.011,steel);box(facility,x,floor+u*.115,z+u*.064,u*.088,u*.024,u*.006,black);box(facility,x-.029*u,floor+u*.11,z+u*.068,u*.016,u*.007,u*.005,glow);if(j===0||j===3)note('gse-storage-'+j,j?'Ground support storage':'Portable electrical GSE','Travels between processing facilities',casework,61);}
+ // Zone identity comes from the provider-specific route. These markings are
+ // explanatory work areas; the building is not a surveyed facility model.
+ const zoneColor=mat(facilityRecord.color||'#80b4b4');
+ function zoneSign(x,z,title,subtitle,id){
+  const p=new T.Group();p.name=title;facility.add(p);p.position.set(x,floor,z);
+  box(p,0,.66,0,.035,1.32,.035,iron);box(p,0,.035,0,.55,.07,.48,graphite);
+  const sign=painted(1024,256,(g,w,hh)=>{g.fillStyle='#19343e';g.fillRect(0,0,w,hh);g.fillStyle=facilityRecord.color||'#9bc8c7';g.fillRect(0,0,11,hh);g.fillStyle='#e0e9e7';g.font='600 62px sans-serif';g.fillText(title.toUpperCase(),34,96,w-68);g.font='34px monospace';g.fillStyle='#aec8ce';g.fillText(subtitle.toUpperCase(),34,178,w-68);});
+  const face=plane(p,0,1.38,.026,2.4,.60,sign);face.name=title+' sign';note(id,title,subtitle,face,59);
+ }
+ zoneSign(-Math.max(R+1.45,3.4),Math.max(R+2.4,4.5),facilityRecord.visual.processingLabel,'Processing route · schematic','processing-zone');
+ zoneSign(layout.receiverX+R+1.25,Math.max(R+1.6,4.0),facilityRecord.visual.matingLabel,facilityRecord.facilityClass==='documented'?'Launcher receiving area · schematic':'Launcher receiving area · planning','mating-zone');
+ const aisleZ=Math.max(R+3.2,6.0);
+ box(facility,(layout.ringX+layout.receiverX)/2,floor+.006,aisleZ,layout.receiverX-layout.ringX,.012,.065,zoneColor).name='Ground transfer route marking';
  const platformFront=Math.max(R*.45,h.fairing.stack[0].radiusM*1.12)*.74;
  const kit=buildBayEquipment({...ctx,floor,platformFront});
+ let processing=null,last={domain:'conops',active:false,seq:null,pose:null,commBench:'sband'};
+ function refreshEquipment(){
+  const connected=!!(last.active&&last.seq&&last.seq.seat===0&&processing&&processing.enabled!==false);
+  const state=connected?processing:null;
+  kit.select(state?.domain||last.domain,last.active,state?.commBench||last.commBench,state);
+  if(last.seq&&last.pose)kit.track(last.pose,last.seq);
+  kit.animateProcessing(state,connected);
+ }
  const eye=v(),local=v();
  function setViewFrom(camera){
   if(!facility.visible||!camera)return;
@@ -113,9 +136,13 @@ export function fitOutBay(ctx){
   for(const w of walls){local.copy(eye).sub(w.position).applyAxisAngle(v(0,1,0),-w.rotation.y);w.visible=local.z>.08;}
   roof.visible=eye.y<floor+wallH-.08;
  }
- return {...kit,...rig,layout,floorY:floor,get interfaceLabel(){return kit.portAnchor.name},setViewFrom,update(opening,domain,active,seq,pose,commBench){
+ return {...kit,...rig,layout,facilityRecord,floorY:floor,get interfaceLabel(){return kit.portAnchor.name},setViewFrom,
+  annotations:()=>[...annotations,...rig.rigAnnotations(),...kit.equipmentAnnotations()],
+  setProcessingState(state){processing=state;refreshEquipment();},
+  processingState:()=>processing?.enabled!==false&&last.active&&last.seq?.seat===0?processing:null,
+  update(opening,domain,active,seq,pose,commBench){
   fixtures.forEach(({f,side})=>{f.rotation.y=active?Math.PI/2:0;f.position.set(active?layout.ringX:side*opening*R*2.25,0,active?-side*opening*R*2.25:0);});
-  kit.select(domain,active,commBench); if(seq&&pose){kit.track(pose,seq);rig.update(seq,pose);}
+  last={domain,active,seq,pose,commBench};refreshEquipment();if(seq&&pose)rig.update(seq,pose);
 
  }};
 }

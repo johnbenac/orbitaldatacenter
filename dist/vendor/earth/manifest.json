@@ -1,0 +1,506 @@
+{
+  "schemaVersion": 1,
+  "title": "Orbital Data Center — archival NASA Earth imagery",
+  "retrieved": "2026-11-07",
+  "projection": {
+    "type": "equirectangular",
+    "longitudeDegrees": [
+      -180,
+      180
+    ],
+    "latitudeDegreesTopToBottom": [
+      90,
+      -90
+    ],
+    "origin": "northwest",
+    "columns": "west to east",
+    "rows": "north to south"
+  },
+  "license": {
+    "name": "NASA media usage guidelines; US Government imagery generally not subject to US copyright",
+    "url": "https://www.nasa.gov/nasa-brand-center/images-and-media/",
+    "svsPolicy": "https://svs.gsfc.nasa.gov/",
+    "credit": "Imagery: NASA Earth Observatory / NASA GSFC / NASA Scientific Visualization Studio",
+    "note": "NASA imagery is credited without implying NASA endorsement. No third-party commercial map imagery is included."
+  },
+  "usage": "Archival visual context, not live weather or a mission-date surface/illumination observation. Surface, cloud, city-light and geographic-water layers are separate; lighting is calculated by the renderer.",
+  "sources": {
+    "day": {
+      "file": "day-original.jpg",
+      "title": "NASA Blue Marble: Next Generation, September 2004, base map",
+      "page": "https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/base-map/",
+      "url": "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-base/september/world.200409.3x21600x10800.jpg",
+      "dimensions": [
+        21600,
+        10800
+      ],
+      "sha256": "7cf788e13a3a7b4a926b524f8f71d635c56a18c48ba0bfe35695b05a305db3f3",
+      "date": "2004-09",
+      "credit": "NASA Earth Observatory / NASA Goddard Space Flight Center; Blue Marble data courtesy of Reto Stöckli",
+      "description": "Monthly MODIS surface composite with cloud contamination removed by NASA processing. The base map has no added cloud layer, day/night terminator, atmospheric limb, or city lights."
+    },
+    "clouds": {
+      "file": "clouds-blue-marble-original.tif",
+      "title": "NASA Blue Marble: Clouds",
+      "page": "https://visibleearth.nasa.gov/images/57747/blue-marble-clouds",
+      "currentPage": "https://science.nasa.gov/earth/earth-observatory/the-blue-marble-true-color-global-imagery-at-1km-resolution/",
+      "archivedPage": "https://web.archive.org/web/20231212203633/https://visibleearth.nasa.gov/images/57747/blue-marble-clouds",
+      "url": "https://eoimages.gsfc.nasa.gov/images/imagerecords/57000/57747/cloud_combined_8192.tif",
+      "retrievedFrom": "https://web.archive.org/web/20231230035002id_/https://eoimages.gsfc.nasa.gov/images/imagerecords/57000/57747/cloud_combined_8192.tif",
+      "dimensions": [
+        8192,
+        4096
+      ],
+      "sha256": "d137775d8966ab8d443fd5126dc6e7ad72072bc1ed50555c5818d221735daf0f",
+      "date": "2002-02-11 publication; multi-day archival cloud composite",
+      "credit": "NASA Goddard Space Flight Center; cloud imagery by Reto Stöckli; enhancements by Robert Simmon; MODIS teams",
+      "description": "Original full-global NASA cloud texture: two days of visible-light imagery plus a third day of thermal-infrared imagery over the poles. This is an archival appearance layer, not live or mission-date weather. The original host returned HTTP 503 during preparation, so the exact NASA TIFF was retrieved from the Internet Archive's 2023-12-30 capture."
+    },
+    "night": {
+      "file": "night-original.jpg",
+      "title": "NASA Black Marble 2016 global night map",
+      "page": "https://science.nasa.gov/earth/earth-observatory/earth-at-night/maps/",
+      "url": "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/imagerecords/144000/144898/BlackMarble_2016_3km.jpg",
+      "dimensions": [
+        13500,
+        6750
+      ],
+      "sha256": "230aac448ae68c358be433dd518888cccb3a85ccf66f7b44326441c324ad6725",
+      "date": "2016 annual composite",
+      "credit": "NASA Earth Observatory; Suomi NPP VIIRS / Black Marble",
+      "description": "Archival composite of nighttime observations. Source includes a subdued surface background as well as illuminated settlements; the renderer controls its night-only emission."
+    },
+    "ocean": {
+      "file": "land-original.tif",
+      "title": "NASA SVS Blue Marble land layer, high-resolution monsoon layers",
+      "page": "https://svs.gsfc.nasa.gov/4439/",
+      "url": "https://svs.gsfc.nasa.gov/vis/a000000/a004400/a004439/flat_bluemarble_8192x4096.tif",
+      "dimensions": [
+        8192,
+        4096
+      ],
+      "sha256": "87053cd6e5c3408c3a4c8fcd302538057b98f177e283b66bd0ee8e4bd7a95a51",
+      "date": "2016-06-23 publication; static Blue Marble land layer",
+      "credit": "NASA Goddard Space Flight Center Scientific Visualization Studio; Blue Marble",
+      "description": "Ocean mask is the inverted alpha channel of NASA's RGBA land layer, resampled with Lanczos. No color threshold or invented coastline is used. White denotes water, black denotes land; coastal pixels are antialiased. This is a geographic surface mask, not a dynamic sea-ice product."
+    }
+  },
+  "layers": {
+    "dayPreview": "day-1k.jpg",
+    "dayBase": "day-4k.jpg",
+    "dayDetail": {
+      "pathPattern": "day-16k/c{column}-r{row}.jpg",
+      "globalWidth": 16384,
+      "globalHeight": 8192,
+      "columns": 8,
+      "rows": 4,
+      "interiorPixels": 2048,
+      "borderPixels": 2,
+      "fileWidth": 2052,
+      "fileHeight": 2052,
+      "borderRule": "Horizontal wrap across antimeridian; vertical clamp at poles",
+      "interiorUvRange": [
+        0.0009746588693957114,
+        0.9990253411306043
+      ]
+    },
+    "cloudsBase": "clouds-4k.jpg",
+    "cloudsDetail": "clouds-8k.jpg",
+    "cloudsInterpretation": "Linear data: black transparent, white opaque; archived multi-day cloud composite with global polar coverage",
+    "night": "night-4k.jpg",
+    "ocean": "ocean-2k.png",
+    "oceanInterpretation": "Linear data: black land, white water; antialiased geographic coastline, not sea-ice state"
+  },
+  "preparation": {
+    "script": "scripts/prepare-earth-assets.py",
+    "resampling": "Lanczos",
+    "dayJpegQuality": 93,
+    "dayBaseAndNightJpegQuality": 94,
+    "previewAndCloudJpegQuality": 90,
+    "chromaSubsampling": "4:4:4 (none); cloud maps are grayscale",
+    "processing": "Resize, crop, pad, grayscale cloud conversion and land-alpha inversion only; no generated detail, sharpening, recoloring or cloud fabrication"
+  },
+  "totalImageBytes": 31691175,
+  "files": [
+    {
+      "path": "clouds-4k.jpg",
+      "width": 4096,
+      "height": 2048,
+      "mode": "L",
+      "bytes": 2543034,
+      "sha256": "3954ad24430b4cbb3c237d1958358c18deb4947082124d8cd3569b0feb97f277",
+      "source": "clouds",
+      "colorSpace": "linear-data"
+    },
+    {
+      "path": "clouds-8k.jpg",
+      "width": 8192,
+      "height": 4096,
+      "mode": "L",
+      "bytes": 8669718,
+      "sha256": "a10799f591ef3fd1e8fe9de4b7d6086ff398a85cc46e64c69c2bec808b90ba32",
+      "source": "clouds",
+      "colorSpace": "linear-data"
+    },
+    {
+      "path": "day-16k/c0-r0.jpg",
+      "width": 2052,
+      "height": 2052,
+      "mode": "RGB",
+      "bytes": 550069,
+      "sha256": "cd17afdf1fb3d8a254d47795fb71029f90222de3ad5398d2ad0155c7682ccfae",
+      "source": "day",
+      "colorSpace": "sRGB"
+    },
+    {
+      "path": "day-16k/c0-r1.jpg",
+      "width": 2052,
+      "height": 2052,
+      "mode": "RGB",
+      "bytes": 56899,
+      "sha256": "c2fa07cddb4450238d0c10aed70c1cc7c7586737edf8dd2870adca7b6a5ff041",
+      "source": "day",
+      "colorSpace": "sRGB"
+    },
+    {
+      "path": "day-16k/c0-r2.jpg",
+      "width": 2052,
+      "height": 2052,
+      "mode": "RGB",
+      "bytes": 69951,
+      "sha256": "a92bd00449f9a65642b29561c0fba3b87d4cf132bdbf908b584433be4553ff17",
+      "source": "day",
+      "colorSpace": "sRGB"
+    },
+    {
+      "path": "day-16k/c0-r3.jpg",
+      "width": 2052,
+      "height": 2052,
+      "mode": "RGB",
+      "bytes": 296266,
+      "sha256": "797c160853232ea42f00ce4ef94cb02fbcce5cebea3da70c7aa6981eedbacc09",
+      "source": "day",
+      "colorSpace": "sRGB"
+    },
+    {
+      "path": "day-16k/c1-r0.jpg",
+      "width": 2052,
+      "height": 2052,
+      "mode": "RGB",
+      "bytes": 1051426,
+      "sha256": "7d6d2ceca28be3abfc50f62f2847f8b5f900167d924af4c2b3b9c0bee53ed3b4",
+      "source": "day",
+      "colorSpace": "sRGB"
+    },
+    {
+      "path": "day-16k/c1-r1.jpg",
+      "width": 2052,
+      "height": 2052,
+      "mode": "RGB",
+      "bytes": 570546,
+      "sha256": "16728705e84f0eb18ef844c87470fd61a5561c5906ec681abbe4f31ea4fc9c7f",
+      "source": "day",
+      "colorSpace": "sRGB"
+    },
+    {
+      "path": "day-16k/c1-r2.jpg",
+      "width": 2052,
+      "height": 2052,
+      "mode": "RGB",
+      "bytes": 52512,
+      "sha256": "4fd8e2aa36fe12a168a143ef42b66720c55cf520391f978eff6ff6397c5c4818",
+      "source": "day",
+      "colorSpace": "sRGB"
+    },
+    {
+      "path": "day-16k/c1-r3.jpg",
+      "width": 2052,
+      "height": 2052,
+      "mode": "RGB",
+      "bytes": 372159,
+      "sha256": "6f0810c02720426fde7c5d932e7957bc1b1e144e39d6f3873136b26bc1cb7b7f",
+      "source": "day",
+      "colorSpace": "sRGB"
+    },
+    {
+      "path": "day-16k/c2-r0.jpg",
+      "width": 2052,
+      "height": 2052,
+      "mode": "RGB",
+      "bytes": 842874,
+      "sha256": "c5812ccf83193e5d232a5f3bde0d5dd8ba24b3a9cf9db15304a584fe8e2349d7",
+      "source": "day",
+      "colorSpace": "sRGB"
+    },
+    {
+      "path": "day-16k/c2-r1.jpg",
+      "width": 2052,
+      "height": 2052,
+      "mode": "RGB",
+      "bytes": 487898,
+      "sha256": "04cb72ae5be10f8d1b44bfe5eb353d830fc41830a189351f1ebc54a519590dbe",
+      "source": "day",
+      "colorSpace": "sRGB"
+    },
+    {
+      "path": "day-16k/c2-r2.jpg",
+      "width": 2052,
+      "height": 2052,
+      "mode": "RGB",
+      "bytes": 833307,
+      "sha256": "415e519251ddc4d1868fe2aa08cf6c9605b7377f510ac22b18bafa2adf34e7a0",
+      "source": "day",
+      "colorSpace": "sRGB"
+    },
+    {
+      "path": "day-16k/c2-r3.jpg",
+      "width": 2052,
+      "height": 2052,
+      "mode": "RGB",
+      "bytes": 553310,
+      "sha256": "f48220aa4b07058d829c06f0b31efda41625eae1b15867d2e22766833354d76b",
+      "source": "day",
+      "colorSpace": "sRGB"
+    },
+    {
+      "path": "day-16k/c3-r0.jpg",
+      "width": 2052,
+      "height": 2052,
+      "mode": "RGB",
+      "bytes": 393500,
+      "sha256": "58c3f9f0e93acf3c033fceb48b0d9a155195c66e17ea6c57c5e746a611cd9f72",
+      "source": "day",
+      "colorSpace": "sRGB"
+    },
+    {
+      "path": "day-16k/c3-r1.jpg",
+      "width": 2052,
+      "height": 2052,
+      "mode": "RGB",
+      "bytes": 374006,
+      "sha256": "b62c504bf70c6690403b8013a9d7dec317b5833e050c485d5bec88cc31d507d2",
+      "source": "day",
+      "colorSpace": "sRGB"
+    },
+    {
+      "path": "day-16k/c3-r2.jpg",
+      "width": 2052,
+      "height": 2052,
+      "mode": "RGB",
+      "bytes": 174380,
+      "sha256": "ceecf9b67ab0557a76065361ebb7a1245f9491dc27e62a6b250ccaec2e64af43",
+      "source": "day",
+      "colorSpace": "sRGB"
+    },
+    {
+      "path": "day-16k/c3-r3.jpg",
+      "width": 2052,
+      "height": 2052,
+      "mode": "RGB",
+      "bytes": 352926,
+      "sha256": "b5aa9b491f403c665d0620ea52f61faa3f198eb6d8ac79e26c03e9a3f940b76c",
+      "source": "day",
+      "colorSpace": "sRGB"
+    },
+    {
+      "path": "day-16k/c4-r0.jpg",
+      "width": 2052,
+      "height": 2052,
+      "mode": "RGB",
+      "bytes": 883815,
+      "sha256": "2106340353f5b6c1f34a58c540f19ab2503b888c0ab2f803fd63bef7fb927f43",
+      "source": "day",
+      "colorSpace": "sRGB"
+    },
+    {
+      "path": "day-16k/c4-r1.jpg",
+      "width": 2052,
+      "height": 2052,
+      "mode": "RGB",
+      "bytes": 1151632,
+      "sha256": "4623e619fe967a2b9b0c5007a584d540ac43d9899d0e4d5b2e89dc0bc7070927",
+      "source": "day",
+      "colorSpace": "sRGB"
+    },
+    {
+      "path": "day-16k/c4-r2.jpg",
+      "width": 2052,
+      "height": 2052,
+      "mode": "RGB",
+      "bytes": 599669,
+      "sha256": "b9798bd9db93c9fc75e60fa80fd754913caf1d2d6c261ff79d289a930a29e8de",
+      "source": "day",
+      "colorSpace": "sRGB"
+    },
+    {
+      "path": "day-16k/c4-r3.jpg",
+      "width": 2052,
+      "height": 2052,
+      "mode": "RGB",
+      "bytes": 373910,
+      "sha256": "a00f26d4b07288bb998fc04b35e2cfe20d6483ca8003a276459a6072b9a5beb4",
+      "source": "day",
+      "colorSpace": "sRGB"
+    },
+    {
+      "path": "day-16k/c5-r0.jpg",
+      "width": 2052,
+      "height": 2052,
+      "mode": "RGB",
+      "bytes": 1181534,
+      "sha256": "8097327a62cbaa8a2d65e34e335385aa71c81d1624ea800eab78e984bd3f727e",
+      "source": "day",
+      "colorSpace": "sRGB"
+    },
+    {
+      "path": "day-16k/c5-r1.jpg",
+      "width": 2052,
+      "height": 2052,
+      "mode": "RGB",
+      "bytes": 998108,
+      "sha256": "237122366e1dc951c3a2085bc907ea535198b5106f436fba158cc8927da3e92e",
+      "source": "day",
+      "colorSpace": "sRGB"
+    },
+    {
+      "path": "day-16k/c5-r2.jpg",
+      "width": 2052,
+      "height": 2052,
+      "mode": "RGB",
+      "bytes": 97795,
+      "sha256": "4d3a23e393b5cbf3d4edce6745f04a6549cebd5ac1f0e6e227272cad9ada3119",
+      "source": "day",
+      "colorSpace": "sRGB"
+    },
+    {
+      "path": "day-16k/c5-r3.jpg",
+      "width": 2052,
+      "height": 2052,
+      "mode": "RGB",
+      "bytes": 435797,
+      "sha256": "d9f41c776aa64009676177c5a8102d99f631519ded4711962e49a5fc19a367d9",
+      "source": "day",
+      "colorSpace": "sRGB"
+    },
+    {
+      "path": "day-16k/c6-r0.jpg",
+      "width": 2052,
+      "height": 2052,
+      "mode": "RGB",
+      "bytes": 1200254,
+      "sha256": "66497b6c994efe5e1d75456021ae6631e69c6ec255e8ef77cb53182e2c2981df",
+      "source": "day",
+      "colorSpace": "sRGB"
+    },
+    {
+      "path": "day-16k/c6-r1.jpg",
+      "width": 2052,
+      "height": 2052,
+      "mode": "RGB",
+      "bytes": 950298,
+      "sha256": "fbb968e9edb7202025b5cc87839fca85d75b8208940e491d49ed3a31b4af6785",
+      "source": "day",
+      "colorSpace": "sRGB"
+    },
+    {
+      "path": "day-16k/c6-r2.jpg",
+      "width": 2052,
+      "height": 2052,
+      "mode": "RGB",
+      "bytes": 446587,
+      "sha256": "c23b4ebe7a3301e775f1469a2e445dafe80a2cf3eb11d9b961e387147a385376",
+      "source": "day",
+      "colorSpace": "sRGB"
+    },
+    {
+      "path": "day-16k/c6-r3.jpg",
+      "width": 2052,
+      "height": 2052,
+      "mode": "RGB",
+      "bytes": 388597,
+      "sha256": "8769547206b9c8956fe92396f95a139ce8e28d5613bc6680c2abea02555529c3",
+      "source": "day",
+      "colorSpace": "sRGB"
+    },
+    {
+      "path": "day-16k/c7-r0.jpg",
+      "width": 2052,
+      "height": 2052,
+      "mode": "RGB",
+      "bytes": 800182,
+      "sha256": "67d594284240e4a189d1e2a2a1d959502921e162f5c209f39aa80509163d0445",
+      "source": "day",
+      "colorSpace": "sRGB"
+    },
+    {
+      "path": "day-16k/c7-r1.jpg",
+      "width": 2052,
+      "height": 2052,
+      "mode": "RGB",
+      "bytes": 97125,
+      "sha256": "e3f5527cc47ae7dc76cc6629c47185561a48c75477db351b6dc23ab81241bc77",
+      "source": "day",
+      "colorSpace": "sRGB"
+    },
+    {
+      "path": "day-16k/c7-r2.jpg",
+      "width": 2052,
+      "height": 2052,
+      "mode": "RGB",
+      "bytes": 493992,
+      "sha256": "96a5afbbb1013d3b68b66f347caf8ddb1e92943b28c67c96e3897cccf960ed6e",
+      "source": "day",
+      "colorSpace": "sRGB"
+    },
+    {
+      "path": "day-16k/c7-r3.jpg",
+      "width": 2052,
+      "height": 2052,
+      "mode": "RGB",
+      "bytes": 564888,
+      "sha256": "d2e74398654992e1143f412d6ffc8a944b05e921ed6087f7595cdf03c1e13b85",
+      "source": "day",
+      "colorSpace": "sRGB"
+    },
+    {
+      "path": "day-1k.jpg",
+      "width": 1024,
+      "height": 512,
+      "mode": "RGB",
+      "bytes": 100292,
+      "sha256": "9d1ec054b6802ce313e70cb9942b7ab929d3ad4f1c1c2ff838697442d56849b6",
+      "source": "day",
+      "colorSpace": "sRGB"
+    },
+    {
+      "path": "day-4k.jpg",
+      "width": 4096,
+      "height": 2048,
+      "mode": "RGB",
+      "bytes": 1568129,
+      "sha256": "d45b80801bc3a6b9b883dd85f4fb1fc451c997105d740adfe71bb24172c375bd",
+      "source": "day",
+      "colorSpace": "sRGB"
+    },
+    {
+      "path": "night-4k.jpg",
+      "width": 4096,
+      "height": 2048,
+      "mode": "RGB",
+      "bytes": 966928,
+      "sha256": "81757e5288e3d16514e8034524483a204bc114d750e0950d898978b390f8afca",
+      "source": "night",
+      "colorSpace": "sRGB"
+    },
+    {
+      "path": "ocean-2k.png",
+      "width": 2048,
+      "height": 1024,
+      "mode": "L",
+      "bytes": 146862,
+      "sha256": "d56d7b5d40648c33b5b15ca340e232255b61e04a581ddc0ae2701e81f05139ee",
+      "source": "ocean",
+      "colorSpace": "linear-data"
+    }
+  ]
+}

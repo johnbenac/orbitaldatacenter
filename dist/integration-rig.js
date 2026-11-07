@@ -54,6 +54,7 @@ export function buildIntegrationRig(ctx){
  const {facility,layout:g,h,box,tube,cylinder,steel,rib,dark,black,mat}=ctx;
  const {star,horizontal,radius:r,space,receiverX:x,ringX,portY,craneY,floor}=g;
  const mark=mat('#d7a44f'),beam=mat('#476a78',.32),slate=mat('#324852'),warning=mat('#e2bd6a');
+ const annotations=[],note=(id,title,detail,anchor,priority=65,lens=null)=>annotations.push({id,title,detail,anchor,kind:'facility',priority,lens});
  const attach=name=>{const o=new T.Group();o.name=name;facility.add(o);return o};
  const ground=attach(g.record.facility),rig=attach('Traveling bridge and lifting rig');
  const east=horizontal?g.roomHalfX-1:x+r*2.3,west=ringX-r*2.5,near=r+3,far=-space-r*1.4;
@@ -64,12 +65,13 @@ export function buildIntegrationRig(ctx){
   }
   box(ground,xx,craneY,(near+far)/2,.44,.54,near-far,slate);
  }
- const bridge=new T.Group();rig.add(bridge);
- for(const dz of [-.30,.30])box(bridge,(east+west)/2,craneY+.31,dz,east-west,.47,.28,mark);
+ const bridge=new T.Group();bridge.name='Traveling crane bridge';rig.add(bridge);
+ for(const dz of [-.30,.30]){const girder=box(bridge,(east+west)/2,craneY+.31,dz,east-west,.47,.28,mark);girder.name='Bridge crane girder';if(dz>0)note('bridge-crane','Bridge crane','Facility lifting system',girder,71);}
  const traveler=new T.Group();bridge.add(traveler);
- box(traveler,0,craneY+.47,0,1.55,.70,1.35,beam);
+ const trolley=box(traveler,0,craneY+.47,0,1.55,.70,1.35,beam);trolley.name='Crane traveling hoist';note('crane-hoist','Traveling hoist','Follows the handling load',trolley,77);
  const yoke=new T.Group();rig.add(yoke);
  const beamHead=box(yoke,0,0,0,1,.14,.17,warning);
+ beamHead.name='Load-spreading lifting yoke';note('lifting-yoke','Lifting yoke','Ground lifting fixture',beamHead,117,'payload');
  const fixture=attach('Removable payload lifting frame'),bus=h.fairing.stack.find(q=>q.part==='Insulated bus');
  const busY=bus.z0M+h.bodyLengthM-.15,outer=Math.max(h.stowedDiameterM*.52,h.bodyHeightM*.59);
  for(const side of [-1,1]){
@@ -95,7 +97,7 @@ export function buildIntegrationRig(ctx){
     const zz=sign*r*.67,top=portY-r*.74;
     box(rack,xx,(floor+top)/2,zz,.42,top-floor,.35,beam);
     tube(rack,V(xx,floor+.1,sign*.15),V(xx,top,zz),.09,steel);
-    box(rack,xx,top-.08,zz,.82,.16,.45,dark);
+    const pad=box(rack,xx,top-.08,zz,.82,.16,.45,dark);pad.name='Upper-stage cradle contact pad';if(j===.26&&sign===1)note('receiving-cradle','Upper-stage cradle','Horizontal integration support',pad,83);
    }
   }
   // Upending strongback rolls from the cleanroom interface to the stage.
@@ -115,7 +117,7 @@ export function buildIntegrationRig(ctx){
   for(const sx of [-1,1])for(const sz of [-1,1])box(rack,sideX+sx*1.15,(floor+top)/2,iz+sz*1.45,.19,top-floor,.19,beam);
   for(let j=1;j<=levels;j++){
    const y=floor+(top-floor)*j/(levels+1);
-   box(rack,sideX,y,iz,3,.20,3.7,steel);
+   const deck=box(rack,sideX,y,iz,3,.20,3.7,steel);deck.name='Receiving service platform';if(j===1)note('service-platform','Receiving work platform','Facility access equipment',deck,70);
    for(const zz of [-1.6,1.6]){
     box(rack,sideX,y+1,iz+zz,3,.065,.065,mark);
     for(const xx of [-1.4,0,1.4])box(rack,sideX+xx,y+.5,iz+zz,.055,1,.055,mark);
@@ -158,7 +160,7 @@ export function buildIntegrationRig(ctx){
    const lo=outerX-.75,z=sign*w;
    box(dock,(lo+innerX)/2,top-.16,z,innerX-lo+.3,.21,.15,steel);
    for(const xx of [outerX-.68,outerX+.68,innerX-.12]){
-    const roller=cylinder(dock,xx,top-.075,z,.075,.075,.13,warning,'pad',16);roller.rotation.x=Math.PI/2;roller.name='Ground load bridge roller';
+    const roller=cylinder(dock,xx,top-.075,z,.075,.075,.13,warning,'pad',16);roller.rotation.x=Math.PI/2;roller.name='Ground load bridge roller';if(sign===1&&xx===outerX+.68)note('cargo-load-bridge','Cargo load bridge','Ground-supported carriage berth',roller,88);
    }
    for(let k=0;k<levels;k++){
     const y0=floor+(top-.25-floor)*k/levels,y1=floor+(top-.25-floor)*(k+1)/levels;
@@ -176,11 +178,11 @@ export function buildIntegrationRig(ctx){
    const xx=-g.capH*j,zz=side*r*.62,H=portY-r*.82-floor;
    box(moving,xx,floor+H*.5,zz,.36,H,.29,beam);
    cylinder(moving,xx,floor+.16,zz,.16,.16,.12,black,'pad',12).rotation.x=Math.PI/2;
-   box(moving,xx,portY-r*.82-.08,zz,.9,.16,.4,dark);
+   const saddle=box(moving,xx,portY-r*.82-.08,zz,.9,.16,.4,dark);saddle.name='Transport support saddle';if(j===.18&&side===1)note('transfer-support','Transfer support','Moves with encapsulated payload',saddle,95);
   }
  }
  if(!horizontal&&!star){
-  const topY=1.10;box(moving,0,topY-.1,0,1.82*r,.20,1.82*r,beam);
+  const topY=1.10,deck=box(moving,0,topY-.1,0,1.82*r,.20,1.82*r,beam);deck.name='Payload transporter deck';note('transfer-support','Payload transporter','Ground transfer support',deck,95);
   for(const k of [-1,1])for(const j of [-1,1]){
    const xx=k*r*.66,zz=j*r*.76;
    box(moving,xx,(topY+floor)/2,zz,.19,topY-floor-.18,.22,steel);
@@ -228,5 +230,5 @@ export function buildIntegrationRig(ctx){
    cable(ropes[i],V(tip.x,craneY+.29,tip.z+sign*.29),Q);cable(ropes[i+2],Q,support[i]);}
   handlingAnchor.position.copy(tip);
  }
- return {receiverAnchor,handlingAnchor,update};
+ return {receiverAnchor,handlingAnchor,rigAnnotations:()=>annotations,update};
 }

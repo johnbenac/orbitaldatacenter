@@ -1,36 +1,36 @@
 {
   "release": "site",
-  "source_commit": "96afad81b656852d168e678cd424c5723d048f7c",
-  "index_sha256": "5aabe86fea40ec66ebf1a9f444f603cb898aacb9f4d3fde58483148909cd1fda",
+  "source_commit": "c9a3c75a267c04dac5912b9080d5e81d1dafabb7",
+  "index_sha256": "c7916d868b40680222ddc253ea3ad6e759caef16fe385f3f1d383cd1330f9016",
   "project": "orbitaldatacenter",
   "deployment": {
-    "id": "4a913380-bf08-423b-8d77-25223abbafa4",
-    "short_id": "4a913380",
+    "id": "6cb726f6-7cd2-412f-9a70-27191dac58ea",
+    "short_id": "6cb726f6",
     "project_id": "8cfed813-a5e3-48d5-9451-47e81b01d88f",
     "project_name": "orbitaldatacenter",
     "environment": "production",
-    "url": "https://4a913380.orbitaldatacenter-2o2.pages.dev",
-    "created_on": "2026-11-07T19:44:48.881437Z",
-    "modified_on": "2026-11-07T19:44:50.537483Z",
+    "url": "https://6cb726f6.orbitaldatacenter-2o2.pages.dev",
+    "created_on": "2026-11-08T00:36:12.737174Z",
+    "modified_on": "2026-11-08T00:36:14.465202Z",
     "latest_stage": {
       "name": "deploy",
       "started_on": null,
-      "ended_on": "2026-11-07T19:44:50.537483Z",
+      "ended_on": "2026-11-08T00:36:14.465202Z",
       "status": "success"
     },
     "deployment_trigger": {
       "type": "ad_hoc",
       "metadata": {
         "branch": "main",
-        "commit_hash": "96afad81b656852d168e678cd424c5723d048f7c",
-        "commit_message": "feat(release): import upstream v56 from split archive\r\n\r\nJoin both Downloads parts and retain source checksums and upstream provenance.\r\nImport new material assets, documentation and packaging tools without application patches.\r\n\r\nPreserve AGPLv3, the author footer and Blender sharing card. Verify 16 integration\r\ntests, all listed assets, JavaScript syntax and desktop/mobile browse\n\n[commit_message truncated]",
+        "commit_hash": "c9a3c75a267c04dac5912b9080d5e81d1dafabb7",
+        "commit_message": "feat(release): import upstream v63 from split archive\r\n\r\nImport both v63 archive parts with recorded SHA-256 provenance. Preserve local author links,\r\nfloating footer, social artwork and deployment configuration through the existing assembly workflow.\r\n\r\nMap the reviewed upstream documentation and screenshots explicitly. Verify archive integrity,\r\n2648 source files, 2469 assets, 20\n\n[commit_message truncated]",
         "commit_dirty": true
       }
     },
     "stages": [
       {
         "name": "queued",
-        "started_on": "2026-11-07T19:44:48.881437Z",
+        "started_on": "2026-11-08T00:36:12.737174Z",
         "ended_on": null,
         "status": "active"
       },
@@ -55,7 +55,7 @@
       {
         "name": "deploy",
         "started_on": null,
-        "ended_on": "2026-11-07T19:44:50.537483Z",
+        "ended_on": "2026-11-08T00:36:14.465202Z",
         "status": "success"
       }
     ],

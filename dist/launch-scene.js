@@ -34,7 +34,7 @@ function shellBands(section,begin,angle,n=Math.ceil(64*angle/Math.PI)){
  }
  const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(vertices,3));g.setAttribute('normal',new T.Float32BufferAttribute(normals,3));g.setAttribute('uv',new T.Float32BufferAttribute(uv,2));g.setIndex(indices);return g;
 }
-export function makeLaunch(h,repaint){
+export function makeLaunch(h,repaint,{environment=true}={}){
  const root=new T.Group(), stage=group(root,'launcher'), lower=group(stage,'launcher'), upper=group(stage,'launcher'),
  payload=group(stage,'payload'), shell=group(stage,'fairing'), facility=group(root,'pad'), tower=group(root,'pad');
  const livery=createLaunchLivery(h.input.launcher,repaint),bodyFinish=livery.surface(livery.record.finish),whiteFinish=livery.surface('paint'),compositeFinish=livery.surface('composite');
@@ -256,7 +256,7 @@ export function makeLaunch(h,repaint){
  const merged=star?makeExhaust(lower,0,baseY-4.8,0,baseR*.88,fuel.core,true):null;
  const wake=buildAscentWake([[lower,baseY,baseR,fuel.core,'ignition'],...boosters.map(({br,rb})=>[br,0,rb,fuel.booster,'boosterPower'])]);
  const coreMounts=[{x:0,z:0,r:baseR,part:lower,localBase:baseY},...boosters.map(({br,rb})=>({x:br.position.x,z:br.position.z,r:rb,part:br,localBase:0}))];
- const ground=buildLaunchGround(site,{tower,coreMounts,baseR,baseY,allH,fleet,box,tube,mesh,cylinder,mat,steel,rib,dark,gold,black,repaint});
+ const ground=buildLaunchGround(site,{tower,coreMounts,baseR,baseY,allH,fleet,box,tube,mesh,cylinder,mat,steel,rib,dark,gold,black,repaint,includeEnvironment:environment});
  const layout=integrationLayout(h,record,single?stage1:stage2,capH);
  const bay=fitOutBay({facility,tower,halves,unit,R,baseR,baseY,maxH,h,profile,layout,box,tube,mesh,cylinder,mat,steel,rib,dark,gold,black});
  const umbilicals=buildLaunchUmbilicals({design:launchUmbilicalDesign(h),site,tower,parts:{lower,upper,boosters:boosters.map(q=>q.br),payload,shell,fitting},

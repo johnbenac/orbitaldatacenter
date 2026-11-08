@@ -16,7 +16,10 @@ const craft=makeCraft(h),skin=focusHardware(craft.root),normal=new Map();
 craft.root.traverse(o=>{if(o.isMesh)normal.set(o,o.material);});
 for(const domain of Object.keys(domainSceneSpecs))for(const phase of ['C','D','E']){
  const view=recommendedDomainCamera(phase,domain),s=phase==='D'?packed:active;skin.apply(domain);
- const marks=domainInstruments(domain,h,s,{view});assert(marks.length>=1,phase+'/'+domain+' empty instruments');
+ const marks=domainInstruments(domain,h,s,{view});
+ const missionView=['compute','conops'].includes(domain)&&['spacecraft','core'].includes(view);
+ if(missionView)assert.deepEqual(marks,[],phase+'/'+domain+' mission results stay outside the 3D hardware view');
+ else assert(marks.length>=1,phase+'/'+domain+' empty instruments');
  assert(!marks.some(q=>/undefined|NaN/.test(q.title+' '+q.value)));if(domain!=='thermal')assert(!marks.some(q=>/\bjunction|cold plate|coolant|\d K\b/i.test(q.title+' '+q.value)),domain+' stray temperature');
  if(phase==='D')assert.equal(view,domain==='orbit'?'orbit':'launch');
  if(domain==='data'){for(const [o] of normal){if(['storage','avionics','communications'].includes(hardwarePart(o)))assert(!o.material.userData.domainGhost);if(['battery','cmg','solar','radiator'].includes(hardwarePart(o)))assert(o.material.userData.domainGhost);}}

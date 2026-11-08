@@ -1,0 +1,74 @@
+[
+  {
+    "id": "redwire-8kw",
+    "name": "Redwire 8 kW compute node",
+    "recipe_revision": "odc-study-2026-11-r2",
+    "architecture_family": "redwire-platform",
+    "source_case_altitude_km": 1500,
+    "mesh_count": 179,
+    "texture_count": 54,
+    "export_sha256": "baed9d90452e050b2df56e26781a8615e7c1b3e1cc705768b4d215d6d548aaf2",
+    "source_commit": "ce1096c3669380375ad08748c81b78d83f953dbf",
+    "modeled_solar_span_m": 43.82679308453323
+  },
+  {
+    "id": "starcloud-3",
+    "name": "Starcloud-3",
+    "recipe_revision": "odc-study-2026-11-r2",
+    "architecture_family": "starcloud-inline",
+    "source_case_altitude_km": 700,
+    "mesh_count": 350,
+    "texture_count": 51,
+    "export_sha256": "738adf9de79e8933de08da6b2ca63b89ec47f8c056367212f4bead635657791f",
+    "source_commit": "ce1096c3669380375ad08748c81b78d83f953dbf",
+    "modeled_solar_span_m": 239.38776323137162
+  },
+  {
+    "id": "starmind-ai1",
+    "name": "SpaceX Starmind AI1",
+    "recipe_revision": "odc-study-2026-11-r2",
+    "architecture_family": "starmind-cross",
+    "source_case_altitude_km": 550,
+    "mesh_count": 351,
+    "texture_count": 48,
+    "export_sha256": "7b7fb9959000a8a39b3e82aace5607c9ea8155a68ca5069ff7893a556bd4f52a",
+    "source_commit": "ce1096c3669380375ad08748c81b78d83f953dbf",
+    "modeled_solar_span_m": 75
+  },
+  {
+    "id": "orbital-1-202609",
+    "name": "Orbital-1 / Reflex",
+    "recipe_revision": "odc-study-2026-11-r2",
+    "architecture_family": "orbital-reflex",
+    "source_case_altitude_km": 650,
+    "mesh_count": 372,
+    "texture_count": 51,
+    "export_sha256": "362f22958e7b5ab89f507951e553928c64a337c5baa59b38752c4c93df961b1b",
+    "source_commit": "ce1096c3669380375ad08748c81b78d83f953dbf",
+    "modeled_solar_span_m": 351.6626718578161
+  },
+  {
+    "id": "orbital-1-202606",
+    "name": "Orbital June reference",
+    "recipe_revision": "odc-study-2026-11-r2",
+    "architecture_family": "orbital-rack",
+    "source_case_altitude_km": 650,
+    "mesh_count": 292,
+    "texture_count": 51,
+    "export_sha256": "9fb3d6e16de1e40a8c21c84147ba2775dd76e7a7c540ebe62d82adf4b83bab2f",
+    "source_commit": "ce1096c3669380375ad08748c81b78d83f953dbf",
+    "modeled_solar_span_m": 100
+  },
+  {
+    "id": "star-catcher-self-powered",
+    "name": "Star Catcher self-powered node model",
+    "recipe_revision": "odc-study-2026-11-r2",
+    "architecture_family": "heatlift-study",
+    "source_case_altitude_km": 550,
+    "mesh_count": 390,
+    "texture_count": 51,
+    "export_sha256": "067af3590a5911a391d0b77f40b5d2a9c7e041bbfc1e32e6aac08e51998abdbc",
+    "source_commit": "ce1096c3669380375ad08748c81b78d83f953dbf",
+    "modeled_solar_span_m": 214.17391670651568
+  }
+]

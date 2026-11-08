@@ -1,0 +1,9 @@
+.scene-part-menu{position:absolute;z-index:18;display:flex;flex-direction:column;box-sizing:border-box;padding:7px;border:1px solid #6a858d;border-radius:9px;background:#13222bf5;box-shadow:0 8px 28px #0008;overflow:auto;color:#e9eff0;font:12px/1.45 system-ui,sans-serif;pointer-events:auto;overscroll-behavior:contain;scrollbar-width:thin}
+.scene-part-menu[hidden]{display:none}
+.scene-part-menu-title{margin:0;padding:6px 8px 4px;font-size:13px;font-weight:650;overflow-wrap:anywhere}
+.scene-part-menu-detail{margin:0;padding:0 8px 7px;color:#9db8c2;font-size:10px;overflow-wrap:anywhere}
+.scene-part-menu-action{display:block;width:100%;padding:10px 9px;min-height:40px;border:1px solid transparent;border-radius:5px;background:transparent;color:#d7e8e8;text-align:left;font:inherit;cursor:pointer;white-space:normal}
+.scene-part-menu-action:hover{background:#29404a;color:#fff}
+.scene-part-menu-action:focus-visible{outline:2px solid #a6d8ce;outline-offset:-2px;background:#253b44}
+.scene-part-menu-action[data-scene-part-action="part"]{margin-top:4px;border-top-color:#40555f;color:#aee3d6;font-weight:600}
+@media(pointer:coarse){.scene-part-menu-action{min-height:44px}}

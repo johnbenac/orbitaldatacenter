@@ -9,7 +9,7 @@ const historyDomains=new Set(['conops','orbit','attitude','software','comm','the
 export function activePointing(v,s){
  return ['C','D','E','F'].includes(v.phase)&&s.t>=540&&!s.orbitLost&&!s.referenceBody&&!(s.spacecraftModelEndedAt!=null&&s.t>=s.spacecraftModelEndedAt);
 }
-const frameName=v=>v.cameraTracking==='sun-velocity'?'Sun–velocity view':v.cameraTracking==='manual'?'Your view · follows spacecraft':v.camera==='orbit'?'Earth-centered view':v.camera==='spacecraft'&&!(v.chapter==='commissioning'&&v.deploymentLens!=='vehicle')?'Local orbital frame':v.camera==='launch'?'Launch camera':'Body-following camera';
+const frameName=v=>v.cameraTracking==='sun-velocity'?'Sun–velocity view':v.cameraTracking==='orbit'?'Local orbital frame':v.cameraTracking==='body'?'Spacecraft body frame':v.cameraTracking==='inertial'?'Inertial frame':v.cameraTracking==='manual'?'Your view · follows spacecraft':v.camera==='orbit'?'Earth-centered view':v.camera==='spacecraft'&&!(v.chapter==='commissioning'&&v.deploymentLens!=='vehicle')?'Local orbital frame':v.camera==='launch'?'Launch camera':'Body-following camera';
 const gaugeIcons={
  solar:'<path d="M4 11h4m16 0h4M7 5l3 2m11 0 3-2"/><path d="M4 18h24v4H4zM9 18v4m5-4v4m5-4v4m5-4v4" class="pointer"/>',
  radiator:'<path d="M3 22h11l2-3"/><path d="M6 15h20v4H6zM10 15v4m4-4v4m4-4v4m4-4v4" class="pointer"/>',

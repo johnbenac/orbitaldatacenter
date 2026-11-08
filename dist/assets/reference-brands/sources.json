@@ -1,0 +1,149 @@
+{
+  "schema": "odc-reference-brand-assets/1",
+  "retrieved": "2026-11-07",
+  "policy": "Only original verified identity assets. Mission names remain plain interface text unless a separate official mission logo is verified. Generic unassociated concepts use the John Benac monogram. Company-associated analytical studies retain their company attribution.",
+  "missionLogoReview": {
+    "references": [
+      "redwire-8kw",
+      "starcloud-3",
+      "starmind-ai1",
+      "orbital-1-202609",
+      "orbital-1-202606",
+      "star-catcher-self-powered"
+    ],
+    "result": "No separate mission-specific mark verified in the reviewed official pages and media assets; company logos are used."
+  },
+  "sources": [
+    {
+      "owner": "John Benac",
+      "kind": "creator monogram",
+      "sourcePage": "https://johnbenac.com/",
+      "assetUrl": "https://johnbenac.com/",
+      "extraction": "Original inline header brand-mark SVG; only the standalone XML namespace was added.",
+      "usage": "Unassociated generic workbench concepts only.",
+      "assets": [
+        {
+          "file": "john-benac-jb.svg",
+          "sha256": "da360c80a2c479c47870b5d5d3d4dddfc1a6cea4ea0c3e188f733e3283939459",
+          "bytes": 536
+        }
+      ]
+    },
+    {
+      "owner": "Redwire",
+      "kind": "company logo",
+      "sourcePage": "https://rdw.com/about/brand/",
+      "assetUrl": "https://rdw.com/wp-content/uploads/2023/08/redwire-logo-horitontal-white-red.png",
+      "extraction": "Unchanged official transparent PNG.",
+      "assets": [
+        {
+          "file": "redwire-company-dark.png",
+          "sha256": "2de5a2339f8c3a7115788cdad4dc520ad5cd7ad2f8eb03fdd0ff04fac1ed50f4",
+          "bytes": 72788
+        }
+      ]
+    },
+    {
+      "owner": "Redwire",
+      "kind": "company logo",
+      "sourcePage": "https://rdw.com/",
+      "assetUrl": "https://rdw.com/wp-content/uploads/2021/08/RedWire-Logos_Redwire_Horizontal_Black-Red.svg",
+      "extraction": "Unchanged official SVG.",
+      "assets": [
+        {
+          "file": "redwire-company-light.svg",
+          "sha256": "caa3ba564c367c54d70ad9760dd5d91a1226c1d53eaf129a7c3f171b77fa3458",
+          "bytes": 4020
+        }
+      ]
+    },
+    {
+      "owner": "Starcloud",
+      "kind": "company logo",
+      "sourcePage": "https://www.starcloud.com/starcloud-3",
+      "assetUrl": "https://cdn.prod.website-files.com/66c1eabc58c4c392a9fba788/67b3571a4ed34c5c6f0bcb6d_ef455c4125c2b2a526fe96d3aa3a93c7_logo_star_cloud.svg",
+      "extraction": "Unchanged SVG referenced by the official page header.",
+      "assets": [
+        {
+          "file": "starcloud-logo.svg",
+          "sha256": "636d2a62e48ae7b1a1b1fd82a1007709e7d812afdd3db8045bdbc58760f426d5",
+          "bytes": 5778
+        }
+      ]
+    },
+    {
+      "owner": "SpaceX",
+      "kind": "company logo",
+      "sourcePage": "https://www.spacex.com/",
+      "assetUrl": "https://www.spacex.com/main.31216f547cbf0c31.js",
+      "component": "spx-logo-svg",
+      "extraction": "Exact original SVG attributes, grouping, path geometry and colors extracted from the official inline component.",
+      "missionPage": "https://www.spacex.com/spacexsi/starmind",
+      "assets": [
+        {
+          "file": "spacex-logo.svg",
+          "sha256": "e3379ce320456c82ec38a64acb6a2e1cf160d879931109bba68d328385b7acfa",
+          "bytes": 1769
+        }
+      ]
+    },
+    {
+      "owner": "Orbital Compute Inc.",
+      "kind": "company logo",
+      "sourcePage": "https://orbital.inc/",
+      "assetUrl": "https://orbital.inc/images/logo_white.png",
+      "extraction": "Unchanged official transparent PNG; original clear space retained.",
+      "assets": [
+        {
+          "file": "orbital-logo-white.png",
+          "sha256": "e679fd7d553e7526cb5ece0c29fa64780e8e9bf9f27852c179e7beaf938aa623",
+          "bytes": 17104
+        }
+      ]
+    },
+    {
+      "owner": "Reflex Aerospace",
+      "kind": "company logo",
+      "sourcePage": "https://www.reflexaerospace.com/",
+      "assetUrl": "https://images.squarespace-cdn.com/content/v1/672dc6578e576d567a24cf8f/9849c783-b2aa-47a0-a9fc-702c4a1f59c4/Reflex+Logo+Light+design",
+      "extraction": "Unchanged official transparent PNG.",
+      "assets": [
+        {
+          "file": "reflex-logo-white.png",
+          "sha256": "a06ef995b3cccd9f1eaa1ff8995166e7f589c219a24bc21525843a4c447264d6",
+          "bytes": 80971
+        }
+      ]
+    },
+    {
+      "owner": "Star Catcher",
+      "kind": "company logo",
+      "sourcePage": "https://www.star-catcher.com/media",
+      "assetUrl": "https://framerusercontent.com/assets/ruAdV2b4c6ybz2qy5Pwra3DwvU.zip",
+      "archiveMember": "Logos/Dark Backgrounds/Digital/SVG/Stellar-Dust_Sol-Yellow_Stacked_RGB.svg",
+      "extraction": "Unchanged SVG extracted from the official logo pack.",
+      "assets": [
+        {
+          "file": "star-catcher-company-dark.svg",
+          "sha256": "c4493bc723f1d406625d2229536a6c10cbbe02f5d42ca23bc3db426b3068f72c",
+          "bytes": 5561
+        }
+      ]
+    },
+    {
+      "owner": "Star Catcher",
+      "kind": "company logo",
+      "sourcePage": "https://www.star-catcher.com/media",
+      "assetUrl": "https://framerusercontent.com/assets/ruAdV2b4c6ybz2qy5Pwra3DwvU.zip",
+      "archiveMember": "Logos/Light Backgrounds/Digital/SVG/Sol-Yellow_Deep-Space_Stacked_RGB.svg",
+      "extraction": "Unchanged SVG extracted from the official logo pack.",
+      "assets": [
+        {
+          "file": "star-catcher-company-light.svg",
+          "sha256": "44ce899b244cd5f70768714ef6e129f6c9a4d85aebca89375f63ff68d8d60678",
+          "bytes": 5560
+        }
+      ]
+    }
+  ]
+}

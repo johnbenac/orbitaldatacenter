@@ -104,12 +104,11 @@ export function domainInstruments(key,h,s,{view='spacecraft',reference=false}={}
   item('shroud','fairing','Payload enclosure',met(h.input.fairingM,'m usable diameter',2),'right'),
   item('thrustDeck','booster',fleet?.boosters?'Side boosters':'Launch architecture',(fleet?.stages||0)+' axial stage'+(fleet?.stages===1?'':'s')+' · '+(fleet?.boosters||0)+' side boosters','left')
  ]:[item('body','payload','Launched stack',fmtI(h.launchKg,'kg'),'right')];}
- case 'compute':case 'conops':{const q=h.ai||{},info=purposeInfo(h);
+ case 'compute':case 'conops':{const info=purposeInfo(h);
   if(view==='launch')return [item('payload','payload',info.name,reference?'Stowed reference':stage+' · '+met(100*(s.deployment||0),'% deployed',0),'right')];
-  const execution=item('compute','compute',info.name,met(s.aiUnitRate,(q.unit||'work units')+'/s',2),'left');
-  if(key==='compute'&&q.training)return [execution,item('storage','storage','Training inputs',bytes(s.aiInputBufferGB)+' staged','left'),item('activeTerminal','communications','Artifact received on Earth',bytes(s.aiProductDeliveredGB)+' / '+bytes(q.artifactGB),'right')];
-  if(key==='compute'&&q.purposeId==='agents')return [execution,item('avionics','avionics','Onboard agent exchange',met(s.aiPeerMbps,'Mbit/s')+' · '+met(q.agentWaves,'waves/stage',0),'left'),item('activeTerminal','communications','Research product received',bytes(s.aiProductDeliveredGB),'right')];
-  return [execution,item('storage','storage',info.output,bytes(s.aiProductQueueGB)+' queued','left'),item('activeTerminal','communications','Product delivered to Earth',bytes(s.aiProductDeliveredGB),'right')];}
+  // Workload and delivery metrics belong in their panels, not as objects
+  // pinned over the spacecraft. Keep the general flight view unobstructed.
+  return [];}
  case 'orbit':return [item('body','structure','Flight state',fmtI(s.altitudeKm,'km')+' · '+(s.eclipse?'eclipse':'sunlit'),'right')];
  default:return [];
  }

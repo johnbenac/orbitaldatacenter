@@ -131,6 +131,7 @@ function complete(host,s){
  host.querySelector('[data-cv-run]')?.focus({preventScroll:true});
 }
 function progress(host,s){
+ if(s.captureHolds){s.timer=0;return}
  if(!s.active)return;
  if(s.active.step>=s.active.result.stages.length-1){complete(host,s);return}
  s.active.step++;
@@ -170,6 +171,15 @@ function bind(host){
   s.onChange?.(commTestWorksheet(host,s.hardware));
  });
  workbenches.set(host,s);return s;
+}
+export function holdCommTestClock(host){
+ const s=host&&workbenches.get(host);if(!s)return ()=>{};
+ const active=s.active;s.captureHolds=(s.captureHolds||0)+1;
+ clearTimeout(s.timer);s.timer=0;let released=false;
+ return ()=>{
+  if(released)return;released=true;s.captureHolds=Math.max(0,s.captureHolds-1);
+  if(!s.captureHolds&&s.active&&s.active===active&&s.chapter==='integration'&&host.isConnected)s.timer=setTimeout(()=>progress(host,s),640);
+ };
 }
 export function updateCommTestConsole(host,hardware,chapter='integration',onSelect=null,selectedId='sband',onReturn=null,restored=null,onChange=null){
  if(!host)return;

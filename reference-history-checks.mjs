@@ -47,6 +47,7 @@ function harness(search='?center=redwire-8kw&phase=E&domain=conops&chapter=opera
   location,entries,history,checkpoint,
   get input(){return input},get view(){return view},
   visit(reference){view.reference=reference;draw()},
+  visitPart(id,category='flight'){view.reference='parts';view.partId=id;view.partsCategory=category;view.partView={mode:'wireframe',projection:'orthographic',context:true,axes:false};draw();checkpoint.save()},
   install(referenceCenterId,solarM2){
    input={referenceCenterId,solarM2};
    view={...view,referenceCenterId,reference:null};
@@ -62,6 +63,12 @@ function harness(search='?center=redwire-8kw&phase=E&domain=conops&chapter=opera
    for(const listener of listeners.get('popstate')||[])listener({state:history.state});
    await Promise.resolve();await Promise.resolve();
   },
+  async forward(){
+   assert.ok(index<entries.length-1,'A following history entry must exist');
+   location.href=entries[++index].url;
+   for(const listener of listeners.get('popstate')||[])listener({state:history.state});
+   await Promise.resolve();await Promise.resolve();
+  },
   reloadSnapshot(){navigationType='reload';return checkpoint.read()},
   cleanup(){checkpoint.save();for(const [key,value] of Object.entries(saved))value===undefined?delete globalThis[key]:globalThis[key]=value}
  };
@@ -69,6 +76,29 @@ function harness(search='?center=redwire-8kw&phase=E&domain=conops&chapter=opera
 
 const tests=[];
 async function test(name,run){await run();tests.push(name)}
+
+await test('Individual part pages retain separate Back and Forward destinations and shared hardware',async()=>{
+ const h=harness();
+ try{
+  h.visit('equipment');h.visitPart('flight:02.01');h.visitPart('ground:fairing-carrier','ground');
+  assert.equal(h.location.searchParams.get('reference'),'parts');
+  assert.equal(h.location.searchParams.get('part'),'ground:fairing-carrier');
+  assert.equal(h.location.searchParams.get('family'),'ground');
+  await h.back();
+  assert.equal(h.view.partId,'flight:02.01');
+  assert.equal(h.location.searchParams.get('part'),'flight:02.01');
+  assert.equal(h.view.partView.mode,'wireframe');
+  assert.equal(h.input.solarM2,96);
+  assert.equal(h.reloadSnapshot().view.partId,'flight:02.01');
+  await h.back();
+  assert.equal(h.view.reference,'equipment');
+  assert.equal(h.location.searchParams.has('part'),false);
+  await h.forward();await h.forward();
+  assert.equal(h.view.partId,'ground:fairing-carrier');
+  assert.equal(h.view.partsCategory,'ground');
+  assert.deepEqual(h.reloadSnapshot().design,h.input);
+ }finally{h.cleanup()}
+});
 
 await test('Back preserves the active variant and rewrites its checkpoint entry',async()=>{
  const h=harness();

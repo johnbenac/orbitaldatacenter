@@ -159,6 +159,11 @@ export function filterEquipmentRows(rows,{query='',subsystem='',evidence='',mate
 }
 function materialBadge(status){return '<span class="mel-badge mel-material-evidence" data-tone="'+esc(status)+'">'+esc(materialEvidenceLabels[status]||status||'Unresolved')+'</span>'}
 function materialLink(materialId,caption){return '<button type="button" class="mel-material-link" data-page="materials" data-material-id="'+esc(materialId)+'">'+esc(caption)+' ↗</button>'}
+function partPreview(wbs,title){
+ const id='flight:'+wbs;
+ return '<button type="button" class="mel-part-thumb" data-open-part="'+esc(id)+'" aria-label="Open part view: '+esc(title)+'"><span aria-hidden="true">3D</span><img data-part-thumbnail="'+esc(id)+'" alt="" loading="lazy" width="72" height="54"></button>';
+}
+function partLink(wbs,title){return '<button type="button" class="mel-part-link" data-open-part="flight:'+esc(wbs)+'" aria-label="Open part view: '+esc(title)+'">Open part view ↗</button>'}
 function materialSourcesLinks(ids){
  return [...new Set(ids||[])].map(id=>materialSources[id]).filter(Boolean).map(source=>'<a href="'+esc(source.url)+'" target="_blank" rel="noopener noreferrer" title="'+esc(source.boundary||source.claim||'')+'">'+esc(source.shortTitle||source.title)+' ↗</a>').join('<span aria-hidden="true"> · </span>');
 }
@@ -167,13 +172,13 @@ function materialRegister(rows,selection=''){
  for(const row of rows){
   if(row.parent!==prior){prior=row.parent;body+='<tr class="mel-group"><th colspan="5" scope="rowgroup"><span>'+esc(prior)+'</span> '+esc(row.subsystem)+'</th></tr>'}
   const details=(row.materialAssignments||[]).filter(detail=>!selection||detail.evidence?.status===selection);
-  body+='<tr class="mel-material-parent"><th scope="rowgroup" colspan="5"><div><span><span class="mel-number">'+esc(row.wbs)+'</span> '+esc(row.item)+'</span><small>'+mass(row.extendedMassKg)+' kg in parent allocation · '+details.length+' material '+(details.length===1?'detail':'details')+'</small></div></th></tr>';
+  body+='<tr class="mel-material-parent"><th scope="rowgroup" colspan="5"><div><div class="mel-part-identity">'+partPreview(row.wbs,row.item)+'<div><span class="mel-number">'+esc(row.wbs)+'</span> '+esc(row.item)+partLink(row.wbs,row.item)+'</div></div><small>'+mass(row.extendedMassKg)+' kg in parent allocation · '+details.length+' material '+(details.length===1?'detail':'details')+'</small></div></th></tr>';
   if(!details.length){body+='<tr class="mel-material-row"><td colspan="5"><p class="mel-material-empty">'+(row.bulkMaterial?'<b>'+esc(row.bulkMaterial.composition)+'</b> · '+esc(row.bulkMaterial.stateAtLoading)+'. '+esc(row.bulkMaterial.visibility)+'. '+esc(row.bulkMaterial.selectionBasis):'Material selection remains open for this equipment. No finish is established by its supplier reference alone.')+'</p></td></tr>';continue}
   for(const detail of details){
    const material=getSpacecraftMaterial(detail.materialId),preview=material?.texture?.previewUrl||material?.previewUrl||material?.texture?.baseColorUrl,texture=detail.textureId||material?.textureId;
    const thumb=preview?'<img class="mel-material-swatch" src="'+esc(preview)+'" alt="" loading="lazy" width="72" height="54">':'<span class="mel-material-no-swatch" aria-hidden="true">'+(texture?'◧':'—')+'</span>';
    const sources=materialSourcesLinks(detail.evidence?.sourceIds),accounts=detail.accountedInWbs?.length?detail.accountedInWbs:[detail.parentWbs];
-   body+='<tr class="mel-material-row"><th scope="row"><span class="mel-number">'+esc(detail.id)+'</span><b>'+esc(detail.label)+'</b><small>'+esc(detail.coverage)+'</small></th>'
+   body+='<tr class="mel-material-row"><th scope="row"><div class="mel-part-identity">'+partPreview(detail.id,detail.label)+'<div><span class="mel-number">'+esc(detail.id)+'</span><b>'+esc(detail.label)+'</b><small>'+esc(detail.coverage)+'</small>'+partLink(detail.id,detail.label)+'</div></div></th>'
     +'<td><div class="mel-material-identity">'+thumb+'<div>'+materialLink(detail.materialId,material?.name||detail.materialName||detail.materialId)+'<small>'+esc(material?.finish||detail.materialFinish||'')+'</small></div></div></td>'
     +'<td>'+materialBadge(detail.evidence?.status)+'<p>'+esc(detail.evidence?.basis)+'</p>'+(sources?'<div class="mel-material-sources">'+sources+'</div>':'')+'</td>'
     +'<td>'+(texture?'<code class="mel-texture-id">'+esc(texture)+'</code>':'<small>No visible texture</small>')+'<p>'+esc(detail.visibility)+'</p></td>'
@@ -194,7 +199,7 @@ function registerTable(rows,lens,{materialEvidence=''}={}){
    body+='<tr class="mel-group"><th colspan="'+headings.length+'" scope="rowgroup"><span>'+esc(prior)+'</span> '+esc(r.subsystem)+'<small>'+mass(subtotal)+' kg</small></th></tr>';
   }
   const materialNames=r.bulkMaterial?[r.bulkMaterial.name]:(r.materials||[]).map(material=>material.name);
-  const name='<th scope="row"><span class="mel-number">'+r.wbs+'</span><b>'+esc(r.item)+'</b><small>'+esc(r.classification)+'</small>'+(lens==='mass'&&materialNames.length?'<small class="mel-material-summary" title="Selection evidence is listed in Materials &amp; finishes">Materials · '+esc(materialNames.join(' · '))+'</small>':'')+'</th>';
+  const name='<th scope="row"><div class="mel-part-identity">'+partPreview(r.wbs,r.item)+'<div><span class="mel-number">'+r.wbs+'</span><b>'+esc(r.item)+'</b><small>'+esc(r.classification)+'</small>'+partLink(r.wbs,r.item)+'</div></div>'+(lens==='mass'&&materialNames.length?'<small class="mel-material-summary" title="Selection evidence is listed in Materials &amp; finishes">Materials · '+esc(materialNames.join(' · '))+'</small>':'')+'</th>';
   const basisRef=(note,url,title)=>'<p>'+esc(note)+'</p><a href="'+esc(url)+'" target="_blank" rel="noopener">'+esc(title)+' ↗</a>';
   const metric=n=>Number.isFinite(n)?mass(n)+' W':'Unallocated';
   if(maturity)body+='<tr>'+name+'<td>'+evidenceBadge(r)+link(r)+'</td><td><strong>'+esc(r.maturity.installedMaturity)+'</strong><p>'+esc(r.maturity.heritageApplicability)+'</p></td><td>'+(r.classification==='Hardware'?'<strong>Unassessed</strong><p>'+esc(r.maturity.mgaBasis)+'</p>':'<strong>Separate resource boundary</strong><p>Outside spacecraft dry-hardware MGA. Carry the loading or launch-interface basis separately.</p>')+'</td><td><p>'+esc(r.maturity.fabricationStatus)+'</p><small>'+esc(r.maturity.owner)+' · '+esc(r.maturity.due)+'</small></td></tr>';
@@ -210,6 +215,7 @@ export function renderEquipmentList(h,s=null){
  const cards=[['Equipment',t.hardwareKg,'Dry hardware before growth'],['Dry spacecraft',t.dryKg,'Hardware plus '+mass(t.growthKg)+' kg growth'],['Wet spacecraft',t.wetKg,'Dry vehicle, liquids and helium'],['Launched mass',t.launchKg,'Wet vehicle plus adapter']];
  return '<section class="mel" data-mel><header class="mel-header"><div><div class="mel-eyebrow">Engineering reference / installed configuration</div><h2>Master equipment list</h2><p>'+esc(list.reference?list.reference.name+(list.reference.modified?' · modified study variant':' · study configuration'):'Custom study configuration')+'. Installed mass, electrical loads, physical envelopes, materials and their evidence follow this active build.</p></div><div class="mel-files"><a data-file="csv" class="btn" download="spacecraft-equipment-list.csv" title="Download every equipment allocation with materials, mass basis and sources">Full CSV ↓</a><a data-file="json" class="btn" download="spacecraft-equipment-list.json" title="Download the structured hierarchy, material details and totals for this design">Full JSON ↓</a><a data-file="materials" class="btn" download="spacecraft-material-details.csv" title="Download material and texture assignments with their parent mass boundaries and selection evidence">Materials CSV ↓</a></div></header>'
  +'<div class="mel-cards">'+cards.map(([title,value,note])=>'<div><small>'+title+'</small><strong>'+mass(value)+' <em>kg</em></strong><span>'+note+'</span></div>').join('')+'</div>'
+ +'<nav class="mel-parts-nav" aria-label="Browse related parts"><button type="button" class="btn" data-page="parts">Parts navigator ↗</button><span>Explore the complete system</span><button type="button" data-parts-category="launch">Launch vehicle</button><button type="button" data-parts-category="ground">Ground support</button><button type="button" data-parts-category="site">Launch site</button><small>Ground and carrier hardware remain outside spacecraft mass totals.</small></nav>'
  +'<div class="mel-controls"><div role="group" aria-label="Equipment list view" class="mel-views"><button type="button" data-lens="mass" aria-pressed="true">Mass register</button><button type="button" data-lens="materials" aria-pressed="false">Materials &amp; finishes</button><button type="button" data-lens="power" aria-pressed="false">Electrical loads</button><button type="button" data-lens="dimensions" aria-pressed="false">Dimensions</button><button type="button" data-lens="heritage" aria-pressed="false">Heritage &amp; sources</button><button type="button" data-lens="maturity" aria-pressed="false">Maturity &amp; margins</button></div>'
  +'<label>Find equipment or material<input data-mel-search type="search" placeholder="Component, material, texture, supplier…" autocomplete="off"></label>'
  +'<label>Subsystem<select data-mel-sub>'+option('','All subsystems')+subs.map(s=>option(s,s)).join('')+'</select></label>'
@@ -236,6 +242,7 @@ export function bindEquipmentList(container,h,s=null){
   find('[data-mel-status]').textContent=isMaterial?details.length+' details in '+count+' equipment allocations · mass counted once':count+' of '+list.rows.length+' rows · '+mass(total)+' kg shown';
   for(const [selector,hidden] of [['[data-mel-material-note]',!isMaterial],['[data-mel-material-filter]',!isMaterial],['[data-mel-reference-filter]',isMaterial]]){const control=find(selector);if(control)control.hidden=hidden}
   find('.mel-scroll').innerHTML=registerTable(rows,lens,{materialEvidence:selectedMaterialEvidence});clear.hidden=!search.value&&!sub.value&&!(isMaterial?selectedMaterialEvidence:evidence.value);
+  if(typeof CustomEvent==='function')el.dispatchEvent?.(new CustomEvent('parts-thumbnails-change',{bubbles:true}));
  };
  search.addEventListener('input',refresh);sub.addEventListener('change',refresh);evidence.addEventListener('change',refresh);materialEvidence?.addEventListener('change',refresh);
  clear.addEventListener('click',()=>{search.value='';sub.value='';evidence.value='';if(materialEvidence)materialEvidence.value='';refresh();search.focus()});

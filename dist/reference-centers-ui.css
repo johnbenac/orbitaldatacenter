@@ -9,3 +9,76 @@
 @media(max-width:1000px){.rc-case-toolbar{grid-template-columns:1fr}.rc-case-buttons{justify-content:flex-start}.rc-case-toolbar>small{grid-column:auto}.rc-environment{padding:13px}}
 @media(max-width:540px){.rc-case-toolbar{padding:16px;gap:11px}.rc-case-toolbar h3{font-size:16px}.rc-case-buttons{display:grid;grid-template-columns:1fr 1fr}.rc-case-buttons .btn{font-size:10px;padding:7px 10px}.rc-evidence-legend{gap:5px 9px;font-size:9px}.rc-orbit-metrics{gap:12px 8px}.rc-orbit-metrics dd{font-size:11px}.rc-environment{padding:12px;margin:20px 0 15px}.rc-study .rc-section-title{flex-wrap:wrap;gap:8px}.rc-family-id{font-size:9px}}
 .rc-geometry-comparison{margin:20px 0;padding:15px;background:#142934;border-left:2px solid #7ca9ba;border-radius:2px}.rc-geometry-comparison .rc-orbit-metrics{margin:12px 0}.rc-geometry-comparison p{font-size:11px!important;color:#a5becc;line-height:1.65}.rc-geometry-comparison dd{font-size:11px;overflow-wrap:anywhere}.rc-assembly-review li{line-height:1.6;padding:3px 0}.rc-assembly-review li p{margin:5px 0 9px;font-size:10px}
+/* Original brand artwork keeps its own proportions and colors. */
+.rc-brand-marks{display:flex;align-items:center;gap:13px;min-width:0;min-height:42px;margin-bottom:3px}
+.rc-brand-mark{display:flex;align-items:center;justify-content:flex-start;min-width:0;width:160px;max-width:100%;height:42px;flex:0 1 auto}
+.rc-brand-mark img{display:block;max-width:100%;max-height:32px;width:auto;height:auto;object-fit:contain}
+.rc-brand-mark-orbital img{max-height:42px}
+.rc-brand-mark[data-brand-surface=light]{width:54px;padding:7px;background:#f5f3ec;border-radius:4px}
+.rc-brand-marks-multiple{gap:14px}
+.rc-brand-marks-multiple .rc-brand-mark{flex:1 1 0;width:0}
+.rc-brand-marks-multiple .rc-brand-mark img{max-height:28px}
+.rc-brand-marks-multiple .rc-brand-mark-orbital img{max-height:42px}
+.rc-reference-links{display:flex;align-items:center;flex-wrap:wrap;gap:5px 13px;padding:9px 13px;border-top:1px solid #314752;background:#14232c}
+.rc-reference-links a{display:inline-flex;align-items:center;gap:4px;min-height:24px;max-width:100%;font:10px/1.4 var(--sans,system-ui);color:#b1d7d3;text-decoration:underline;text-decoration-color:#58777d;text-underline-offset:3px;overflow-wrap:anywhere}
+.rc-reference-links a:hover{color:#edfff8;text-decoration-color:currentColor}
+.rc-reference-links a:focus-visible{outline:2px solid #a3e1d8;outline-offset:3px;border-radius:2px}
+.rc-dossier-head .rc-brand-marks{margin-bottom:13px;max-width:310px}
+.rc-dossier-head .rc-reference-links{padding:9px 0 0;border:0;background:transparent}
+.rc-brand-marks-compact{min-height:30px;height:30px;margin:0;flex:0 0 auto}
+.rc-brand-marks-compact .rc-brand-mark{width:95px;height:30px}
+.rc-brand-marks-compact .rc-brand-mark img{max-height:24px}
+.rc-brand-marks-compact .rc-brand-mark-orbital img{max-height:30px}
+.rc-brand-marks-compact .rc-brand-mark[data-brand-surface=light]{width:40px;padding:5px}
+.rc-table thead .rc-brand-marks{margin-bottom:8px}
+.rc-active-identity>.rc-brand-marks{flex-wrap:nowrap}
+.manage-row>.rc-brand-marks{margin-right:2px}
+@media(max-width:540px){.rc-reference-links{padding:7px 9px;gap:3px 10px}.rc-reference-links a{font-size:9px;min-height:28px}.rc-brand-marks-multiple{gap:8px}.rc-brand-mark{width:140px}.rc-active-identity>.rc-brand-marks .rc-brand-mark{width:70px}.rc-active-identity>.rc-brand-marks .rc-brand-mark[data-brand-surface=light]{width:40px}}
+
+/* Fixed reference artwork supplements the current spacecraft and its diagrams. */
+.rc-illustration{display:block;width:100%;aspect-ratio:16/9;overflow:hidden;background:#03070b}
+.rc-illustration img{display:block;width:100%;height:100%;object-fit:contain}
+.rc-card-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.rc-card{border-radius:8px;transition:border-color .18s ease,box-shadow .18s ease}
+.rc-card:not(.is-selected):hover,.rc-card:focus-within{border-color:var(--rc-accent)}
+.rc-catalog .rc-card-preview:focus-visible{outline:2px solid #b5e6dc;outline-offset:-3px;border-radius:7px}
+.rc-card-meta{padding:12px 16px 0;min-height:32px;gap:8px;font-size:9px}
+.rc-card-meta b{font-size:8px}
+.rc-card-visual{display:block;width:100%;margin-top:10px;background:#10212a;border-top:1px solid #314752;border-bottom:1px solid #314752}
+.rc-card-preview .rc-illustration img{transition:filter .18s ease}
+.rc-card-preview:hover .rc-illustration img{filter:brightness(1.08)}
+.rc-art-basis{display:block;padding:7px 16px;border-top:1px solid #253c48;background:#12222c;font:9px/1.45 var(--mono,monospace);letter-spacing:.015em;color:#a5bdc9}
+.rc-card-copy,.rc-secondary-grid .rc-card-copy{padding:16px 16px 12px;gap:7px}
+.rc-card-title,.rc-secondary-grid .rc-card-title{font-size:clamp(18px,1.3vw,22px)}
+.rc-card-summary{font-size:12px;line-height:1.6;max-width:68ch}
+.rc-card-stat,.rc-secondary-grid .rc-card-stat{margin:0 16px;width:calc(100% - 32px);padding:12px 0;align-items:center;flex-direction:row}
+.rc-card-stat strong,.rc-secondary-grid .rc-card-stat strong{font-size:21px}
+.rc-card-stat small{font-size:10px;max-width:190px}
+.rc-card-inspect{font-size:12px}
+.rc-card .rc-reference-links{padding:9px 16px}
+.rc-compare-toggle{min-height:36px;font-size:11px!important}
+.rc-secondary-grid .rc-card-preview{display:flex}
+.rc-reference-figure figcaption{padding:12px 18px 14px}
+.rc-illustration-caption{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:7px 14px}
+.rc-illustration-caption strong{font:9px/1.5 var(--mono,monospace);letter-spacing:.015em;color:#c4d7dd}
+.rc-reference-figure figcaption p{margin:7px 0 0;line-height:1.6}
+.rc-illustration-caption a,.rc-catalog-art-credit a{color:#acdcd3;text-underline-offset:3px;text-decoration-color:#60827f;white-space:nowrap}
+.rc-illustration-caption a:hover,.rc-catalog-art-credit a:hover{color:#e1fff4;text-decoration-color:currentColor}
+.rc-illustration-caption a:focus-visible,.rc-catalog-art-credit a:focus-visible,.rc-catalog details>summary:focus-visible{outline:2px solid #a3e1d8;outline-offset:4px;border-radius:2px}
+.rc-catalog-art-credit{display:inline-block;margin-left:6px}
+.rc-architecture-schematic{margin-top:17px;padding-top:13px}
+.rc-architecture-schematic[open]>summary{color:#bce7da}
+.rc-schematic-art{margin-top:12px;border:1px solid #35515e;border-radius:4px;overflow:hidden}
+.rc-table thead small{display:block;white-space:normal;overflow-wrap:anywhere}
+.rc-table thead button{display:block;max-width:100%;margin-top:8px;line-height:1.45;white-space:normal}
+.rc-comparison-art{width:112px;max-width:100%;margin-bottom:10px;border:1px solid #45606c;border-radius:4px}
+.rc-active-identity{gap:12px}
+.rc-active-art{width:96px;flex:0 0 96px;align-self:center;margin:0}
+.rc-active-thumbnail{border:1px solid #44606b;border-radius:4px}
+.rc-active-art figcaption{padding-top:4px;color:#a8c0ca;font:7px/1.4 var(--mono,monospace);letter-spacing:0}
+@media(min-width:1800px){.rc-card-grid:not(.rc-secondary-grid){grid-template-columns:repeat(4,minmax(0,1fr))}.rc-card-meta{font-size:8px}.rc-card-title{font-size:19px}.rc-card-summary{font-size:11px}}
+@media(max-width:1150px){.rc-active-strip{flex-wrap:wrap;align-items:center}.rc-active-actions{max-width:none}}
+@media(max-width:780px){.rc-illustration-caption{align-items:flex-start}.rc-active-strip{align-items:stretch}.rc-active-actions{justify-content:flex-start}}
+@media(max-width:640px){.rc-card-grid{grid-template-columns:minmax(0,1fr);gap:14px}.rc-card-meta{padding:10px 14px 0;font-size:9px}.rc-card-copy,.rc-secondary-grid .rc-card-copy{padding:14px 14px 12px}.rc-card-title,.rc-secondary-grid .rc-card-title{font-size:20px}.rc-card-summary{font-size:12px}.rc-card-stat,.rc-secondary-grid .rc-card-stat{margin:0 14px;width:calc(100% - 28px)}.rc-card .rc-reference-links{padding:9px 14px}.rc-art-basis{padding:7px 14px}.rc-comparison-art{width:92px;margin-bottom:8px}.rc-reference-figure figcaption{padding:11px 16px 13px}.rc-catalog-art-credit{margin-left:0;margin-top:4px;display:block}}
+@media(max-width:400px){.rc-active-identity{gap:8px}.rc-active-art{width:76px;flex-basis:76px}.rc-active-art figcaption{font-size:7px;line-height:1.4}}
+@media(prefers-reduced-motion:reduce){.rc-card,.rc-card-preview .rc-illustration img{transition:none}}

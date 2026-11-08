@@ -9,6 +9,33 @@ const svgCommon=`display opacity visibility color font-family font-size font-wei
 const xml=value=>String(value).replaceAll('&','&amp;').replaceAll('"','&quot;').replaceAll('<','&lt;').replaceAll('>','&gt;');
 const aborted=signal=>{if(signal?.aborted)throw new DOMException('Capture cancelled.','AbortError')};
 const finite=value=>Number.isFinite(value)&&value>0;
+export const CAPTURE_SOURCE_URL='https://orbital-data-center-lab.kda44d.chatgpt.site/';
+export const CAPTURE_SOURCE_LABEL='Orbital Data Center';
+const appearanceExclusions={
+ leaders:'.scene-annotations,.bay-annotations,.bay-pin,.scene-focus-label',
+ readouts:'.scene-readouts,.viewtag,.imagestate,.viewcaption,.launch-location-badge',
+ axes:'.coordinate-triad'
+};
+
+// One compositor supplies the exact same signature in the preview, PNG and
+// every video frame. It is independent of imagery's own source attribution.
+export function drawCaptureWatermark(context,width,height){
+ const scale=Math.max(.15,Math.min(width/1200,height/180)),pad=12*scale,margin=14*scale;
+ const title=CAPTURE_SOURCE_LABEL.toUpperCase(),address=CAPTURE_SOURCE_URL.replace(/^https:\/\//,'').replace(/\/$/,'');
+ context.save();
+ try{
+  context.setTransform(1,0,0,1,0,0);context.globalAlpha=1;context.globalCompositeOperation='source-over';
+  context.textAlign='left';context.textBaseline='top';context.font=`600 ${12*scale}px system-ui, sans-serif`;
+  const titleWidth=context.measureText(title).width;
+  context.font=`400 ${11*scale}px system-ui, sans-serif`;
+  const boxWidth=Math.max(titleWidth,context.measureText(address).width)+pad*2,boxHeight=46*scale;
+  const x=width-margin-boxWidth,y=height-margin-boxHeight;
+  context.fillStyle='rgba(9,18,27,.88)';context.fillRect(x,y,boxWidth,boxHeight);
+  context.fillStyle='#eeb772';context.fillRect(x,y,2*scale,boxHeight);
+  context.fillStyle='#f1f5f6';context.font=`600 ${12*scale}px system-ui, sans-serif`;context.fillText(title,x+pad,y+8*scale);
+  context.fillStyle='#c5dae0';context.font=`400 ${11*scale}px system-ui, sans-serif`;context.fillText(address,x+pad,y+26*scale);
+ }finally{context.restore();}
+}
 
 /** Preserve the displayed aspect ratio, optionally using even video dimensions. */
 export function captureDimensions(element,{maxEdge=3840,even=false}={}){
@@ -66,7 +93,7 @@ function clearBackdrop(root,scene){
 
 /**
  * Capture one stable element without changing the live DOM.
- * render({width,height,canvas,sceneCanvas,signal}) resolves to the output canvas.
+ * render({width,height,canvas,sceneCanvas,signal,appearance}) resolves to the output canvas.
  * Supply sceneCanvas for #viewport: the backdrop, raw scene and labels are drawn
  * separately, preserving transparent render backgrounds and on-screen leaders.
  * Call dispose() when a PNG finishes, or after the final video frame.
@@ -125,7 +152,7 @@ export function createArtworkCapture(element,{background='#10141a',exclude='',sc
  function cloneTree(source,ctx){
   if(source.nodeType===3)return source.cloneNode(false);
   if(source.nodeType!==1)return null;
-  if(source!==element&&(source.matches(omit)||source.hidden||['script','style','link','iframe','object','embed','noscript','animate','animateMotion','animateTransform','set'].includes(source.localName)))return null;
+  if(source!==element&&(source.matches(omit)||(ctx.omitAppearance&&source.matches(ctx.omitAppearance))||source.hidden||['script','style','link','iframe','object','embed','noscript','animate','animateMotion','animateTransform','set'].includes(source.localName)))return null;
   const style=win.getComputedStyle(source);
   if(style.display==='none'||style.contentVisibility==='hidden')return null;
   if(ctx.rawScene&&source.localName==='canvas'&&(!ctx.sceneHost||ctx.sceneHost.contains(source)))return null;
@@ -135,6 +162,12 @@ export function createArtworkCapture(element,{background='#10141a',exclude='',sc
    try{clone.src=source.toDataURL('image/png');}catch{throw Error('This canvas cannot be captured because an image is not available locally.');}
   }else clone=source.cloneNode(false);
   ctx.nodes.set(source,clone);removeBehavior(clone);copyStyle(source,clone,style,ctx);
+  // Keep the quantitative temperature key above the optional signature.
+  // Only the exported clone moves; the working view retains its own layout.
+  if(ctx.watermarkInset&&source.matches('[aria-label="Thermal overlay legend"]')){
+   clone.style.top='auto';
+   clone.style.bottom=Math.max(parseFloat(style.bottom)||0,ctx.watermarkInset)+'px';
+  }
   if(source.namespaceURI===HTML){
    if(source.localName==='img'){
     const url=source.currentSrc||source.src;if(url)ctx.tasks.push(embedResource(url).then(value=>clone.setAttribute('src',value)));
@@ -172,7 +205,7 @@ export function createArtworkCapture(element,{background='#10141a',exclude='',sc
   if(background){context.fillStyle=background;context.fillRect(0,0,size.width,size.height);}
   context.imageSmoothingEnabled=true;context.imageSmoothingQuality='high';return context;
  }
- async function render({width,height,canvas=null,sceneCanvas=null,signal=null}={}){
+ async function render({width,height,canvas=null,sceneCanvas=null,signal=null,appearance={}}={}){
   check(signal);
   if(!element.isConnected)throw Error('The visualization changed during capture. Start again on the new view.');
   const rect=element.getBoundingClientRect();if(!finite(rect.width)||!finite(rect.height))throw Error('Keep the captured visualization open until its download is ready.');
@@ -181,7 +214,10 @@ export function createArtworkCapture(element,{background='#10141a',exclude='',sc
   const sceneHost=sceneCanvas?(sceneElement||element.querySelector('#scene')||element.querySelector('canvas')?.parentElement):null;
   if(sceneCanvas&&(!sceneHost||(sceneHost!==element&&!element.contains(sceneHost))))throw Error('The 3D view is not ready for capture yet.');
   const sceneRect=sceneHost?.getBoundingClientRect();
-  const ctx={tasks:[],nodes:new Map(),scale:size.width/rect.width,rawScene:!!sceneCanvas,sceneHost};
+  const omitAppearance=Object.entries(appearanceExclusions).filter(([key])=>appearance[key]===false).map(([,selector])=>selector).join(',');
+  const scale=size.width/rect.width;
+  const watermarkInset=appearance.watermark?60*Math.max(.15,Math.min(size.width/1200,size.height/180))/scale+8:0;
+  const ctx={tasks:[],nodes:new Map(),scale,rawScene:!!sceneCanvas,sceneHost,omitAppearance,watermarkInset};
   // Snapshot styles and text synchronously, before awaiting assets or decoding.
   const clone=cloneTree(element,ctx);if(!clone)throw Error('Open the visualization before capturing it.');
   const isSvg=element.namespaceURI===SVG&&element.localName==='svg';
@@ -208,6 +244,7 @@ export function createArtworkCapture(element,{background='#10141a',exclude='',sc
    context.drawImage(sceneCanvas,(sceneRect.left-rect.left)*sx,(sceneRect.top-rect.top)*sy,sceneRect.width*sx,sceneRect.height*sy);
   }
   context.drawImage(front,0,0,size.width,size.height);
+  if(appearance.watermark)drawCaptureWatermark(context,size.width,size.height);
   if(!cleanChecked){
    try{context.getImageData(0,0,1,1);cleanChecked=true;}catch(error){canvas.width=size.width;throw Error('The browser blocked a non-local image in this capture. The view itself is unchanged.');}
   }

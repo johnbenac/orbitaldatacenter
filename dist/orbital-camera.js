@@ -1,4 +1,31 @@
-import {Vector3} from './vendor/three.module.js';
+import {Quaternion,Vector3} from './vendor/three.module.js';
+import {INSERTION_MET} from './launch-effects-state.js';
+
+export const CAMERA_MODES=Object.freeze(['orbit','body','inertial','sun-velocity']);
+export const normalizeCameraMode=value=>CAMERA_MODES.includes(value)?value:'orbit';
+
+export function cameraModeAvailable(view,snapshot,chapter='',deploymentLens='vehicle'){
+ return ['spacecraft','core'].includes(view)&&!!snapshot&&
+  Number.isFinite(snapshot.t)&&snapshot.t>=INSERTION_MET&&
+  Number.isFinite(snapshot.altitudeKm)&&snapshot.altitudeKm>0&&
+  !snapshot.referenceBody&&!snapshot.orbitLost&&snapshot.flightPhase!=='entry'&&
+  !(view==='spacecraft'&&chapter==='commissioning'&&deploymentLens!=='vehicle');
+}
+
+const eciToScene=new Quaternion().setFromAxisAngle(new Vector3(1,0,0),-Math.PI/2);
+
+// The local orbital frame is +X along-track, +Y orbit normal, +Z radial outward:
+// a cyclic axis permutation of the Hill radial/tangential/normal (RTN) frame.
+// flightFrames quaternions map these axes and the body axes into scene space.
+// Physical ECI uses (x,y,z); the distant scene uses (x,z,-y).
+export function cameraReferenceToBody(mode,frame){
+ if(!frame)return new Quaternion();
+ switch(normalizeCameraMode(mode)){
+  case 'orbit':return frame.orbitalToBody.clone();
+  case 'inertial':return frame.body.clone().invert().multiply(eciToScene);
+  default:return new Quaternion(); // Body and Sun–velocity already use body-space bases.
+ }
+}
 
 export const SUN_VELOCITY_TILT_DEG=22.5;
 const tilt=SUN_VELOCITY_TILT_DEG*Math.PI/180;

@@ -1,16 +1,16 @@
 {
-  "release": "v56",
+  "release": "v63",
   "source_host": "boiler",
-  "source_path": "/home/johnb/Downloads/orbital-data-center-v56.zip.part01 + orbital-data-center-v56.zip.part02",
-  "archive_sha256": "44eb50af6152b4df67dce50dbae383cc374c6022c953c600e368c2f6e3340363",
+  "source_path": "/home/johnb/Downloads/orbital-data-center-v63.zip.part01 + orbital-data-center-v63.zip.part02",
+  "archive_sha256": "d7948e6b8e8131f1bb06272b3b693ed4feb9472876e83e4b03c388a96223450b",
   "static_directory": "dist",
   "checks_passed": [
-    "2441 asset manifest entries",
-    "192 JavaScript syntax checks",
+    "2469 asset manifest entries",
+    "205 JavaScript syntax checks",
     "16 import and assembly regression tests",
-    "2585 upstream files match the archive",
+    "2648 upstream files match the archive",
     "All application files fit the Cloudflare Pages file-size limit",
-    "Desktop and mobile startup, 3D rendering, fixed footer and Blender OG metadata; no browser errors or failed assets"
+    "Desktop and mobile startup, WebGL rendering, fixed footer and Blender OG metadata; no browser errors or failed assets"
   ],
   "validation_notes": [
     "Split archive concatenated in numeric part order; original parts and combined archive retained outside Git.",
@@ -19,14 +19,14 @@
   ],
   "source_parts": [
     {
-      "source_path": "/home/johnb/Downloads/orbital-data-center-v56.zip.part01",
-      "size": 419430400,
-      "sha256": "90386867ced49a126edf40f4d0c76eccd9b79d09e7babf7f6bbc00693f0772b0"
+      "source_path": "/home/johnb/Downloads/orbital-data-center-v63.zip.part01",
+      "size": 418005332,
+      "sha256": "3479ea1daeff55be44c03f9a14f40b00335164a15213d6e699d6adc036c6b7e4"
     },
     {
-      "source_path": "/home/johnb/Downloads/orbital-data-center-v56.zip.part02",
-      "size": 409574647,
-      "sha256": "08b8e6e2b37b714ed61d1ec4f6e9d5e27125dad7c791e7d3bfabf9587a0abbee"
+      "source_path": "/home/johnb/Downloads/orbital-data-center-v63.zip.part02",
+      "size": 418005331,
+      "sha256": "affb2bfb6b8a00a67124b7dbd3926eec67d2a6420b27072ba59e6be55248f734"
     }
   ]
 }

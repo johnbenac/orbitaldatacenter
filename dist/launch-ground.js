@@ -82,7 +82,7 @@ export function buildAscentWake(mounts){
   }
  },faceClouds(camera){camera.getWorldQuaternion(q);for(const {root,particles} of parents){if(!root.visible)continue;root.getWorldQuaternion(inv).invert().multiply(q);for(const m of particles)m.quaternion.copy(inv);}}};
 }
-export function buildLaunchGround(site,{tower,coreMounts,baseR:r,baseY,allH:H,fleet,box,tube,mesh,cylinder,mat,steel,rib,dark,gold,black,repaint}){
+export function buildLaunchGround(site,{tower,coreMounts,baseR:r,baseY,allH:H,fleet,box,tube,mesh,cylinder,mat,steel,rib,dark,gold,black,repaint,includeEnvironment=true}){
  const deckY=baseY-r*.63-1,depth=site.exhaust==='split-trench'?Math.max(10,.15*H):Math.max(7,.10*H),grade=deckY-depth*.62;
  const w=Math.max(9,2.5*r+fleet.boosters*.38*r),length=site.exhaust==='split-trench'?4.8*w:3.8*w;
  const concrete=civilSurfaceMaterial('concrete'),wall=mat('#989b98',.17,.87),burnt=civilSurfaceMaterial('burnt'),cool=mat('#aebfc0',.45,.6),pipe=mat('#b9ced1',.45),charcoal=mat('#4a5960',.46);
@@ -93,7 +93,7 @@ export function buildLaunchGround(site,{tower,coreMounts,baseR:r,baseY,allH:H,fl
  const shaft=(p,a,b,rad,m)=>tube(p,V(...a),V(...b),rad,m,'pad');
  const post=(p,x,z,bottom,h,rad,m)=>cylinder(p,x,bottom+h/2,z,rad,rad,h,m,'pad',14);
  const floorY=deckY-depth,channelStart=-(site.trenchOutlets>1?length:1.55*w),channelEnd=length;
- const environment=buildLaunchEnvironment(site,{parent:land,grade,aperture:{x0:channelStart,x1:channelEnd,z0:-w,z1:w},repaint});
+ const environment=includeEnvironment?buildLaunchEnvironment(site,{parent:land,grade,aperture:{x0:channelStart,x1:channelEnd,z0:-w,z1:w},repaint}):{status:'ready',update(){},faceCamera(){},labels(){return [];}};
  // The grade has a real incision. Retaining walls and a sloped center
  // deflector are visible below the launch table from the open exhaust mouths.
  function tile(x,z,dx,dz,height,material){
@@ -108,7 +108,7 @@ export function buildLaunchGround(site,{tower,coreMounts,baseR:r,baseY,allH:H,fl
   pad(civil,(channelEnd+channelStart)/2,(floorY+grade)/2,s*(w+.52),channelEnd-channelStart,grade-floorY+1,1.04,wall);
   pad(civil,0,(floorY+deckY)/2,s*(w+1.5),2.55*w,depth,3,wall);
   pad(civil,0,deckY-.36,s*(w+1.15),3.1*w,.72,3.7,cool);
-  if(site.infrastructure?.water?.visual?.render)shaft(civil,[channelStart+1,grade+.6,s*(w+1.2)],[channelEnd-1,grade+.6,s*(w+1.2)],.26,pipe);
+  if(site.infrastructure?.water?.visual?.render)shaft(civil,[channelStart+1,grade+.6,s*(w+1.2)],[channelEnd-1,grade+.6,s*(w+1.2)],.26,pipe).name='Water cooling manifold';
  }
  // Elevated mount bears on piers around an open aperture. A low ridge of
  // water-cooled inclined steel beneath the engine plane turns exhaust sideways.
@@ -232,7 +232,7 @@ export function buildLaunchGround(site,{tower,coreMounts,baseR:r,baseY,allH:H,fl
  const sprays=g(tower,'Water curtain'),jetMat=new T.MeshBasicMaterial({color:'#b4e1e7',transparent:true,opacity:.66,depthWrite:false});
  const application=site.infrastructure?.water?.visual?.application||'study';sprays.userData.application=application;sprays.userData.geometryBasis='Illustrative nozzles and water paths; no flow rate or surveyed nozzle count.';
  function waterJet(origin,point){
-  const a=V(...origin),b=V(...point(.08));shaft(civil,a.toArray(),a.clone().lerp(b,.30).toArray(),.17,cool);
+  const a=V(...origin),b=V(...point(.08));shaft(civil,a.toArray(),a.clone().lerp(b,.30).toArray(),.17,cool).name='Water injection nozzle';
   let start=origin;
   for(let j=1;j<=5;j++){const f=j/5,end=point(f);shaft(sprays,start,end,.07+.11*f,jetMat);start=end;}
  }

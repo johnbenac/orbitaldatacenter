@@ -20,6 +20,7 @@ export const pages={
  software:['Flight Software','workflow','Inspect the active mode, its reference, actuator feedback and the interlock permitting the next operation.'],
  architecture:['Spacecraft architecture','box','Inspect the selected reference architecture and the explicit workbench adaptation used by its installed design.'],
  timeline:['Master timeline','clock-3','Follow this design from ground processing through launch and the first operating checkout. Select a call to inspect its timing or replay it on the mission clock.'],
+ parts:['Parts navigator','box','Explore each spacecraft, launcher, ground-support and launch-site component, its current geometry and linked equipment data.'],
  equipment:['Master equipment list','list-checks','Trace each mass allocation to the installed hardware, its sizing basis and its published reference.'],
  materials:['Materials & finishes','box','Inspect documented materials, preliminary finish allocations, surface details and the texture bank linked to the master equipment list.'],
  sources:['Model & sources','book-open','Inspect the equations, assumptions, and reference hardware behind this design.'],

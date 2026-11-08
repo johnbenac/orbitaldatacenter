@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import {Quaternion,Vector3} from './dist/vendor/three.module.js';
-import {SUN_VELOCITY_TILT_DEG,sunVelocityCameraFrame} from './dist/orbital-camera.js';
+import {CAMERA_MODES,normalizeCameraMode,cameraModeAvailable,cameraReferenceToBody,SUN_VELOCITY_TILT_DEG,sunVelocityCameraFrame} from './dist/orbital-camera.js';
+import {flightFrames} from './dist/flight-frame.js';
+import {INSERTION_MET} from './dist/launch-effects-state.js';
 
 const V=(...a)=>new Vector3(...a),DEG=Math.PI/180;
 const close=(actual,expected,message,tolerance=1e-10)=>
@@ -116,3 +118,73 @@ sunVelocityCameraFrame(snapshot,initial);
 assert.equal(JSON.stringify(snapshot),savedSnapshot);
 assert.deepEqual(frameArrays(initial),savedFrame);
 console.log('Orbital default camera: bisector tilt, arrow separation, physical ECI transforms, moving vectors, singular continuity, radial-up transport and repeatability passed.');
+
+assert.deepEqual(CAMERA_MODES,['orbit','body','inertial','sun-velocity']);
+for(const mode of CAMERA_MODES)assert.equal(normalizeCameraMode(mode),mode);
+for(const value of [undefined,null,'','Orbit','earth',{}])assert.equal(normalizeCameraMode(value),'orbit');
+for(const mode of CAMERA_MODES){
+ assert(cameraReferenceToBody(mode,null).equals(new Quaternion()),'missing flight frame safely supplies identity');
+ assert(cameraReferenceToBody(mode,undefined).equals(new Quaternion()),'uninitialized flight frame safely supplies identity');
+}
+
+const orbitSnapshot={t:INSERTION_MET,altitudeKm:550,flightPhase:'insertion'};
+for(const view of ['spacecraft','core']){
+ assert(cameraModeAvailable(view,orbitSnapshot),'camera modes become available at orbital insertion');
+ assert(cameraModeAvailable(view,{...orbitSnapshot,t:9000,flightPhase:'operations'}));
+ assert(cameraModeAvailable(view,{...orbitSnapshot,flightPhase:'deorbit'}),'an orbiting deorbit view remains available before entry');
+ for(const patch of [{t:INSERTION_MET-1},{t:NaN},{t:Infinity},{altitudeKm:0},{altitudeKm:-1},
+  {altitudeKm:NaN},{altitudeKm:Infinity},{referenceBody:true},{orbitLost:true},{flightPhase:'entry'}])
+  assert(!cameraModeAvailable(view,{...orbitSnapshot,...patch}),'non-orbital or invalid snapshots must not expose camera modes');
+ for(const input of [null,undefined,{}])assert(!cameraModeAvailable(view,input));
+}
+for(const view of ['orbit','launch','bay',''])assert(!cameraModeAvailable(view,orbitSnapshot),'camera modes are limited to close spacecraft/core views');
+assert(cameraModeAvailable('spacecraft',orbitSnapshot,'commissioning','vehicle'));
+for(const lens of ['wing','radiator'])assert(!cameraModeAvailable('spacecraft',orbitSnapshot,'commissioning',lens),'dedicated commissioning lenses keep their own camera');
+assert(cameraModeAvailable('core',orbitSnapshot,'commissioning','wing'));
+assert(cameraModeAvailable('spacecraft',orbitSnapshot,'operations','wing'));
+
+// Use independently constructed physical ECI axes rather than the render-space
+// conversion to check transform direction and quaternion multiplication order.
+const orbitPlane=new Quaternion().setFromAxisAngle(V(.3,.8,-.4).normalize(),.71);
+const cameraOffset=new Quaternion().setFromAxisAngle(V(.4,-.3,.7).normalize(),1.17)
+ .multiply(new Quaternion().setFromAxisAngle(V(0,1,0),-.29));
+const localEye=V(0,0,1).applyQuaternion(cameraOffset),localUp=V(0,1,0).applyQuaternion(cameraOffset);
+const expectedNadir=V(0,0,-1).applyQuaternion(cameraOffset.clone().invert());
+const bodyEyeDirections=[];
+function intoBody(vector,s){return V(vector.dot(V(...s.bodyXECI)),vector.dot(V(...s.bodyUpECI)),vector.dot(V(...s.bodyZECI)));}
+function intoECI(vector,s){return V(...s.bodyXECI).multiplyScalar(vector.x).addScaledVector(V(...s.bodyUpECI),vector.y).addScaledVector(V(...s.bodyZECI),vector.z);}
+for(let sample=0;sample<16;sample++){
+ const angle=sample*Math.PI/7;
+ const radial=V(Math.cos(angle),Math.sin(angle),0).applyQuaternion(orbitPlane);
+ const along=V(-Math.sin(angle),Math.cos(angle),0).applyQuaternion(orbitPlane);
+ const normal=V(0,0,1).applyQuaternion(orbitPlane);
+ // Body attitude changes independently of orbital phase, including roll.
+ const attitude=new Quaternion().setFromAxisAngle(V(.2,.5,.8).normalize(),sample*.43)
+  .multiply(new Quaternion().setFromAxisAngle(V(1,0,0),.61-sample*.17));
+ const s={...orbitSnapshot,radial:radial.toArray(),along:along.toArray(),normal:normal.toArray(),
+  positionECI:radial.clone().multiplyScalar(7000).toArray(),
+  bodyXECI:V(1,0,0).applyQuaternion(attitude).toArray(),
+  bodyUpECI:V(0,1,0).applyQuaternion(attitude).toArray(),
+  bodyZECI:V(0,0,1).applyQuaternion(attitude).toArray()};
+ const frame=flightFrames(s);
+ const original=Object.fromEntries(Object.entries(frame).map(([key,q])=>[key,q.toArray()]));
+ const orbitCamera=cameraReferenceToBody('orbit',frame).multiply(cameraOffset);
+ const actualNadir=intoBody(radial.clone().negate(),s).applyQuaternion(orbitCamera.clone().invert());
+ assert(actualNadir.distanceTo(expectedNadir)<1e-10,'nadir keeps the same camera direction through an orbit despite body attitude changes and a fixed arbitrary drag offset');
+ const orbitEyeECI=intoECI(V(0,0,1).applyQuaternion(orbitCamera),s);
+ const expectedEye=along.clone().multiplyScalar(localEye.x).addScaledVector(normal,localEye.y).addScaledVector(radial,localEye.z);
+ assert(orbitEyeECI.distanceTo(expectedEye)<1e-10,'orbit frame is along-track, orbit-normal, radial-outward in that order');
+
+ const inertialCamera=cameraReferenceToBody('inertial',frame).multiply(cameraOffset);
+ assert(intoECI(V(0,0,1).applyQuaternion(inertialCamera),s).distanceTo(localEye)<1e-10,'inertial eye direction remains fixed in physical ECI');
+ assert(intoECI(V(0,1,0).applyQuaternion(inertialCamera),s).distanceTo(localUp)<1e-10,'inertial roll/up remains fixed in physical ECI');
+
+ const bodyCamera=cameraReferenceToBody('body',frame).multiply(cameraOffset);
+ assert(V(0,0,1).applyQuaternion(bodyCamera).distanceTo(localEye)<1e-10,'body mode retains the same chassis-relative viewing angle');
+ assert(V(0,1,0).applyQuaternion(bodyCamera).distanceTo(localUp)<1e-10,'body mode retains chassis-relative roll');
+ bodyEyeDirections.push(intoECI(V(0,0,1).applyQuaternion(bodyCamera),s));
+ assert(cameraReferenceToBody('sun-velocity',frame).equals(new Quaternion()),'Sun–velocity retains its existing separately computed body-space basis');
+ assert.deepEqual(Object.fromEntries(Object.entries(frame).map(([key,q])=>[key,q.toArray()])),original,'composing a camera offset never mutates the shared flight frames');
+}
+assert(bodyEyeDirections.some(direction=>direction.distanceTo(bodyEyeDirections[0])>.5),'body mode follows spacecraft attitude rather than accidentally staying inertial');
+console.log('Camera modes: availability, orbit-relative nadir stability, independent body attitude, constant inertial ECI orientation and frame immutability passed.');

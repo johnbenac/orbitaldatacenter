@@ -35,7 +35,7 @@ export function layoutBayAnnotations(points,width,height){
  return placed;
 }
 
-export function drawBayAnnotations(parent,entries){
+export function drawBayAnnotations(parent,entries,{actions=false}={}){
  // Retain each button across scene redraws so native title tooltips and keyboard
  // focus survive live telemetry, camera updates and background rendering.
  const previous=new Map(Array.from(parent.children,card=>[card.dataset.annotationId,card]));
@@ -47,14 +47,15 @@ export function drawBayAnnotations(parent,entries){
    parent.append(card);
   }
   card.className='bay-pin'+(e.side==='left'?' bay-pin-left':'');
-  // A leader moves the current camera once. It never selects a persistent
-  // inspection preset or changes the engineering service selection.
-  card.dataset.sceneAnchor=e.id;card.setAttribute('aria-label','Center view on '+e.title.toLowerCase());
+  // The live scene opens its part menu; simpler consumers can retain direct
+  // centering. Both retain the native browser tooltip as the one hover hint.
+  card.dataset.sceneAnchor=e.id;card.setAttribute('aria-label',(actions?'Actions for ':'Center view on ')+e.title.toLowerCase());
+  if(actions)card.setAttribute('aria-haspopup','menu');else card.removeAttribute('aria-haspopup');
   if(e.pad)card.dataset.padCallout=e.id;else delete card.dataset.padCallout;
   if(e.instrument)card.dataset.sceneInstrument=e.instrument;else delete card.dataset.sceneInstrument;
   card.dataset.annotationId=e.id;
   card.style.left=e.x+'px';card.style.top=e.y+'px';card.style.maxWidth=e.labelWidth+'px';
-  const description=[e.value,e.detail,'Click to center view'].filter(Boolean).join(' · ');
+  const description=[e.value,e.detail,actions?'Click for part actions':'Click to center view'].filter(Boolean).join(' · ');
   const title=e.title+' · '+description;
   if(card.title!==title)card.title=title;
   card.setAttribute('aria-description',description);

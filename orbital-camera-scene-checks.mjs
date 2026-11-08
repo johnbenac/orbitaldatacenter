@@ -92,177 +92,204 @@ function frame(){
 }
 const close=(a,b,message,tol=1e-7)=>assert.ok(Math.abs(a-b)<tol,`${message}: ${a} != ${b}`);
 const samePoint=(a,b,message)=>assert.ok(a.distanceTo(b)<1e-7,`${message}: ${a.toArray()} != ${b.toArray()}`);
-function sameFraming(a,b,message){close(a.radius,b.radius,message+' distance');close(a.height,b.height,message+' span');close(a.rotation.angleTo(b.rotation),0,message+' orientation');}
+function sameFraming(a,b,message){close(a.radius,b.radius,message+' distance');close(a.height,b.height,message+' span');close(a.rotation.angleTo(b.rotation),0,message+' orientation',1e-6);}
 
 
 const V=(...a)=>new Vector3(...a),degrees=r=>r*180/Math.PI;
 const hardware=sizeDesign(missionStarter('text')),simulation=createSimulation(hardware),base=simulation.at(7800);
 const container=new Element();body.append(container);
-let picked=0;
-const scene=createScene(container,{onPick:()=>{picked++;}}),canvas=container.children[0];
-// Preserve one real simulation's geometry/thermal/deployment fields, replacing
-// only the orbital frame to isolate camera following from model integration.
-function orbitalSnapshot(t,orbitAngle,sunAngle,bodyAngle){
- const radial=[Math.cos(orbitAngle),Math.sin(orbitAngle),0],along=[-Math.sin(orbitAngle),Math.cos(orbitAngle),0];
+let picked=0;const modeChanges=[];
+const scene=createScene(container,{onPick:()=>{picked++;},onCameraFrameChange:mode=>modeChanges.push(mode)}),canvas=container.children[0];
+// One real simulation supplies model fields. Independent orbital and attitude
+// rotations isolate the camera frames without integrating additional missions.
+function orbitalSnapshot(t,orbitAngle,sunAngle,bodyAngle,planeTilt=0){
+ const plane=new Quaternion().setFromAxisAngle(V(1,0,0),planeTilt);
+ const radial=V(Math.cos(orbitAngle),Math.sin(orbitAngle),0).applyQuaternion(plane),along=V(-Math.sin(orbitAngle),Math.cos(orbitAngle),0).applyQuaternion(plane);
+ const attitude=new Quaternion().setFromAxisAngle(V(1,2,3).normalize(),bodyAngle);
  const range=Math.hypot(...base.positionECI),speed=Math.hypot(...base.velocityECI);
- return {...base,t,radial,along,normal:[0,0,1],positionECI:radial.map(x=>x*range),velocityECI:along.map(x=>x*speed),
-  sunECI:[Math.cos(sunAngle),Math.sin(sunAngle),0],
-  bodyXECI:[Math.cos(bodyAngle),Math.sin(bodyAngle),0],bodyUpECI:[-Math.sin(bodyAngle),Math.cos(bodyAngle),0],bodyZECI:[0,0,1]};
+ return {...base,t,radial:radial.toArray(),along:along.toArray(),normal:V(0,0,1).applyQuaternion(plane).toArray(),
+  positionECI:radial.clone().multiplyScalar(range).toArray(),velocityECI:along.clone().multiplyScalar(speed).toArray(),
+  sunECI:[Math.cos(sunAngle),Math.sin(sunAngle),0],bodyXECI:V(1,0,0).applyQuaternion(attitude).toArray(),
+  bodyUpECI:V(0,1,0).applyQuaternion(attitude).toArray(),bodyZECI:V(0,0,1).applyQuaternion(attitude).toArray()};
 }
-const first=orbitalSnapshot(7800,0,0,0),later=orbitalSnapshot(8400,.7,.2,.35),latest=orbitalSnapshot(9000,1.1,-.1,.8);
+const first=orbitalSnapshot(7800,0,0,0),later=orbitalSnapshot(8400,.7,.2,.35,.2),latest=orbitalSnapshot(9000,1.1,-.1,.8,-.25);
 let snapshot=first;
 function draw(){scene.update(hardware,snapshot);return frame();}
+const savedState=()=>JSON.parse(JSON.stringify(scene.getCameraState()));
 function bodyDirection(a,s=snapshot){
  const ray=V(...a),x=V(...s.bodyXECI),y=V(...s.bodyUpECI),z=x.clone().cross(y).normalize();
  return V(ray.dot(x),ray.dot(y),ray.dot(z)).normalize();
 }
+function bodyToECI(a,s=snapshot){return V(...s.bodyXECI).multiplyScalar(a.x).addScaledVector(V(...s.bodyUpECI),a.y).addScaledVector(V(...s.bodyZECI),a.z);}
+function cameraComponents(a,camera){return V(a.dot(camera.right),a.dot(camera.up),a.dot(camera.direction));}
+function earthInCamera(camera){return cameraComponents(bodyDirection(snapshot.positionECI.map(x=>-x)),camera);}
+function inertialBasis(camera){return {right:bodyToECI(camera.right),up:bodyToECI(camera.up),direction:bodyToECI(camera.direction)};}
+function sameBasis(a,b,message){for(const key of ['right','up','direction'])samePoint(a[key],b[key],message+' '+key);}
 function rotationEqual(a,b,message){close(a.angleTo(b),0,message,1e-6);}
 function samePose(a,b,message){samePoint(a.eye,b.eye,message+' eye');samePoint(a.pivot,b.pivot,message+' pivot');sameFraming(a,b,message);}
-function assertAuto(actual,label){
- assert.equal(scene.getCameraTracking(),'sun-velocity',label+' uses automatic orbital framing');
+function sameRangeAndPivot(a,b,message){close(a.radius,b.radius,message+' range');close(a.height,b.height,message+' scale');samePoint(a.pivot,b.pivot,message+' pivot');}
+function assertMode(mode,label){assert.equal(scene.getCameraMode(),mode,label+' selected mode');assert.equal(scene.getCameraTracking(),mode,label+' rendered frame');}
+function assertSun(actual,label){
+ assertMode('sun-velocity',label);
  const sun=bodyDirection(snapshot.sunECI),velocity=bodyDirection(snapshot.velocityECI);
  const bisector=sun.clone().add(velocity).normalize(),normal=sun.clone().cross(velocity).normalize();
  close(degrees(actual.direction.angleTo(bisector)),22.5,label+' out-of-plane angle',1e-6);
  const inPlane=actual.direction.clone().addScaledVector(normal,-actual.direction.dot(normal)).normalize();
- samePoint(inPlane,bisector,label+' in-plane component follows the actual unit-vector bisector');
+ samePoint(inPlane,bisector,label+' actual unit-vector bisector');
  const sx=sun.dot(actual.right),sy=sun.dot(actual.up),vx=velocity.dot(actual.right),vy=velocity.dot(actual.up);
  const separation=Math.abs(sx*vy-sy*vx)/Math.hypot(sx,sy)/Math.hypot(vx,vy);
  assert.ok(separation>1e-4,label+' projects Sun and velocity to distinct lines');
- if(Math.abs(sun.dot(velocity))<.1)assert.ok(separation>.2,label+' has a visibly separated nondegenerate projection');
+ if(Math.abs(sun.dot(velocity))<.1)assert.ok(separation>.2,label+' visibly separates the perpendicular sample');
 }
 function pointer(type,x,y,button=0){return fire(canvas,type,{clientX:x,clientY:y,button});}
 function drag(x,y,toX,toY,button=0){pointer('pointerdown',x,y,button);pointer('pointermove',toX,toY,button);pointer('pointerup',toX,toY,button);}
 function key(key,values={}){assert.ok(fire(canvas,'keydown',{key,...values}).defaultPrevented,'Camera key is handled: '+key);}
+function navigationPreservesMode(mode){
+ const start=draw(),untouched=savedState();
+ pointer('pointerdown',160,100);pointer('pointermove',163,100);pointer('pointerup',163,100);pointer('pointermove',160,100);
+ assert.deepEqual(savedState(),untouched,mode+': click, hover and three-pixel jitter do not rotate');
+ const clicked=draw();samePose(clicked,start,mode+': click preserves camera');assertMode(mode,'After click');
+ fire(canvas,'wheel',{deltaY:-100});const zoomed=frame();assertMode(mode,'After wheel');assert.ok(zoomed.height<start.height,'Wheel changes visible scale');
+ drag(160,100,180,109,1);const panned=frame();assertMode(mode,'After middle-button pan');
+ assert.ok(panned.pivot.distanceTo(zoomed.pivot)>.01,'Pan moves the target');
+ key('ArrowRight',{shiftKey:true});frame();assertMode(mode,'After keyboard pan');
+ const picksBeforePinch=picked;
+ fire(canvas,'pointerdown',{pointerType:'touch',pointerId:11,clientX:100,clientY:100});
+ fire(canvas,'pointerdown',{pointerType:'touch',pointerId:12,clientX:220,clientY:100});
+ fire(canvas,'pointermove',{pointerType:'touch',pointerId:12,clientX:230,clientY:100});frame();assertMode(mode,'During pinch');
+ fire(canvas,'pointerup',{pointerType:'touch',pointerId:12,clientX:230,clientY:100});
+ fire(canvas,'pointermove',{pointerType:'touch',pointerId:11,clientX:100,clientY:100});
+ fire(canvas,'pointermove',{pointerType:'touch',pointerId:11,clientX:102,clientY:101});
+ fire(canvas,'pointerup',{pointerType:'touch',pointerId:11,clientX:102,clientY:101});
+ const result=draw();assertMode(mode,'After pinch and release jitter');
+ assert.equal(picked,picksBeforePinch,'Ending a pinch must not activate a pick');return result;
+}
+function roundTrip(saved,expected,mode){
+ // Home resets the current frame, then importing must recover both its mode
+ // and geometry even when the saved values came from a different mission time.
+ key('Home');frame();assertMode(mode,mode+' Home');
+ scene.setCameraMode(mode==='body'?'inertial':'body');frame();
+ scene.setCameraState(JSON.parse(JSON.stringify(saved)));const restored=frame();assertMode(mode,mode+' restored');
+ samePose(restored,expected,mode+' saved frame at changed time');assert.deepEqual(savedState(),saved,mode+' serialized round trip');return restored;
+}
 
 scene.setDomain('conops','E');scene.setChapter('operations');scene.setView('spacecraft');scene.update(hardware,snapshot);scene.resetCamera();
-let initial=frame();assertAuto(initial,'Spacecraft opening');
-assert.equal(scene.getSpacecraftFocus(),'core','Opening framing still defaults to the core');
+const opening=frame();assertMode('orbit','Opening');assert.equal(scene.getSpacecraftFocus(),'core');
+assert.deepEqual(savedState()._camera,{version:1,mode:'orbit',legacy:[],bodyPan:[]});
+const openingEarth=earthInCamera(opening);
+snapshot=later;const orbitFollowing=draw();assertMode('orbit','Untouched orbit');
+samePoint(earthInCamera(orbitFollowing),openingEarth,'Orbit default keeps Earth direction fixed through orbit and attitude changes');
+assert.ok(orbitFollowing.rotation.angleTo(opening.rotation)>.08,'Orbit mode actively follows the changing physical frame');
 
-// Holding a pointer down or clicking is not a request to take over the camera.
-const untouchedState=scene.getCameraState().spacecraft.slice();
-pointer('pointerdown',160,100);assert.equal(scene.getCameraTracking(),'sun-velocity');
-pointer('pointermove',163,100);pointer('pointerup',163,100);
-pointer('pointermove',160,100);
-assert.deepEqual(scene.getCameraState().spacecraft,untouchedState,'Three-pixel click jitter does not mutate camera state');
-let afterClick=draw();samePose(afterClick,initial,'Click and hover preserve the opening camera');assertAuto(afterClick,'After click');
+snapshot=first;draw();const orbitNavigation=navigationPreservesMode('orbit'),navigationState=savedState();
+const navigationEarth=earthInCamera(orbitNavigation),navigationPan=cameraComponents(orbitNavigation.pivot,orbitNavigation);
+snapshot=later;const beforeOrbitDrag=draw();samePoint(earthInCamera(beforeOrbitDrag),navigationEarth,'Orbit following after pan/zoom');
+samePoint(cameraComponents(beforeOrbitDrag.pivot,beforeOrbitDrag),navigationPan,'Orbit pan remains in the orbital frame');
+assert.deepEqual(savedState(),navigationState,'Following does not rewrite pan, zoom or turn state');
+drag(160,100,192,117);const orbitDrag=frame();assertMode('orbit','Orbit drag');sameRangeAndPivot(orbitDrag,beforeOrbitDrag,'Orbit drag');
+assert.ok(orbitDrag.rotation.angleTo(beforeOrbitDrag.rotation)>.03,'Orbit drag visibly turns');
+const orbitSaved=savedState(),orbitEarth=earthInCamera(orbitDrag),orbitPan=cameraComponents(orbitDrag.pivot,orbitDrag);
+assert.ok([10,14].includes(orbitSaved.spacecraft.length),'Orbit rotation is serialized');
+snapshot=latest;const orbitHeld=draw();assertMode('orbit','Orbit after drag and time advance');
+samePoint(earthInCamera(orbitHeld),orbitEarth,'Earth direction stays fixed after an Orbit drag');
+samePoint(cameraComponents(orbitHeld.pivot,orbitHeld),orbitPan,'Orbit pan follows the selected frame after drag');
+assert.deepEqual(savedState(),orbitSaved);roundTrip(orbitSaved,orbitHeld,'orbit');
 
-fire(canvas,'wheel',{deltaY:-100});let zoomed=frame();assertAuto(zoomed,'After wheel');
-assert.ok(zoomed.height<initial.height,'Wheel still changes the visible scale');
-drag(160,100,180,109,1);const panned=frame();assertAuto(panned,'After middle-button pan');
-assert.ok(panned.pivot.distanceTo(zoomed.pivot)>.01,'Pan still moves the camera target');
-key('ArrowRight',{shiftKey:true});const keyboardPanned=frame();assertAuto(keyboardPanned,'After keyboard pan');
-// Ending a two-finger pan/pinch is not a rotation. A stationary remaining
-// finger must still pass the normal movement threshold before taking over.
-const picksBeforePinch=picked;
-fire(canvas,'pointerdown',{pointerType:'touch',pointerId:11,clientX:100,clientY:100});
-fire(canvas,'pointerdown',{pointerType:'touch',pointerId:12,clientX:220,clientY:100});
-fire(canvas,'pointermove',{pointerType:'touch',pointerId:12,clientX:230,clientY:100});
-assertAuto(frame(),'During two-finger navigation');
-fire(canvas,'pointerup',{pointerType:'touch',pointerId:12,clientX:230,clientY:100});
-fire(canvas,'pointermove',{pointerType:'touch',pointerId:11,clientX:100,clientY:100});
-fire(canvas,'pointermove',{pointerType:'touch',pointerId:11,clientX:102,clientY:101});
-fire(canvas,'pointerup',{pointerType:'touch',pointerId:11,clientX:102,clientY:101});
-assertAuto(draw(),'After two-finger navigation and small release jitter');
-assert.equal(picked,picksBeforePinch,'Ending a pinch must not activate the remaining finger as a click');
-const navigationState=scene.getCameraState().spacecraft.slice();
-snapshot=later;const following=draw();assertAuto(following,'Later orbital geometry');
-assert.ok(following.rotation.angleTo(keyboardPanned.rotation)>.08,'An untouched camera follows changing Sun/velocity geometry');
-assert.deepEqual(scene.getCameraState().spacecraft,navigationState,'Automatic following preserves the user zoom and pan');
+// Standard mode changes preserve the displayed composition. Their different
+// behavior is visible only as the physical frame changes afterward.
+scene.setCameraMode('body');const bodyStart=frame();assertMode('body','Orbit to Body');samePose(bodyStart,orbitHeld,'Orbit to Body has no jump');
+snapshot=first;const bodyHeld=draw();samePose(bodyHeld,bodyStart,'Body view remains fixed through orbit and attitude changes');
+drag(160,100,180,111);const bodyDrag=frame();assertMode('body','Body drag');sameRangeAndPivot(bodyDrag,bodyHeld,'Body drag');
+const bodySaved=savedState();snapshot=later;const bodyLater=draw();samePose(bodyLater,bodyDrag,'Body rotation stays body-relative');
+roundTrip(bodySaved,bodyLater,'body');
+scene.setDomain('power','E');const bodyDomain=frame();samePose(bodyDomain,bodyLater,'Body view survives a domain change');
+scene.setSpacecraftFocus('entire');rotationEqual(frame().rotation,bodyLater.rotation,'Entire focus preserves orientation');
+scene.setSpacecraftFocus('core');samePose(frame(),bodyLater,'Returning to core preserves camera');
+container.width=400;container.height=260;scene.resize();rotationEqual(frame().rotation,bodyLater.rotation,'Resize preserves orientation');
+container.width=320;container.height=200;scene.resize();samePose(frame(),bodyLater,'Restoring viewport preserves camera');
 
-// Real rotation takes over from the exact displayed frame. The handoff must
-// not reframe the bus or translate the target underneath an ongoing gesture.
-const beforeTakeover=following;
-pointer('pointerdown',160,100);assert.equal(scene.getCameraTracking(),'sun-velocity','Pointerdown alone keeps following');
-pointer('pointermove',192,117);const duringDrag=frame();
-assert.equal(scene.getCameraTracking(),'manual','A real drag captures a manual body-frame camera');
-close(duringDrag.radius,beforeTakeover.radius,'Drag handoff keeps range');
-close(duringDrag.height,beforeTakeover.height,'Drag handoff keeps scale');
-samePoint(duringDrag.pivot,beforeTakeover.pivot,'Drag handoff keeps pivot');
-assert.ok(duringDrag.rotation.angleTo(beforeTakeover.rotation)>.03,'Rotation drag visibly turns the camera');
-pointer('pointerup',192,117);
-const manualState=scene.getCameraState();assert.equal(manualState.spacecraft.length,14,'Manual saves include turn and frozen base quaternions');
-assert.deepEqual(manualState.spacecraft.slice(0,6),navigationState,'Rotation takes over without rewriting pan or zoom');
-const manual=draw();rotationEqual(manual.rotation,duringDrag.rotation,'Releasing drag preserves orientation');
-snapshot=latest;const held=draw();assert.equal(scene.getCameraTracking(),'manual');
-samePose(held,manual,'Time and attitude changes preserve the chosen body-relative view');
-assert.deepEqual(scene.getCameraState(),manualState,'Time does not rewrite manual camera state');
+scene.setCameraMode('inertial');const inertialStart=frame();assertMode('inertial','Body to Inertial');samePose(inertialStart,bodyLater,'Body to Inertial has no jump');
+const inertialInitialBasis=inertialBasis(inertialStart),inertialInitialPan=bodyToECI(inertialStart.pivot);
+snapshot=latest;const inertialHeld=draw();sameBasis(inertialBasis(inertialHeld),inertialInitialBasis,'Inertial view stays fixed in physical ECI');
+samePoint(bodyToECI(inertialHeld.pivot),inertialInitialPan,'Inertial pan stays fixed in physical ECI');
+drag(160,100,182,113);const inertialDrag=frame();assertMode('inertial','Inertial drag');sameRangeAndPivot(inertialDrag,inertialHeld,'Inertial drag');
+const inertialSaved=savedState(),turnedInertialBasis=inertialBasis(inertialDrag),turnedInertialPan=bodyToECI(inertialDrag.pivot);
+snapshot=first;const inertialLater=draw();sameBasis(inertialBasis(inertialLater),turnedInertialBasis,'Inertial drag retains the ECI frame');
+samePoint(bodyToECI(inertialLater.pivot),turnedInertialPan,'Inertial pan remains stable after a drag');
+roundTrip(inertialSaved,inertialLater,'inertial');
+scene.setCameraMode('orbit');const backToOrbit=frame();assertMode('orbit','Inertial to Orbit');samePose(backToOrbit,inertialLater,'Inertial to Orbit has no jump');
+const returnedOrbitEarth=earthInCamera(backToOrbit);snapshot=latest;const returnedOrbit=draw();
+samePoint(earthInCamera(returnedOrbit),returnedOrbitEarth,'Returning to Orbit adopts orbital-frame following');
 
-scene.setDomain('power','E');const domainChanged=frame();rotationEqual(domainChanged.rotation,manual.rotation,'Domain change preserves manual orientation');
-assert.deepEqual(scene.getCameraState(),manualState,'Domain change preserves manual pan and zoom');
-scene.setSpacecraftFocus('entire');const entire=frame();rotationEqual(entire.rotation,manual.rotation,'Entire focus preserves manual orientation');
-scene.setSpacecraftFocus('core');samePose(frame(),held,'Returning to core preserves the held framing');
-container.width=400;container.height=260;scene.resize();rotationEqual(frame().rotation,manual.rotation,'Resize preserves manual orientation');
-assert.deepEqual(scene.getCameraState(),manualState,'Resize preserves saved pan and zoom');
-container.width=320;container.height=200;scene.resize();samePose(frame(),held,'Returning to original size preserves framing');
-scene.setView('core');const coreOpening=frame();assertAuto(coreOpening,'Core cutaway opening');
-scene.setView('spacecraft');samePose(frame(),held,'Returning to spacecraft preserves its independent manual view');
+// Sun–velocity is an explicit assisted composition. Navigation preserves it;
+// deliberate rotation visibly changes the selected mode to Body.
+scene.setDomain('conops','E');scene.setCameraMode('sun-velocity');const sunOpening=frame();assertSun(sunOpening,'Explicit Sun–velocity');
+assert.ok(sunOpening.rotation.angleTo(returnedOrbit.rotation)>.01,'Selecting Sun–velocity recomposes the camera');
+key('Home');assertSun(frame(),'Home in Sun–velocity');snapshot=first;draw();
+const sunNavigation=navigationPreservesMode('sun-velocity'),sunNavigationState=savedState();assertSun(sunNavigation,'Sun navigation');
+snapshot=later;const sunFollowing=draw();assertSun(sunFollowing,'Sun following');
+assert.ok(sunFollowing.rotation.angleTo(sunNavigation.rotation)>.08,'Sun–velocity follows changing vector geometry');
+assert.deepEqual(savedState(),sunNavigationState,'Sun following preserves user navigation state');
+pointer('pointerdown',160,100);assertMode('sun-velocity','Sun pointerdown');pointer('pointermove',192,117);const sunDrag=frame();pointer('pointerup',192,117);
+assertMode('body','Sun drag takeover');assert.equal(modeChanges.at(-1),'body','Sun drag announces the new selector value');
+sameRangeAndPivot(sunDrag,sunFollowing,'Sun-to-Body takeover');
+assert.equal(savedState().spacecraft.length,14,'Frozen Sun composition retains a base quaternion');
+snapshot=latest;samePose(draw(),sunDrag,'Sun takeover stays body-relative');
+key('Home');frame();assertMode('body','Home after Sun takeover');
+scene.setCameraMode('sun-velocity');assertSun(frame(),'Reselect Sun–velocity');
 
-// Restoring the serialized manual camera at another orbital time is a true
-// round trip, not just a copied multiplier with a newly generated baseline.
-scene.resetCamera();let reset=frame();assertAuto(reset,'Reset camera');
-assert.equal(scene.getCameraState().spacecraft.length,6,'Reset removes the frozen manual base');
-scene.setCameraState(manualState);const restored=frame();assert.equal(scene.getCameraTracking(),'manual');samePose(restored,held,'Manual saved state restores exact frame');
-assert.deepEqual(scene.getCameraState(),manualState,'Manual saved state round trip');
-key('Home');reset=frame();assertAuto(reset,'Home reset');
-snapshot=first;const resumed=draw();assertAuto(resumed,'Following after Home');
-assert.ok(resumed.rotation.angleTo(reset.rotation)>.08,'Home resumes time-dependent following');
-
-// Reproduce the earlier drag while holding the pointer stationary as time and
-// attitude advance. The final camera must match the same gesture started at
-// the later displayed frame, rather than the frame that existed on pointerdown.
-scene.setCameraState({spacecraft:navigationState});const waitingStart=draw();
-pointer('pointerdown',160,100);
-snapshot=later;const waitingCurrent=draw();assertAuto(waitingCurrent,'While holding a pointer');
-assert.ok(waitingCurrent.rotation.angleTo(waitingStart.rotation)>.08,'A stationary held pointer allows following to advance');
+// A held pointer must take over from the latest displayed Sun composition.
+scene.setCameraState(sunNavigationState);snapshot=first;const waitingStart=draw();pointer('pointerdown',160,100);
+snapshot=later;const waitingCurrent=draw();assertSun(waitingCurrent,'While holding a pointer');
+assert.ok(waitingCurrent.rotation.angleTo(waitingStart.rotation)>.08,'A stationary pointer allows following to advance');
 pointer('pointermove',192,117);const delayedTakeover=frame();pointer('pointerup',192,117);
-assert.equal(scene.getCameraTracking(),'manual');
-samePose(delayedTakeover,duringDrag,'Delayed drag starts from the current displayed camera');
-key('Home');frame();snapshot=first;draw();
+assertMode('body','Delayed Sun takeover');samePose(delayedTakeover,sunDrag,'Delayed drag starts from the current displayed frame');
+scene.setCameraMode('sun-velocity');frame();key('ArrowLeft');frame();assertMode('body','Sun keyboard turn');
+scene.setCameraMode('sun-velocity');frame();key('q');const rolled=frame();assertMode('body','Sun keyboard roll');
+snapshot=latest;samePose(draw(),rolled,'Sun keyboard roll remains body-relative');
 
-// Rotate and roll keys are deliberate orientation changes, unlike pan keys.
-key('ArrowLeft');const keyboardTurn=frame();assert.equal(scene.getCameraTracking(),'manual');
-assert.equal(scene.getCameraState().spacecraft.length,14);
-snapshot=later;rotationEqual(draw().rotation,keyboardTurn.rotation,'Keyboard turn stays body-fixed through time');
-key('Home');frame();key('q');const keyboardRoll=frame();assert.equal(scene.getCameraTracking(),'manual');
-snapshot=latest;rotationEqual(draw().rotation,keyboardRoll.rotation,'Keyboard roll stays body-fixed through time');
-
-// The core camera has a separate manual state and the same follow/reset rules.
-scene.setView('core');assertAuto(frame(),'Independent core camera');
-key('ArrowUp');const coreManual=frame();assert.equal(scene.getCameraTracking(),'manual');
-assert.equal(scene.getCameraState().core.length,14);
-snapshot=first;rotationEqual(draw().rotation,coreManual.rotation,'Core manual camera stays body-fixed');
-key('Home');assertAuto(frame(),'Core Home reset');
-scene.setView('spacecraft');assert.equal((frame(),scene.getCameraTracking()),'manual','Core reset does not reset spacecraft');
-
-// Old default states adopt following. Old customized states keep their former
-// orbital-frame or body-frame rendering, including their relative quaternion.
-scene.setDomain('conops','E');frame();
-scene.setCameraState({spacecraft:[.61,.49,1.2,.1,-.2,.3]});assertAuto(frame(),'Old untouched angles');
-const oldSix=[.82,.37,1.2,.1,-.2,.3];scene.setCameraState({spacecraft:oldSix});const legacySix=frame();
-assert.equal(scene.getCameraTracking(),'legacy');assert.deepEqual(scene.getCameraState().spacecraft,oldSix);
+// Old six/ten-value saves retain their former rendering path. A 14-value save
+// without metadata is the previous body-fixed format, not a new Orbit save.
+scene.setCameraMode('orbit');scene.setDomain('conops','E');snapshot=later;draw();key('Home');frame();
+const oldDefault=[.61,.49,1.2,.1,-.2,.3];scene.setCameraState({spacecraft:oldDefault});const migrated=frame();assertMode('orbit','Old default angles adopt Orbit');
+samePoint(migrated.pivot,V(...oldDefault.slice(3)),'Old body-coordinate pan does not jump on import');
+assert.deepEqual(savedState()._camera.bodyPan,[],'Old pan is converted once into the chosen frame');
+const oldSix=[.82,.37,1.2,.1,-.2,.3];scene.setCameraState({spacecraft:oldSix});const legacySix=frame();assert.equal(scene.getCameraTracking(),'legacy');
+assert.deepEqual(savedState().spacecraft,oldSix);assert.ok(savedState()._camera.legacy.includes('spacecraft'));
 const local=V(Math.sin(oldSix[0])*Math.cos(oldSix[1]),-Math.cos(oldSix[0])*Math.cos(oldSix[1]),Math.sin(oldSix[1]));
 const legacyECI=V(...snapshot.along).multiplyScalar(local.x).addScaledVector(V(...snapshot.normal),local.y).addScaledVector(V(...snapshot.radial),local.z);
-samePoint(legacySix.direction,bodyDirection(legacyECI.toArray()),'Old six-value camera retains its orbital-frame sightline');
+samePoint(legacySix.direction,bodyDirection(legacyECI.toArray()),'Old six-value camera keeps its original orbital-frame sightline');
 const oldTurn=new Quaternion().setFromAxisAngle(V(1,2,-1).normalize(),.28),oldTen=[...oldSix,...oldTurn.toArray()];
 scene.setCameraState({spacecraft:oldTen});const legacyTen=frame();assert.equal(scene.getCameraTracking(),'legacy');
-rotationEqual(legacyTen.rotation,legacySix.rotation.clone().multiply(oldTurn),'Old ten-value camera retains its relative turn');
-assert.deepEqual(scene.getCameraState().spacecraft,oldTen);
-scene.setCameraState({spacecraft:[1.2,.8,1,0,0,0]});const legacyBeforeTakeover=frame();
-key('ArrowRight');const legacyTakenOver=frame();assert.equal(scene.getCameraTracking(),'manual');
-close(legacyTakenOver.radius,legacyBeforeTakeover.radius,'Legacy handoff keeps range');
-close(legacyTakenOver.height,legacyBeforeTakeover.height,'Legacy handoff keeps scale');
-samePoint(legacyTakenOver.pivot,legacyBeforeTakeover.pivot,'Legacy handoff keeps pivot');
-rotationEqual(legacyTakenOver.rotation,legacyBeforeTakeover.rotation.clone().multiply(new Quaternion().setFromAxisAngle(V(0,1,0),.1)),'Legacy handoff applies only the requested keyboard turn');
-key('Home');assertAuto(frame(),'Reset old customized camera');
+rotationEqual(legacyTen.rotation,legacySix.rotation.clone().multiply(oldTurn),'Old ten-value save retains its relative turn');
+const legacyExport=savedState();key('Home');frame();scene.setCameraState(legacyExport);samePose(frame(),legacyTen,'Legacy metadata preserves the old rendering path');
+assert.equal(scene.getCameraTracking(),'legacy');assert.deepEqual(savedState(),legacyExport);
+scene.setCameraState({spacecraft:[1.2,.8,1,0,0,0]});const legacyBeforeTakeover=frame();key('ArrowRight');const legacyTakenOver=frame();assertMode('orbit','Legacy rotation adopts selected frame');
+sameRangeAndPivot(legacyTakenOver,legacyBeforeTakeover,'Legacy rotation handoff');
+rotationEqual(legacyTakenOver.rotation,legacyBeforeTakeover.rotation.clone().multiply(new Quaternion().setFromAxisAngle(V(0,1,0),.1)),'Legacy handoff applies only the requested turn');
+const legacyEarth=earthInCamera(legacyTakenOver);snapshot=latest;samePoint(earthInCamera(draw()),legacyEarth,'Legacy takeover follows Orbit afterward');
+const oldBase=new Quaternion().setFromAxisAngle(V(1,3,2).normalize(),.51),oldFourteen=[.61,.49,1.4,.15,-.12,.2,...oldTurn.toArray(),...oldBase.toArray()];
+scene.setCameraState({spacecraft:oldFourteen});const oldBody=frame();assertMode('body','Old 14-value save implies Body');
+rotationEqual(oldBody.rotation,oldBase.clone().multiply(oldTurn),'Old 14-value base and turn retain their meaning');
+samePoint(oldBody.pivot,V(...oldFourteen.slice(3,6)),'Old 14-value pan remains in body coordinates');
+snapshot=first;samePose(draw(),oldBody,'Old body save stays body-fixed through time');
 
-// Existing scene-specific compositions are outside the new orbital default.
-scene.setView('orbit');frame();assert.equal(scene.getCameraTracking(),'preset','Earth overview keeps its camera preset');
-scene.setView('spacecraft');scene.setChapter('commissioning');scene.setDeploymentLens('wing');frame();
-assert.equal(scene.getCameraTracking(),'preset','Commissioning wing closeup keeps its camera preset');
-scene.setDeploymentLens('elbow');frame();assert.equal(scene.getCameraTracking(),'preset','Commissioning elbow closeup keeps its camera preset');
-scene.setDeploymentLens('vehicle');assertAuto(frame(),'Commissioning whole vehicle');
-scene.setChapter('operations');scene.setView('launch');scene.setDomain('launcher','D');frame();
-assert.equal(scene.getCameraTracking(),'preset','Launch scene keeps its camera preset');
+// The dedicated core camera uses the selected frame but keeps independent
+// per-view navigation. Mode changes deliberately clear the inactive base.
+scene.setCameraMode('orbit');frame();const spacecraftBeforeCore=savedState().spacecraft;
+scene.setView('core');key('Home');const coreOpening=frame();assertMode('orbit','Core opening');const coreEarth=earthInCamera(coreOpening);
+snapshot=later;samePoint(earthInCamera(draw()),coreEarth,'Core Orbit default keeps Earth direction constant');
+key('ArrowUp');const coreDrag=frame();assertMode('orbit','Core keyboard turn');const coreTurnedEarth=earthInCamera(coreDrag);
+snapshot=latest;samePoint(earthInCamera(draw()),coreTurnedEarth,'Core rotation retains Orbit');
+scene.setView('spacecraft');frame();assert.deepEqual(savedState().spacecraft,spacecraftBeforeCore,'Core navigation does not rewrite spacecraft navigation');
+scene.setCameraMode('body');frame();assert.equal(savedState().core.length,6,'A frame change clears the inactive camera base and turn');
+scene.setView('core');frame();assertMode('body','Core honors selected Body mode');key('Home');frame();assertMode('body','Core Home keeps Body mode');
 
+// Scene-specific overview and close-up presets remain outside these modes.
+scene.setView('orbit');frame();assert.equal(scene.getCameraTracking(),'preset','Earth overview keeps its preset');
+scene.setView('spacecraft');scene.setChapter('commissioning');scene.setDeploymentLens('wing');frame();assert.equal(scene.getCameraTracking(),'preset','Commissioning wing closeup keeps its preset');
+scene.setDeploymentLens('elbow');frame();assert.equal(scene.getCameraTracking(),'preset','Commissioning elbow closeup keeps its preset');
+scene.setDeploymentLens('vehicle');frame();assertMode('body','Commissioning whole vehicle uses selected frame');
+scene.setChapter('operations');scene.setView('launch');scene.setDomain('launcher','D');frame();assert.equal(scene.getCameraTracking(),'preset','Launch scene keeps its preset');
 scene.destroy();
-console.log('Orbital production-camera checks passed: 22.5-degree vector framing, following, interaction takeover, body-relative persistence, saved-state compatibility, and preset scope.');
+console.log('Orbital production-camera checks passed: Orbit/Body/Inertial frame stability, Sun–velocity takeover, gestures, no-jump mode changes, saved-state migration, and preset scope.');

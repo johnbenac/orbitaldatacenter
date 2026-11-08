@@ -76,11 +76,19 @@ const frustum=new T.Frustum().setFromProjectionMatrix(vp),fog=scene.fog;
 const fogHex=fog?.color.getHex(),fogColor=fog?[fogHex>>16,fogHex>>8&255,fogHex&255]:null;
 // Lines share the same depth buffer and material order as triangle surfaces.
 function drawLine(a,k,l,c,mat){
- const dx=a[l]-a[k],dy=a[l+1]-a[k+1],steps=Math.min(4000,Math.max(1,Math.ceil(Math.max(Math.abs(dx),Math.abs(dy)))));
+ const dx=a[l]-a[k],dy=a[l+1]-a[k+1],dz=a[l+2]-a[k+2];let from=0,to=1;
+ // Clip before stepping: near-clipped wire edges may project far beyond the
+ // viewport. Work stays proportional to the visible segment, with full depth.
+ for(let axis=0;axis<3;axis++){
+  const start=a[k+axis],delta=a[l+axis]-start,lo=axis===2?-1:0,hi=axis===0?width-1:axis===1?height-1:1;
+  if(Math.abs(delta)<1e-12){if(start<lo||start>hi)return;continue;}
+  const t0=(lo-start)/delta,t1=(hi-start)/delta;from=Math.max(from,Math.min(t0,t1));to=Math.min(to,Math.max(t0,t1));if(from>to)return;
+ }
+ const steps=Math.min(4000,Math.max(1,Math.ceil(Math.max(Math.abs(dx),Math.abs(dy))*(to-from))));
  for(let j=0;j<=steps;j++){
-  const f=j/steps,x=Math.round(a[k]+dx*f),y=Math.round(a[k+1]+dy*f);
+  const f=from+(to-from)*j/steps,x=Math.round(a[k]+dx*f),y=Math.round(a[k+1]+dy*f);
   if(x<0||x>=width||y<0||y>=height)continue;
-  const i=y*width+x,z=a[k+2]+(a[l+2]-a[k+2])*f;
+  const i=y*width+x,z=a[k+2]+dz*f;
   if(z< -1||z>1||(mat.depthTest&&z>depth[i]+1e-7))continue;
   const px=4*i,alpha=mat.opacity,dst=img[px+3]/255,coverage=alpha+dst*(1-alpha);
   if(!coverage)continue;
@@ -154,10 +162,12 @@ if(intensity)for(let i=0;i<n;i++){vec.fromBufferAttribute(normal,i).applyMatrix3
 }
 const physical=gain&&mat.toneMapped!==false&&(mat.isMeshStandardMaterial||glow||mat.userData.celestial);
 const texel=mat.map?.colorSpace===T.SRGBColorSpace?srgbBytes:linearBytes;
+const wireColor=mat.wireframe?color.getHex():0;
 const nearU=[0,0],nearV=[0,0];
 function triangle(ia,ib,ic){
  const A=ia*4,B=ib*4,C=ic*4,x0=a[A],y0=a[A+1],x1=a[B],y1=a[B+1],x2=a[C],y2=a[C+1],den=(y1-y2)*(x0-x2)+(x2-x1)*(y0-y2);
  if(Math.abs(den)<.02||den>0&&mat.side===T.FrontSide||den<0&&mat.side===T.BackSide)return;
+ if(mat.wireframe){drawLine(a,A,B,wireColor,mat);drawLine(a,B,C,wireColor,mat);drawLine(a,C,A,wireColor,mat);return;}
  const xlo=Math.max(0,Math.ceil(Math.min(x0,x1,x2)-.5)),xhi=Math.min(width-1,Math.floor(Math.max(x0,x1,x2)-.5)),ylo=Math.max(0,Math.ceil(Math.min(y0,y1,y2)-.5)),yhi=Math.min(height-1,Math.floor(Math.max(y0,y1,y2)-.5));
  if(xlo>xhi||ylo>yhi)return;
  const la=intensity?intensity[ia]:1,lb=intensity?intensity[ib]:1,lc=intensity?intensity[ic]:1;const ca=(y1-y2)/den,cb=(y2-y0)/den,da=(x2-x1)/den,db=(x0-x2)/den,za=a[A+2],zb=a[B+2],zc=a[C+2];let ua=0,ub=0,uc=0,va=0,vb=0,vc=0;let texture=baseTexture;if(texture&&uv){ua=ia<n?uv.getX(ia):nearU[ia-n];ub=ib<n?uv.getX(ib):nearU[ib-n];uc=ic<n?uv.getX(ic):nearU[ic-n];va=ia<n?uv.getY(ia):nearV[ia-n];vb=ib<n?uv.getY(ib):nearV[ib-n];vc=ic<n?uv.getY(ic):nearV[ic-n];const footprint=Math.max(Math.abs((ua-uc)*ca+(ub-uc)*cb)*texture.width,Math.abs((ua-uc)*da+(ub-uc)*db)*texture.width,Math.abs((va-vc)*ca+(vb-vc)*cb)*texture.height,Math.abs((va-vc)*da+(vb-vc)*db)*texture.height);if(footprint*Math.max(Math.abs(tm[0]),Math.abs(tm[4]))>2)texture=imageData(mat.map,Math.min(9,Math.max(0,Math.round(Math.log2(footprint*Math.max(Math.abs(tm[0]),Math.abs(tm[4])))))));}

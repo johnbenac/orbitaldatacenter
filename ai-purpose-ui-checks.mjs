@@ -47,7 +47,7 @@ for(const id of ids){
   }else assert(!html.includes('data-purpose-preview')&&!html.includes('class="ap-primary"'));
  }
  const trade=domainTrade('purpose',c,c);assert(trade.rows.every(r=>r.delta===null||r.delta===0));assert.equal(trade.curves[0].unit,h.ai.unit+'/s');
- assert.equal(recommendedDomainCamera('D','purpose'),'launch');assert(domainInstruments('purpose',h,state).length>=3);
+ assert.equal(recommendedDomainCamera('D','purpose'),'launch');assert.deepEqual(domainInstruments('purpose',h,state),[],id+' mission results stay outside the 3D hardware view');
 }
 // An edited machine and a retained orbital context must produce the same preview as the start action.
 const custom=sizeDesign({...missionStarter('pretrain'),solarM2:8123,hostCores:1555,altitudeKm:609});

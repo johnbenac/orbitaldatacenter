@@ -1,0 +1,118 @@
+{
+  "schema": "orbitaldatacenter-reference-illustrations/1",
+  "sourceBundle": {
+    "file": "orbitaldatacenter-reference-carousel-v2-assets.zip",
+    "sha256": "38b9d59d7eeb897bef9262b2df67ea78c930ed7d8fe4ceb61b0f9465163d97a5",
+    "archiveRoot": "orbitaldatacenter-reference-carousel-v2"
+  },
+  "sourceCatalog": "v56",
+  "recipeRevision": "odc-study-2026-11-r2",
+  "sourceCommit": "ce1096c3669380375ad08748c81b78d83f953dbf",
+  "licenseFile": "LICENSE.txt",
+  "creditsAndIntegrationFile": "provenance.md",
+  "modelProvenanceFile": "MODEL-PROVENANCE.json",
+  "illustrations": [
+    {
+      "id": "redwire-8kw",
+      "name": "Redwire 8 kW compute node",
+      "variants": [
+        {
+          "file": "redwire-8kw-960.webp",
+          "source": "carousel/images/redwire-8kw.small.webp",
+          "width": 960,
+          "height": 540,
+          "bytes": 52898,
+          "sha256": "89011abb7685ad9c7882e77bf86af460622e4aa76b4b0a93287d90a31dd53eb4"
+        }
+      ]
+    },
+    {
+      "id": "starcloud-3",
+      "name": "Starcloud-3",
+      "variants": [
+        {
+          "file": "starcloud-3-960.webp",
+          "source": "carousel/images/starcloud-3.small.webp",
+          "width": 960,
+          "height": 540,
+          "bytes": 46664,
+          "sha256": "c59adaa2c2bdba34f9a1e208744466b11bd850cff1816fb2c7370b6a638fb291"
+        }
+      ]
+    },
+    {
+      "id": "starmind-ai1",
+      "name": "SpaceX Starmind AI1",
+      "variants": [
+        {
+          "file": "starmind-ai1-960.webp",
+          "source": "carousel/images/starmind-ai1.small.webp",
+          "width": 960,
+          "height": 540,
+          "bytes": 43592,
+          "sha256": "b673578968541a8771abcbeaa566c74259f796a23598b6c89ad2d864775e201e"
+        },
+        {
+          "file": "starmind-ai1-1920.webp",
+          "source": "carousel/images/starmind-ai1.webp",
+          "width": 1920,
+          "height": 1080,
+          "bytes": 111400,
+          "sha256": "801714a14e29bb46b4ac41bbac09b959e2764242fef29148c709b338b7f145b7"
+        }
+      ]
+    },
+    {
+      "id": "orbital-1-202609",
+      "name": "Orbital-1 / Reflex",
+      "variants": [
+        {
+          "file": "orbital-1-202609-960.webp",
+          "source": "carousel/images/orbital-1-202609.small.webp",
+          "width": 960,
+          "height": 540,
+          "bytes": 47784,
+          "sha256": "3517b42f8afc12477835ca8ceb5b0429ca52b33803b2919739d3bbffd816399d"
+        }
+      ]
+    },
+    {
+      "id": "orbital-1-202606",
+      "name": "Orbital June reference",
+      "variants": [
+        {
+          "file": "orbital-1-202606-960.webp",
+          "source": "carousel/images/orbital-1-202606.small.webp",
+          "width": 960,
+          "height": 540,
+          "bytes": 48912,
+          "sha256": "534f28e7a08602fbfac2208563545c69f633fb1aeafc9c1e7015756975cbfff6"
+        }
+      ]
+    },
+    {
+      "id": "star-catcher-self-powered",
+      "name": "Star Catcher self-powered node model",
+      "variants": [
+        {
+          "file": "star-catcher-self-powered-960.webp",
+          "source": "carousel/images/star-catcher-self-powered.small.webp",
+          "width": 960,
+          "height": 540,
+          "bytes": 48370,
+          "sha256": "8bd00ed82bf7b4db856f9f377d53b6a79854d5747afcd4ad3acddf2c6e130a78"
+        }
+      ]
+    }
+  ],
+  "social_preview": {
+    "source_path": "carousel/images/starmind-ai1.webp",
+    "deployed_filename": "starmind-ai1-1920.webp",
+    "width": 1920,
+    "height": 1080,
+    "bytes": 111400,
+    "sha256": "801714a14e29bb46b4ac41bbac09b959e2764242fef29148c709b338b7f145b7",
+    "usage": "Open Graph and Twitter summary-large-image preview, reusing the supplied responsive image without a duplicate raster asset."
+  },
+  "deploymentNote": "Six supplied 960px previews plus the 1920px Starmind social preview are deployed. Higher-resolution variants remain in the original supplied kit. Images are unmodified."
+}

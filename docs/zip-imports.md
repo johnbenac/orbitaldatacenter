@@ -1,5 +1,8 @@
 # Importing developer ZIP releases
 
+Routine changes arrive as pull requests (see `AGENTS.md`). This importer is kept for a developer ZIP
+drop. `upstream-files.json` records the last ZIP import and is not checked on pull requests.
+
 Developer files stay in `dist/` and the existing root `.mjs` suites and design
 documents. Our author content, metadata, assembly tooling, and deployment remain
 in separate `extensions/`, `scripts/`, and other site-owned files. Building the

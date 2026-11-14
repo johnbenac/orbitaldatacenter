@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shlex
 import subprocess
 import sys
 import urllib.error
@@ -21,6 +22,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('release', nargs='?', type=Path, default=ROOT,
                         help='Release directory containing dist/ (default: this checkout)')
+    parser.add_argument('--commit-hash', help='Source commit recorded on the Pages deployment')
+    parser.add_argument('--no-record', action='store_true',
+                        help='Skip writing deployment-records/production.json (CI tracks deployments)')
     args = parser.parse_args()
     release = args.release.resolve()
     if not (release / 'dist/index.html').is_file():
@@ -28,7 +32,9 @@ def main():
     subprocess.run([sys.executable, str(ROOT / 'scripts/build-site.py'),
                     '--source', str(release)], check=True)
     dist = ROOT / '.build/public'
-    token = Path('/root/.config/orbitaldatacenter/cloudflare-api-token').read_text().strip()
+    # CI supplies CLOUDFLARE_API_TOKEN; local runs read the token file kept outside Git.
+    token = (os.environ.get('CLOUDFLARE_API_TOKEN') or
+             Path('/root/.config/orbitaldatacenter/cloudflare-api-token').read_text()).strip()
 
     def api(path, method='GET', body=None, missing_ok=False):
         request = urllib.request.Request(
@@ -60,10 +66,15 @@ def main():
     env.update(CLOUDFLARE_API_TOKEN=token, CLOUDFLARE_ACCOUNT_ID=ACCOUNT,
                WRANGLER_SEND_METRICS='false',
                XDG_CONFIG_HOME=str(ROOT / '.deploy-state'))
-    tooling = Path('/charactum/operations/cloud-foundation/node_modules')
-    command = [str(tooling / 'node/bin/node'), str(tooling / 'wrangler/bin/wrangler.js')]
+    if os.environ.get('WRANGLER_COMMAND'):  # CI: a pinned wrangler, for example "npx --yes wrangler@4.129.0"
+        command = shlex.split(os.environ['WRANGLER_COMMAND'])
+    else:
+        tooling = Path('/charactum/operations/cloud-foundation/node_modules')
+        command = [str(tooling / 'node/bin/node'), str(tooling / 'wrangler/bin/wrangler.js')]
+    source = (['--commit-hash', args.commit_hash, '--commit-dirty=false'] if args.commit_hash
+              else ['--commit-dirty=true'])
     subprocess.run(command + ['pages', 'deploy', str(dist), '--project-name', PROJECT,
-                             '--branch', 'main', '--commit-dirty=true'],
+                             '--branch', 'main'] + source,
                    cwd=release, env=env, check=True)
 
     domains = api(base + '/domains')
@@ -84,6 +95,9 @@ def main():
     elif any(item['type'] != 'CNAME' or item['content'] != target for item in website_records):
         raise RuntimeError('Existing website DNS conflicts with Pages; review before replacing.')
 
+    if args.no_record:
+        print('Deployment published; record skipped.', flush=True)
+        return
     project = api(base)
     snapshot = {
         'release': release.name,

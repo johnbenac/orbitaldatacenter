@@ -1,36 +1,36 @@
 {
   "release": "site",
-  "source_commit": "c9a3c75a267c04dac5912b9080d5e81d1dafabb7",
-  "index_sha256": "c7916d868b40680222ddc253ea3ad6e759caef16fe385f3f1d383cd1330f9016",
+  "source_commit": "4be155d407d882ad20c644a039177aa422fd2925",
+  "index_sha256": "968cebf3b0269e26e4c33743029144e94dbe49a0b63daa858f24cd4ecd0b0239",
   "project": "orbitaldatacenter",
   "deployment": {
-    "id": "6cb726f6-7cd2-412f-9a70-27191dac58ea",
-    "short_id": "6cb726f6",
+    "id": "58591b7e-94e0-4cb4-b02e-a987d407c723",
+    "short_id": "58591b7e",
     "project_id": "8cfed813-a5e3-48d5-9451-47e81b01d88f",
     "project_name": "orbitaldatacenter",
     "environment": "production",
-    "url": "https://6cb726f6.orbitaldatacenter-2o2.pages.dev",
-    "created_on": "2026-11-08T00:36:12.737174Z",
-    "modified_on": "2026-11-08T00:36:14.465202Z",
+    "url": "https://58591b7e.orbitaldatacenter-2o2.pages.dev",
+    "created_on": "2026-11-14T21:53:13.306981Z",
+    "modified_on": "2026-11-14T21:53:14.866554Z",
     "latest_stage": {
       "name": "deploy",
       "started_on": null,
-      "ended_on": "2026-11-08T00:36:14.465202Z",
+      "ended_on": "2026-11-14T21:53:14.866554Z",
       "status": "success"
     },
     "deployment_trigger": {
       "type": "ad_hoc",
       "metadata": {
         "branch": "main",
-        "commit_hash": "c9a3c75a267c04dac5912b9080d5e81d1dafabb7",
-        "commit_message": "feat(release): import upstream v63 from split archive\r\n\r\nImport both v63 archive parts with recorded SHA-256 provenance. Preserve local author links,\r\nfloating footer, social artwork and deployment configuration through the existing assembly workflow.\r\n\r\nMap the reviewed upstream documentation and screenshots explicitly. Verify archive integrity,\r\n2648 source files, 2469 assets, 20\n\n[commit_message truncated]",
+        "commit_hash": "4be155d407d882ad20c644a039177aa422fd2925",
+        "commit_message": "feat(graphics): add orbit landmarks v5 poster with scale lineup\r\n\r\nTrack the LinkedIn poster artwork in the repository. It shows six publicly disclosed\r\norbital data center concepts beside familiar landmarks, with the cards ordered from the\r\nsmallest landmark to the largest.\r\n\r\nThe footer carries a new lineup of the same six landmarks rendered in one orthographic\r\nview at a single \n\n[commit_message truncated]",
         "commit_dirty": true
       }
     },
     "stages": [
       {
         "name": "queued",
-        "started_on": "2026-11-08T00:36:12.737174Z",
+        "started_on": "2026-11-14T21:53:13.306981Z",
         "ended_on": null,
         "status": "active"
       },
@@ -55,7 +55,7 @@
       {
         "name": "deploy",
         "started_on": null,
-        "ended_on": "2026-11-08T00:36:14.465202Z",
+        "ended_on": "2026-11-14T21:53:14.866554Z",
         "status": "success"
       }
     ],

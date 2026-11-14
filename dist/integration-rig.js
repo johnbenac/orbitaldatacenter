@@ -2,6 +2,9 @@
 // facility, slings and transfer hardware are visualization assumptions in metres.
 import * as T from './vendor/three.module.js';
 import {cargoBay,starshipCargoFit} from './starship-cargo.js';
+import {connectionAnchor} from './connection-geometry.js';
+import {objectMatrixInFrame} from './routing-audit.js';
+import {hoistRoutingSnapshot} from './bay-hoist-routing.js';
 const V=(x=0,y=0,z=0)=>new T.Vector3(x,y,z);
 const u01=x=>Math.max(0,Math.min(1,x));
 const interval=(t,a,b)=>{const q=u01((t-a)/(b-a));return q*q*(3-2*q)};
@@ -66,13 +69,20 @@ export function buildIntegrationRig(ctx){
   box(ground,xx,craneY,(near+far)/2,.44,.54,near-far,slate);
  }
  const bridge=new T.Group();bridge.name='Traveling crane bridge';rig.add(bridge);
- for(const dz of [-.30,.30]){const girder=box(bridge,(east+west)/2,craneY+.31,dz,east-west,.47,.28,mark);girder.name='Bridge crane girder';if(dz>0)note('bridge-crane','Bridge crane','Facility lifting system',girder,71);}
+ // The hoist hangs between the bridge rails. The former 0.60 m spacing put
+ // both paid-out ropes through a girder, as well as burying the hoist case.
+ // A 1.72 m clear opening accommodates the actual 1.35 m case and outlets.
+ for(const dz of [-1,1]){const girder=box(bridge,(east+west)/2,craneY+.31,dz,east-west,.47,.28,mark);girder.name='Bridge crane girder';if(dz>0)note('bridge-crane','Bridge crane','Facility lifting system',girder,71);}
  const traveler=new T.Group();bridge.add(traveler);
- const trolley=box(traveler,0,craneY+.47,0,1.55,.70,1.35,beam);trolley.name='Crane traveling hoist';note('crane-hoist','Traveling hoist','Follows the handling load',trolley,77);
+ traveler.userData.bayRoutingMotion={owner:'bay:trolley',type:'rigid'};
+ for(const xx of [-.60,.60]){const carrier=box(traveler,xx,craneY+.64,0,.16,.18,2.3,steel);carrier.name='Hoist trolley rail crossmember';}
+ const trolley=box(traveler,0,craneY+.67,0,1.55,1.10,1.35,beam);trolley.name='Crane traveling hoist';note('crane-hoist','Traveling hoist','Follows the handling load',trolley,77);
  const yoke=new T.Group();rig.add(yoke);
+ yoke.userData.bayRoutingMotion={owner:'bay:yoke',type:'rigid'};
  const beamHead=box(yoke,0,0,0,1,.14,.17,warning);
  beamHead.name='Load-spreading lifting yoke';note('lifting-yoke','Lifting yoke','Ground lifting fixture',beamHead,117,'payload');
  const fixture=attach('Removable payload lifting frame'),bus=h.fairing.stack.find(q=>q.part==='Insulated bus');
+ fixture.userData.bayRoutingMotion={owner:'bay:article',type:'rigid'};
  const busY=bus.z0M+h.bodyLengthM-.15,outer=Math.max(h.stowedDiameterM*.52,h.bodyHeightM*.59);
  for(const side of [-1,1]){
   const innerZ=side*h.bodyHeightM*.51,outZ=side*outer;
@@ -82,11 +92,38 @@ export function buildIntegrationRig(ctx){
    tube(fixture,V(x,busY,innerZ),V(x,busY,outZ),.052,beam);
    tube(fixture,V(x,busY,outZ),V(0,h.stowedLengthM,outZ),.045,beam);
   }
+  for(const xx of [-.055,.055])box(fixture,xx,h.stowedLengthM+.05,outZ,.020,.10,.035,steel).name='Payload lifting-eye clevis cheek';
+ }
+ const collar=attach('Removable external fairing lifting collar'),collarHeight=.18;
+ collar.userData.bayRoutingMotion={owner:'bay:assembly',type:'rigid'};
+ const fairingProfile=h.fairing.profile,profileMaximum=Math.max(...fairingProfile.map(p=>p[1]));let collarRadius=r;
+ for(let i=1;i<fairingProfile.length;i++)if(collarHeight<=fairingProfile[i][0]){const [y0,r0]=fairingProfile[i-1],[y1,r1]=fairingProfile[i];collarRadius=r/profileMaximum*(r0+(r1-r0)*(collarHeight-y0)/(y1-y0));break;}
+ const collarRing=new T.Mesh(new T.TorusGeometry(collarRadius+.035,.035,8,80),steel);collarRing.rotation.x=Math.PI/2;collarRing.position.y=collarHeight;collarRing.name='External fairing lifting collar';collar.add(collarRing);
+ for(const sign of [-1,1])for(const xx of [-.055,.055]){
+  tube(collar,V(xx,collarHeight,sign*Math.sqrt(Math.max(0,(collarRadius+.035)**2-xx*xx))),V(xx,collarHeight,sign*(r+.12)),.018,steel).name='Fairing lifting-eye outrigger';
+  box(collar,xx,collarHeight+.05,sign*(r+.12),.020,.10,.035,steel).name='Fairing lifting-eye clevis cheek';
  }
 
- const ropes=[];
- for(let i=0;i<4;i++){const line=cylinder(rig,0,0,0,.025,.025,1,i<2?black:steel,'pad',8);ropes.push(line)}
- function cable(o,a,b){const d=b.clone().sub(a);o.position.copy(a).lerp(b,.5);o.scale.y=Math.max(.001,d.length());o.quaternion.setFromUnitVectors(V(0,1,0),d.normalize())}
+ const ropes=[],ropeRecords=[],reels=[],loadEyes=[],ropeRadiusM=.025,reelRadiusM=.45,minimumBendRadiusM=.40,installedLengthM=craneY-floor+Math.abs(x-ringX)+2*r+5;
+ const eye=(parent,name)=>{const anchor=connectionAnchor(parent,[0,0,0],[0,1,0],name),ring=new T.Mesh(new T.TorusGeometry(.055,.015,8,16),steel);ring.name=name+' swivel eye';ring.userData.part='pad';anchor.add(ring);return anchor;};
+ for(let i=0;i<2;i++){
+  const reel=new T.Group();reel.name='Hoist paid-out rope drum '+(i+1);traveler.add(reel);reel.position.set((i?1:-1)*.32,craneY+.67,0);const drum=cylinder(reel,0,0,0,reelRadiusM,reelRadiusM,.36,steel,'pad',24);drum.rotation.z=Math.PI/2;reels.push(reel);
+  loadEyes.push(eye(rig,'Removable load lifting eye '+(i+1)));
+ }
+ for(let i=0;i<4;i++){
+  const upper=i<2,index=i%2,line=cylinder(rig,0,0,0,ropeRadiusM,ropeRadiusM,1,upper?black:steel,'pad',8),from=eye(upper?traveler:yoke,(upper?'Hoist outlet ':'Yoke lower eye ')+(index+1)),to=upper?eye(yoke,'Yoke upper eye '+(index+1)):loadEyes[index],record={id:'bay:hoist:'+(upper?'winch-':'payload-sling-')+index,kind:upper?'winch-payout':'fixed-sling',mesh:line,from,to,radiusM:ropeRadiusM,minimumBendRadiusM,reel:upper?reels[index]:null,reelRadiusM,installedLengthM,cutLengthM:star?.89:.84};
+  line.name=upper?'Paid-out hoist rope '+(index+1):'Fixed-cut load sling '+(index+1);line.userData.routingLine=true;line.userData.hoistConnection=record;ropes.push(line);ropeRecords.push(record);
+  from.userData.bayRoutingMotion={owner:'bay:rope-eye:'+i+':from',type:'hoist-eye',lineIndex:i,end:'from'};
+  to.userData.bayRoutingMotion={owner:'bay:rope-eye:'+i+':to',type:'hoist-eye',lineIndex:i,end:'to'};
+ }
+ const placeAnchor=(anchor,point,normal)=>{const matrix=objectMatrixInFrame(rig,anchor.parent);anchor.position.copy(point).applyMatrix4(matrix);anchor.quaternion.setFromUnitVectors(V(0,0,1),normal.clone().transformDirection(matrix));};
+ function cable(index,a,b,{active,loadKind='payload',cutLengthM=null,loadOwner='bay:article'}={}){
+  const o=ropes[index],record=ropeRecords[index],d=b.clone().sub(a),length=d.length();o.position.copy(a).lerp(b,.5);o.scale.y=Math.max(.001,length);o.quaternion.setFromUnitVectors(V(0,1,0),d.clone().normalize());o.visible=o.userData.routingPresent=!!active;
+  placeAnchor(record.from,a,d);placeAnchor(record.to,b,d.clone().negate());record.from.visible=record.from.userData.routingPresent=!!active;record.to.visible=record.to.userData.routingPresent=!!active;
+  record.motion={type:record.kind==='winch-payout'?'hoist-payout':'rigid',owner:record.kind==='winch-payout'?'bay:winch:'+index:loadOwner,lineIndex:index};
+  for(const anchor of [record.from,record.to])Object.assign(anchor.userData.bayRoutingMotion,{routeId:record.id,loadOwner});
+  if(record.kind==='winch-payout')record.reel.rotation.x=length/reelRadiusM;else{record.id='bay:hoist:'+loadKind+'-sling-'+(index-2);record.cutLengthM=cutLengthM;for(const anchor of [record.from,record.to])anchor.userData.bayRoutingMotion.routeId=record.id;}
+ }
  // Floor rails under the transfer equipment or ring stand outside the bells.
  const rack=attach(horizontal?'Horizontal upper-stage cradle':star?'Starship transport stand':'Vertical launch interface');
  if(horizontal){
@@ -172,6 +209,7 @@ export function buildIntegrationRig(ctx){
  }
  const receiverAnchor=new T.Object3D();receiverAnchor.position.set(x,horizontal?portY:portY-g.stage2*.46,0);facility.add(receiverAnchor);
  const moving=attach('Encapsulated payload transfer support');
+ moving.userData.bayRoutingMotion={owner:'bay:transporter',type:'rigid'};
  if(horizontal){
   // Low transport saddle carries the horizontal assembly forward once upended.
   for(const j of [.18,.65])for(const side of [-1,1]){
@@ -202,33 +240,33 @@ export function buildIntegrationRig(ctx){
    const attached=p.seat>=1&&p.lift<1;
    const cx=p.lift>=1?x-cargoBay.strokeM:p.article.x;
    const pick=V(cx,p.article.y+h.stowedLengthM,0),top=pick.y+1.15;
-   moving.visible=false;fixture.visible=attached;fixture.position.copy(p.article);
-   bridge.position.z=0;traveler.position.x=cx;yoke.visible=attached;yoke.position.set(cx,top,0);yoke.rotation.y=Math.PI/2;beamHead.scale.x=outer*2.2;
+   moving.visible=moving.userData.routingPresent=false;collar.visible=collar.userData.routingPresent=false;fixture.visible=fixture.userData.routingPresent=attached;fixture.position.copy(p.article);
+   bridge.position.z=0;traveler.position.x=cx;yoke.visible=yoke.userData.routingPresent=attached;yoke.position.set(cx,top,0);yoke.rotation.y=Math.PI/2;beamHead.scale.x=outer*2.2;
    for(let i=0;i<2;i++){
     const zz=(i?1:-1)*outer,q=V(cx,top,zz);
-    cable(ropes[i],V(cx,craneY+.29,zz*.14),q);cable(ropes[i+2],q,V(cx,pick.y,zz));
-    ropes[i].visible=ropes[i+2].visible=attached;
+    cable(i,V(cx,craneY+.07,(i?1:-1)*.29),q.clone().add(V(0,.12,0)),{active:attached});cable(i+2,q.clone().add(V(0,-.16,0)),V(cx,pick.y+.10,zz),{active:attached,cutLengthM:.89});
    }
    handlingAnchor.position.copy(pick);return;
   }
 
-  moving.visible=horizontal?p.lift>=.999:!star&&p.lift>=.999;
+  moving.visible=moving.userData.routingPresent=horizontal?p.lift>=.999:!star&&p.lift>=.999;
   moving.position.x=horizontal?p.assembly.x:ringX+(x-space-ringX)*p.transfer;
   let root=p.article,top=h.stowedLengthM,arm=outer,rot=0;
   if(pickCap||capped&&s.close===1){
-   root=pickCap?p.shell:p.assembly;top=g.capH*.76;arm=r*.74;rot=p.angle;
+   root=pickCap?p.shell:p.assembly;top=collarHeight;arm=r+.12;rot=p.angle;
   }
   const attachHeight=top,headH=pickCap||capped&&s.close===1?g.capH+1.45:top+1.1;
   const a=V(0,0,1),tip=V(0,headH,0).applyAxisAngle(a,rot).add(root);
   const support=[-1,1].map(k=>V(0,attachHeight,k*arm).applyAxisAngle(a,rot).add(root));
   bridge.position.z=tip.z;traveler.position.x=tip.x; yoke.position.copy(tip);yoke.rotation.y=Math.PI/2;beamHead.scale.x=arm*2.2;
-  fixture.visible=s.seat>0&&s.seat<1;fixture.position.copy(p.article);
+  fixture.visible=fixture.userData.routingPresent=s.seat>0&&s.seat<1;fixture.position.copy(p.article);
   const onCarrier=!horizontal&&!star&&p.lift>=1&&p.mate===0;
   const hanging=active&&!onCarrier&&(s.seat>0&&s.seat<1||pickCap||s.lift>0);
-  yoke.visible=hanging;for(const rope of ropes)rope.visible=hanging;
+  yoke.visible=yoke.userData.routingPresent=hanging;const loadAxis=V(0,1,0).applyAxisAngle(a,rot),loadKind=pickCap||capped&&s.close===1?'fairing':'payload';
+  collar.visible=collar.userData.routingPresent=hanging&&loadKind==='fairing';collar.position.copy(root);collar.rotation.z=rot;collar.userData.bayRoutingMotion.owner=pickCap?'bay:cap':'bay:assembly';
   for(let i=0;i<2;i++){const sign=i?1:-1,Q=tip.clone().add(V(0,0,sign*arm));
-   cable(ropes[i],V(tip.x,craneY+.29,tip.z+sign*.29),Q);cable(ropes[i+2],Q,support[i]);}
+   cable(i,V(tip.x,craneY+.07,tip.z+sign*.29),Q.clone().add(V(0,.12,0)),{active:hanging});cable(i+2,Q.clone().addScaledVector(loadAxis,-.16),support[i].clone().addScaledVector(loadAxis,.10),{active:hanging,loadKind,loadOwner:loadKind==='payload'?'bay:article':pickCap?'bay:cap':'bay:assembly',cutLengthM:headH-attachHeight-.26});}
   handlingAnchor.position.copy(tip);
  }
- return {receiverAnchor,handlingAnchor,rigAnnotations:()=>annotations,update};
+ return {receiverAnchor,handlingAnchor,rigAnnotations:()=>annotations,hoistRoutingSnapshot:options=>hoistRoutingSnapshot(ropeRecords,options),hoistRoutingRecords:ropeRecords,update};
 }

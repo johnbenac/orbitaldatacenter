@@ -1,4 +1,5 @@
 import {launchClockFor,INSERTION_MET} from './launch-effects-state.js';
+import {launchCompatibility,launchProgressState} from './launch-compatibility.js';
 import {ascentTrack,launchPath} from './launch-path.js';
 import {commissioningClock,deploymentProgress,deploymentMET,deploymentPowerKW} from './commissioning-clock.js';
 import {deploymentStages,deploymentSchedule} from './deployment.js';
@@ -40,19 +41,21 @@ export const modelNotes=[
 ];
 const SEC=60,G0=9.80665;
 const cache=new WeakMap();
+const cachedTakeoffs=new WeakMap();
 const scalar=(value,fallback)=>Number.isFinite(Number(value))?Number(value):fallback;
 function inventory(h){const d=h.input;const a=h.ai;return {aiBuilt:false,aiCompletionS:null,aiDeliveryS:null,aiBuffer:a.preloadedGB,aiEarth:a.training?Math.max(0,a.corpusGB-a.preloadedGB):0,aiOffered:0,aiUploaded:0,aiConsumed:0,aiUnits:0,aiPGenerated:0,aiPDelivered:0,aiPQueue:0,aiPDropped:0,aiPending:0,aiCheckpointGB:0,aiCheckpointPendingGB:0,aiCheckpointTargetUnits:0,aiCheckpointCommits:0,aiCheckpointCompleteUnits:0,aiCheckpointDeferred:0,aiCheckpointCommitS:null,aiActiveS:0,t:0,energy:h.batteryKWh*d.socInitial,heat:d.initialCoreK,loopK:d.initialCoreK,payloadColdK:d.initialCoreK,packK:d.initialBatteryK,queue:h.initialQueueGB,textQueue:0,textDelivered:0,textGenerated:0,textDropped:0,uplinkQueue:0,uplinkDropped:0,uplinkGenerated:0,hkPoweredS:0,hkDeliveredGB:0,delivered:0,generated:0,dropped:0,uploaded:0,tokens:0,prop:h.propellantKg,dragImpulse:0,pendingImpulse:0,usedImpulse:0,trimPaid:0,burnEnd:0,burnKind:'',contactSince:0,station:null,lastUnpoweredAt:0,momentum:0,momentumECI:[0,0,0],controlLoadNm:0,controlTorqueEciNm:[0,0,0],magneticTorqueEciNm:[0,0,0],controlPowerFraction:1,unloading:false,unmetEnergy:0,throughputKWh:0,writeGB:0,chargeBusKWh:0,dischargeBusKWh:0};}
 export function createSimulation(design){
- if(cache.has(design))return cache.get(design);
+ const previous=cache.get(design);
+ if(previous&&(design.input?previous.electricalMassRevision===(design.electricalMassRevision||0):cachedTakeoffs.get(design)===design.installedHarnessTakeoff))return previous;
  const h=design.input?design:sizeDesign(design),d=h.input,epoch=Date.parse(d.epoch),duration=Math.max(1,d.missionYears*YEAR),reserve=h.propellantKg*(d.reserveFraction+d.residualFraction),exhaust=G0*d.isp;
  const architecture=architectureFamily(h),communications=installedCommunications(h),clock=commissioningClock(h),DEPLOY_START_S=clock.startS,DEPLOY_END_S=clock.endS,transport=h.energySystem.thermal,passiveTransport=transport.kind==='passive-local',heatliftTransport=transport.kind==='heat-lift';
  const terminalInstalled=terminal=>terminal==='Ka'||terminal==='Ka-band'?communications.kaInstalled:terminal==='S-band'?communications.sBandInstalled:terminal==='Optical';
  const ai=h.ai,relaySchedule=relayTiming(d),relay=d.serviceRoute!=='direct',hybrid=d.serviceRoute==='hybrid',trainEnd=DEPLOY_END_S+d.trainingBudgetDays*DAY,outputCapacityGB=Math.max(0,(h.usableTB-h.weightsTB)*1000-d.retainedGB-ai.reservedStorageGB);
  const commandKbps=d.commandKbps??16,uplinkBufferGB=(d.uplinkBufferMB??128)/1000;
- const carrierClock=launchClockFor(d.launcher),cargoAccessHeld=d.launcher==='starship'&&(!h.fairing.fit||!h.payloadInterface.passes);
+ const carrierClock=launchClockFor(d.launcher),launchReadiness=launchCompatibility(h),cargoAccessHeld=d.launcher==='starship'&&!launchReadiness.ok;
  // A held Phase D mechanism cannot release an article. The independently selectable
  // operating-orbit study begins at commissioning and remains explicitly conditional.
- const carrier={...carrierClock,release:cargoAccessHeld?DEPLOY_START_S:(carrierClock.eject??carrierClock.release)};
+ const carrier={...carrierClock,release:!launchReadiness.ok?DEPLOY_START_S:(carrierClock.eject??carrierClock.release)};
  const period=TAU*Math.sqrt((R+d.altitudeKm)**3/MU),burnTime=43200,mainDays=new Map(),blockSeeds=new Map(),eventCache=new Map();
  const ignition=disposalIgnition(d,duration,h.wetKg-.35*h.propellantKg),terminalDay=Math.floor(ignition/DAY),targetPerigee=d.disposalTargetPerigeeKm??80,trapped=h.propellantKg*d.residualFraction;
  const nominalDisposalDv=disposalRequirement(d),protectedKg=burnMass(h.wetKg,d.isp,Math.max(nominalDisposalDv,d.disposalDv)),maintenanceFloor=reserve+protectedKg+burnMass(h.wetKg,d.isp,d.maneuverDv);
@@ -68,10 +71,10 @@ export function createSimulation(design){
   const wet=h.dryKg+h.pressurantKg+s.prop,circular=Math.sqrt(MU/(R+d.altitudeKm))*1000,
    deficit=(t>=carrier.release?Math.max(0,d.trimDv-s.trimPaid):d.trimDv)+s.pendingImpulse/Math.max(1,wet);
   const delta=-2*(R+d.altitudeKm)*deficit/circular,minA=(R+120)/(1-d.ecc),low=R+d.altitudeKm+delta<minA;
-  const offset=Math.max(delta,minA-R-d.altitudeKm);let track=null;
-  if(t<INSERTION_MET){insertionState??=launchPath(d,offset);track=ascentTrack(insertionState,t);}
+  const offset=Math.max(delta,minA-R-d.altitudeKm),launchState=launchProgressState(launchReadiness,t,phase(t,s),DEPLOY_START_S);let track=null;
+  if(t<INSERTION_MET||launchState.held){insertionState??=launchPath(d,offset);track=ascentTrack(insertionState,launchState.geometryTime);}
   else if(s.plan?.samples?.length)track=trajectoryAt(s.plan,t);
-  const atTime=finished(t,s)?s.plan.end:t,g=geometry(d,atTime,offset,track);g.t=t;g.windowAgeYears=Math.max(0,atTime/YEAR);g.flightPhase=phase(t,s);g.cargoAccessHeld=cargoAccessHeld;g.carrierAttached=t<carrier.release;g.orbitLost=t>=INSERTION_MET&&low&&!s.plan?.feasible;if(g.orbitLost||s.plan||g.carrierAttached){g.station=null;g.stationECI=null;}return g;
+  const atTime=finished(t,s)?s.plan.end:t,g=geometry(d,launchState.held?launchState.geometryTime:atTime,offset,track);g.t=t;g.windowAgeYears=Math.max(0,atTime/YEAR);g.flightPhase=launchState.geometryPhase;g.launchHeld=launchState.held;g.launchHoldReason=launchState.reason;g.launchHoldIssues=launchState.issues;g.launchGeometryTime=launchState.geometryTime;g.assumedOrbit=launchState.assumedOrbit;g.cargoAccessHeld=cargoAccessHeld&&t<DEPLOY_START_S;g.carrierAttached=t<carrier.release;g.orbitLost=!launchState.held&&t>=INSERTION_MET&&low&&!s.plan?.feasible;if(g.orbitLost||s.plan||g.carrierAttached){g.station=null;g.stationECI=null;}return g;
  };
  const first=inventory(h),limits=attitudeLimits(h);
  // Budget the retrograde flip at the 65% unloading threshold. Use an
@@ -329,6 +332,14 @@ return {lastUnpoweredAt:b.terminalPowered?s.lastUnpoweredAt:to,antennaRateDegS:e
   const logBytes=Math.floor((s.hkPoweredS+1e-8)/d.hkPeriodS)*h.cdh.packetBytes,capacityBytes=Math.floor(d.hkRecorderMB*1e6/h.cdh.packetBytes)*h.cdh.packetBytes;
   snapshot.selectedPayloadTerminal=b.selectedPayloadTerminal;snapshot.sBandInstalled=communications.sBandInstalled;snapshot.kaInstalled=communications.kaInstalled;
   const electronicsOn=!(snapshot.referenceBody||hardwareStopped(s.t,s));
+  // Readouts of the same instantaneous byte movements used by channels().
+  // Available link capacity is not traffic, and local checkpoint writes are
+  // distinct from the final training artifact placed in the output recorder.
+  const payloadRateScale=electronicsOn?8000/.25:0;
+  snapshot.aiInputMbps=b.incoming*payloadRateScale;
+  snapshot.aiInputReadMbps=b.payloadReadGB*payloadRateScale;
+  snapshot.aiProductGeneratedMbps=b.product*payloadRateScale;
+  snapshot.aiCheckpointWriteMbps=b.checkpointWritten*payloadRateScale;
   snapshot.cdhKW=electronicsOn?b.cdhKW:0;snapshot.cdhServedKW=snapshot.cdhKW*b.poweredSupport;
   snapshot.hkRateKbps=electronicsOn&&s.t>=carrier.release?8*h.cdh.packetBytes/d.hkPeriodS*b.poweredSupport/1000:0;
   snapshot.hkDeliveredGB=s.hkDeliveredGB;
@@ -834,5 +845,5 @@ return {lastUnpoweredAt:b.terminalPowered?s.lastUnpoweredAt:to,antennaRateDegS:e
    close();try{adoptAudit(data);if(data.preparation)adoptPreparation(data.preparation);resolve(data.result);}catch(error){reject(error);}
   };worker.postMessage(d);
  });}
- const api={hardware:h,serviceSeed:t=>{const seed=structuredClone(stateAt(clip(Number(t)||0,0,duration)));if(seed.attitudeAnchor){seed.attitudeState=flightGuidance(seed,seed.t,geo(seed.t,seed)).attitudeState;delete seed.attitudeAnchor;}return seed;},serviceDay,serviceTimeline,terminalRuns:terminalWindow,thermalWindow,story,disposal,ignition,focusWindow,duration,at,window,events,mission,daySummary,modelNotes,auditStep,runAudit,prepareDisposal,prepareWindow:request=>prepareDisposal({...request,closeout:false}),prepareDisposalSnapshot,get audit(){return audited?.result||null;}};cache.set(design,api);return api;
+ const api={hardware:h,electricalMassRevision:h.electricalMassRevision||0,serviceSeed:t=>{const seed=structuredClone(stateAt(clip(Number(t)||0,0,duration)));if(seed.attitudeAnchor){seed.attitudeState=flightGuidance(seed,seed.t,geo(seed.t,seed)).attitudeState;delete seed.attitudeAnchor;}return seed;},serviceDay,serviceTimeline,terminalRuns:terminalWindow,thermalWindow,story,disposal,ignition,focusWindow,duration,at,window,events,mission,daySummary,modelNotes,auditStep,runAudit,prepareDisposal,prepareWindow:request=>prepareDisposal({...request,closeout:false}),prepareDisposalSnapshot,get audit(){return audited?.result||null;}};cache.set(design,api);cachedTakeoffs.set(design,design.installedHarnessTakeoff);return api;
 }

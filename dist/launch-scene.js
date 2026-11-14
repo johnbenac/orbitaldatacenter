@@ -10,6 +10,7 @@ import {buildLaunchUmbilicals} from './launch-umbilical-visuals.js';
 import {buildStarship,falconRecovery,launchNozzles,shipNose} from './launch-hardware.js';
 import {cargoBay,starshipCargoFit,starshipCargoFlight} from './starship-cargo.js';
 import {integrationState} from './integration-sequence.js';
+import {launchCompatibility,launchProgressState} from './launch-compatibility.js';
 import {integrationProfile} from './integration-profiles.js';
 import {flightInterfaceGeometry} from './payload-interface-mesh.js';
 import {spacecraftInterface} from './payload-interface.js';
@@ -20,6 +21,7 @@ import {architectureFamily,architectureTerminalStations} from './architecture-fa
 import {thermalMesh} from './thermal-view.js';
 import {fitOutBay,payloadFinishes} from './launch-art.js';
 import {createLaunchLivery} from './launch-livery.js';
+import {bayRoutingSnapshot,launchServiceRoutingSnapshot} from './launch-routing-registry.js';
 const v=(x=0,y=0,z=0)=>new T.Vector3(x,y,z),clamp=x=>Math.max(0,Math.min(1,x));
 const group=(p,name)=>{const g=new T.Group();g.userData.part=name;p.add(g);return g;};
 function shellBands(section,begin,angle,n=Math.ceil(64*angle/Math.PI)){
@@ -34,7 +36,7 @@ function shellBands(section,begin,angle,n=Math.ceil(64*angle/Math.PI)){
  }
  const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(vertices,3));g.setAttribute('normal',new T.Float32BufferAttribute(normals,3));g.setAttribute('uv',new T.Float32BufferAttribute(uv,2));g.setIndex(indices);return g;
 }
-export function makeLaunch(h,repaint,{environment=true}={}){
+export function makeLaunch(h,repaint,{environment=true,routingProgress=null}={}){
  const root=new T.Group(), stage=group(root,'launcher'), lower=group(stage,'launcher'), upper=group(stage,'launcher'),
  payload=group(stage,'payload'), shell=group(stage,'fairing'), facility=group(root,'pad'), tower=group(root,'pad');
  const livery=createLaunchLivery(h.input.launcher,repaint),bodyFinish=livery.surface(livery.record.finish),whiteFinish=livery.surface('paint'),compositeFinish=livery.surface('composite');
@@ -123,7 +125,7 @@ export function makeLaunch(h,repaint,{environment=true}={}){
    const rim=Math.sqrt((spacecraftInterface.outerM/2)**2-z*z),slide=group(fitting,'adapter');
    slide.name='Two-axis separation shoe';
    box(fitting,1.15,seatY*.49,z,.11,seatY*.98,.12,steel,'adapter');
-   const stem=box(fitting,1.15,seatY-.05,z,.068,.12,.075,rib,'adapter');
+   const stem=box(fitting,1.15,seatY-.05,z,.068,.12,.075,rib,'adapter');stem.name='Separation shoe stem';
    slide.position.set(rim,seatY+.009,z);
    box(slide,.33,0,0,.43,.085,.09,dark,'adapter');
    const piston=box(slide,.095,0,0,.19,.044,.055,gold,'adapter');
@@ -195,6 +197,7 @@ export function makeLaunch(h,repaint,{environment=true}={}){
   box(parked,...foot,pv?.026:.18,pv?.16:.026,.18,rib,'structure');
  }
  const referenceParts=payload.children.filter(o=>o!==liveMount&&o.userData.part!=='adapter');
+ for(const object of [parked,...referenceParts])object.userData.routingReferenceRepresentation=true;
  const fleet=launchFleet[d.launcher]||launchFleet.terran,glenn=/glenn/i.test(d.launcher);
  const parallel=d.launcher==='falconHeavy',single=fleet.stages===1;
  const baseR=fleet.diameterM/2,capH=star?shipNose.at(-1)[1]:outerProfile.at(-1)[1],bodyLength=Math.max(4*baseR,fleet.heightM-capH),
@@ -260,17 +263,20 @@ export function makeLaunch(h,repaint,{environment=true}={}){
  const layout=integrationLayout(h,record,single?stage1:stage2,capH);
  const bay=fitOutBay({facility,tower,halves,unit,R,baseR,baseY,maxH,h,profile,layout,box,tube,mesh,cylinder,mat,steel,rib,dark,gold,black});
  const umbilicals=buildLaunchUmbilicals({design:launchUmbilicalDesign(h),site,tower,parts:{lower,upper,boosters:boosters.map(q=>q.br),payload,shell,fitting},
-  geometry:{baseY,heightM:allH,lowerLengthM:stage1,upperLengthM:stage2,fairingRadiusM:R,fairingHeightM:maxH,baseRadiusM:baseR,payloadWidthM:hw,payloadHeightM:hh,payloadSeatM:seatY,flightRingRadiusM:upperR},
-  serviceFrame:ground.serviceFrame,serviceSources:ground.serviceSources});
+  geometry:{baseY,heightM:allH,lowerLengthM:stage1,upperLengthM:stage2,fairingRadiusM:R,fairingHeightM:maxH,baseRadiusM:baseR,payloadWidthM:hw,payloadHeightM:hh,payloadSeatM:seatY,flightRingRadiusM:upperR,cargoLiftStrokeM:access?.liftStrokeM||0},
+  serviceFrame:ground.serviceFrame,serviceSources:ground.serviceSources,utilityRouting:ground.infrastructure.routingRecords,routingProgress});
  root.traverse(o=>{if(o.isMesh){o.receiveShadow=o.userData.receiveShadow!==false;o.castShadow=!o.userData.noShadow&&o.geometry.type!=='PlaneGeometry'&&o.material.transparent!==true;}});
+ const launchReadiness=launchCompatibility(h);
  function update(s,chapter,context={}){
+  const requestedPhase=s.flightPhase||(s.t< -600?'integration':s.t<0?'pad':s.t<INSERTION_MET?'ascent':s.t<900?'insertion':s.t<1200?'commissioning':'operations'),progress=launchProgressState(launchReadiness,s.t,requestedPhase);
+  if(progress.held)s={...s,t:progress.geometryTime,flightPhase:'integration',altitudeKm:0};
   let phase=s.flightPhase||(s.t< -600?'integration':s.t<0?'pad':s.t<INSERTION_MET?'ascent':s.t<900?'insertion':s.t<1200?'commissioning':'operations');
   const reference=!['integration','pad','ascent','insertion','commissioning','deorbit','entry','infeasible'].includes(phase);
   const vehicleStudy=context.domain==='launcher'&&reference,integration=!vehicleStudy&&(phase==='integration'||reference),pad=phase==='pad'||vehicleStudy,asc=phase==='ascent',insert=phase==='insertion',commission=phase==='commissioning';
   const directCraft=commission||['deorbit','entry','infeasible'].includes(phase);
   const t=s.t,fx=launchEffectsAt(t,d.launcher,d.launchSite),up=asc?clamp(t/INSERTION_MET):0,level=asc?Math.max(0,s.altitudeKm||0):0;
   envelope.visible=integration||context.phase==='D'&&context.domain&&context.domain!=='launcher'&&context.domain!=='conops'&&(pad||asc&&(star||t<fairingT));facility.visible=integration;tower.visible=pad||(asc&&t<35);lower.visible=pad||(asc&&(single||t<(star?clock.boostbackCutoff:separationT+45)))||(single&&insert);upper.visible=!single&&(star||!integration)&&!directCraft;payload.visible=!directCraft;shell.visible=integration||pad||(asc&&(star||t<fairingT+46))||(star&&insert);
-  parked.visible=reference;referenceParts.forEach(o=>o.visible=reference);const opening=reference&&!vehicleStudy?.80:integration?clamp((-600-t)/2400)*.90:asc&&!star?clamp((t-fairingT)/46):star&&insert?clamp((t-clock.doorOpen)/(clock.release-clock.doorOpen)):0;
+  parked.visible=parked.userData.routingPresent=reference;referenceParts.forEach(o=>o.visible=o.userData.routingPresent=reference);const opening=reference&&!vehicleStudy?.80:integration?clamp((-600-t)/2400)*.90:asc&&!star?clamp((t-fairingT)/46):star&&insert?clamp((t-clock.doorOpen)/(clock.release-clock.doorOpen)):0;
   const working=phase==='integration',groundTime=h.payloadInterface.passes&&canLoad?t:Math.min(t,-3000),seq=working?integrationState(groundTime):null,pose=working?bayHandlingPose(h,layout,seq):null;
   const cargo=star?starshipCargoFlight(t,clock,canLoad,access.liftStrokeM):null;
   bay.update(pose?.opening??opening,context.domain,working,seq,pose,context.commBench);
@@ -375,8 +381,12 @@ halves.forEach(({g,side})=>{
    }
    center.applyAxisAngle(v(0,0,1),stage.rotation.z);
   }
+  // Physical presence is a mechanism state. Later view cutaways may alter
+  // visible without deleting these solids from a routing audit.
+  for(const part of [facility,tower,lower,upper,payload,shell,fitting,...boosters.map(q=>q.br)])part.userData.routingPresent=part.visible;
   const backdrop=integration?'hangar':pad||asc&&level<15?'ground':asc&&level<95?'sky':'space';
-  return {center,half:zoomH,environment:backdrop,cargoHeld,directCraft,reference,vehicleStudy,phase,opening:pose?.opening??opening,bayTime:working?t:null,launchFX:fx,padCutaway,padCutawayLabel:padCutaway?'Inspection cutaway · flight interface':null};
+  return {center,half:zoomH,environment:backdrop,cargoHeld,directCraft,reference,vehicleStudy,phase,launchHeld:progress.held,launchHoldReason:progress.reason,launchHoldIssues:progress.issues,geometryTime:progress.geometryTime,requestedTime:progress.requestedTime,assumedOrbit:progress.assumedOrbit,opening:pose?.opening??opening,bayTime:working?t:null,launchFX:fx,padCutaway,padCutawayLabel:padCutaway?'Inspection cutaway · flight interface':null};
  }
- return {root,update,bay,ground,umbilicals,setPadConnection(id){umbilicals.setSelectedConnection(id);},faceLaunchClouds(camera){ground.faceClouds(camera);wake.faceClouds(camera);},geometry:{heightM:allH,diameterM:baseR*2,upperLengthM:stage2,lowerLengthM:stage1,stages:fleet.stages,sideBoosters:boosters.length},parts:{payload,fitting,liveMount,shell,fairingPatch,facility,tower,stage,lower,upper,boosterBase,sideOutlines,boosters:boosters.map(q=>q.br)}};
+ const assembly={root,update,bay,ground,umbilicals,setPadConnection(id){umbilicals.setSelectedConnection(id);},faceLaunchClouds(camera){ground.faceClouds(camera);wake.faceClouds(camera);},geometry:{heightM:allH,diameterM:baseR*2,upperLengthM:stage2,lowerLengthM:stage1,stages:fleet.stages,sideBoosters:boosters.length},parts:{payload,fitting,liveMount,shell,fairingPatch,facility,tower,stage,lower,upper,boosterBase,sideOutlines,boosters:boosters.map(q=>q.br)}};
+ bay.routingSnapshot=options=>bayRoutingSnapshot(assembly,options);assembly.routingSnapshot=options=>launchServiceRoutingSnapshot(assembly,options);return assembly;
 }

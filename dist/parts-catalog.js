@@ -7,6 +7,7 @@ import {processingFacility} from './processing-facilities.js';
 import {bayLesson} from './bay-lessons.js';
 import {GROUND_OPERATIONS,processingSources} from './ground-processing.js';
 import {architectureFamily} from './architecture-families.js';
+import {buildElectricalArchitecture,connectorSelections} from './electrical-architecture.js';
 
 // Navigation describes the active build. Only MEL allocations own flight mass;
 // surfaces, handling equipment and provider hardware never create ledger rows.
@@ -23,19 +24,19 @@ const f=(...ids)=>ids.map(id=>'flight:'+id);
 const unavailable=reason=>({family:'flight',unavailable:true,unavailableReason:reason});
 const flightGeometry={
  '01.01':{roles:['compute-board','cold-plate']},'01.02':{roles:['compute-chassis']},'01.03':{roots:['recorder']},
- '01.04':{roots:['avionics'],contextOnly:true,contextLabel:'Shared electronics package; the payload fabric has no separate modeled enclosure.'},
+ '01.04':{roots:['fabric']},
  '02.01':{roles:['solar-active','solar-backing','solar-boom']},'02.02':{roles:['battery-case']},
- '02.03':{roots:['avionics'],contextOnly:true,contextLabel:'Shared electronics package; the PCDU has no separate modeled enclosure.'},
+ '02.03':{roots:['pcdu']},
  '03.01':{roles:['radiator-finish','radiator-face-sheet','radiator-core','radiator-passage']},
  '03.02':{roles:['coolant-tube','passive-heat-pipe','heat-pump-case']},'03.03':{roles:['mli-outer','mli-white-outer']},
  '04.01':{roots:['gyroPack']},'04.02':{roots:['torquers']},
- '04.03':unavailable('Attitude sensors have a mass and interface allocation but no separate sensor geometry in the current spacecraft model.'),
+ '04.03':{electricalItemId:'flight:04.03'},
  '05.01':{roots:['patches']},'05.02':{roots:['dish.parent.parent']},'05.03':{roots:['opticalTerminals.parent.parent','optic.parent.parent']},
  '06.01':{roots:['engines']},'06.02':{roles:['propellant-feed']},'06.03':{roots:['tankMap.fuel']},
  '06.04':{roots:['tankMap.oxidizer']},'06.05':{roots:['tankMap.helium']},
  '07.01':{roles:['primary-frame','launch-interface']},'07.02':{roles:['enclosure-face-sheet','sandwich-core','feedthrough-seal']},
  '07.03':unavailable('Shielding is an allocated wall-area mass. The current model does not resolve a separate radiation-shield layer.'),
- '07.04':{roles:['deployment-hardware']},'07.05':{roles:['harness']},'08.01':{roots:['avionics']},
+ '07.04':{roles:['deployment-hardware']},'07.05':{roots:['harnesses']},'08.01':{roots:['avionics']},
  '09.01':{family:'launch',roots:['parts.fitting','parts.liveMount']}
 };
 const neighbors={
@@ -66,12 +67,12 @@ export function buildPartsCatalog(h,s=null){
  const add=record=>{const r={description:'',facts:[],sources:[],basis:'',relatedIds:[],animations:[],...record};if(byId[r.id])throw new Error('Duplicate part '+r.id);r.sources=sources(r.sources);records.push(r);byId[r.id]=r;return r};
  for(const row of mel.rows){
   const geometry=INVENTORY.has(row.wbs)?unavailable('Loaded fluid inventory is a quantity inside its vessel, not a separately modeled solid part. Open the related pressure vessel to inspect its hardware.'):{family:'flight',...(flightGeometry[row.wbs]||unavailable('No separate geometry is modeled for this allocation.'))};
-  if(row.wbs==='07.05'&&familyModel&&family.thermalTopology!=='passive-local')Object.assign(geometry,unavailable('The routed harness has an equipment and electrical allocation, but this architecture does not resolve separate cable geometry.'));
   const r=add({id:'flight:'+row.wbs,title:row.item,category:'flight',cluster:row.subsystem,wbs:row.wbs,quantity:row.quantity,quantityUnit:row.unit,description:row.massBasis,materials:row.materials,
    facts:[fact('Quantity',row.quantity,row.unit),fact('Allocation mass',row.extendedMassKg,'kg'),fact('Average unit mass',row.unitMassKg,'kg'),fact('Mass boundary',row.classification),fact('Operating power',row.operatingPowerW==null?'Unallocated':row.operatingPowerW,row.operatingPowerW==null?null:'W'),fact('Envelope',row.dimensionsM.map(num).join(' × '),'m'),fact('Dimension boundary',row.dimensionScope),fact('Reference article',row.manufacturer+' · '+row.referenceModel),fact('Evidence',row.evidence)],
    sources:[row,...row.otherSources,{title:row.powerSourceName,url:row.powerSourceUrl},{title:row.dimensionSourceName,url:row.dimensionSourceUrl}],
    basis:row.dimensionBasis+' '+row.heritage+' Rendered hardware follows the active study geometry; it is not supplier CAD.',
-   relatedIds:neighbors[row.wbs]||[],render:geometry,massAccounting:'mel-allocation',extendedMassKg:row.extendedMassKg,
+   referenceHardware:{manufacturer:row.manufacturer,referenceModel:row.referenceModel,sourceUrl:row.sourceUrl,evidence:row.evidence,heritage:row.heritage},
+   relatedIds:[...(neighbors[row.wbs]||[]),...(row.assemblyDetails||[]).map(x=>x.itemId)],electricalDefinition:row.assemblyDetails?.length?{kind:'equipment',itemId:'flight:'+row.wbs}:undefined,render:geometry,massAccounting:'mel-allocation',extendedMassKg:row.extendedMassKg,
    animations:['02.01','03.01','07.04'].includes(row.wbs)?[{id:'deployment',label:'Deploy & stow'}]:row.wbs==='04.01'?[{id:'cmg',label:'Gyro motion'}]:['05.02','05.03'].includes(row.wbs)?[{id:'terminals',label:'Terminal pointing'}]:[]});
   if(row.instantPowerW!=null)r.facts.push(fact('Power at mission instant',row.instantPowerW,'W'));
   for(const detail of row.materialAssignments||[]){
@@ -85,6 +86,16 @@ export function buildPartsCatalog(h,s=null){
     basis:detail.evidence?.basis||detail.massBasis,relatedIds:[r.id],render,animations:r.animations,massAccounting:'included-in-parent',materialId:detail.materialId,materials:[{id:detail.materialId,name:detail.materialName}]});
   }
  }
+ const electrical=buildElectricalArchitecture(h);
+ for(const r of records.filter(r=>r.massAccounting==='mel-allocation'&&!r.render?.unavailable&&(r.id==='flight:07.05'||electrical.boxes.some(b=>b.itemId===r.id)))){r.electricalDefinition={kind:'equipment',itemId:r.id};if(!r.animations.some(a=>a.id==='electrical'))r.animations=[...r.animations,{id:'electrical',label:'Continuity & signal rehearsal'}];}
+ for(const detail of mel.assemblyDetails){
+  const parent=byId[detail.parentId],definition=detail.electricalDefinition,hs=electrical.harnesses.filter(a=>definition.harnessIds?.includes(a.id)||definition.portIds?.includes(a.fromPortId)||definition.portIds?.includes(a.toPortId)),related=[detail.parentId,...hs.flatMap(a=>[electrical.boxById[a.fromBoxId].itemId,electrical.boxById[a.toBoxId].itemId,...electrical.connectorDetails.filter(c=>c.portIds.includes(a.fromPortId)||c.portIds.includes(a.toPortId)).map(c=>c.itemId)])].filter(id=>id!==detail.itemId);
+  const thermal=detail.electricalThermalModel;
+  const extra=detail.kind==='harness'?(()=>{const a=electrical.harnesses.find(a=>a.id===detail.exemplarHarnessId);return [fact('Example assembly',a.id),fact('Route / cut length',num(a.routeLengthM)+' / '+num(a.cutLengthM),'m'),fact('Wire or fiber',a.wire.construction),fact('Maximum circuit current',Math.max(...hs.map(a=>a.currentA)),'A'),fact('Selection voltage',Math.max(...hs.map(a=>a.voltageV)),'V'),fact('Endpoint definitions',hs.length),fact('Mated interfaces per assembly',a.totalMatedInterfacesPerAssembly)]})():detail.kind==='connector'?[fact('Mating family',detail.referenceModel),fact('Procurement unit','One cable plug + equipment receptacle'),fact('Supplier approval','Open; selected catalog family is not flight qualification')]:[fact('Operating power',detail.operatingPowerW,'W')];
+  add({id:detail.itemId,title:detail.title,category:'flight',cluster:parent?.cluster||'Spacecraft avionics',parentId:detail.parentId,wbs:detail.wbs,quantity:detail.quantity,quantityUnit:detail.unit,description:detail.description,facts:[fact('Quantity',detail.quantity,detail.unit),fact('Included allocation mass',detail.extendedMassKg,'kg'),fact('Independent material estimate',detail.estimatedMassKg,'kg'),fact('Mass accounting','Included in '+detail.parentWbs+'; no additional spacecraft mass'),...extra,fact('Procurement','Build specification / supplier quote required')],sources:detail.sources,basis:detail.basis,relatedIds:[...new Set(related)],render:{family:'flight',electricalItemId:detail.itemId},animations:[{id:'electrical',label:'Continuity & signal rehearsal'}],massAccounting:'included-in-parent',extendedMassKg:detail.extendedMassKg,materialId:detail.materialId,materials:[{id:detail.materialId,name:detail.materialId==='electronics-board'?'Electronic circuit board':detail.materialId==='harness-polyimide'?'Copper / insulated cable':detail.materialId==='rf-dielectric'?'RF dielectric / antenna substrate':'Aluminum connector shell'}],electricalDefinition:definition,electricalThermalModel:thermal,procurement:detail.procurement,referenceHardware:{manufacturer:detail.manufacturer,referenceModel:detail.referenceModel,sourceUrl:detail.sourceUrl,evidence:'Supplier family / project allocation',heritage:detail.basis}});
+ }
+ const egseType=connectorSelections['spacewire-a'];
+ add({id:'ground:egse-cable',title:'Removable electrical checkout cable',category:'ground',cluster:'Electrical ground support',parentId:'ground:avionics',description:'A 3 m Omnetics SpaceWire Type A bench lead connects the controlled ground checkout adapter to the spacecraft flight-side EGSE interface. Remove before flight; it is outside the spacecraft mass ledger.',facts:[fact('Nominal length',3,'m'),fact('Raw interface rate',100,'Mbit/s'),fact('Cable wiring','Type A, eight signal wires; position3 unpopulated'),fact('Scope','Removable ground equipment; no flight mass')],sources:egseType.sourceIds.map(id=>electrical.sources[id]),basis:egseType.procurement+' A 3 m physical lead is shown for the checkout setting. The released ground adapter, isolation, safe-to-mate procedure and supplier order are controlled integration artifacts.',relatedIds:['ground:avionics','ground:checkout','flight:07.05.16','flight:08.01'],render:{family:'flight',electricalItemId:'ground:egse-cable'},animations:[{id:'electrical',label:'Ground checkout flow'}],electricalDefinition:{kind:'ground-harness',itemId:'ground:egse-cable',flightInterfaceId:'flight:07.05.16'},electricalThermalModel:{kind:'ground-harness',massKg:3*.045+2*egseType.estimatedPairKg,specificHeatJPerKgK:600,areaM2:Math.PI*.005*3,loadW:0,emissivity:.8,absorptivity:.4,scope:'One removable 3 m ground checkout cable, not installed flight hardware',basis:'Explicit3 m cable with estimated0.045 kg/m jacket/conductor composite plus two mated interfaces;600 J/(kg·K) preliminary effective capacity. Ground fixture is outside the flight ledger.'}});
  const launchSources=sources([{title:fleet.sourceTitle,url:fleet.sourceUrl},{title:fleet.evidenceTitle,url:fleet.evidenceUrl}]);
  const launchBasis='Recognition geometry from the current '+fleet.name+' model. Dimensions and installation details are schematic unless identified in the cited provider reference. Launch-vehicle mass is outside the spacecraft MEL.';
  const launch=(id,title,render,extra={})=>add({id:'launch:'+id,title,category:'launch',cluster:fleet.name,parentId:id==='vehicle'?undefined:'launch:vehicle',description:fleet.architecture,sources:launchSources,basis:launchBasis,render:{family:'launch',...render},...extra});
@@ -157,6 +168,7 @@ export function buildPartsCatalog(h,s=null){
  // Prune options absent from this selected architecture, then make links reciprocal.
  for(const r of records)r.relatedIds=[...new Set([...(r.parentId?[r.parentId]:[]),...r.relatedIds])].filter(id=>id!==r.id&&byId[id]);
  for(const r of records)for(const id of r.relatedIds)if(!byId[id].relatedIds.includes(r.id))byId[id].relatedIds.push(r.id);
+ for(const id of ['ground:avionics','ground:checkout'])if(byId[id])byId[id].relatedIds=[...new Set([...(byId[id].relatedIds||[]),'ground:egse-cable','flight:07.05.16'])];
  return {schema:'orbital-data-center/parts/1',records,byId,categories:CATEGORIES.map(x=>({...x,count:records.filter(r=>r.category===x.id).length})),reference:mel.reference,massAccounting:'Only flight MEL allocation records own mass. Material details and ground, launch and site records are non-additive.',flightTotals:mel.totals};
 }
 

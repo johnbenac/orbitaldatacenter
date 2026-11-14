@@ -96,7 +96,7 @@ export function fitOutBay(ctx){
   // Each half translates with its own three-point carrier until encapsulation.
   // The shoes touch the lower circumferential ring and clear the central pedestal.
   for(const side of [-1,1]){
-   const f=new T.Group();f.name='Fairing half carrier';facility.add(f);fixtures.push({f,side});
+   const f=new T.Group();f.name='Fairing half carrier';f.userData.bayRoutingMotion={type:'rigid',owner:'bay:fairing-shoe:'+side,side};facility.add(f);fixtures.push({f,side});
    stand(f,side*.87*rim,.18*rim,.72*rim,-.12,false);
    for(const a of [.9,Math.PI/2,Math.PI-.9]){
     const shoe=box(f,side*Math.sin(a)*rim,-.06,Math.cos(a)*rim,.19,.12,.19,dark);

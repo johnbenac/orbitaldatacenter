@@ -1,0 +1,39 @@
+{
+  "method": "libjpeg coefficient-preserving progressive Huffman optimization",
+  "sourceRevision": "a9f186ea78b71d9f5151a44fcd852e75128fed0c",
+  "totalBytesSaved": 911769,
+  "assets": [
+    {
+      "path": "dist/assets/launch-sites/cape-lc36-detail.jpg",
+      "dimensions": [
+        4096,
+        4096
+      ],
+      "originalBytes": 7316117,
+      "optimizedBytes": 6850007,
+      "bytesSaved": 466110,
+      "rgbaExact": true,
+      "quantizationExact": true,
+      "appAndCommentMarkersExact": true,
+      "originalFileSha256": "41defc07390b870a1b4d286caf867b03f6b86175a961b0ef7ae1898d8e299fea",
+      "optimizedFileSha256": "86870fd42436fa84cb1ec537dc51f6c43aead93ff23b57e5a5d6443d2cde6550",
+      "decodedRgbaSha256": "48fe50352001e40fa5e0201e832f0d48cf33872dae3e7ce561a6d429c5a4e12c"
+    },
+    {
+      "path": "dist/assets/launch-sites/cape-lc16-detail.jpg",
+      "dimensions": [
+        4096,
+        4096
+      ],
+      "originalBytes": 7197228,
+      "optimizedBytes": 6751569,
+      "bytesSaved": 445659,
+      "rgbaExact": true,
+      "quantizationExact": true,
+      "appAndCommentMarkersExact": true,
+      "originalFileSha256": "e7181041170151888c896486f9ca391dcc558140b08b801c12a6c754642791b8",
+      "optimizedFileSha256": "87f5fec7dc946925ca60b5871e9b082b68525b1260fa978d2527f61e11b210be",
+      "decodedRgbaSha256": "84fb71909b44c2cff6f707aa0723f513ae87a9ecd80175c0e36a457990c042b1"
+    }
+  ]
+}

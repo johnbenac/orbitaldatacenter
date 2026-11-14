@@ -5,8 +5,9 @@ import {domains,domainReadout,domainTrade,renderDomainReadout,renderDomainTrade,
 import {cfg} from './dist/workspaces.js';
 import {schematicPages} from './dist/subsystem-diagrams.js';
 
-const expected=['conops','purpose','environment','orbit','compute','data','comm','power','thermal','attitude','prop','mass','launch','launcher','mechanical','avionics','software'];
-assert.deepEqual(Object.keys(domains),expected);assert.deepEqual(schematicPages,expected);
+const expected=['conops','environment','orbit','compute','data','comm','power','thermal','attitude','prop','mass','launch','launcher','mechanical','avionics','software'];
+assert.deepEqual(Object.keys(domains),expected);assert.deepEqual(schematicPages.filter(id=>id!=='purpose'),expected);assert(schematicPages.includes('purpose'),'Legacy purpose schematic remains routable.');
+assert.equal(domains.purpose,domains.compute,'The legacy purpose link resolves to Payload Operations without adding a duplicate domain.');
 const available=new Set(controls.map(c=>c.key));
 function sample(design){
  const hardware=sizeDesign(design),sim=createSimulation(hardware),events=sim.events(0,86400),pass=events.find(e=>e.type==='contact');
@@ -31,11 +32,15 @@ const traffic=domainTrade('data',baseline,edit).rows.find(r=>r.key==='meanTraffi
 const env=environmentFlows(baseline),g=baseline.state;
 const radiation=env.filter(r=>['Absorbed direct shortwave','Absorbed albedo','Absorbed longwave'].includes(r.quantity));
 assert.ok(Math.abs(radiation.reduce((n,r)=>n+r.value,0)-g.absorbedKW)<1e-9);assert.ok(env.every(r=>r.source&&r.receiver&&r.unit));
-const dataRows=domainReadout('data','E',baseline).rows;assert.ok(Math.abs(dataRows.find(r=>r.key==='byteResidual').value)<1e-7);
+const dataRows=domainReadout('data','E',baseline).rows;
+assert.equal(dataRows.find(r=>r.key==='aiProductGeneratedGB').value,g.aiProductGeneratedGB);
+assert.equal(dataRows.find(r=>r.key==='aiProductQueueGB').value,g.aiProductQueueGB);
+assert.equal(dataRows.find(r=>r.key==='aiProductDeliveredGB').value,g.aiProductDeliveredGB);
+assert.ok(Math.abs(g.aiProductGeneratedGB-g.aiProductQueueGB-g.aiProductDeliveredGB-g.aiProductDroppedGB)<1e-7);
 const post={...baseline,state:{...baseline.state,referenceBody:true,spacecraftModelEndedAt:500,t:501,entryDynamicPressurePa:402,entryReferenceDragMS2:2.68},disposal:{method:'reentry',outcome:'target-miss',targetErrorKm:201,target:{latDeg:-48.9,lonDeg:-123.4},impact:{t:510,speedMs:150},burns:[]}};
 assert.equal(domainReadout('power','F',post).rows.find(r=>r.key==='batteryKWh').value,null);assert.equal(domainReadout('environment','F',post).rows.find(r=>r.key==='entryDynamicPressurePa').value,402);
 const grave=domainReadout('prop','F',{...baseline,disposal:{method:'graveyard',outcome:'graveyard',burns:[{start:2000,end:2001,role:'Raise apogee'},{start:5000,end:5001,role:'Circularize'}],end:5001,finalPerigeeKm:903,finalApogeeKm:909}});assert.ok(grave.rows.some(r=>r.label==='Graveyard final perigee'&&r.value===903));
-console.log('102 distinct phase/domain interpretations, 17 trade studies with aligned curves, same-instant radiative heat closure, payload byte conservation and both disposal routes verified.');
+console.log('96 distinct phase/domain interpretations, 16 trade studies with aligned curves, same-instant radiative heat closure, payload byte conservation and both disposal routes verified.');
 const {chronologicalAudit}=await import('./dist/mission-worker.js');
 const audit=chronologicalAudit(baseline.hardware).result,withAudit={...baseline,audit};
 for(const key of expected){

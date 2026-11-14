@@ -2,6 +2,7 @@
 // never infers a lightning mast, water tower or commodity from regional scenery.
 // Layout offsets are recognition geometry, not a surveyed site plan.
 import * as T from './vendor/three.module.js';
+import {connectionTube,connectionAnchor} from './connection-geometry.js';
 const V=(x=0,y=0,z=0)=>new T.Vector3(x,y,z);
 const COLORS={lox:'#90c7dc',oxygen:'#90c7dc',methane:'#d7b783',lng:'#d7b783',hydrogen:'#bdabd9',lh2:'#bdabd9',rp1:'#c8a178',kerosene:'#c8a178',nitrogen:'#a5b8bd',helium:'#afbd9a',water:'#83c5c9'};
 const colorFor=id=>COLORS[id]||'#a5b8bd';
@@ -9,7 +10,7 @@ const known=feature=>feature&&feature.status!=='unknown'&&feature.visual?.render
 
 export function buildPadInfrastructure(site,{tower,land,civil,grade,baseY,heightM:H,widthM:w,mast,box,tube,cylinder,mesh,mat,steel}){
  const root=new T.Group();root.name='Site utility infrastructure';land.add(root);
- const specs=site.infrastructure||{},annotations=[],overviewObjects=[],serviceSources=new Map(),lightningObjects=[],waterObjects=[];
+ const specs=site.infrastructure||{},routingRecords=[],annotations=[],overviewObjects=[],serviceSources=new Map(),lightningObjects=[],waterObjects=[];
  const concrete=mat('#b0b0a7',.08,.88),white=mat('#e1e4dd',.18,.75),dark=mat('#52666a',.38),line=mat('#92a9ae',.42),band=mat('#c1ac89',.24);
  const group=(p,name)=>{const o=new T.Group();o.name=name;o.userData.part='pad';p.add(o);return o;};
  const block=(p,x,y,z,a,b,c,m)=>box(p,x,y,z,a,b,c,m,'pad');
@@ -19,14 +20,18 @@ export function buildPadInfrastructure(site,{tower,land,civil,grade,baseY,height
   const anchor=new T.Object3D();anchor.name=title+' annotation';anchor.position.copy(point);parent.add(anchor);
   const entry={id,title,detail,anchor,kind:'facility',priority};annotations.push(entry);return entry;
  };
- function pipe(p,points,r,material){for(let i=1;i<points.length;i++)rod(p,points[i-1],points[i],r,material);}
- function tank(p,id,x,z,r,h,label,material=white){
+ function pipe(p,points,r,material,id='site-line-'+routingRecords.length){
+  const first=V(...points[0]),last=V(...points.at(-1)),fromNormal=V(...points[1]).sub(first).normalize(),toNormal=V(...points.at(-2)).sub(last).normalize(),from=connectionAnchor(p,first.toArray(),fromNormal.toArray(),id+' source outlet'),to=connectionAnchor(p,last.toArray(),toNormal.toArray(),id+' destination inlet'),bendRadiusM=r*3;
+  const terminations=[];for(const [end,point,normal,anchor] of [['source',first,fromNormal,from],['destination',last,toNormal,to]]){const fitting=rod(p,point.clone().addScaledVector(normal,-Math.max(.22,r*1.25)).toArray(),point.toArray(),r*1.15,line);fitting.name=id+' '+end+' fitting';fitting.userData.routingTerminalId=id;terminations.push({mesh:fitting,anchor});}
+  const tube=connectionTube(p,{radius:r,material,part:'pad',segments:224,radialSegments:8,bendRadiusM,name:id+' · routed utility line'});tube.mesh.userData.routingLine=true;tube.update(points);const record={id,tube,parent:p,from,to,radiusM:r,bendRadiusM,terminations,controlPoints:points};routingRecords.push(record);return record;
+ }
+ function tank(p,id,x,z,r,h,label,material=white,outletRadiusM=.18){
   const g=group(p,label);g.position.set(x,grade,z);g.userData.commodity=id;g.userData.schematic=true;
   post(g,0,0,-.1,.55,r*1.15,concrete);post(g,0,0,.55,h,r,material);
   const roof=mesh(g,new T.SphereGeometry(1,16,8,0,Math.PI*2,0,Math.PI/2),material,0,h+.55,0,'pad');roof.scale.set(r,.25*r,r);
   for(const y of [h*.16,h*.76])post(g,0,0,y+.55,.09,r*1.018,band);
-  const out=V(x,grade+.95,z+r+.27);rod(root,[x,grade+.95,z+r],[out.x,out.y,out.z],.18,line);
-  return {group:g,port:out,anchor:V(0,h*.61,0)};
+  const out=V(x,grade+.95,z+r+Math.max(.27,outletRadiusM*2)),fitting=rod(root,[x,grade+.95,z+r],[out.x,out.y,out.z],outletRadiusM,line);fitting.name=label+' outlet fitting';
+  return {group:g,port:out,fitting,anchor:V(0,h*.61,0)};
  }
  // One vessel symbol per documented commodity. It does not assert the actual
  // number, shape, capacity or siting of the provider's storage vessels.
@@ -38,12 +43,15 @@ export function buildPadInfrastructure(site,{tower,land,civil,grade,baseY,height
   const x=(i-(species.length-1)/2)*rr*3.4+H*.18,z=-H*.56-rr*1.4;
   const t=tank(storage,id,x,z,rr,hh,s.label||id),accent=mat(colorFor(id),.28);
   post(t.group,0,0,hh*.84+.55,.26,rr*1.024,accent);
-  const transfer=V(x,grade+.95,-w*1.8),manifold=V(mast.x-w*.13+(i-species.length*.5)*.42,grade+.95,mast.z-w*.45);
-  pipe(root,[t.port.toArray(),transfer.toArray(),[manifold.x,transfer.y,transfer.z],manifold.toArray()],.13,line);
+  const transfer=V(x,grade+.95+i*.35,-w*1.8-i*.5),manifold=V(mast.x-w*.75-i*4,grade+.95+i*.35,Math.min(mast.z-w*.75,-w-4));
+  const feed=pipe(root,[t.port.toArray(),transfer.toArray(),[manifold.x,transfer.y,transfer.z],manifold.clone().add(V(0,0,-.32)).toArray()],.13,line,'commodity-'+id+'-supply');feed.terminations.push({mesh:t.fitting,anchor:feed.from});
   serviceSources.set(id,manifold);overviewObjects.push(t.group);
   mark(t.group,'commodity-'+id,s.label||id,'Representative storage · '+commodities.status,t.anchor,58+i);
  }
- const manifold=group(root,'Ground utility distribution');manifold.position.set(mast.x-w*.36,grade+.75,mast.z-w*.44);
+ // Keep the electrical cabinet outside the mast/commodity manifold corridor.
+ // The layout is notional, but a source connector cannot begin inside another
+ // service manifold or point directly through a tower leg.
+ const manifold=group(root,'Ground utility distribution');manifold.position.set(mast.x-w*2.40,grade+.75,Math.min(mast.z-w*.75,-w-5));
  block(manifold,0,.6,0,Math.max(2.4,w*.20),1.3,1.2,dark);
  for(let i=0;i<3;i++)block(manifold,-.75+i*.75,.65,.62,.45,.66,.03,line);
  serviceSources.set('power',manifold.position.clone().add(V(-.55,.9,0)));
@@ -54,10 +62,10 @@ export function buildPadInfrastructure(site,{tower,land,civil,grade,baseY,height
  // Storage/pumping topology is site data. Unknown installations are omitted,
  // leaving the evidence gap visible in the linked site record.
  const water=specs.water,waterKind=water?.visual?.kind||'unknown',waterEnabled=known(water)&&waterKind!=='unknown';
- let waterSupply=null;
+ let waterSupply=null,waterSourceFitting=null,waterHeader=null;
  if(waterEnabled){
   const supply=group(root,'Sound suppression water supply');waterObjects.push(supply);overviewObjects.push(supply);
-  const x=H*.67,z=-H*.87;
+  const x=H*(site.tower==='mobile-gantry'?1.30:.67),z=-H*.87;
   if(waterKind==='water-tower'){
    const height=Number.isFinite(water.heightM)?water.heightM:H*.88,rr=Math.max(3.6,height*.068);
    post(supply,x,z,grade-.2,.8,rr*1.08,concrete);
@@ -65,17 +73,19 @@ export function buildPadInfrastructure(site,{tower,land,civil,grade,baseY,height
    cylinder(supply,x,grade+height*.79,z,rr,rr*.39,height*.11,white,'pad',20);
    post(supply,x,z,grade+height*.845,height*.15,rr,white);
    post(supply,x,z,grade+height*.995,.24,rr*1.035,line);
-   rod(supply,[x+rr*.38,grade+.5,z],[x+rr*.38,grade+height*.80,z],.24,line);
-   waterSupply=V(x+rr*.38,grade+.7,z);mark(supply,'water-supply',water.label||'Water tower',water.heightM?water.heightM+' m published height · '+water.status:'Schematic elevation · '+water.status,V(x,grade+height*.87,z),91);
+   waterSupply=V(x+rr+.50,grade+height*.80,z);mark(supply,'water-supply',water.label||'Water tower',water.heightM?water.heightM+' m published height · '+water.status:'Schematic elevation · '+water.status,V(x,grade+height*.87,z),91);
   }else if(waterKind==='ground-tanks'){
-   const t=tank(supply,'water',x,z,Math.max(4,H*.06),Math.max(4,H*.06),'Water storage',white);waterSupply=t.port;
+   const t=tank(supply,'water',x,z,Math.max(4,H*.06),Math.max(4,H*.06),'Water storage',white,.39);waterSupply=t.port;waterSourceFitting=t.fitting;
    mark(t.group,'water-supply',water.label||'Deluge water storage','Representative reservoir · '+water.status,t.anchor,88);
   }
   if(waterSupply){
-   const pump=group(supply,'Water distribution station');pump.position.set(H*.40,grade,-w*1.75);
+   const pump=group(supply,'Water distribution station'),pumpZ=-w*1.75-3,lightningSpec=specs.lightning,lightningCount=Number.isFinite(lightningSpec?.count)?lightningSpec.count:0;
+   const pumpX=[.40,.52,.28,.65,.82,1.10].map(f=>H*f).find(px=>Array.from({length:lightningCount},(_,i)=>{const q=Array.isArray(lightningSpec.visual?.layout)?lightningSpec.visual.layout[i]:null,angle=2*Math.PI*i/lightningCount+Math.PI/4,lx=(q?.[0]??Math.cos(angle)*.58)*H,lz=(q?.[1]??Math.sin(angle)*.56)*H,hh=lightningSpec.masts?.[i]?.heightM??lightningSpec.heightM??H*(lightningSpec.visual?.heightRatio||1.2),half=Math.max(1.25,hh*.019)*.7+.8;return Math.abs(px-lx)>4+half||Math.abs(pumpZ-lz)>7+half;}).every(Boolean))??H*1.30;pump.position.set(pumpX,grade,pumpZ);
    block(pump,0,1.2,0,5.6,2.4,3.6,concrete);block(pump,0,2.46,0,5.85,.18,3.85,line);
    for(const xx of [-1.6,0,1.6])block(pump,xx,1.2,1.81,1.0,1.7,.04,dark);
-   pipe(supply,[waterSupply.toArray(),[waterSupply.x,grade+.65,pump.position.z],[pump.position.x,grade+.65,pump.position.z],[w*1.7,grade+.65,-w*1.75],[w*1.7,grade+.65,-w*1.08]],.34,line);
+   const feedY=grade+4.8,inlet=V(pump.position.x,grade+1.1,pump.position.z-2.2),outlet=V(pump.position.x,grade+1.1,pump.position.z+2.2),rise=waterKind==='water-tower'?[waterSupply.toArray(),waterSupply.clone().add(V(2.2,0,0)).toArray(),[waterSupply.x+2.2,feedY,waterSupply.z]]:[waterSupply.toArray(),waterSupply.clone().add(V(0,0,2.2)).toArray(),[waterSupply.x,feedY,waterSupply.z+2.2]],entry=rise.at(-1);
+   const outerX=H*(site.tower==='mobile-gantry'?1.55:1.04),incoming=pipe(supply,[...rise,[outerX,feedY,entry[2]],[outerX,feedY,inlet.z-2.3],[inlet.x,feedY,inlet.z-2.3],[inlet.x,inlet.y,inlet.z-2.3],inlet.toArray()],.34,line,'water-reservoir-to-pump');if(waterSourceFitting)incoming.terminations.push({mesh:waterSourceFitting,anchor:incoming.from});
+   const header=V(w*1.7,grade+3.7,-Math.max(w+7,Math.abs(mast.z)+mast.span*.5+2,Math.abs(mast.z)+w*.75+3)),headerRunZ=Math.min(header.z-3.1,outlet.z+2.3-3.1,...Array.from({length:lightningCount},(_,i)=>{const q=Array.isArray(lightningSpec.visual?.layout)?lightningSpec.visual.layout[i]:null,angle=2*Math.PI*i/lightningCount+Math.PI/4,lx=(q?.[0]??Math.cos(angle)*.58)*H,lz=(q?.[1]??Math.sin(angle)*.56)*H,hh=lightningSpec.masts?.[i]?.heightM??lightningSpec.heightM??H*(lightningSpec.visual?.heightRatio||1.2),half=Math.max(1.25,hh*.019)*.7+2;return lx>Math.min(header.x,pumpX)-4&&lx<Math.max(header.x,pumpX)+4?lz-half:Infinity;})),outY=feedY+2.8,outgoing=pipe(supply,[outlet.toArray(),[outlet.x,outlet.y,outlet.z+2.3],[outlet.x,outY,outlet.z+2.3],[outlet.x,outY,headerRunZ],[header.x,outY,headerRunZ],[header.x,outY,header.z],[header.x,header.y,header.z]],.34,line,'water-pump-to-header'),headerBody=block(supply,header.x,header.y-.6,header.z,2.4,1.2,1.0,dark);headerBody.name='Water header shutoff manifold';waterHeader={position:header.clone(),mesh:headerBody};outgoing.terminations.push({mesh:headerBody,anchor:outgoing.to});
    mark(pump,'water-distribution','Water distribution','Supply routed to the launch table and trench',V(0,1.7,0),76);
   }
  }
@@ -91,11 +101,11 @@ export function buildPadInfrastructure(site,{tower,land,civil,grade,baseY,height
    const bottom=grade+mast.top,heightAbove=Number.isFinite(lightning.heightM)?Math.min(lightning.heightM,mast.top*.45):H*.21;
    const p=group(lightningRoot,'Tower-mounted lightning mast');p.position.set(mast.x,bottom,mast.z);lightningObjects.push(p);
    post(p,0,0,0,heightAbove,.22,white);post(p,0,0,heightAbove,.45,.055,band);
-   const lead=V(mast.x,grade+1,mast.z-mast.span*.55);pipe(lightningRoot,[[mast.x,bottom+heightAbove,mast.z],[mast.x,bottom,mast.z],lead.toArray()],.065,line);
+   const topPort=V(mast.x+.45,bottom+heightAbove,mast.z),lead=V(mast.x-mast.span*.5-.7,grade+1,mast.z-mast.span*.5-.7);pipe(lightningRoot,[topPort.toArray(),[topPort.x+1,topPort.y,topPort.z],[topPort.x+1,topPort.y,lead.z],[lead.x,topPort.y,lead.z],lead.toArray()],.065,line,'lightning-mast-downlead');
    mark(p,'lightning-protection',lightning.label||'Tower lightning protection',lightning.status+' · layout schematic',V(0,heightAbove*.7,0),87);
    if(lightning.visual?.catenary){
-    const y=bottom+heightAbove*.85,a=[mast.x-H*.63,grade,mast.z],b=[mast.x+H*.63,grade,mast.z];
-    pipe(lightningRoot,[a,[mast.x,y,mast.z],b],.065,line);
+    const y=bottom+heightAbove*.85,a=[mast.x-H*.63,grade+.3,mast.z-H*.50],b=[mast.x+H*.63,grade+.3,mast.z-H*.50];
+    pipe(lightningRoot,[a,[mast.x-.3,y,mast.z]],.065,line,'lightning-guy-left');pipe(lightningRoot,[[mast.x+.3,y,mast.z],b],.065,line,'lightning-guy-right');
    }
   }else if(count>0){
    for(let i=0;i<count;i++){
@@ -115,13 +125,13 @@ export function buildPadInfrastructure(site,{tower,land,civil,grade,baseY,height
    }
    if(type==='catenary'||lightning.kind==='catenary'){
     for(let i=0;i<points.length;i++){
-     const a=points[i],b=points[(i+1)%points.length],chain=[];
+     const rawA=points[i],rawB=points[(i+1)%points.length],direction=rawB.clone().sub(rawA).normalize(),a=rawA.clone().addScaledVector(direction,.32),b=rawB.clone().addScaledVector(direction,-.32),chain=[];
      for(let j=0;j<=12;j++){const f=j/12,p=a.clone().lerp(b,f);p.y-=H*.035*4*f*(1-f);chain.push(p.toArray());}
-     pipe(lightningRoot,chain,.075,line);
+     pipe(lightningRoot,chain,.075,line,'lightning-catenary-'+i);
     }
     mark(lightningRoot,'lightning-catenary','Lightning catenary',count+' separate masts · '+lightning.status,points[0].clone().lerp(points[1],.5).add(V(0,-H*.035,0)),94);
    }
   }
  }
- return {root,annotations,overviewObjects,serviceSources,waterEnabled,waterObjects,lightningObjects,waterSupply};
+ return {root,routingRecords,addRoutingLine:pipe,annotations,overviewObjects,serviceSources,waterEnabled,waterObjects,lightningObjects,waterSupply,waterHeader};
 }

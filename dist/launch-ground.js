@@ -108,7 +108,7 @@ export function buildLaunchGround(site,{tower,coreMounts,baseR:r,baseY,allH:H,fl
   pad(civil,(channelEnd+channelStart)/2,(floorY+grade)/2,s*(w+.52),channelEnd-channelStart,grade-floorY+1,1.04,wall);
   pad(civil,0,(floorY+deckY)/2,s*(w+1.5),2.55*w,depth,3,wall);
   pad(civil,0,deckY-.36,s*(w+1.15),3.1*w,.72,3.7,cool);
-  if(site.infrastructure?.water?.visual?.render)shaft(civil,[channelStart+1,grade+.6,s*(w+1.2)],[channelEnd-1,grade+.6,s*(w+1.2)],.26,pipe).name='Water cooling manifold';
+  // Water headers are routed outside the solid retaining walls below.
  }
  // Elevated mount bears on piers around an open aperture. A low ridge of
  // water-cooled inclined steel beneath the engine plane turns exhaust sideways.
@@ -229,6 +229,11 @@ export function buildLaunchGround(site,{tower,coreMounts,baseR:r,baseY,allH:H,fl
  // symbols allocate commodities; they do not assert surveyed tank counts.
  tile(-95,42,180,7,grade+.19,asphalt);
  const infrastructure=buildPadInfrastructure(site,{tower,land,civil,grade,baseY,heightM:H,widthM:w,mast:{x:mastX,z:mastZ,top,span},box,tube,cylinder,mesh,mat,steel});
+ if(infrastructure.waterEnabled)for(const side of [-1,1]){
+  const y=grade+3.25,header=infrastructure.waterHeader,z=side<0?(header?.position.z??-Math.max(w+7,Math.abs(mastZ)+span*.5+2,Math.abs(mastZ)+w*.75+3)):w+4;
+  if(side<0&&header){const left=infrastructure.addRoutingLine(civil,[[channelStart+1,y,z],[header.position.x-1.2,y,z]],.26,pipe,'water-cooling-manifold-south-left'),right=infrastructure.addRoutingLine(civil,[[header.position.x+1.2,y,z],[channelEnd-1,y,z]],.26,pipe,'water-cooling-manifold-south-right');left.terminations.push({mesh:header.mesh,anchor:left.to});right.terminations.push({mesh:header.mesh,anchor:right.from});}
+  else infrastructure.addRoutingLine(civil,[[channelStart+1,y,z],[channelEnd-1,y,z]],.26,pipe,'water-cooling-manifold-'+(side<0?'south':'north'));
+ }
  const sprays=g(tower,'Water curtain'),jetMat=new T.MeshBasicMaterial({color:'#b4e1e7',transparent:true,opacity:.66,depthWrite:false});
  const application=site.infrastructure?.water?.visual?.application||'study';sprays.userData.application=application;sprays.userData.geometryBasis='Illustrative nozzles and water paths; no flow rate or surveyed nozzle count.';
  function waterJet(origin,point){

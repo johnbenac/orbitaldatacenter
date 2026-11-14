@@ -1,6 +1,9 @@
 // Every power number is an electrical load at the equipment boundary. Generation,
 // charging and discharge are energy transfers and are excluded from consumption.
 import {architectureFamily} from './architecture-families.js';
+import {electricalBoxLayout} from './electrical-architecture.js';
+const electricalLayouts=new WeakMap();
+function electricalEnvelope(h,wbs){let boxes=electricalLayouts.get(h);if(!boxes){boxes=electricalBoxLayout(h);electricalLayouts.set(h,boxes);}const parts=boxes.filter(b=>b.wbs===wbs);return parts.length?[0,1,2].map(axis=>Math.max(...parts.map(p=>p.positionM[axis]+p.dimensionsM[axis]/2))-Math.min(...parts.map(p=>p.positionM[axis]-p.dimensionsM[axis]/2))):null;}
 const model=(file,label)=>({url:'./'+file,label});
 const sizing=model('design.js','Installed sizing equations'),flight=model('model.js','Mission load equations'),geometry=model('craft.js','Vehicle installation drawing'),terminal=model('physics.js','Terminal load model');
 const prop=model('spacecraft-architecture.js','Pressure vessel and engine sizing'),packing=model('deployment.js','Rigid-panel envelope');
@@ -17,6 +20,7 @@ export function equipmentResources(r,h,s){
  const idle=[h.trays*d.trayIdleKw,n(installed?.compute.extraHostIdleKW),n(installed?.fabric.idleKW)].map(x=>1000*x),active=[memW,1000*h.ai.hostKw,1000*h.ai.fabricKw].map((x,i)=>Math.max(idle[i],x)),idleW=idle.reduce((a,b)=>a+b,0),activeW=active.reduce((a,b)=>a+b,0);
  const activity=activeW>idleW?Math.max(0,Math.min(1,(actualITW-idleW)/(activeW-idleW))):0;
  const shares=idle.map((x,i)=>x+(active[i]-x)*activity),shareSum=shares.reduce((a,b)=>a+b,0),computeNow=shares.map((x,i)=>shareSum>0?actualITW*x/shareSum:i===0?actualITW:0);
+ const workerOptics=installed?.fabric?.workerOptics,opticsW=workerOptics?.powerW||0,opticsNow=shareSum>0?actualITW*Math.min(opticsW,shares[2])/shareSum:0;
  const auxW=1000*n(s?.auxKW)*serviceFraction,burnW=s?.burn?Math.min(150*serviceFraction,auxW):0,houseW=auxW-burnW;
  const cdhW=Math.min(houseW,(Number.isFinite(s?.cdhKW)?1000*s.cdhKW:h.cdh?.operatingW??45)*serviceFraction),allocatedHotelW=Math.max(0,houseW-cdhW);
  const rfW=1000*n(s?.terminalKW)*serviceFraction,hasRelay=s?.aiRelayOn||s?.aiActiveRoute==='relay';
@@ -43,7 +47,8 @@ export function equipmentResources(r,h,s){
   electric(h.storageKw*1000,n(s?.storageKW)*1000*serviceFraction,'Recorder operating','Installed drive count × selected module draw. The current column applies the admitted service-power fraction.',sizing);
   envelope([w*.512,b*.12,zdepth*.132],'Recorder bank','Shared bank envelope holding all installed drives. Individual drive packaging depends on the selected carrier.');
  }
- if(id==='01.04'){electric(fabricW,computeNow[2],'Fabric active','Installed switch, NIC and storage-controller rating. Actual idle/active allocation is a share of served IT power; fixed platform interfaces remain in spacecraft auxiliary loads.',service);envelope(smallBox,'Electronics allowance','Shared electronics mounting volume. Final line-card arrangement is open.');}
+ if(id==='01.04'){electric(fabricW-opticsW,computeNow[2]-opticsNow,'Fabric active','Installed switch, NIC and storage-controller electronics/cages. The separately named LR4 modules are excluded from this row. Actual idle/active allocation is a share of served IT power; fixed platform interfaces remain in spacecraft auxiliary loads.',service);envelope(smallBox,'Electronics allowance','Shared electronics mounting volume. Final line-card arrangement is open.');}
+ if(id==='01.05'&&workerOptics){electric(opticsW,opticsNow,'Powered optical interface',workerOptics.powerBasis+' Current draw is its share of the actual served IT boundary, counted once.',{url:workerOptics.sourceUrls[0],label:'NVIDIA LR4 module maximum power'});envelope(workerOptics.moduleDimensionsM,'One allocated LR4 module','20 × 15 × 80 mm preliminary module envelope, inserted at each allocated switch/computer optical port.',model('redwire-payload-transfer.js','LR4 endpoint project allocation'));}
  if(id==='02.01'){envelope([h.wingLengthM,.002,h.wingWidthM],'One deployed flexible blanket','Length × packed blanket gauge allowance × width at zero tilt. The boom cross-section, drum and saddle are additional.',packing);powBasis='Generation appears in the solar power budget. Drive consumption is on 07.04.';}
  if(id==='02.02'){const vol=h.batteryKWh/d.packWhL/q;const c=Math.cbrt(vol);envelope([c,c,c],'Equivalent pack envelope','One quarter of battery volume from Wh/pack volumetric energy density, expressed as an equal-volume cube.',sizing);powBasis='Charge/discharge is energy transfer. Battery management electronics are inside the shared auxiliary budget.';}
  if(id==='02.03'){electric(Math.max(0,420+1000*h.switchKw-(h.cdh?.operatingW??45))+1000*n(eps?.electrical.peakConversionLossKW),allocatedHotelW+1000*n(s?.epsConversionLossKW),'Conversion and bus support','Installed peak DC/DC and quiescent losses plus the residual platform auxiliary allocation. Current conversion loss is already served and is counted once. MPPT source loss and pack transfer loss are outside bus consumption.',energy);envelope(smallBox,'Shared power-conversion mounting volume','Modular PCDU and converter allocation within the service electronics envelope.');}
@@ -68,6 +73,9 @@ export function equipmentResources(r,h,s){
  if(id==='07.05')electric(1000*n(eps?.electrical.peakHarnessLossKW),1000*n(s?.harnessLossKW),'Distribution dissipation','Primary, 48 V payload and 28 V service I²R losses at installed peak / actual admitted load. Array wiring losses occur upstream of the bus and are excluded from bus consumption.',energy);
  if(id==='08.01'){electric(h.cdh?.operatingW??45,cdhW,'Flight avionics active','Flight computer, GNSS receiver/antenna interface, command interfaces and spacecraft recorder are carried within the existing flight-avionics power and 12 kg mass allocation.');envelope(h.cdh?.suiteDimsM??smallBox,'Flight avionics suite','Bounding installation allocation including GNSS, interfaces and mounts. The Moog unit retains its own comparison dimensions; it does not qualify this integrated suite.');}
  if(id==='09.01'){const a=h.fairing?.stack?.[0];if(a)envelope([a.widthM,a.heightM,h.payloadInterface.upperFaceStationM],'Active adapter and stand-off','Bounding diameter of launcher transition and stack height up to the spacecraft mounting face.',model('fairings.js','Fairing interface model'));}
+ if(['01.04','02.03','08.01'].includes(id)){
+  const installedEnvelope=electricalEnvelope(h,id);if(installedEnvelope){dims=installedEnvelope;scope=id==='01.04'?'Installed switch cassette group':'Separate electrical enclosure';basis='Physical box positions and dimensions from the controlled electrical interface layout, shared with harness endpoints and the 3D installation. Supplier reference dimensions remain a comparison.';dimSrc=model('electrical-architecture.js','Electrical box and connector layout');}
+ }
  const comparison={
   '01.01':d.compute==='dgx'?[10200,[.4823,.356,.8971],'Complete DGX H100 server, maximum input and chassis']:d.compute==='flight'?[400,null,'A100 80 GB SXM standard chip thermal design power']:[],
   '01.03':d.storage==='rugged'?[]:[14,null,'Micron 7450 PRO 3.84 TB U.3 drive, maximum RMS active write. Table 4.'],

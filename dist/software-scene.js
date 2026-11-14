@@ -105,7 +105,7 @@ const draw=o=>{if(!o.isMesh&&!o.isLine&&!o.isPoints)return;const g=o.geometry,p=
 // intersections retain geography and a smooth limb even in close LEO views.
 if(mat.userData.earthAtmosphere)return;
 if(mat.userData.earthSurface){renderEarthSoftware({object:o,state:mat.userData.earthSurface,camera,width,height,pixels:img,depth,exposureEV:ev});return;}
-if(o.frustumCulled&&!frustum.intersectsObject(o))return;mvp.multiplyMatrices(vp,o.matrixWorld);normMat.getNormalMatrix(o.matrixWorld);const e=mvp.elements,n=p.count;// Two scratch vertices hold near-plane intersections. Use homogeneous
+if(o.frustumCulled&&!frustum.intersectsObject(o))return;mvp.multiplyMatrices(vp,o.matrixWorld);normMat.getNormalMatrix(o.matrixWorld);const e=mvp.elements,n=p.count,reflected=o.matrixWorld.determinant()<0;// Two scratch vertices hold near-plane intersections. Use homogeneous
 // clipping before dividing by w so a wall touching the eye cannot disappear.
 // Retain depth precision across kilometre-scale terrain. Float32 normalized
 // depth rounds a centimetre-separated coastal surface onto the terrain and
@@ -130,12 +130,21 @@ const color=mat.map&&!baseTexture&&mat.userData.materialFallbackColor?mat.userDa
  const k=4*j,x=Math.round(a[k]),y=Math.round(a[k+1]),z=a[k+2],i=y*width+x;
  if(a[k+3]<=0||x<0||x>=width||y<0||y>=height||z>1||z< -1||z>=depth[i])continue;
  const px=4*i;img[px]=red;img[px+1]=green;img[px+2]=blue;img[px+3]=(mat.opacity??1)*255;
- }return;}if(o.isLine){let step=o.isLineSegments?2:1;for(let j=g.drawRange.start,end=Math.min(total,g.drawRange.start+g.drawRange.count);j<end-1;j+=step){let k=(ix?ix[j]:j)*4,l=(ix?ix[j+1]:j+1)*4;if(a[k+3]>0&&a[l+3]>0)drawLine(a,k,l,color.getHex(),mat);}return;}
+ }return;}if(o.isLine){let step=o.isLineSegments?2:1;for(let j=g.drawRange.start,end=Math.min(total,g.drawRange.start+g.drawRange.count);j<end-1;j+=step){
+  const left=ix?ix[j]:j,right=ix?ix[j+1]:j+1;let k=left*4,l=right*4;
+  // Clip in homogeneous coordinates before dividing by w. A grid or cable
+  // crossing the eye must keep its visible segment instead of disappearing.
+  if(crossesNear){const d0=distance(left),d1=distance(right);if(d0<0&&d1<0)continue;if((d0<0)!==(d1<0)){
+   const f=d0/(d0-d1),u=1-f;project(n,u*p.getX(left)+f*p.getX(right),u*p.getY(left)+f*p.getY(right),u*p.getZ(left)+f*p.getZ(right));a[n*4+2]=-1;if(d0<0)k=n*4;else l=n*4;
+  }}
+  if(a[k+3]>0&&a[l+3]>0)drawLine(a,k,l,color.getHex(),mat);
+ }return;}
 const tintR=display(color.r)/255,tintG=display(color.g)/255,tintB=display(color.b)/255;
 const uv=g.attributes.uv,normal=g.attributes.normal,opacity=mat.opacity??1,smoothMap=mat.map?.magFilter!==T.NearestFilter;
 if(mat.map?.matrixAutoUpdate)mat.map.updateMatrix();const tm=mat.map?.matrix.elements;
 const wrap=(v,type)=>type===T.RepeatWrapping?v-Math.floor(v):type===T.MirroredRepeatWrapping?(Math.floor(v)%2?1-(v-Math.floor(v)):v-Math.floor(v)):Math.max(0,Math.min(1,v));
 const intensity=normal&&mat.isMeshStandardMaterial?scratch.intensity:null;
+const backIntensity=intensity&&mat.side!==T.FrontSide?(scratch.backIntensity??=new Float32Array(scratch.intensity.length)):null;
 const glow=mat.userData.airglow?scratch.glow:null;
 const vertexColor=mat.vertexColors&&g.attributes.color?scratch.colors:null;
 if(vertexColor){const attribute=g.attributes.color;for(let i=0;i<n;i++){vertexColor[i*3]=attribute.getX(i);vertexColor[i*3+1]=attribute.getY(i);vertexColor[i*3+2]=attribute.getZ(i);}}
@@ -144,8 +153,10 @@ if(glow){const norm=new T.Vector3(),toEye=new T.Vector3();for(let i=0;i<n;i++){
  const l=Math.min(1,Math.max(0,(norm.dot(lighting?.sun??sun)+.22)/.40));
  glow[i]=Math.pow(1-Math.abs(norm.dot(toEye)),5)*(.060+.65*l*l*(3-2*l));
 }}
-if(intensity)for(let i=0;i<n;i++){vec.fromBufferAttribute(normal,i).applyMatrix3(normMat).normalize();intensity[i]=(lighting?.ambient??.33)+(lighting?.direct??1.05)*Math.max(0,vec.dot(lighting?.sun??sun))+(lighting?.rim??.38)*Math.max(0,vec.dot(lighting?.rimDirection??rim));
- if(lighting?.softbox)intensity[i]+=1.12*Math.max(0,vec.dot(lighting.softbox))+.68*Math.max(0,vec.dot(lighting.bounce));
+// Like the GPU material shader, a two-sided surface lights the side facing the
+// camera. Otherwise a lit chamber interior or panel back becomes an unlit hole.
+if(intensity)for(let side=0;side<(backIntensity?2:1);side++){const values=side?backIntensity:intensity;for(let i=0;i<n;i++){vec.fromBufferAttribute(normal,i).applyMatrix3(normMat).normalize();if(side)vec.negate();values[i]=(lighting?.ambient??.33)+(lighting?.direct??1.05)*Math.max(0,vec.dot(lighting?.sun??sun))+(lighting?.rim??.38)*Math.max(0,vec.dot(lighting?.rimDirection??rim));
+ if(lighting?.softbox)values[i]+=1.12*Math.max(0,vec.dot(lighting.softbox))+.68*Math.max(0,vec.dot(lighting.bounce));
  // The material library uses real metalness. Treating a 70%-metal surface as
  // a full Lambertian diffuser washes aluminum almost white under the studio
  // fills. A bounded vertex specular approximation retains diffuse/metal
@@ -157,23 +168,30 @@ if(intensity)for(let i=0;i<n;i++){vec.fromBufferAttribute(normal,i).applyMatrix3
   const specular=(direction,strength)=>{half.copy(direction).add(eye).normalize();return strength*Math.max(0,vec.dot(direction))*Math.max(0,vec.dot(half))**power;};
   let spec=specular(lighting?.sun??sun,lighting?.direct??1.05)+specular(lighting?.rimDirection??rim,lighting?.rim??.38);
   if(lighting?.softbox)spec+=specular(lighting.softbox,1.12)+specular(lighting.bounce,.68);
-  intensity[i]=intensity[i]*(1-metal)+metal*((lighting?.ambient??.33)+.5*spec);
+  values[i]=values[i]*(1-metal)+metal*((lighting?.ambient??.33)+.5*spec);
  }
-}
+}}
 const physical=gain&&mat.toneMapped!==false&&(mat.isMeshStandardMaterial||glow||mat.userData.celestial);
 const texel=mat.map?.colorSpace===T.SRGBColorSpace?srgbBytes:linearBytes;
 const wireColor=mat.wireframe?color.getHex():0;
 const nearU=[0,0],nearV=[0,0];
 function triangle(ia,ib,ic){
  const A=ia*4,B=ib*4,C=ic*4,x0=a[A],y0=a[A+1],x1=a[B],y1=a[B+1],x2=a[C],y2=a[C+1],den=(y1-y2)*(x0-x2)+(x2-x1)*(y0-y2);
- if(Math.abs(den)<.02||den>0&&mat.side===T.FrontSide||den<0&&mat.side===T.BackSide)return;
+ // WebGL reverses front-face winding for a reflected object transform.
+ const facing=reflected?-den:den;
+ if(!Number.isFinite(den)||Math.abs(den)<.02||facing>0&&mat.side===T.FrontSide||facing<0&&mat.side===T.BackSide)return;
  if(mat.wireframe){drawLine(a,A,B,wireColor,mat);drawLine(a,B,C,wireColor,mat);drawLine(a,C,A,wireColor,mat);return;}
  const xlo=Math.max(0,Math.ceil(Math.min(x0,x1,x2)-.5)),xhi=Math.min(width-1,Math.floor(Math.max(x0,x1,x2)-.5)),ylo=Math.max(0,Math.ceil(Math.min(y0,y1,y2)-.5)),yhi=Math.min(height-1,Math.floor(Math.max(y0,y1,y2)-.5));
  if(xlo>xhi||ylo>yhi)return;
- const la=intensity?intensity[ia]:1,lb=intensity?intensity[ib]:1,lc=intensity?intensity[ic]:1;const ca=(y1-y2)/den,cb=(y2-y0)/den,da=(x2-x1)/den,db=(x0-x2)/den,za=a[A+2],zb=a[B+2],zc=a[C+2];let ua=0,ub=0,uc=0,va=0,vb=0,vc=0;let texture=baseTexture;if(texture&&uv){ua=ia<n?uv.getX(ia):nearU[ia-n];ub=ib<n?uv.getX(ib):nearU[ib-n];uc=ic<n?uv.getX(ic):nearU[ic-n];va=ia<n?uv.getY(ia):nearV[ia-n];vb=ib<n?uv.getY(ib):nearV[ib-n];vc=ic<n?uv.getY(ic):nearV[ic-n];const footprint=Math.max(Math.abs((ua-uc)*ca+(ub-uc)*cb)*texture.width,Math.abs((ua-uc)*da+(ub-uc)*db)*texture.width,Math.abs((va-vc)*ca+(vb-vc)*cb)*texture.height,Math.abs((va-vc)*da+(vb-vc)*db)*texture.height);if(footprint*Math.max(Math.abs(tm[0]),Math.abs(tm[4]))>2)texture=imageData(mat.map,Math.min(9,Math.max(0,Math.round(Math.log2(footprint*Math.max(Math.abs(tm[0]),Math.abs(tm[4])))))));}
+ const faceIntensity=facing>0&&backIntensity?backIntensity:intensity,la=faceIntensity?faceIntensity[ia]:1,lb=faceIntensity?faceIntensity[ib]:1,lc=faceIntensity?faceIntensity[ic]:1;const ca=(y1-y2)/den,cb=(y2-y0)/den,da=(x2-x1)/den,db=(x0-x2)/den,za=a[A+2],zb=a[B+2],zc=a[C+2];let ua=0,ub=0,uc=0,va=0,vb=0,vc=0;let texture=baseTexture;if(texture&&uv){ua=ia<n?uv.getX(ia):nearU[ia-n];ub=ib<n?uv.getX(ib):nearU[ib-n];uc=ic<n?uv.getX(ic):nearU[ic-n];va=ia<n?uv.getY(ia):nearV[ia-n];vb=ib<n?uv.getY(ib):nearV[ib-n];vc=ic<n?uv.getY(ic):nearV[ic-n];const footprint=Math.max(Math.abs((ua-uc)*ca+(ub-uc)*cb)*texture.width,Math.abs((ua-uc)*da+(ub-uc)*db)*texture.width,Math.abs((va-vc)*ca+(vb-vc)*cb)*texture.height,Math.abs((va-vc)*da+(vb-vc)*db)*texture.height);if(footprint*Math.max(Math.abs(tm[0]),Math.abs(tm[4]))>2)texture=imageData(mat.map,Math.min(9,Math.max(0,Math.round(Math.log2(footprint*Math.max(Math.abs(tm[0]),Math.abs(tm[4])))))));}
 // Match polygon offset in normalized depth; markings remain on the hull.
 const depthOffset=mat.polygonOffset?mat.polygonOffsetFactor*Math.max(Math.abs((za-zc)*ca+(zb-zc)*cb),Math.abs((za-zc)*da+(zb-zc)*db))+mat.polygonOffsetUnits/8388608:0;
-for(let y=ylo;y<=yhi;y++){let w0=ca*(xlo+.5-x2)+da*(y+.5-y2),w1=cb*(xlo+.5-x2)+db*(y+.5-y2);for(let x=xlo;x<=xhi;x++,w0+=ca,w1+=cb){const w2=1-w0-w1;if(w0<-.001||w1<-.001||w2<-.001)continue;const z=za*w0+zb*w1+zc*w2+depthOffset,k=y*width+x;if((mat.depthTest!==false&&z>=depth[k])||z< -1||z>1)continue;const light=lc+w0*(la-lc)+w1*(lb-lc);let rr=color.r*light,gg=color.g*light,bb=color.b*light;
+// A shared triangle edge belongs to exactly one face. The former broad
+// negative barycentric tolerance painted it twice, exposing a bright diagonal
+// in every translucent pane and a moving mesh pattern in ghosted assemblies.
+const direction=den>0?1:-1,topLeft=(ax,ay,bx,by)=>(by-ay)*direction<0||by===ay&&(bx-ax)*direction>0;
+const edge0=topLeft(x1,y1,x2,y2),edge1=topLeft(x2,y2,x0,y0),edge2=topLeft(x0,y0,x1,y1),edgeEpsilon=1e-10;
+for(let y=ylo;y<=yhi;y++){let w0=ca*(xlo+.5-x2)+da*(y+.5-y2),w1=cb*(xlo+.5-x2)+db*(y+.5-y2);for(let x=xlo;x<=xhi;x++,w0+=ca,w1+=cb){const w2=1-w0-w1;if(w0< -edgeEpsilon||w1< -edgeEpsilon||w2< -edgeEpsilon||w0<=edgeEpsilon&&!edge0||w1<=edgeEpsilon&&!edge1||w2<=edgeEpsilon&&!edge2)continue;const z=za*w0+zb*w1+zc*w2+depthOffset,k=y*width+x;if((mat.depthTest!==false&&z>=depth[k])||z< -1||z>1)continue;const light=lc+w0*(la-lc)+w1*(lb-lc);let rr=color.r*light,gg=color.g*light,bb=color.b*light;
  let alpha=opacity;
  if(glow){
   alpha=glow[ia]*w0+glow[ib]*w1+glow[ic]*w2;if(alpha<.003)continue;
@@ -228,6 +246,7 @@ for(let y=ylo;y<=yhi;y++){let w0=ca*(xlo+.5-x2)+da*(y+.5-y2),w1=cb*(xlo+.5-x2)+d
   a[(n+q)*4+2]=-1;
   if(uv){nearU[q]=u*uv.getX(left)+f*uv.getX(right);nearV[q]=u*uv.getY(left)+f*uv.getY(right);}
   if(intensity)intensity[n+q]=u*intensity[left]+f*intensity[right];
+  if(backIntensity)backIntensity[n+q]=u*backIntensity[left]+f*backIntensity[right];
   if(glow)glow[n+q]=u*glow[left]+f*glow[right];
   if(vertexColor)for(let channel=0;channel<3;channel++)vertexColor[(n+q)*3+channel]=u*vertexColor[left*3+channel]+f*vertexColor[right*3+channel];
   return n+q;

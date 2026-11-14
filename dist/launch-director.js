@@ -54,6 +54,7 @@ function lensAvailable(key,id,t){
  return t<(['pad','site','surroundings','services'].includes(key)?35:100);
 }
 function directorState(s,d){
+ if(s.launchHeld)return ['Launch progression held',s.launchHoldReason];
  const t=s.t,c=launchClockFor(d.launcher),band=launchSegment(t);
  if(band==='pad')return [launchEffectsAt(t,d.launcher,d.launchSite).label,t<0?'The countdown, engine start and water systems share the mission clock.':'Watch the exhaust reach the diverter and the stack clear the tower.'];
  if(band==='ascent'){
@@ -89,7 +90,7 @@ export function launchGuide(h,s,v,playing){
   fact('Payload release',s.cargoAccessHeld?'Held':clock(c.eject??c.release))+fact('Commissioning starts',clock(DEPLOY_START_S));
 
  return `<aside class="lp-guide"><div class="lp-kicker">${band==='insertion'?'SPACECRAFT HANDOVER':'LAUNCH CONTROL'} &nbsp; / &nbsp; ${esc(pad.region)}</div><div class="lp-veh">${esc(names[d.launcher]||fleet.family)}</div><h2 id="lp-state">${esc(title||phase)}</h2><p id="lp-description">${esc(description)}</p><div class="lp-location"><b>${esc(pad.name)}</b><span>${esc(pad.range)}</span><small>${esc(pad.statusLabel)}</small></div>
- ${hold?'<small class="lp-mismatch"><b>Launch authorization held · conditional replay</b><br>'+esc(hold)+'</small>':''}
+ ${hold?'<small class="lp-mismatch"><b>Launch progression held</b><br>'+esc(hold)+'</small>':''}
  <dl><div><dt>Mission clock</dt><dd id="lp-clock">${clock(s.t)}</dd></div>${readouts}</dl>
  ${band==='insertion'&&d.launcher==='starship'?cargoSection(h):''}
  ${live||d.launcher==='starship'&&band==='insertion'?`<div id="lp-lenses"${!lensAvailable('wide',d.launcher,s.t)?' hidden':''} class="lp-lenses" data-choice-group="launch-lenses" role="group" aria-label="Launch camera viewpoints">${[['wide',band==='insertion'?'Cargo mechanism':'Vehicle overview'],['fairing',d.launcher==='starship'?'Cargo door & patch':'Fairing & patch'],['site','Launch site'],['surroundings','Surroundings'],['services','Umbilicals'],['pad','Pad works'],...(d.launcher==='starship'?[['ship',band==='insertion'?'Whole ship':'Ship & flaps'],['engines','Ship engine bay']]:[]),...(['falconHeavy','starship'].includes(d.launcher)?[['base',d.launcher==='falconHeavy'?'Landing legs':'Super Heavy base']]:[])].map(([key,label])=>`<button class="chip" data-launch-lens="${key}"${!lensAvailable(key,d.launcher,s.t)?' hidden':''} aria-pressed="${v.camera==='launch'&&v.launchLens===key}">${label}</button>`).join('')}</div>`:''}

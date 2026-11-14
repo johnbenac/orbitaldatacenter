@@ -61,7 +61,7 @@ has been deployed or sent automatically to the development team.
    it for the new container. Keep startup content flexible/scrollable so controls
    and loading text fit on small screens. Do not place duplicate status roles
    in the image caption.
-6. Add newly shipped static files to `dist/assets.json` for offline exports.
+6. Run `python build-asset-index.py` to include newly shipped files in the losslessly compressed `dist/assets.json.zip` inventory for offline exports.
    Keep only optimized WebP files in the deployment, not Blender scenes or
    source texture banks. The finished PNGs are provided as masters, not startup
    downloads. For a PNG-only deployment, update the slide paths explicitly.

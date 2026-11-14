@@ -63,7 +63,7 @@ for(const site of Object.values(launchSites)){
  const path=localFile(g.elevation.url),grid=await readJsonResponse(new Response(readFileSync(path)),g.elevation.url);validBounds(grid.bounds);
  assert(grid.width>16&&grid.height>16);assert.equal(grid.values.length,grid.width*grid.height);assert(grid.values.every(Number.isFinite));assert(grid.values.every(v=>v>=-440&&v<9000));assert(contains(grid.bounds,site.lon,site.lat));
  assert.equal(grid.width,g.elevation.width);assert.equal(grid.height,g.elevation.height);grids.set(g.id,grid);
- if(g.features?.url){const features=JSON.parse(readFileSync(localFile(g.features.url),'utf8'));assert.equal(features.type,'FeatureCollection');assert(Array.isArray(features.features));assert(g.features.attribution&&g.features.license);}
+ if(g.features?.url){const features=await readJsonResponse(new Response(readFileSync(localFile(g.features.url))),g.features.url);assert.equal(features.type,'FeatureCollection');assert(Array.isArray(features.features));assert(g.features.attribution&&g.features.license);}
  const map=localGeography(site),east=map.point(site.lon+.001,site.lat),north=map.point(site.lon,site.lat+.001);
  assert(east[0]>80&&east[0]<112&&Math.abs(east[1])<1e-8,site.id+' east registration');assert(north[1]<-111&&north[1]>-112&&Math.abs(north[0])<1e-8,site.id+' north registration');
  const projected=map.coordinate(...map.point(site.lon+.013,site.lat-.009));assert(Math.abs(projected[0]-site.lon-.013)<1e-11);assert(Math.abs(projected[1]-site.lat+.009)<1e-11);
@@ -104,7 +104,7 @@ globalThis.Image=class{
 globalThis.fetch=(url,options={})=>new Promise((resolve,reject)=>{
  // Release real compressed response bytes so the delayed-resource test also
  // exercises the production lazy ZIP extraction path.
- const item={url,resolve:json=>resolve(new Response(/\.json\.zip$/.test(url)?readFileSync(localFile(url)):JSON.stringify(json))),reject};fetchQueue.push(item);
+ const item={url,resolve:json=>resolve(new Response(/\.(?:geo)?json\.zip$/.test(url)?readFileSync(localFile(url)):JSON.stringify(json))),reject};fetchQueue.push(item);
  options.signal?.addEventListener('abort',()=>reject(new Error('Aborted')),{once:true});
 });
 const flush=()=>new Promise(resolve=>setImmediate(resolve));

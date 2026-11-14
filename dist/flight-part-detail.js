@@ -54,11 +54,11 @@ function boxAssembly(k,context,kind){
  // End rails and a lid lip are shallow, preserving the allocated package.
  for(const s of [-1,1])f.plate(s*f.W*.46,0,Math.min(f.W*.025,.008),f.H*.86,t,'metal');
  if(kind==='battery'){
-  const front=face(k,'z');for(const sign of [-1,1])connector(k,front,sign*front.W*.25,0,front.W*.16,Math.min(front.H*.18,.03));
+  const front=face(k,'z');if(!k.source.userData.explicitElectricalPorts)for(const sign of [-1,1])connector(k,front,sign*front.W*.25,0,front.W*.16,Math.min(front.H*.18,.03));
   for(const s of [-1,1])f.plate(s*f.W*.22,0,Math.min(f.W*.025,.009),f.H*.83,t,'dark');tag(k,f,context,'BATTERY');
  }else{
   const front=face(k,thin===k.size.z?'z':'z'),n=k.high?3:2;
-  for(let i=0;i<n;i++)connector(k,front,(i-(n-1)/2)*front.W*.26,0,front.W*.19,Math.min(front.H*.38,.036));
+  if(!k.source.userData.explicitElectricalPorts)for(let i=0;i<n;i++)connector(k,front,(i-(n-1)/2)*front.W*.26,0,front.W*.19,Math.min(front.H*.38,.036));
   const finCount=k.high?7:3;
   if(thin>Math.max(k.size.x,k.size.y,k.size.z)*.12)for(let i=0;i<finCount;i++)f.plate((i-(finCount-1)/2)*f.W*.055,f.H*.14,Math.min(f.W*.015,.004),f.H*.32,t,'dark');
   tag(k,f,context,kind==='compute'?'COMPUTE':kind==='pump'?'THERMAL':'ELECTRONICS');

@@ -16,9 +16,9 @@ The imagery is archival visual context. Surface season, city lights and clouds c
 
 Exact original URLs, archive retrieval URLs, source checksums, preparation settings, output dimensions and output checksums are recorded in:
 
-- [day-provenance.json](day-provenance.json)
-- [night-provenance.json](night-provenance.json)
-- [clouds-provenance.json](clouds-provenance.json)
+- [day-provenance.json](day-provenance.json.zip)
+- [night-provenance.json](night-provenance.json.zip)
+- [clouds-provenance.json](clouds-provenance.json.zip)
 
 Day credit: **NASA Earth Observatory / NASA Goddard Space Flight Center / Reto Stöckli**. Night credit: **NASA Earth Observatory / NASA GSFC / Suomi NPP VIIRS; Miguel Román and Joshua Stevens**. Cloud credit: **NASA GSFC; Reto Stöckli, Robert Simmon and the MODIS teams**. NASA's [Blue Marble description](https://science.nasa.gov/earth/earth-observatory/the-blue-marble-true-color-global-imagery-at-1km-resolution/) explains the visible-light cloud composite and the additional polar infrared imagery in the finished global map.
 
@@ -112,3 +112,5 @@ python scripts/prepare-earth-cloud-details.py \
 ```
 
 All three accept `--output` for a separate destination. Existing source caches support offline preparation without `--download`. Preserve the provenance files alongside the images; they record source and output checksums and the settings used for this bundle. Day maps and high-resolution clouds use AVIF quality 55, speed 6; the 20K cloud preview tier uses quality 45 at the same spatial dimensions. All are encoded directly from their uncompressed prepared fields rather than transcoding earlier WebP files. Night retains WebP quality 92, selecting lossless encoding for sparse tiles when smaller. No image contains HDR or orientation metadata. The source rasters and temporary working mosaics are not deployed with the site.
+
+The provenance JSON files are delivered as single-file ZIP archives. Unzipping restores the exact original UTF-8 bytes.

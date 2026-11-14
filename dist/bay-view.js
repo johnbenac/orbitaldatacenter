@@ -21,12 +21,13 @@ export function bayGuide(h,s,v){
  const l=bayLesson(v.domain,h,v.commBench),p=integrationProfile(h.input.launcher,h.input.launchSite),facility=processingFacility(h);
  const carrier=v.domain==='launcher',ship=p.kind==='ship-bay';
  const operation=groundOperation(v.processingOperation,v.commBench),rehearsal=operation.domain===v.domain&&!carrier;
- const disconnected=!['launcher','launch'].includes(v.domain)&&integrationState(s?.t).seat>0&&h.payloadInterface.passes;
+ const disconnected=!['launcher','launch'].includes(v.domain)&&integrationState(s?.launchGeometryTime??s?.t).seat>0&&h.payloadInterface.passes;
  const questions={environment:'How does the spacecraft arrive ready for processing?',battery:'How is the flight battery prepared on the ground?',propellant:'How does propellant reach the spacecraft?',coolant:'How is the spacecraft cooled before launch?',rf:v.commBench==='ka'?'How is the high-rate data path checked on the ground?':'How do commands and telemetry cross the test interface?',optical:'How is the laser terminal aligned before flight?',metrology:'How are mass and mechanical datums verified?'};
  const question=disconnected?'What happens to ground equipment at pickup?':carrier?(ship?'How does a large spacecraft get inside Starship?':'How does the spacecraft meet its rocket?'):rehearsal?questions[operation.id]:l.question;
  const explanation=disconnected?'Service connections and test fixtures are removed before the crane moves the spacecraft. Follow the payload to the launcher or return to checkout to inspect the equipment.':carrier?p.handling:rehearsal?operation.purpose:l.explanation;
  const procedure=disconnected?'Portable ground equipment stays on the floor. The spacecraft carries its installed flight hardware forward in the released configuration.':carrier?p.mating:rehearsal?operation.stages[0].detail:l.procedure;
  return `<aside class="bay-guide"><header><span class="bay-emblem">${icon(domains[v.domain].icon,20)}</span><div><small>${esc(p.location)}</small><b>${esc(domains[v.domain].label)}</b></div></header>
+ ${s?.launchHeld?`<section class="lp-mismatch" role="status" aria-label="Launch held"><strong>Launch progression held</strong><p>${esc(s.launchHoldReason)}</p><p>The spacecraft remains at the last permitted bay state. The selected mission-clock controls remain available.</p><div class="lp-site-buttons"><button class="chip" data-chapter="pad">Pad · held</button><button class="chip" data-chapter="ascent">Ascent · held</button><button class="chip" data-chapter="insertion">Separation · held</button></div><button class="textbutton" data-chapter="commissioning">Open assumed-orbit deployment study →</button></section>`:''}
  <p class="bay-facility-status">${esc(facility.shortName)} <span>${esc(facility.statusLabel)}</span></p>
  <h2>${esc(question)}</h2><p class="bay-explainer">${esc(explanation)}</p>
  <div class="bay-crew"><span>${icon('wrench',14)} ${esc(facility.visual.processingLabel)}</span><h3>${carrier?'Loading and mating':esc(rehearsal?operation.venue:l.stationName)}</h3><p>${esc(procedure)}</p></div>
@@ -43,6 +44,7 @@ export function facilityNotes(h){
  ${f.candidateFacilities.length?`<h3>Candidate spacecraft processing provider</h3>${f.candidateFacilities.map(c=>`<p><b>${esc(c.name)}</b> · ${esc(c.basis)}</p>`).join('')}`:''}
  <h3>Ground equipment travels; facility interfaces are agreed locally</h3><div class="facility-gse">${f.portableGSE.map(g=>`<article><h4>${esc(g.label)}</h4><p>${esc(g.description)}</p></article>`).join('')}</div>
  <h3>Capability and verification allocation</h3><div class="facility-capabilities">${f.capabilities.map(c=>`<article><b>${esc(c.label)}</b><span>${esc(c.status)}</span><p>${esc(c.basis)}</p></article>`).join('')}</div>
+ <p><button type="button" class="btn" data-page="facilities">Explore environmental test facilities · capabilities, 3D & maps</button></p>
  <h3>Release items for this campaign</h3><ul>${f.requiredApprovals.map(a=>`<li><b>${esc(a.label)}</b> · ${esc(a.description)}</li>`).join('')}</ul>
  <h3>Processing references beyond this launcher</h3><div class="facility-reference-grid">${Object.values(FACILITY_REFERENCES).map(r=>`<article><h4>${esc(r.name)}</h4><small>${esc(r.role)}</small><p>${esc(r.summary)}</p>${r.sources.map(sourceLink).join(' ')}</article>`).join('')}</div>
  <h3>Handling sequence and interface basis</h3><p>${esc(p.handling)}</p><p>${esc(p.mating)}</p><p>${esc(p.provenance)}</p>

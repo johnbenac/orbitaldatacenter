@@ -9,7 +9,7 @@ const num=(v,dec=1)=>Number.isFinite(v)?v.toLocaleString('en-US',{maximumFractio
 const link=(url,title)=>`<a href="${e(url)}" target="_blank" rel="noopener noreferrer">${e(title)} ↗</a>`;
 const ids=Object.keys(launchFleet),cache=new WeakMap();
 export function launcherFits(h){
- if(cache.has(h))return cache.get(h);
+ const massRevision=h.electricalMassRevision||0,cached=cache.get(h);if(cached?.massRevision===massRevision)return cached.rows;
  const rows=ids.map(id=>{
   const selected=h.input.launcher===id,ref=fairings[id],v=launchFleet[id],maxD=2*Math.max(...ref.profile.map(p=>p[1]));
   const d=selected?h.input:{...h.input,launcher:id,fairingM:maxD,fairingLengthM:ref.profile.at(-1)[0]};
@@ -17,7 +17,7 @@ export function launcherFits(h){
   const f=selected?h.fairing:fairingFit(d,stack);
   return {id,vehicle:v,fairing:f,screenMarginKg:Math.min(v.referenceKg,d.launchAllowanceKg)-h.launchKg,referenceMarginKg:v.referenceKg-h.launchKg,missionMarginKg:d.launchAllowanceKg-h.launchKg,allowanceDeltaKg:v.referenceKg-d.launchAllowanceKg,selected};
  });
- cache.set(h,rows);return rows;
+ cache.set(h,{massRevision,rows});return rows;
 }
 // Geometry of the vehicle is a recognition diagram. Each strap-on count is
 // listed explicitly; side views show the visible left and right boosters.

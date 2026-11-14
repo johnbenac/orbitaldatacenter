@@ -1,1 +1,20 @@
-{"name":"orbital-data-center","private":true,"type":"module"}
+{
+  "name": "orbital-data-center",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "package:parts-knowledge": "node scripts/package-parts-knowledge.mjs",
+    "check:parts-knowledge-package": "node scripts/check-parts-knowledge-package.mjs",
+    "check:engineering-contracts": "node engineering-readiness-checks.mjs",
+    "check:engineering-readiness": "node scripts/check-engineering-readiness.mjs",
+    "check:engineering-predictions": "node scripts/check-engineering-readiness.mjs --solves offered",
+    "check:publish": "npm run check:routing && npm run check:facilities && node electrical-model-checks.mjs && node electrical-geometry-checks.mjs && node electrical-ui-checks.mjs && node payload-data-checks.mjs && node thermal-analysis-checks.mjs && node thermal-convergence-checks.mjs && node thermal-engineering-controller-checks.mjs && node thermal-engineering-ui-checks.mjs && node engineering-readiness-checks.mjs && node scripts/check-engineering-readiness.mjs --solves offered",
+    "check:electrical": "node electrical-model-checks.mjs && node electrical-geometry-checks.mjs && node electrical-ui-checks.mjs",
+    "check:payload-data": "node payload-data-checks.mjs",
+    "check:facilities": "node facility-data-checks.mjs && node facility-geometry-checks.mjs && node parts-verification-scenes-checks.mjs",
+    "check:routing": "node scripts/check-routing.mjs"
+  },
+  "devDependencies": {
+    "acorn": "8.19.0"
+  }
+}

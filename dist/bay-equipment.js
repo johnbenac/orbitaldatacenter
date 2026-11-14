@@ -1,5 +1,6 @@
 // Representative integration tools in metres. Ground articles stay outside the flight mass ledger.
 import * as T from './vendor/three.module.js';
+import {addGroundTube,groundConnectionRecords} from './ground-connection-routing.js';
 import {bayStationFor,commFixtures} from './bay-lessons.js';
 import {terminalStations,terminalLayout} from './deployment.js';
 import {createBayFlow,createChargeIndicator,buildPropellantService} from './bay-processing-visuals.js';
@@ -37,17 +38,20 @@ export function buildBayEquipment(ctx){
  const anchor=(p,x,y,z)=>{const g=new T.Group();g.position.set(x,y,z);p.add(g);return g;};
  const cyl=(p,x,y,z,rt,rb,len,m,n=20)=>cylinder(p,x,y,z,rt,rb,len,m,undefined,n);
  const frontDisc=(p,x,y,z,r,d,m)=>{const o=cyl(p,x,y,z,r,r,d,m,24);o.rotation.x=Math.PI/2;return o;};
+ function hollow(o){const p=o.geometry.parameters;o.geometry=new T.CylinderGeometry(p.radiusTop,p.radiusBottom,p.height,p.radialSegments,p.heightSegments,true);o.userData.routingFitting=true;return o;}
+ function piercedPanel(node,centers,radius){
+  node.updateWorldMatrix(true,false);const shape=new T.Shape();shape.moveTo(-.5,-.5);shape.lineTo(.5,-.5);shape.lineTo(.5,.5);shape.lineTo(-.5,.5);shape.closePath();
+  for(const center of centers){const local=center.clone().sub(node.position),hole=new T.Path();hole.absellipse(local.x/node.scale.x,local.y/node.scale.y,radius/node.scale.x,radius/node.scale.y,0,Math.PI*2,true);shape.holes.push(hole);}
+  const geom=new T.ExtrudeGeometry(shape,{depth:1,bevelEnabled:false,curveSegments:12});geom.translate(0,0,-.5);node.geometry=geom;node.userData.explicitConnectorBores=true;
+ }
  function namePlate(p,x,y,z,w,title,color){
   const m=new T.Mesh(new T.PlaneGeometry(w,w*.1875),panelLabel(title,color));m.position.set(x,y,z);p.add(m);
  }
  function cable(p,start,end,r,out,m){
-  const a=V(start.x-.12,floor+r,start.z-.47),b=V(end.x,floor+r,end.z+.48),along=b.clone().sub(a).normalize();
-  const path=new T.CurvePath();
-  path.add(new T.CubicBezierCurve3(start,start.clone().addScaledVector(out,.22),a.clone().addScaledVector(along,-.20),a));
-  path.add(new T.LineCurve3(a,b));
-  path.add(new T.CubicBezierCurve3(b,b.clone().addScaledVector(along,.17),end.clone().add(V(0,0,.20)),end));
-  const mesh=new T.Mesh(new T.TubeGeometry(path,36,r,8,false),m);mesh.name='Ground service lead';p.add(mesh);
-  return path;
+  const radius=Math.min(r,.014),bottom=floor+radius+.025,depart=start.clone().addScaledVector(out,.32),arrive=end.clone().add(V(0,0,.32));
+  const points=[start,depart,V(depart.x,bottom,depart.z),V(arrive.x,bottom,arrive.z),arrive,end];
+  const route=addGroundTube(p,{id:'bay:'+p.userData.stationId+':ground-'+(p.userData.routeCount=(p.userData.routeCount||0)+1),name:'Ground service lead',points,radiusM:radius,bendRadiusM:.08,fromNormal:out,toNormal:V(0,0,1),material:m,segments:96});
+  return route.mesh.geometry.parameters.path;
  }
  function gauge(p,x,y,z,size){
   frontDisc(p,x,y,z,size,.035,steel);frontDisc(p,x,y,z+.024,size*.84,.012,cream);
@@ -75,14 +79,20 @@ export function buildBayEquipment(ctx){
   frontDisc(p,.28,.52,.265,.14,.06,steel);
   cyl(p,-.26,.69,0,.22,.22,.83,steel,32).name='Isolated ground coolant reservoir';cyl(p,-.26,1.12,0,.19,.22,.05,steel);cyl(p,-.26,1.16,0,.09,.09,.035,charcoal);
   for(const s of [-1,1]){const x=-.26+s*.16;box(p,x,.42,.13,.04,.32,.07,charcoal);}
-  tube(p,V(-.26,.41,.18),V(.18,.41,.18),.036,cyan);
+
   const exchanger=anchor(p,.35,.91,-.02);exchanger.name='Plate heat exchanger';
   for(let k=0;k<7;k++)box(exchanger,0,0,(k-3)*.038,.36,.48,.023,k%2?steel:charcoal);
-  // The conditioning reservoir and its loop remain separate from the flight
-  // fluid. The paired service hoses terminate at the other exchanger side.
-  tube(p,V(.28,.54,.18),V(.35,.69,.18),.029,cyan);
-  tube(p,V(.35,1.13,-.14),V(-.26,1.13,-.14),.029,amber);
-  tube(p,V(-.26,1.13,-.14),V(-.26,.83,-.14),.029,amber);
+  // Ground conditioning and the isolated article loop use different exchanger
+  // ports. Physical back-face exits and separate lanes complete both circuits.
+  const circuits=[
+   ['reservoir-to-pump',[V(-.26,.41,.24),V(-.26,.41,.28),V(-.26,.52,.28),V(-.26,.52,.50),V(.28,.52,.50),V(.28,.52,.32)],cyan],
+   ['pump-to-exchanger',[V(.28,.52,-.275),V(.28,.52,-.40),V(.70,.52,-.40),V(.70,.76,.25),V(.28,.76,.25),V(.28,.76,.135)],cyan],
+   ['exchanger-to-reservoir',[V(.42,1.08,.135),V(.42,1.08,.30),V(.42,1.28,.30),V(-.26,1.28,.30),V(-.26,1.28,0),V(-.26,1.1975,0)],amber],
+   ['isolated-supply',[V(.27,.81,-.18),V(.27,.81,-.32),V(-.65,.81,-.32),V(-.65,.35,-.32),V(-.12,.35,-.32),V(-.12,.35,-.455)],cyan],
+   ['isolated-return',[V(.43,1.03,-.18),V(.43,1.03,-.32),V(.80,1.03,-.32),V(.80,.35,-.32),V(.12,.35,-.32),V(.12,.35,-.455)],amber]
+  ];
+  for(const [id,points,material] of circuits)addGroundTube(p,{id:'bay:thermal:'+id,name:'Coolant cart '+id,points,radiusM:.008,bendRadiusM:.035,material,segments:96});
+
  }
  function rack(p,style,accent){
   const W=1.14,D=.64,H=style==='compute'||style==='avionics'?1.52:1.04;
@@ -106,6 +116,14 @@ export function buildBayEquipment(ctx){
     cyl(p,x,1.335,-.06,.055,.155,.08,i?steel:blue);cyl(p,x,1.405,-.06,.044,.044,.08,amber);
     for(const y of [.53,.98])cyl(p,x,y,-.06,.162,.162,.041,charcoal);
    }
+   box(p,.45,1.58,-.06,.26,.16,.16,steel).name='Inert-gas isolation and regulation manifold';
+   for(const [i,x] of [-.26,.15].entries()){
+    const source=V(x,1.48,-.06),end=V(i?.37:.53,1.70,-.06),high=i?1.85:2.05;
+    hollow(cyl(p,x,1.4625,-.06,.014,.014,.035,steel)).name='Bottle outlet fitting';hollow(cyl(p,end.x,1.68,-.06,.014,.014,.04,steel)).name='Isolated regulator inlet fitting';
+    addGroundTube(p,{id:'bay:propulsion:'+ (i?'service':'supply')+'-to-regulator',name:'Inert-gas bottle to regulator',points:[source,V(source.x,high,source.z),V(end.x,high,end.z),end],radiusM:.006,bendRadiusM:.035,material:amber,segments:64});
+   }
+   const regulatorOut=cyl(p,.3025,1.57,-.06,.014,.014,.035,steel);regulatorOut.rotation.z=Math.PI/2;hollow(regulatorOut).name='Regulated service outlet fitting';
+   addGroundTube(p,{id:'bay:propulsion:regulated-outlet',name:'Regulated gas to cart service connector',points:[V(.285,1.57,-.06),V(.21,1.57,-.06),V(.21,1.57,-.30),V(-.60,1.57,-.30),V(-.60,.35,-.30),V(-.12,.35,-.30),V(-.12,.35,-.455)],radiusM:.006,bendRadiusM:.035,material:amber,segments:96});
    box(p,0,.96,.185,.87,.35,.074,accent);gauge(p,-.20,1.00,.237,.102);gauge(p,.11,1.00,.237,.082);
   }else if(id==='power'){
    box(p,0,.73,0,1.18,.91,.68,cream).name='Ground power converter';box(p,0,.80,.351,1.07,.61,.035,accent);
@@ -150,35 +168,32 @@ export function buildBayEquipment(ctx){
  }
  const fittings=anchor(facility,0,serviceY,platformZ+.05);fittings.userData.bayRole='interface';fittings.name='Ground interface on the support stand';
  box(fittings,0,0,0,.47,.30,.10,charcoal);
- for(const x of [-.11,.11])frontDisc(fittings,x,0,.085,.053,.08,steel);
+ for(const x of [-.11,.11])hollow(frontDisc(fittings,x,0,.085,.053,.08,steel));
  const groundPort=V(0,serviceY,platformZ+.174);
  // Ground-side shelf supports the hose load. Each jumper runs from the upward
  // branch of the pedestal manifold, around the deck edge, to an illustrative
  // lower-body service panel. Its narrow +Z corridor stays inside the fairing.
  const portY=bus.z0M+Math.min(.36,h.bodyLengthM*.16),portZ=h.bodyHeightM*.5,portX=h.bodyWidthM*.18;
  function flightJumper(item,key,channel,count,material){
-  const rad=key==='thermal'?.034:key==='power'?.030:.022,sourceX=-.11+.22*channel;
+  const rad=key==='thermal'?.014:key==='power'?.010:.007,sourceX=-.11+.22*channel;
   const x=portX+(count===2?(channel-.5)*.17:0),z=portZ+.115;
-  const outside=Math.max(platformZ+.18,portZ+.26,h.fairing.stack[0].radiusM+.13);
+  const outside=Math.max(platformZ+.45,portZ+.46,h.fairing.stack[0].radiusM+.30)+channel*.14;
   const color=key==='thermal'?material:steel;
-  // A bulkhead junction connects the ground input and this top-outlet fitting.
-  const bulk=cyl(item,sourceX,serviceY+.175,platformZ+.052,.042,.042,.05,steel);
-  bulk.name='Pedestal manifold outlet';
+  const bulk=cyl(item,sourceX,serviceY+.175,platformZ+.052,.042,.042,.05,steel);bulk.name='Pedestal manifold outlet';hollow(bulk);
   const start=V(sourceX,serviceY+.201,platformZ+.052),tie=V(x,.20,outside),end=V(x,portY,z);
-  const p=new T.CurvePath();
-  const bend=V(x,-.18,outside-.13);
-  p.add(new T.CubicBezierCurve3(start,start.clone().add(V(0,.15,0)),bend.clone().add(V(0,0,-.10)),bend));
-  p.add(new T.CubicBezierCurve3(bend,bend.clone().add(V(0,0,.12)),V(x,.03,outside),tie));
-  p.add(new T.CubicBezierCurve3(tie,V(x,portY-.48,outside),V(x,portY,outside+.03),end));
-  const lead=new T.Mesh(new T.TubeGeometry(p,48,rad,8,false),material);lead.name='Stand-to-spacecraft jumper';lead.userData.bayRole='interface';item.add(lead);
+  const shoulderY=serviceY+.421-channel*.10;
+  const points=[start,V(sourceX,shoulderY,start.z),V(sourceX,shoulderY,outside),V(x,shoulderY,outside),V(x,portY,outside),end];
+  const tube=addGroundTube(item,{id:'bay:'+key+':jumper-'+channel,name:'Stand-to-spacecraft jumper',points,radiusM:rad,bendRadiusM:.08,fromNormal:V(0,1,0),toNormal:V(0,0,1),material,segments:96});tube.mesh.userData.bayRole='interface';
+  const p=tube.mesh.geometry.parameters.path;
   // Bracket starts on the pedestal's front edge, holds the harness at a
   // cushioned clamp and gives the flexible section a controlled bend.
-  box(item,x,.045,platformZ-.025,.115,.09,.08,steel);
-  box(item,x,.105,(outside+platformZ-.025)/2,.055,.048,outside-platformZ+.075,steel);
-  box(item,x,.148,outside,.07,.09,.055,charcoal);
-  const collar=cyl(item,x,.20,outside,rad+.012,rad+.012,.055,charcoal);collar.name='Jumper strain relief';
+  const bracketX=x+rad+.070;
+  box(item,bracketX,.045,platformZ-.025,.115,.09,.08,steel).name='Jumper bracket foot';
+  box(item,bracketX,.105,(outside+platformZ-.025)/2,.045,.048,outside-platformZ+.075,steel).name='Jumper offset support';
+  box(item,bracketX,.148,outside,.035,.09,.055,charcoal).name='Jumper clamp support';
+  const collar=cyl(item,x,.20,outside,rad+.012,rad+.012,.055,charcoal);collar.name='Jumper strain relief';hollow(collar);
   const latch=frontDisc(item,x,portY,portZ+.077,.056,.075,color);
-  latch.name='Spacecraft umbilical coupling';latch.userData.bayRole='interface';
+  hollow(latch);latch.name='Spacecraft umbilical coupling';latch.userData.bayRole='interface';
   return p;
  }
  // Each fixture stays in the bay. The optical head and RF hat are removable
@@ -204,7 +219,7 @@ export function buildBayEquipment(ctx){
    trolley(p,1.36,.88);rack(p,'data',accent);
    box(p,0,1.39,.28,1.18,.24,.12,charcoal);namePlate(p,0,1.39,.342,1.10,label,color);
    const hookup=new T.Group();hookup.name='Removable checkout hookup';hookup.userData.bayRole='interface';item.add(hookup);
-   const port=V(.37,.65,.432);frontDisc(p,port.x,port.y,port.z-.015,.045,.044,amber);
+   const port=V(.37,.65,.432);hollow(frontDisc(p,port.x,port.y,port.z-.015,.045,.044,amber));
    let socket;
    if(optical){
     const rad=Math.max(.105,ap*.75),arm=.42;
@@ -217,7 +232,7 @@ export function buildBayEquipment(ctx){
     box(hookup,target.x,floor+.028,mastZ,.46,.056,.40,charcoal);
     const span=target.y-rad-floor-.08;
     cyl(hookup,target.x,floor+.07+span*.5,mastZ,.026,.044,span,steel);
-    socket=V(target.x,target.y,target.z-arm-.22);
+    socket=V(target.x,target.y,target.z-arm-.24);hollow(frontDisc(head,0,0,-arm-.2275,.018,.025,steel)).name='Optical head tether connector';
     // Reticle on the rack identifies the collimated-beacon alignment bench.
     frontDisc(p,.24,1.03,.386,.10,.018,charcoal);
     frontDisc(p,.24,1.03,.397,.082,.006,blue);
@@ -227,44 +242,40 @@ export function buildBayEquipment(ctx){
     const height=w*.21+.06,depth=b*.14+.05;
     box(cap,.012,0,0,.024,height,depth,rubber);box(cap,.083,0,0,.125,height,depth,accent);
     socket=V(target.x+.183,target.y,target.z);
-    const jack=cyl(cap,.16,0,0,.025,.025,.046,steel);jack.rotation.z=Math.PI/2;
+    const jack=cyl(cap,.16,0,0,.025,.025,.046,steel);jack.rotation.z=Math.PI/2;hollow(jack);
    }else{
     // A terminated coupler taps the transmitter at a test port before the reflector.
     const fitting=anchor(hookup,target.x,target.y,target.z-.072);
     fitting.name='Ka conducted RF test port';
     box(fitting,0,0,-.02,.19,.15,.04,steel);
     frontDisc(fitting,0,0,.013,.037,.03,amber);
-    socket=target.clone();frontDisc(fitting,0,0,.048,.023,.044,charcoal);
+    socket=target.clone();hollow(frontDisc(fitting,0,0,.048,.023,.044,charcoal));
     for(let j=0;j<6;j++)box(p,-.20+j*.061,.69,.407,.018,.16,.075,charcoal);
     namePlate(p,-.05,.80,.401,.77,'ATTENUATOR',color);
    }
    // All bend control points stay above the floor. Route the patch coax
    // outside the lateral hardware before it rises up the spacecraft side.
-   const start=p.localToWorld(port),rad=optical?.014:.021;
-   const clear=sband?V(Math.max(target.x+.40,h.stowedDiameterM*.5+.14),floor+rad,target.z):
-    optical?V(socket.x,floor+rad,socket.z-.22):V(socket.x,floor+rad,Math.max(portZ+.6,platformZ+.35));
-   const flat=V(start.x,floor+rad,start.z+(optical?-.25:.25));
-   const route=new T.CurvePath();
-   route.add(new T.CubicBezierCurve3(start,start.clone().add(V(0,0,optical?-.2:.2)),flat.clone().add(V(0,.12,0)),flat));
-   route.add(new T.LineCurve3(flat,clear));
-   route.add(new T.CubicBezierCurve3(clear,clear.clone().add(V(0,.24,0)),V(clear.x,socket.y,clear.z),socket));
-   const lead=new T.Mesh(new T.TubeGeometry(route,54,rad,8,false),optical?cyan:rubber);
-   lead.name=optical?'Optical bench tether':'Shielded RF test coax';hookup.add(lead);
+   const start=p.localToWorld(port),rad=optical?.006:.007,clear=sband?V(Math.max(target.x+.45,h.stowedDiameterM*.5+.30),floor+rad+.025,target.z):optical?V(socket.x,floor+rad+.025,socket.z-.50):V(socket.x,floor+rad+.025,Math.max(portZ+.70,platformZ+.45));
+   const out=V(0,0,1).applyQuaternion(p.quaternion),depart=start.clone().addScaledVector(out,.26),flat=V(depart.x,floor+rad+.025,depart.z),approach=sband?socket.clone().add(V(.24,0,0)):socket.clone().add(V(0,0,optical?-.24:.24));
+   const skirtX=Math.max(flat.x,clear.x,pos.x+.95);
+   const floorPoints=sband?[flat,V(skirtX,flat.y,flat.z),V(skirtX,flat.y,clear.z),clear]:[flat,clear];
+   const points=[start,depart,...floorPoints,V(clear.x,approach.y,clear.z),approach,socket];
+   const tether=addGroundTube(hookup,{id:'bay:comm:'+key,name:optical?'Optical bench tether':'Shielded RF test coax',points,radiusM:rad,bendRadiusM:.07,fromNormal:out,toNormal:sband?V(1,0,0):V(0,0,optical?-1:1),material:optical?cyan:rubber,segments:128}),route=tether.mesh.geometry.parameters.path;
    item.userData.processingFlows=[{id:'signal',cue:createBayFlow(hookup,route,{name:optical?'Optical bench power and data activity':'Contained RF checkout activity',color:optical?'#bca6f2':'#9fd8ec',radius:optical?.022:.029,count:6})}];
    cache.set(chosen,item);station.add(item);
   }
   const item=cache.get(chosen);
-  item.visible=true;station.name=name;station.userData.stationId=chosen;
+  item.visible=item.userData.routingPresent=true;station.name=name;station.userData.stationId=chosen;
   equipmentAnchor.position.copy(pos).y+=1.02;
   vehicleAnchor.position.copy(target);portAnchor.position.copy(target);portAnchor.name=point;
  }
  let chosen,portAtRest,vehicleAtRest;
  function select(domain,on=true,bench='sband',processing=null){
   const isComm=domain==='comm',id=Object.hasOwn(commFixtures,bench)?bench:'sband',key=processing?.id==='propellant'?'propellant-loading':isComm?(id==='sband'?'rf':'rf-'+id):bayStationFor(domain);
-  station.visible=on;
-  fittings.visible=on&&!isComm&&!['alignment','fit','environment','adapter','propellant-loading'].includes(key);
+  station.visible=station.userData.routingPresent=on;
+  fittings.visible=fittings.userData.routingPresent=on&&!isComm&&!['alignment','fit','environment','adapter','propellant-loading'].includes(key);
   if(!on||chosen===key)return;chosen=key;
-  for(const object of cache.values())object.visible=false;
+  for(const object of cache.values())object.visible=object.userData.routingPresent=false;
   if(key==='propellant-loading'){
    let item=cache.get(key);
    if(!item){
@@ -272,7 +283,7 @@ export function buildBayEquipment(ctx){
     item.userData.propellantService=buildPropellantService({h,facility,item,floor,R,platformFront,portX,portY,portZ,box,cylinder,tube,namePlate});
     cache.set(key,item);station.add(item);
    }
-   const service=item.userData.propellantService;item.visible=true;station.name=item.name;station.userData.stationId=key;
+   const service=item.userData.propellantService;item.visible=item.userData.routingPresent=true;station.name=item.name;station.userData.stationId=key;
    equipmentAnchor.position.copy(service.equipmentAnchor);portAnchor.position.copy(service.portAnchor);vehicleAnchor.position.copy(busFace);
    portAnchor.name='Separate spacecraft fuel and oxidizer ports';portAtRest=portAnchor.position.clone();vehicleAtRest=vehicleAnchor.position.clone();return;
   }
@@ -298,7 +309,7 @@ export function buildBayEquipment(ctx){
    }
    if(!room&&!optics&&key!=='adapter'){
     const hoses=key==='thermal'?2:1;
-    const bracket=box(p,0,.349,-.40,.61,.19,.088,steel);bracket.name='Cart service panel';
+    const bracket=box(p,0,.349,-.40,.61,.19,.088,steel);bracket.name='Cart service panel';piercedPanel(bracket,Array.from({length:hoses},(_,j)=>V(-.12+j*.24,.35,-.40)),.052);
     const wired=key!=='mass';
     if(wired){
      const plate=box(item,portX,portY,portZ+.019,hoses===2?.37:.22,.19,.038,steel);
@@ -306,8 +317,8 @@ export function buildBayEquipment(ctx){
     }
     for(let j=0;j<hoses;j++){
      const cx=-.12+j*.24;
-     frontDisc(p,cx,.35,-.454,.064,.035,charcoal);
-     const plug=frontDisc(p,cx,.35,-.49,.042,.060,steel);plug.name='Cart connector';
+     hollow(frontDisc(p,cx,.35,-.454,.064,.035,charcoal));
+     const plug=frontDisc(p,cx,.35,-.49,.042,.060,steel);plug.name='Cart connector';hollow(plug);
      const start=p.localToWorld(V(cx,.35,-.52)),end=groundPort.clone();end.x=-.11+j*.22;
      const rr=key==='thermal'?.040:key==='power'?.033:.024;
      const out=V(0,0,-1).applyQuaternion(p.quaternion);
@@ -320,14 +331,14 @@ export function buildBayEquipment(ctx){
    }
    station.add(item);cache.set(key,item);
   }
-  item.visible=true;station.name=item.name;station.userData.stationId=key;
+  item.visible=item.userData.routingPresent=true;station.name=item.name;station.userData.stationId=key;
   equipmentAnchor.position.copy(pos).y+=['alignment','fit','attitude'].includes(key)?1.34:.86;
   portAnchor.position.copy(key==='adapter'?V(0,.025,h.fairing.stack[0].radiusM):key==='mass'?V(-.85*platformZ/.74,-.1375,platformZ*.84):aim);
   if(room){const probe=item.getObjectByName('Particle sampling inlet');facility.worldToLocal(probe.getWorldPosition(portAnchor.position));}
   if(!room&&!optics&&!['adapter','mass'].includes(key))portAnchor.position.set(portX,portY,portZ+.115);
   portAnchor.name=labels[key]||'Spacecraft checkout receptacle';
   portAtRest=portAnchor.position.clone();vehicleAtRest=vehicleAnchor.position.clone();
-  fittings.visible=!optics&&!room&&key!=='adapter';
+  fittings.visible=fittings.userData.routingPresent=!optics&&!room&&key!=='adapter';
  }
  select('conops');
  function track(pose,state){
@@ -345,8 +356,8 @@ export function buildBayEquipment(ctx){
     if(['Stand-to-spacecraft jumper','Jumper strain relief','Pedestal manifold outlet','Removable checkout hookup'].includes(o.name))jumpers.push(o);
    }); active.userData.pickup={jumpers,lugs};
   }
-  for(const lead of active.userData.pickup.jumpers)lead.visible=state.seat===0;
-  for(const [o,p,q] of active.userData.pickup.lugs){o.position.copy(p);onBus(o.position);o.quaternion.setFromAxisAngle(a,pose.angle).multiply(q);}
+  for(const lead of active.userData.pickup.jumpers)lead.visible=lead.userData.routingPresent=state.seat===0;
+  for(const [o,p,q] of active.userData.pickup.lugs){o.userData.bayRoutingMotion={owner:'bay:article',type:'rigid'};o.position.copy(p);onBus(o.position);o.quaternion.setFromAxisAngle(a,pose.angle).multiply(q);}
  }
  function animateProcessing(state,connected){
   for(const item of cache.values()){
@@ -386,5 +397,5 @@ export function buildBayEquipment(ctx){
   add('Ground instrumentation rack','Instrumentation rack','Portable electrical GSE',80);
   return entries;
  }
- return {station,portAnchor,vehicleAnchor,equipmentAnchor,select,track,animateProcessing,equipmentAnnotations};
+ return {getRoutingSnapshot:()=>({routes:groundConnectionRecords(station)}),station,portAnchor,vehicleAnchor,equipmentAnchor,select,track,animateProcessing,equipmentAnnotations};
 }

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {readStaticAssetIndex} from './asset-index-fixture.mjs';
 import {defaults,missionStarter,sizeDesign,sizingEnvelope,inverseSolve,strictSizingMinimum,meetsSizingRequirement,estimateLife,sizingMargin} from './dist/design.js';
 import {designIdentity,inputRole,isPolicyInput} from './dist/design-contract.js';
 import {assessPdrDomains,pdrDomainOrder,pdrAssessmentHtml,renderPdrDomain} from './dist/pdr-assessment.js';
@@ -75,7 +76,7 @@ const html=pdrAssessmentHtml(records[0]),embedded=html.match(/<script type="appl
 assert.ok(embedded);assert.deepEqual(JSON.parse(embedded[1]),JSON.parse(JSON.stringify(records[0])));
 for(const id of pdrDomainOrder)assert.ok(html.includes('data-pdr-domain="'+id+'"'));
 const baseline=baselineRecord(h);assert.deepEqual(baseline.domainAssessments.configuration,h.input);assert.ok(baselineHtml(baseline).includes('domainAssessments'));
-const files=JSON.parse(readFileSync('dist/assets.json','utf8'));
+const files=await readStaticAssetIndex();
 for(const name of ['design-contract.js','pdr-assessment.js','pdr-assessment.css','pdr-flight.js','pdr-resources.js','pdr-service.js'])assert.ok(files.includes(name),name+' missing from the self-hosted bundle');
 for(const key of ['structureMargin','reserveFraction','radialPaddingM','axialPaddingM'])assert.ok(isPolicyInput(key)&&inputRole(key)==='policy');
 console.log('PASS complete domain exports, configuration provenance and runtime asset inventory');

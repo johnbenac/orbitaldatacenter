@@ -8,7 +8,7 @@ import {INTEGRATION_TIMES} from './integration-sequence.js';
 import {createHardwareDetail,detailSource} from './hardware-detail.js';
 
 const list=x=>x==null?[]:Array.isArray(x)?x:[x],clamp=x=>Math.max(0,Math.min(1,Number(x)||0));
-const labels={deployment:'Deployment sequence',cmg:'Gimbal and rotor motion',terminals:'Terminal pointing',integration:'Integration sequence',fairing:'Fairing closing sequence',service:'Service arm release',processing:'Ground service rehearsal'};
+const labels={deployment:'Deployment sequence',cmg:'Gimbal and rotor motion',terminals:'Terminal pointing',integration:'Integration sequence',fairing:'Fairing closing sequence',service:'Service arm release',processing:'Ground service rehearsal',electrical:'Continuity & signal rehearsal'};
 export function partConfigurationKey(h){return JSON.stringify(h?.input||h||{});}
 export function partAnimations(record){return list(record?.animations).map(a=>typeof a==='string'?{id:a,label:labels[a]||a}:a).filter(a=>labels[a?.id]).map(a=>({...a,label:a.label||labels[a.id]}));}
 export function modelPath(factory,path){
@@ -33,7 +33,8 @@ export function selectPartGeometry(model,record){
  const spec=record?.render||{},empty=reason=>({meshes:[],all:[],available:false,geometryStatus:reason,contextOnly:!!spec.contextOnly});
  if(spec.unavailable)return empty(spec.unavailableReason||'This allocation has no independent geometry in the current model.');
  const f=model.factory,scope=spec.scopeRoots?childrenOf(list(spec.scopeRoots).flatMap(p=>modelPath(f,p))):null;
- const roots=list(spec.roots).flatMap(p=>modelPath(f,p)),rootSet=childrenOf(roots);
+ const electricalRoots=f.electrical?.selectionFor(spec.electricalItemId||record?.id)||[];
+ const roots=[...list(spec.roots).flatMap(p=>modelPath(f,p)),...electricalRoots],rootSet=childrenOf(roots);
  if(spec.connectionId){const c=f.umbilicals?.connectionMeshes.get(spec.connectionId);if(c)for(const root of [c.flight,c.groundHead,c.hose,...c.fixedMeshes])root?.traverse(o=>rootSet.add(o));}
  if(spec.umbilicalGroup)for(const g of f.umbilicals?.groups||[])if(g.spec.id===spec.umbilicalGroup)for(const root of [g.assembly,g.portRoot])root?.traverse(o=>rootSet.add(o));
  const names=new Set(list(spec.names)),roles=new Set(list(spec.roles)),ids=new Set(list(spec.partIds)),excluded=new Set(list(spec.excludeNames));
@@ -70,6 +71,8 @@ export function createPartModel(h,family,onUpdate=()=>{},detailOptions=null){
    for(const c of factory.cmgs||[]){c.gimbal.rotation.z=animationId==='cmg'?.65*Math.sin(p*Math.PI*2+c.index*.6):(snapshot.attitudeDynamics?.gimbalAnglesRad?.[c.index]||0);c.spin.rotation.x=animationId==='cmg'?p*Math.PI*12:0;}
    const q=animationId==='terminals'?p*Math.PI*2:0;
    factory.pointTerminals?.(new T.Vector3(.55*Math.sin(q),.3,1).normalize(),new T.Vector3(.7*Math.cos(q),.45,1).normalize());
+   factory.electrical?.mating(record?.render?.electricalItemId||record?.id,animationId==='mate'?p:1);
+   factory.electrical?.update(snapshot,{enabled:animationId==='electrical',mode:animationId==='electrical'?'checkout':'operational',itemId:record?.render?.electricalItemId||record?.id,time:p*10,reducedMotion:!!snapshot.reducedMotion});
   }else{
    const bay=!!(spec.stationDomain||spec.stationId||spec.processingId||record?.category==='ground'||['integration','fairing','processing'].includes(animationId));
    const domain=spec.stationDomain||'mechanical',bench=spec.commBench||'sband';
@@ -100,9 +103,10 @@ export function partObjectDescriptor(o,model){
  // Never route a generated detail mesh to a new or fabricated equipment row.
  o=detailSource(o);
  const names=[],ancestry=[];for(let p=o;p;p=p.parent){ancestry.push(p);if(p.name)names.push(p.name);}
- const f=model?.factory,paths=model?.family==='launch'?['bay.station',...Object.keys(f.parts).map(k=>'parts.'+k)]:['tankMap.fuel','tankMap.oxidizer','tankMap.helium','recorder','avionics','gyroPack','torquers','engines','regulator','patches','dish','optic','opticalTerminals','shelf','appendages','skin','enclosure','service','internal'];
+ const f=model?.factory,paths=model?.family==='launch'?['bay.station',...Object.keys(f.parts).map(k=>'parts.'+k)]:['tankMap.fuel','tankMap.oxidizer','tankMap.helium','recorder','avionics','pcdu','fabric','harnesses','gyroPack','torquers','engines','regulator','patches','dish','optic','opticalTerminals','shelf','appendages','skin','enclosure','service','internal'];
  const ranked=f?paths.flatMap(path=>modelPath(f,path).filter(root=>ancestry.includes(root)).map(root=>({path,index:ancestry.indexOf(root)}))).sort((a,b)=>a.index-b.index):[];
  const roots=ranked.map(r=>r.path),partId=ancestorValue(o,'part');let category=model?.family==='launch'?(roots.includes('parts.facility')?'ground':roots.includes('parts.tower')?'site':'launch'):'flight',connectionId=null;
  for(const [id,c] of f?.umbilicals?.connectionMeshes||[])if([c.flight,c.groundHead,c.hose,...c.fixedMeshes].some(root=>ancestry.includes(root))){connectionId=id;break;}
- return {id:partId,partId,partIds:[...new Set(ancestry.map(p=>p.userData.part).filter(Boolean))],name:o.name,materialRole:o.userData.materialRole,names,rootKey:roots[0],rootKeys:roots,category,connectionId,stationId:ancestorValue(o,'stationId'),umbilicalGroup:ancestorValue(o,'umbilicalGroup')};
+ const electricalItemId=ancestorValue(o,'physicalPartId'),electricalItemIds=[...new Set(ancestry.flatMap(p=>p.userData.electricalItemIds||[]).filter(Boolean))];
+ return {id:electricalItemId||partId,partId,physicalPartId:electricalItemId,electricalItemId,electricalItemIds,partIds:[...new Set(ancestry.map(p=>p.userData.part).filter(Boolean))],name:o.name,materialRole:o.userData.materialRole,names,rootKey:roots[0],rootKeys:roots,category,connectionId,stationId:ancestorValue(o,'stationId'),umbilicalGroup:ancestorValue(o,'umbilicalGroup')};
 }

@@ -2,10 +2,12 @@
 // The DGX case uses NVIDIA's published chassis. Flight trays and keep-outs are study dimensions.
 export function rackSection(compute,w,h){
  const slotDimensionsM=compute==='dgx'?[.4823,.356,.8971]:[.48,.18,.70];
- const [x,y,z]=slotDimensionsM,pitchM=[x+.065,y+.045,z+.10];
+ // A 65 mm inter-column gap cannot contain a power connector, its backshell
+ // and the allocated 10D bend. Reserve an explicit 280 mm service aisle.
+ const [x,y,z]=slotDimensionsM,pitchM=[x+.28,y+.045,z+.10];
  // Wall-side plumbing zones and top/bottom bus services stay outside this rectangular lattice.
  const columns=Math.max(1,Math.floor(.82*w/pitchM[0])),rows=Math.max(1,Math.floor(.68*h/pitchM[1]));
- return {slotDimensionsM,pitchM,columns,rows};
+ return {slotDimensionsM,pitchM,columns,rows,serviceAisleM:.28,serviceAisleBasis:'Project allocation for side connector banks, strain relief and harness bends; included in package capacity and vehicle sizing.'};
 }
 export function rackLayout(section,trays,z0,z1){
  const {columns,rows,pitchM}=section,bays=Math.floor((z1-z0+1e-7)/pitchM[2]),capacity=bays*rows*columns;

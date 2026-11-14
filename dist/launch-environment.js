@@ -5,6 +5,7 @@ import * as T from './vendor/three.module.js';
 import {geographyForSite} from './launch-geography.js';
 import {fetchJsonAsset} from './json-asset.js';
 
+export const LOCAL_PAD_FLAT_RADIUS_M=190,LOCAL_PAD_MESH_STEP_M=18;
 const DEG=Math.PI/180,EARTH_M=6378137,clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));
 const smooth=(a,b,v)=>{const f=clamp((v-a)/(b-a));return f*f*(3-2*f);};
 const V=(x=0,y=0,z=0)=>new T.Vector3(x,y,z);
@@ -148,7 +149,7 @@ export function buildLaunchEnvironment(site,{parent,grade,aperture,repaint=()=>{
   const [lon,lat]=projection.coordinate(x,z),h=sampleElevation(heightGrid,lon,lat)-padElevationM;
   // Match existing schematic civil geometry without pretending its local
   // slopes, grade or foundation levels have been surveyed.
-  return grade+h*smooth(190,460,Math.hypot(x,z));
+  return grade+h*smooth(LOCAL_PAD_FLAT_RADIUS_M,460,Math.hypot(x,z));
  }
  function tag(m,name){m.name=name;m.userData.noShadow=true;m.userData.noLaunchShadow=true;m.userData.landscape=true;m.userData.receiveShadow=false;m.userData.geographicContext=true;m.castShadow=false;m.receiveShadow=false;
   // Geographic scenery is inspected with its named map chips, not subsystem
@@ -180,7 +181,7 @@ export function buildLaunchEnvironment(site,{parent,grade,aperture,repaint=()=>{
   for(const rect of rectanglesAround(extent,inner))makeTerrain(rect,regionalMaterial,regional,Math.max(100,(extent.x1-extent.x0)/104),'Regional elevation surface');
   for(const rect of rectanglesAround(inner,near))makeTerrain(rect,detailMaterial,detail,Math.max(22,(inner.x1-inner.x0)/74),'Detailed geographic terrain');
  }else for(const rect of rectanglesAround(extent,near))makeTerrain(rect,regionalMaterial,regional,Math.max(70,(extent.x1-extent.x0)/112),'Regional elevation surface');
- for(const rect of rectanglesAround(near,aperture))makeTerrain(rect,nearMaterial,nearRecord,18,'Graded local terrain');
+ for(const rect of rectanglesAround(near,aperture))makeTerrain(rect,nearMaterial,nearRecord,LOCAL_PAD_MESH_STEP_M,'Graded local terrain');
 
  function makeSkirt(){
   const pts=[],segments=32;
@@ -369,7 +370,7 @@ export function buildLaunchEnvironment(site,{parent,grade,aperture,repaint=()=>{
    if(!alive)return;
    for(const r of results)if(r.status==='rejected')errors.push(r.reason?.message||'Geographic asset unavailable');
    api.status=errors.length?'error':'ready';vegetation();coastalWater();repaint();
-   if(record.features?.url)fetch(record.features.url,{signal:abort?.signal}).then(response=>{if(!response.ok)throw new Error('Coastline context unavailable');return response.json();}).then(features=>{if(alive){coastalVectors(features);repaint();}}).catch(error=>{if(alive)warnings.push(error.message);});
+   if(record.features?.url)fetchJsonAsset(record.features.url,{signal:abort?.signal}).then(features=>{if(alive){coastalVectors(features);repaint();}}).catch(error=>{if(alive)warnings.push(error.message);});
   });
  }
  return api;

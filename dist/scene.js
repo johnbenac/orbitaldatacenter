@@ -15,7 +15,9 @@ import {padSky} from './launch-art.js';
 import {createLaunchRendering} from './launch-rendering.js';
 import {createLaunchSiteView} from './launch-site-view.js';
 import {makeLaunch} from './launch-scene.js';
+import {positionLiveCraft} from './launch-craft-placement.js';
 import {makeCraft} from './craft.js';
+import {buildElectricalArchitecture,reconcileRedwireInstalledMassFromCraft} from './electrical-architecture.js';
 import {createPointingGuide,pointingGeometry,pointingViewAllowed} from './pointing-guide.js';
 import {thermalSkin,temperatureLegend} from './thermal-view.js';
 import {domainSceneSpecs,domainInstruments} from './domain-scene.js';
@@ -23,10 +25,13 @@ import {propulsionReview} from './spacecraft-architecture.js';
 import {focusHardware,dataRoutes,hardwareAnchor} from './hardware-focus.js';
 import {launchContextBadge} from './launch-context.js';
 import {softRenderer} from './software-scene.js';
+import {stablePerspectiveNear} from './camera-clipping.js';
+import {obstacleFromMesh} from './routing-audit.js';
+import {groundConnectionRecords} from './ground-connection-routing.js';
+import {flightRoutingSnapshot,mergeRoutingObstacles,mergeServiceRoutingSnapshot} from './flight-routing-registry.js';
 import {deploymentSchedule,deploymentLayout,leafPose,leafCorners,mechanismPose,leafAxes} from './deployment.js';
 import {ascentTrack,launchPath} from './launch-path.js';
 import {payloadFreeMET,launchClockFor,INSERTION_MET,shipEngineViewAvailable} from './launch-effects-state.js';
-import {DEPLOY_START_S} from './commissioning-clock.js';
 import {launchSiteFor} from './launch-sites.js';
 import {layoutBayAnnotations,drawBayAnnotations,visibleBayObject} from './bay-annotations.js';
 import {geometry,groundSites,R,DEG,MU} from './orbit.js';
@@ -34,6 +39,17 @@ const V=(x=0,y=0,z=0)=>new T.Vector3(x,y,z),Y=V(0,1,0),TAU=Math.PI*2,clamp=(x,a,
 const cameraView=s=>/launch|fairing/i.test(s)?'launch':/earth|orbit/i.test(s)?'orbit':/core/i.test(s)?'core':'spacecraft';
 const pickAliases={enclosure:"structure",pv:'solar',array:'solar',arrays:'solar',radiators:'radiator',cmgs:'cmg',antennas:'communications',tanks:'propellant',coolant:'radiator',batteries:'battery',shielding:'structure',engine:'propulsion',prop:'propellant',attitude:'cmg',battery:'battery',trays:'compute'};
 const defaultPose={spacecraft:[.61,.49],core:[2.60,.47],orbit:[.54,.33],launch:[.46,.27],bay:[.40,.29]};
+const redwireLayoutKeys=new WeakMap();
+function redwireElectricalLayoutKey(h){
+ if(h.architectureFamilyId!=='redwire-platform')return '';
+ if(redwireLayoutKeys.has(h))return redwireLayoutKeys.get(h);
+ const graph=buildElectricalArchitecture(h),key=JSON.stringify({
+  boxes:graph.boxes.map(b=>[b.id,b.frame,b.positionM,b.dimensionsM,b.connectorPanels]),
+  ports:graph.ports.map(p=>[p.id,p.boxId,p.positionM,p.normal,p.connectorTypeId,p.quantity,p.instanceOffsetsM,p.packing]),
+  harnesses:graph.harnesses.map(a=>[a.id,a.quantity,a.fromPortId,a.toPortId,a.connectorTypeId,a.wire.awg,a.wire.areaMM2,a.cableDiameterM,a.bendRadiusM,a.routing])
+ });
+ redwireLayoutKeys.set(h,key);return key;
+}
 export function bayWorkAreaPoints(launch,h){
  const {shell,payload,upper,lower}=launch.parts,{station,floorY,layout}=launch.bay,r=h.stowedDiameterM/2;
  const boxes=[];
@@ -446,8 +462,13 @@ export function createScene(container,{onPick=()=>{},onOpenPart=null,getPartInfo
    const wing=m.wings.find(w=>w.side===1&&w.end===1);
    look.copy(craft.root.localToWorld(V(...wing.tip)));half=Math.max(g.ww*.82,g.ww*.76/aspect,.6);
   }else{
-   const bank=m.banks[s.deployment>=.69?1:0];
-   look.copy(craft.root.localToWorld(V(...bank.elbow)));half=Math.max(g.r*.75,g.rw*.60/aspect,.6);
+   const bank=m.banks[s.deployment>=.69?1:0]||m.banks[0];
+   if(g.familyId==='redwire-platform'){
+    const installation=craft.redwireHarnessInstallation,bounds=new T.Box3().setFromPoints([craft.root.localToWorld(V(...bank.root))]);
+    for(const [id,part] of installation?.parts||[])if(id.startsWith('redwire:rotary:'))bounds.expandByObject(part);
+    for(const anchor of installation?.inspectionPoints||[])bounds.expandByPoint(anchor.getWorldPosition(V()));
+    bounds.getCenter(look);half=Math.max(bounds.getSize(V()).length()*.58/Math.min(1,aspect),.6);
+   }else{look.copy(craft.root.localToWorld(V(...bank.elbow)));half=Math.max(g.r*.75,g.rw*.60/aspect,.6);}
   }
  }
  if(inBay()){
@@ -493,10 +514,10 @@ export function createScene(container,{onPick=()=>{},onOpenPart=null,getPartInfo
  }
  cameraTarget.copy(look);camera.position.copy(look).addScaledVector(dir,dist);
  camera.up.copy(viewUp);camera.lookAt(look);camera.left=-half*aspect;camera.right=half*aspect;camera.top=half;camera.bottom=-half;
- // The near plane stays at one percent of ground-view camera distance. This
- // preserves foreground inspection while giving the GPU useful depth
- // precision for a thin water layer across the regional landscape.
- camera.near=perspective?(launchConfig&&launchFrame.environment==='ground'?Math.max(.07,dist*.01):.07):.001;camera.far=dist*(launchConfig?55:4);if(launchConfig&&['ground','sky'].includes(launchFrame.environment))camera.far=Math.max(camera.far,60000);if(inspectingMounts()){const depth=.57*Math.hypot(h.stowedLengthM,h.stowedDiameterM);camera.near=Math.max(.05,dist-depth);camera.far=dist+depth;}if(perspective)camera.aspect=aspect;camera.updateProjectionMatrix();camera.updateMatrixWorld();ring.quaternion.copy(camera.quaternion);}
+ // Scale perspective depth precision with the eye-to-focus distance in the
+ // bay and in flight too. Ground views retain their larger landscape clearance;
+ // orthographic orbital and mounting views keep their existing clipping range.
+ camera.near=perspective?stablePerspectiveNear(camera.position.distanceTo(look),launchConfig&&launchFrame.environment==='ground'?Math.max(.07,dist*.01):.07):.001;camera.far=dist*(launchConfig?55:4);if(launchConfig&&['ground','sky'].includes(launchFrame.environment))camera.far=Math.max(camera.far,60000);if(inspectingMounts()){const depth=.57*Math.hypot(h.stowedLengthM,h.stowedDiameterM);camera.near=Math.max(.05,dist-depth);camera.far=dist+depth;}if(perspective)camera.aspect=aspect;camera.updateProjectionMatrix();camera.updateMatrixWorld();ring.quaternion.copy(camera.quaternion);}
  function anchorFor(id){
   if(view==='orbit'){
    if(id==='orbitCraft')return mark.getWorldPosition(V());
@@ -589,10 +610,14 @@ export function createScene(container,{onPick=()=>{},onOpenPart=null,getPartInfo
   }
   else if(view==='spacecraft'&&chapter==='commissioning'){
    const g=deploymentLayout(h),motion=mechanismPose(g,s.deployment,h.input.solarTiltDeg,s);
-   const wing=motion.wings.find(v=>v.side===1&&v.end===1),bank=motion.banks[s.deployment>=.69?1:0];
+   const wing=motion.wings.find(v=>v.side===1&&v.end===1),bank=motion.banks[s.deployment>=.69?1:0]||motion.banks[0];
    const mark=(anchor,bodyPoint,side,title,value,color)=>({anchor,bodyPoint,side,title,value,color});
-   const detail=deploymentLens==='hinge'||(deploymentLens==='vehicle'&&s.deployment>=.46&&s.deployment<.92);
-   entries=detail?[mark('radiator-root',bank.root,'left','Radiator root',Math.round(Math.abs(bank.rootPitch)*180/Math.PI)+'° from stow','#f1ac65'),mark('radiator-elbow',bank.elbow,'right','Outer hinge',Math.round(180-Math.abs(bank.outerPitch-bank.rootPitch)*180/Math.PI)+'° open','#a5d2c8')]:
+   const redwire=g.familyId==='redwire-platform',detail=deploymentLens==='hinge'||(deploymentLens==='vehicle'&&(redwire?s.deployment>=.06&&s.deployment<.42:s.deployment>=.46&&s.deployment<.92));
+   const installation=redwire&&craft.redwireHarnessInstallation;
+   if(detail&&installation){
+    const local=anchor=>craft.root.worldToLocal(anchor.getWorldPosition(V())).toArray();
+    entries=[mark('harness-rotary-transfer',local(installation.hingeAnchor),'left','Power and fiber rotary joint','Fixed stator · platform-carried rotor','#f1ac65'),mark('harness-platform-raceways',local(installation.panelAnchor),'right','Mounted platform harnesses','Open ladder trays · side-entry connectors','#a5d2c8')];
+   }else entries=detail?(redwire?[mark('radiator-root',bank.root,'left','Platform hinge',Math.round(Math.abs(bank.rootPitch)*180/Math.PI)+'° from stow','#f1ac65')]:[mark('radiator-root',bank.root,'left','Radiator root',Math.round(Math.abs(bank.rootPitch)*180/Math.PI)+'° from stow','#f1ac65'),mark('radiator-elbow',bank.elbow,'right','Outer hinge',Math.round(180-Math.abs(bank.outerPitch-bank.rootPitch)*180/Math.PI)+'° open','#a5d2c8')]):
     [mark('solar-root',wing.root,'left','Fixed wing saddle','Body attachment','#9ed2bf'),mark('solar-tip',wing.tip,'right','Moving tip drum',wing.span.toFixed(2)+' m paid out','#94bfe5')];
   }else if(view==='launch'&&phase==='D'&&['launcher','launch','conops'].includes(focus)&&['pad','ascent'].includes(s.flightPhase)&&s.t<35){
    const site=launchSiteFor(h.input.launcher,h.input.launchSite),star=h.input.launcher==='starship',falcon=h.input.launcher==='falconHeavy';
@@ -913,8 +938,9 @@ export function createScene(container,{onPick=()=>{},onOpenPart=null,getPartInfo
  function actuate(){const depl=clamp(s.deployment??1,0,1);
  craft.positionPanels(depl,s);
  const inspect=activeProcessing()?.domain||(launchFrame?.environment==='hangar'&&!bayIsolate?'':focus);
- craft.appendages.visible=view!=='core'||h.payloadLocation==='radiator';const core=view==='core',payloadFocus=view==='launch'&&inspect&&['data','purpose','compute','thermal','comm','attitude','software','power','prop'].includes(inspect),tank=selected==='propellant'||selected==='propulsion'||inspect==='prop';craft.setCoreView?.(core);
- craft.gyroPack.visible=core||['attitude','software'].includes(inspect)||selected==='cmg';craft.skin.visible=!core&&!payloadFocus&&!tank;craft.internal.visible=core||payloadFocus||selected==='cmg'||['compute','data','purpose','attitude','software','power','thermal','mass'].includes(inspect);
+ craft.appendages.visible=view!=='core'||h.payloadLocation==='radiator';const core=view==='core',payloadFocus=view==='launch'&&inspect&&['data','purpose','compute','thermal','comm','attitude','avionics','software','power','prop'].includes(inspect),tank=selected==='propellant'||selected==='propulsion'||inspect==='prop';craft.setCoreView?.(core);
+ craft.gyroPack.visible=core||['attitude','software'].includes(inspect)||selected==='cmg';craft.skin.visible=!core&&!payloadFocus&&!tank;craft.internal.visible=core||payloadFocus||selected==='cmg'||['compute','data','purpose','attitude','avionics','software','power','thermal','mass'].includes(inspect);
+ if(craft.electricalEquipment)craft.electricalEquipment.visible=craft.internal.visible;
  craft.service.visible=core||payloadFocus||tank||inspect==='mass';craft.shelf.visible=!tank;
  for(const a of craft.cells){
   a.tank.visible=!tank;a.section.visible=tank;
@@ -930,20 +956,15 @@ export function createScene(container,{onPick=()=>{},onOpenPart=null,getPartInfo
  function updateLaunch(){
   if(view!=='launch'){if(launch)launch.root.visible=false;launchFrame=null;return;}
   const signature=[meshKey,h.input.launcher,h.input.launchSite,h.input.fairingM,h.input.fairingLengthM,h.stowedLengthM].join('/');
-  if(signature!==launchKey){if(launch){launchDetail?.dispose();launchDetail=null;launchSkin?.destroy();launchSkin=null;launchFocus?.destroy();launchFocus=null;scene.remove(launch.root);launch.ground?.environment?.dispose?.();disposeGroup(launch.root);}launch=makeLaunch(h,()=>request(true));launchDetail=createHardwareDetail(launch.root,{family:'launch',hardware:h,renderer,gpu,onWake:()=>request()});launchRendering.prepare(launch.root);scene.add(launch.root);launchKey=signature;}
+  if(signature!==launchKey){if(launch){launchDetail?.dispose();launchDetail=null;launchSkin?.destroy();launchSkin=null;launchFocus?.destroy();launchFocus=null;scene.remove(launch.root);launch.ground?.environment?.dispose?.();disposeGroup(launch.root);}launch=makeLaunch(h,()=>request(true),new URLSearchParams(location.search).has('routing-debug')?{routingProgress:record=>console.info('Routing launch',JSON.stringify(record))}:{});launchDetail=createHardwareDetail(launch.root,{family:'launch',hardware:h,renderer,gpu,onWake:()=>request()});launchRendering.prepare(launch.root);scene.add(launch.root);launchKey=signature;}
   launch.setPadConnection?.(padConnection);
   launchFrame=launch.update(s,chapter,{domain:focus,phase,commBench,padInspect:launchLens==='services',padConnection});
   launch.bay.setProcessingState(processingState?{...processingState,enabled:processingState.enabled!==false&&s.t<=-3000&&!!inBay()}:null);
  }
  function positionVehicle(){
-  craftGroup.position.set(0,0,0);craftGroup.quaternion.identity();
-  const packing=view==='launch'&&launchFrame&&!launchFrame.directCraft&&!launchFrame.reference;
-  if(packing){const mount=launch.parts.liveMount;launch.root.updateMatrixWorld(true);mount.getWorldPosition(craftGroup.position);mount.getWorldQuaternion(craftGroup.quaternion);
-   if(s.flightPhase==='insertion'&&h.input.launcher!=='starship'){const clear=launchClockFor(h.input.launcher).releaseClear,k=clamp((s.t-clear)/(DEPLOY_START_S-clear),0,1),f=k*k*(3-2*k);craftGroup.position.multiplyScalar(1-f);craftGroup.quaternion.slerp(new T.Quaternion(),f);launchFrame.center.lerp(V(),f);const fit=Math.max(size.fitHeight*.5,size.fitWidth*.5/(w/Math.max(1,ht)));launchFrame.half+=f*(fit-launchFrame.half);}
-  }
-  craftGroup.visible=view!=='orbit'&&(view!=='launch'||!launchFrame?.reference&&!launchFrame?.cargoHeld);
+  positionLiveCraft(craftGroup,{view,launch,launchFrame,state:s,hardware:h,fitHalfHeight:Math.max(size.fitHeight*.5,size.fitWidth*.5/(w/Math.max(1,ht)))});
  }
- function update(hardware,snapshot){if(!hardware||!snapshot)return;h=hardware;s=snapshot;flightFrame=flightFrames(s);let k=[h.architectureFamilyId||h.input.architectureFamily,h.physicalArchitecture?.revision,h.input.architectureSpanM,h.input.architectureHeightM,h.input.pv,h.input.coating,h.input.communicationsPackage,h.trays,h.storageTB,h.input.diskModuleTB,h.bodyLengthM,h.bodyWidthM,h.bodyHeightM,h.wingLengthM,h.wingWidthM,h.radiatorLengthM,h.radiatorWidthM,h.radiatorPanelsPerBank,h.input.kaDishM,h.input.opticalApertureM,h.tankVolumeL,h.fuelKg,h.oxidizerKg,h.input.thrustN,h.input.engine,...h.propulsion.tanks.flatMap(o=>[o.x,o.y,o.z,o.volumeL]),...h.propulsion.engines.map(o=>o.x+','+o.z)].join('/');if(k!==meshKey){partMenu.close();if(craft){craftDetail?.dispose();craftDetail=null;detailFocus=null;craftSkin?.destroy();craftSkin=null;craftFocus?.destroy();craftFocus=null;custody?.destroy();custody=null;craftGroup.remove(craft.root);disposeGroup(craft.root);}meshKey=k;craft=makeCraft(h);craftDetail=createHardwareDetail(craft.root,{family:'flight',hardware:h,renderer,gpu,onWake:()=>request()});craftGroup.add(craft.root);let span=Math.max(craft.wingspan,craft.spanZ);size={span,fitWidth:Math.max(craft.wingspan*1.05,craft.spanZ*.60),fitHeight:Math.max(craft.wingspan*.29+craft.spanZ*.36,span*.48)};pickables=[craft.root];overlayStale=true;}
+ function update(hardware,snapshot){if(!hardware||!snapshot)return;const previousHardware=h;h=hardware;s=snapshot;flightFrame=flightFrames(s);let k=[redwireElectricalLayoutKey(h),h.architectureFamilyId||h.input.architectureFamily,h.physicalArchitecture?.revision,h.input.architectureSpanM,h.input.architectureHeightM,h.input.pv,h.input.coating,h.input.communicationsPackage,h.trays,h.storageTB,h.input.diskModuleTB,h.bodyLengthM,h.bodyWidthM,h.bodyHeightM,h.wingLengthM,h.wingWidthM,h.radiatorLengthM,h.radiatorWidthM,h.radiatorPanelsPerBank,h.input.kaDishM,h.input.opticalApertureM,h.tankVolumeL,h.fuelKg,h.oxidizerKg,h.input.thrustN,h.input.engine,...h.propulsion.tanks.flatMap(o=>[o.x,o.y,o.z,o.volumeL]),...h.propulsion.engines.map(o=>o.x+','+o.z)].join('/');if(k!==meshKey){partMenu.close();if(craft){craftDetail?.dispose();craftDetail=null;detailFocus=null;craftSkin?.destroy();craftSkin=null;craftFocus?.destroy();craftFocus=null;custody?.destroy();custody=null;craftGroup.remove(craft.root);disposeGroup(craft.root);}meshKey=k;craft=makeCraft(h);craftDetail=createHardwareDetail(craft.root,{family:'flight',hardware:h,renderer,gpu,onWake:()=>request()});craftGroup.add(craft.root);let span=Math.max(craft.wingspan,craft.spanZ);size={span,fitWidth:Math.max(craft.wingspan*1.05,craft.spanZ*.60),fitHeight:Math.max(craft.wingspan*.29+craft.spanZ*.36,span*.48)};pickables=[craft.root];overlayStale=true;}else if(previousHardware!==h&&h.architectureFamilyId==='redwire-platform'){reconcileRedwireInstalledMassFromCraft(h,craft);}
  updateLaunch();syncRotationMode();navReadings=orbitVectorsAvailable(view,s)&&flightFrame&&!(view==='launch'&&launchFrame?.reference)?orbitVectorReadings(s):[];actuate();stagingBounds=chapter!=='commissioning'&&s.deployment<.995&&s.deployment>.0001?new T.Box3().setFromObject(craft.root):null;if(overlayStale||layers.length||domainSceneSpecs[focus]?.vectors?.length||['attitude','prop'].includes(focus)){arrows();overlayStale=false;}if(selected)selectionBox();updateOrbit();positionVehicle();updatePointing();orbit.visible=view==='orbit';setBg();updateThermal();request();}
  function setView(v){const next=cameraView(v);if(next===view&&craft)return;partMenu.close();detailFocus=null;cancelGestures();if(hoverHit)leave({clientX:hoverHit.x,clientY:hoverHit.y});view=next;setBg();if(craft)update(h,s);else request();}
  function thermalRow(hit){return (!focus||focus==='thermal'||thermalEnabled())&&hit?.node?(s.thermalQualification||[]).find(r=>r.id===hit.node)||null:null;}
@@ -968,7 +989,7 @@ export function createScene(container,{onPick=()=>{},onOpenPart=null,getPartInfo
   }else if(active&&packed){launchFocus?.clear();launchSkin??=thermalSkin(launch.parts.stage);launchSkin.apply(s.thermalQualification,gpu?renderer.getPixelRatio():1,thermalScale);}
   else{launchSkin?.clear();if(showFocus&&launch?.root.visible&&!(phase==='D'&&['launcher','launch'].includes(inspect)&&(['pad','ascent'].includes(s.flightPhase)||h.input.launcher==='starship'))){launchFocus??=focusHardware(launch.parts.stage);
     launchFocus.apply(inspect,selected);}else launchFocus?.clear();}
-  if((inspect==='data'||inspect==='purpose')&&craftGroup.visible&&view!=='orbit'&&!s.referenceBody){if(!custody){custody=dataRoutes(craft,h);craft.root.add(custody.root);}custody.update(s,true,inspect);}else if(custody)custody.update(s,false);
+  if(['data','purpose','compute','avionics','power'].includes(inspect)&&craftGroup.visible&&view!=='orbit'&&!s.referenceBody){if(!custody){custody=dataRoutes(craft,h);craft.root.add(custody.root);}const checkout=activeProcessing();custody.update(s,true,inspect,{mode:checkout?'checkout':'operational',time:checkout?(checkout.progress||0)*10:s.t});}else if(custody)custody.update(s,false);
   refreshLegend();
  }
  const ray=new T.Raycaster(),pointer=new T.Vector2(),touches=new Map();let drag=null;
@@ -1180,7 +1201,25 @@ export function createScene(container,{onPick=()=>{},onOpenPart=null,getPartInfo
  const pinAux=e=>{if(annotationButton(e)&&e.button===1)e.preventDefault();};
  const overlayEvents={pointerdown:pinDown,pointermove:pinMove,pointerup:pinUp,pointercancel:pinCancel,wheel:overlayWheel,keydown:pinKey,click:pinClick,auxclick:pinAux};
  for(const [type,handler] of Object.entries(overlayEvents))container.addEventListener(type,handler,type==='wheel'?{passive:false}:undefined);
- setBg();resize();return {update,setView,
+ const routingHighlight=new T.Group();routingHighlight.name='Routing inspection highlight';routingHighlight.userData.engineeringGraphic=true;scene.add(routingHighlight);
+ function clearRoutingHighlight(){const gs=new Set(),ms=new Set();routingHighlight.traverse(o=>{if(o.geometry)gs.add(o.geometry);if(o.material)ms.add(o.material);});routingHighlight.clear();for(const g of gs)g.dispose();for(const m of ms)m.dispose();}
+ function getRoutingSnapshot(){
+  if(!craft)return {routes:[],obstacles:[],additionalIssues:[],obstacleLabels:{},context:{view,timeS:s.t,flightPhase:s.flightPhase}};
+  let base=flightRoutingSnapshot(craft),routes=[...base.routes];const extraSolids=[],labels={...base.obstacleLabels};
+  const labelMeshes=root=>root?.traverse(o=>{if(o.isMesh)labels[o.uuid]=o.name||o.userData.routingWallId||o.userData.part||'Physical mesh';});
+  if(inBay()&&launch?.parts.facility.visible){
+   base=mergeServiceRoutingSnapshot(base,launch.bay.routingSnapshot(),{scope:'Bay service',inventoryKey:'bay'});routes=base.routes;labelMeshes(launch.root);
+  }else if(view==='launch'&&launch?.root.visible&&launch.routingSnapshot){base=mergeServiceRoutingSnapshot(base,launch.routingSnapshot(),{scope:'Launch service',inventoryKey:'launch'});routes=base.routes;labelMeshes(launch.root);}
+  const electrical=h.architectureFamilyId==='redwire-platform'?buildElectricalArchitecture(h):null;
+  const installedElectricalAccounting=electrical?{totalCableLengthM:electrical.totalCableLengthM,massAccounting:electrical.massAccounting,powerLossW:electrical.installedPowerLossW??electrical.harnesses.reduce((sum,line)=>sum+line.quantity*line.powerLossW,0),status:h.installedHarnessAccounting?.status,harnessCount:electrical.harnessMassRecords?.length||0,cableRunCount:electrical.harnessMassRecords?.reduce((sum,row)=>sum+row.routeIds.length,0)||0,installationHardwareMassKg:h.cableInstallationHardware?.totalMassKg||0,installationHardwareCount:h.cableInstallationHardware?.parts?.length||0,workerOptics:h.serviceArchitecture?.fabric?.workerOptics||null,dryKg:h.dryKg,wetKg:h.wetKg,launchKg:h.launchKg}:null;
+  return {...base,routes,obstacles:mergeRoutingObstacles([base.obstacles,extraSolids]),obstacleLabels:labels,context:{...base.context,view,timeS:s.t,flightPhase:s.flightPhase,deployment:s.deployment,architectureFamilyId:h.architectureFamilyId,installedElectricalAccounting,rotaryElectricalAccounting:electrical?.rotaryTransferAccounting||null,rotaryFluidAccounting:h.energySystem?.thermal?.rotaryFluidAccounting||null},coverage:{...base.coverage,fluidSections:base.sections?.length||0}};
+ }
+ function highlightRouting(id){
+  clearRoutingHighlight();if(!id){request();return true;}if(view==='orbit'){request();return false;}const route=getRoutingSnapshot().routes.find(r=>r.id===id);if(!route)return false;
+  const points=route.points.map(p=>V(...p)),line=new T.Line(new T.BufferGeometry().setFromPoints(points),new T.LineBasicMaterial({color:0xffc477,depthTest:false,depthWrite:false,toneMapped:false}));line.renderOrder=10000;line.name='Selected routing centreline';routingHighlight.add(line);
+  const radius=Math.max(.012,route.radiusM*2.2),g=new T.SphereGeometry(radius,12,8);for(const [point,color] of [[points[0],0x8fe0d1],[points.at(-1),0xffc477]]){const marker=new T.Mesh(g,new T.MeshBasicMaterial({color,depthTest:false,depthWrite:false,toneMapped:false}));marker.position.copy(point);marker.renderOrder=10001;routingHighlight.add(marker);}request();return true;
+ }
+ setBg();resize();return {update,setView,getRoutingSnapshot,highlightRouting,
   setProcessingState(state){
    const old=activeProcessing()?.id;processingState=state?{...state,progress:clamp(Number(state.progress)||0,0,1)}:null;
    if(launch?.bay)launch.bay.setProcessingState(processingState?{...processingState,enabled:processingState.enabled!==false&&s.t<=-3000&&!!inBay()}:null);

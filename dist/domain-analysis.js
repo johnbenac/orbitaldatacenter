@@ -2,6 +2,7 @@
 import {propulsionReview} from './spacecraft-architecture.js';
 import {aiPurposes} from './ai-purpose.js';
 import {purposeId,purposeInfo} from './purpose-display.js';
+import {payloadDataStage} from './payload-data-handling.js';
 import {sizingEnvelope,ageProperties,sizingLabel} from './design.js';
 import {launchFleet} from './launch-fleet.js';
 import {launchReferenceFor,launchSiteFor} from './launch-sites.js';
@@ -52,14 +53,14 @@ export const domains={
   ['Payload work and Earth receipt','Follow input staging, estimated execution, recorder occupancy and useful output received by the customer.','aiPurpose burst tokensPerSec prefillPerSec perUserTps junctionK freeTB'],
   ['Payload closeout','Reconcile completed work, delivered products and retained recorder contents before shutdown.','itKW tokensPerSec tokensGenerated tokensDelivered occupiedTB freeTB']
  ],'launch deployment burst eclipse contact disposal'),
- data:spec('Data & delivery','database','Serialized text, bulk payload, link delivery and byte conservation.',
-  'bytesPerToken bulkMbps initialQueueGB retainedGB diskReserve codingEff contactFraction storageTB','bulkMbps bytesPerToken storageTB contactFraction','queueGB tokensDelivered',[
-  ['Data products','Set serialized bytes per token and bulk arrivals. Reserve storage for weights, retained files and recorder overprovisioning.','bytesPerToken bulkOffer initialQueue retained reservePct rawStorage'],
-  ['Data custody','Follow text and bulk traffic through the recorder to completed ground delivery.','textQueueGB bulkQueueGB deliveredGB droppedGB byteResidual'],
-  ['End-to-end data budget','Compare mean production, usable recorder space, contact duty and planning goodput. Ground-received tokens represent useful delivered service.','meanTraffic requiredGoodput accessGoodput storageMargin dailyTokens deliveryFraction'],
-  ['Initial recorder contents','Inventory the preloaded data, persistent model image and storage available for new production.','weightsGB retained initialQueue occupiedTB freeTB'],
-  ['Delivery accounting','Check generated, queued, received and dropped bytes, including the initial bulk load.','generatedGB queueGB deliveredGB droppedGB byteResidual tokensDelivered'],
-  ['Residual data disposition','Count useful work already received and identify the recorder contents still onboard at closeout.','textDeliveredGB bulkDeliveredGB textQueueGB bulkQueueGB droppedGB deliveredFraction']
+ data:spec('Payload Data Handling','database','Customer input staging, payload fabric, model and checkpoint storage, product queues and Earth receipt.',
+  'aiPurpose initialInputGB inputSpoolGB serviceRoute bytesPerToken bulkMbps initialQueueGB retainedGB diskReserve codingEff contactFraction storageTB','bulkMbps initialInputGB storageTB contactFraction','aiProductQueueGB aiProductDeliveredGB',[
+  ['Data products','Define customer inputs, resident model state, local recovery checkpoints and the returned deliverable for the selected workload.','aiPurpose aiDeliverable aiInputBytes aiOutputBytes aiRequiredStorage'],
+  ['Data custody','Follow input staging, payload-fabric exchange, local storage and the product recorder to Earth receipt.','aiInputBufferGB aiProductQueueGB aiProductDeliveredGB diskRead diskWrite'],
+  ['End-to-end data budget','Compare workload storage, input and output throughput, contact capacity and independently tracked supplemental transfers.','aiRequiredStorage aiStorageMargin requiredGoodput accessGoodput aiMemoryMargin'],
+  ['Initial recorder contents','Inventory the preloaded inputs, persistent execution state and allocated storage before powered payload checkout.','phase aiInputBufferGB aiProductGeneratedGB aiProductDeliveredGB storageKW'],
+  ['Delivery accounting','Reconcile admitted input, generated customer products, queued records and confirmed Earth receipt.','aiInputConsumedGB aiProductGeneratedGB aiProductQueueGB aiProductDeliveredGB goodputMbps'],
+  ['Residual data disposition','Retain delivered product identity and identify unrecovered records and local checkpoints at closeout.','aiInputConsumedGB aiProductGeneratedGB aiProductQueueGB aiProductDeliveredGB disposalStatus']
  ],'burst contact disposal coast entry impact graveyard'),
  comm:spec('Communications','radio','Command uplink and payload downlink budgets, access and acquisition.',
   'communicationsPackage network link kaDishM opticalApertureM elevationDeg codingEff linkCapMbps opticalJitterUrad','elevationDeg kaDishM opticalApertureM codingEff','goodputMbps lineMbps',[
@@ -142,14 +143,14 @@ export const domains={
   ['Changing mass distribution','Follow the center of mass as appendages move, liquid is consumed and the adapter separates.','deploymentPct wetKg fuelKg oxidizerKg'],
   ['Mechanical disposition','Inspect retained hardware for a raised orbit or screen individual items for survival during targeted reentry.','disposalMode disposalStatus disposalUsedKg finalPerigee finalApogee']
  ],'launch insertion deployment trim reboost maneuver disposal entry impact graveyard'),
- avionics:spec('Command & Data Handling','panels-top-left','Spacecraft flight computer, command reception, health telemetry and recording.',
+ avionics:spec('Command & Data Handling','panels-top-left','Avionics architecture, electrical interfaces, connector and harness definition, command and telemetry processing, and verification.',
   'commandKbps hkPeriodS hkRecorderMB uplinkBufferMB','hkPeriodS hkRecorderMB commandKbps','hkStoredMB cdhKW',[
   ['Spacecraft command and telemetry requirements','Set the ground command traffic and cadence of spacecraft health measurements.','commandKbps hkPeriodS hkRateKbps hkRecorderMB'],
-  ['Flight computer and housekeeping recorder','Inspect the flight computer, command path, onboard health data and recorder capacity.','cdhKW commandDemandKbps hkRateKbps hkRecorderMB'],
-  ['Avionics in the integrated bus','Compare the avionics load and stored telemetry against recorder capacity and contact access.','cdhKW hkRateKbps hkStoredMB uplinkQueueMB'],
-  ['Flight computer checkout','Follow command availability and health telemetry through launch and separation.','phase cdhKW hkRateKbps hkStoredMB'],
+  ['Avionics and electrical interface design','Inspect box and card diagrams, protected power, signaling, connector pin allocations and routed harness schedules.','cdhKW commandDemandKbps hkRateKbps hkRecorderMB'],
+  ['Integrated electrical interfaces','Check route endpoints, mating compatibility, branch voltage drop, signaling capacity and interface evidence on the assembled vehicle.','cdhKW hkRateKbps hkStoredMB uplinkQueueMB'],
+  ['Harness and avionics checkout','Verify workmanship, continuity and isolation before powered command, telemetry, time and launch-inhibit tests.','phase cdhKW hkRateKbps hkStoredMB'],
   ['Spacecraft housekeeping','Watch command backlog, ground contact and the housekeeping recorder at the mission instant.','cdhKW commandGoodputKbps uplinkQueueMB hkStoredMB hkOverwrittenMB'],
-  ['Last commands and telemetry','Inspect command delivery and the spacecraft recorder at retirement or entry interface.','disposalStatus cdhKW commandUploadedGB hkStoredMB']
+  ['Avionics closeout','Keep command authority, timing and health telemetry available through the disposal sequence; reconcile final records before shutdown.','disposalStatus cdhKW commandUploadedGB hkStoredMB']
  ],'launch insertion deployment contact disposal entry impact graveyard'),
  software:spec('Flight Software','workflow','Follow the onboard decisions that point the chassis, steer appendages, establish a link and permit a burn.',
   'attitude solarTiltDeg cmgTorqueNm cmgMomentumNms dipoleAm2','attitude solarTiltDeg cmgTorqueNm dipoleAm2','attitudeSlewErrorDeg radiatorDirectSolarKW',[
@@ -182,12 +183,12 @@ export function purposeDomainFields(id,input){
  const p=purposeId(input),prof=aiPurposes[p]||aiPurposes.text,meta=domains[id];if(!meta)return [];
  if(id==='conops')return [...new Set([...serviceFields[prof.id],...prof.fields,'serviceRoute',...(input.serviceRoute==='relay'?['relayAvailability','relayRttMs','relayUpMbps','relayDownMbps']:['network','elevationDeg','customerUplinkMbps']),'missionYears','duty','idleComputePolicy','pumpStandbyPolicy','disposalMethod'])];
  if(id==='compute')return [...new Set(['aiPurpose','compute','workload','trayCount','bits','hostCores','fabricGbps',...prof.fields,...serviceFields[prof.id],'duty','storageTB'])];
- if(id==='data'&&p!=='text')return [...new Set(['inputSpoolGB','initialInputGB','storageTB','customerUplinkMbps','serviceRoute','link',...prof.fields,'retainedGB','diskReserve'])];
+ if(id==='data')return [...new Set(['inputSpoolGB','initialInputGB','storageTB','customerUplinkMbps','serviceRoute','link',...prof.fields,'retainedGB','diskReserve'])];
  return meta.inputs;
 }
 export function purposeTradeKeys(id,input){id=canonicalDomainId(id);const p=purposeId(input);
- return (id==='compute'||id==='conops'||(p!=='text'&&id==='data'))?tradeByPurpose[p]||tradeByPurpose.text:domains[id]?.tradeKeys||[];}
-export function purposeStageDescription(id,phase,h){id=canonicalDomainId(id);const index='ABCDEF'.indexOf(phase);return id==='conops'&&index>=0?purposeInfo(h).phases[index]:domains[id]?.stages[phase]?.description||'';}
+ return (id==='compute'||id==='conops'||id==='data')?tradeByPurpose[p]||tradeByPurpose.text:domains[id]?.tradeKeys||[];}
+export function purposeStageDescription(id,phase,h){id=canonicalDomainId(id);const index='ABCDEF'.indexOf(phase);return id==='data'?payloadDataStage(phase,h).description:id==='conops'&&index>=0?purposeInfo(h).phases[index]:domains[id]?.stages[phase]?.description||'';}
 const registry={};
 function fields(source,defs,note=''){
  for(const [id,label,unit='',key=id] of defs)registry[id]={label,unit,note,read:c=>c[source]?.[key],source};
@@ -316,7 +317,7 @@ const memo=new WeakMap();
 function context(ctx,needEnvelope=false){
  const h=ctx.hardware,s=ctx.state,d=h.input,day=ctx.day??{};
  let e;
- if(needEnvelope){e=ctx.envelope??memo.get(h);if(!e){e=sizingEnvelope(h);memo.set(h,e)}}
+ if(needEnvelope){const massRevision=h.electricalMassRevision||0,cached=memo.get(h);e=ctx.envelope??(cached?.massRevision===massRevision?cached.envelope:null);if(!e){e=sizingEnvelope(h);memo.set(h,{massRevision,envelope:e})}}
  return {...ctx,h,d,s,day,e:e??{},audit:ctx.audit??ctx.sim?.audit??null};
 }
 const numberValue=x=>typeof x==='number'&&!Number.isFinite(x)?null:x??null;
@@ -331,12 +332,12 @@ function readMetric(code,c){
 }
 const F=(source,receiver,quantity,value,unit,kind='Induced')=>({source,receiver,quantity,value:numberValue(value),unit,kind});
 export function environmentFlows({hardware:h,state:s}){
- const d=h.input,open=!s.carrierAttached&&!s.referenceBody,A=open?s.radiatorCoupledM2/1000:0;
+ const d=h.input,open=!s.carrierAttached&&!s.referenceBody;
  const heatRows=[
   F('Sun','Solar-wing surface','Normal irradiance',!s.carrierAttached?s.solarIrradiance:null,'W/m²','Natural'),
-  F('Sun','Radiator coating','Absorbed direct shortwave',!s.carrierAttached?A*s.absorptivity*s.solarIrradiance*s.radiatorSunCos:null,'kW','Natural'),
-  F('Illuminated Earth','Radiator coating','Absorbed albedo',!s.carrierAttached?A*s.absorptivity*s.albedoIrradiance:null,'kW','Natural'),
-  F('Earth thermal IR','Radiator faces','Absorbed longwave',!s.carrierAttached?A*s.emissivity*s.earthIRIrradiance:null,'kW','Natural'),
+  F('Sun','Radiator coating','Absorbed direct shortwave',!s.carrierAttached?s.radiatorDirectSolarKW:null,'kW','Natural'),
+  F('Illuminated Earth','Radiator coating','Absorbed albedo',!s.carrierAttached?s.radiatorAlbedoKW:null,'kW','Natural'),
+  F('Earth thermal IR','Radiator faces','Absorbed longwave',!s.carrierAttached?s.radiatorEarthIRKW:null,'kW','Natural'),
   F('Earth and Sun','Enclosure exterior','Area-weighted shortwave',open?s.enclosureSolarWm2:null,'W/m²','Natural'),
   F('Thermosphere','Ram-facing silhouette','Local neutral density',s.t>=540?s.densityKgM3:null,'kg/m³','Natural'),
   F('Solar activity','Density scenario','81-day F10.7 proxy',s.t>=540?s.f107Mean:null,'sfu','Natural'),
@@ -390,8 +391,8 @@ function linkedFlows(id,c){
  };
  if(purposeId(h)!=='text'){
   if(id==='compute')all.compute=[F('Regulated bus','Installed workload','Served IT demand',s.itKW,'kW'),F('Accelerators','Execution ledger','Onboard work completed',s.aiUnitsComputed,h.ai?.unit||'work units'),F(purposeInfo(h).customer,'Staged input','Input held onboard',s.aiInputBufferGB,'GB'),F('Recorder',purposeInfo(h).customer,'Returned product',s.aiProductDeliveredGB,'GB')];
-  if(id==='data')all.data=[F('Customer','Input staging','Received onboard',s.aiInputUploadedGB,'GB'),F('Compute','Recorder','Customer product generated',s.aiProductGeneratedGB,'GB'),F('Recorder',purposeInfo(h).customer,'Customer product received',s.aiProductDeliveredGB,'GB')];
  }
+ if(id==='data')all.data=[F('Customer','Input staging','Received onboard',s.aiInputUploadedGB,'GB'),F('Compute','Recorder','Customer product generated',s.aiProductGeneratedGB,'GB'),F('Recorder',purposeInfo(h).customer,'Customer product received',s.aiProductDeliveredGB,'GB')];
  return (s.referenceBody||s.spacecraftModelEndedAt!=null&&s.t>s.spacecraftModelEndedAt)?[]:(all[id]??[]);
 }
 const isRelevant=(domain,e)=>domain.eventTypes.includes(e.type)||(/disposal|graveyard|entry|impact|coast|passiv|retire/.test(e.type)&&domain.eventTypes.some(k=>['disposal','graveyard'].includes(k)));
@@ -446,7 +447,7 @@ export function domainReadout(id,phase,ctx){
  let keys=stage.keys;
  if(purposeId(c.h)!=='text'&&id==='compute')keys={
    A:['aiPurpose','aiUnit','aiRequiredStorage','aiMemoryMargin','trays','memoryGB'],B:['aiPurpose','activeWorkRate','aiFabricEfficiency','aiMemoryMargin','diskRead','diskWrite'],C:['activeWorkRate','requiredWorkRate','aiMemoryMargin','aiFabricEfficiency','meanBus','launchMargin'],D:['phase','trays','memoryGB','aiInputBufferGB','itKW'],E:['aiUnitRate','aiUnitsComputed','aiInputConsumedGB','itKW','aiProductGeneratedGB','aiProductQueueGB'],F:['aiUnitsComputed','aiInputConsumedGB','aiProductGeneratedGB','aiProductDeliveredGB','disposalStatus']}[phase];
- if(purposeId(c.h)!=='text'&&id==='data')keys={
+ if(id==='data')keys={
    A:['aiPurpose','aiDeliverable','aiInputBytes','aiOutputBytes','aiRequiredStorage'],B:['aiInputBufferGB','aiProductQueueGB','aiProductDeliveredGB','diskRead','diskWrite'],C:['aiRequiredStorage','aiStorageMargin','requiredGoodput','accessGoodput','aiMemoryMargin'],D:['phase','aiInputBufferGB','aiProductGeneratedGB','aiProductDeliveredGB','storageKW'],E:['aiInputConsumedGB','aiProductGeneratedGB','aiProductQueueGB','aiProductDeliveredGB','goodputMbps'],F:['aiInputConsumedGB','aiProductGeneratedGB','aiProductQueueGB','aiProductDeliveredGB','disposalStatus']}[phase];
  if(phase==='F'&&id==='environment'&&c.s.referenceBody)keys=['disposalMode','altitudeKm','relSpeed','densityKgM3','entryDynamicPressurePa','entryReferenceDragMS2'];
  if(phase==='F'&&c.disposal?.method==='reentry'&&(id==='orbit'||id==='launch'))keys=keys.filter(k=>!['finalPerigee','finalApogee'].includes(k));
@@ -456,7 +457,7 @@ export function domainReadout(id,phase,ctx){
  const rows=[...new Set(keys)].map(key=>readMetric(key,c));if(['compute','conops'].includes(id)&&['A','C','E','F'].includes(phase))rows.push(...serviceRows(c));
  if(phase==='C')rows.push(...auditRows(id,c.audit));
  if(phase==='F')rows.push(...terminalRows(id,c));
- return {title:stage.title,description:purposeStageDescription(id,phase,c.h),basis:phase==='A'?'Mission requirements and installed configuration':phase==='C'?'Installed design and end-of-service sizing envelope. Window and audited mission quantities are labeled separately.':phase==='F'?'Retirement trajectory and spacecraft channels within their modeled interval':'Shared mission clock · quantities at the selected instant unless labeled as window totals',rows,flows:linkedFlows(id,c),events:eventList(id,phase,c)};
+ return {title:id==='data'?payloadDataStage(phase,c.h).title:stage.title,description:purposeStageDescription(id,phase,c.h),basis:phase==='A'?'Mission requirements and installed configuration':phase==='C'?'Installed design and end-of-service sizing envelope. Window and audited mission quantities are labeled separately.':phase==='F'?'Retirement trajectory and spacecraft channels within their modeled interval':'Shared mission clock · quantities at the selected instant unless labeled as window totals',rows,flows:linkedFlows(id,c),events:eventList(id,phase,c)};
 }
 function series(code,ctx){
  const data=ctx.samples??[];
@@ -503,7 +504,7 @@ export function domainTrade(id,baselineContext,editedContext){
  const a=context(baselineContext,true),b=context(editedContext,true),keys=purposeId(b.h)!=='text'&&['compute','data'].includes(id)?domainReadout(id,'C',{...editedContext,audit:null,sim:null}).rows.filter(r=>!r.key.startsWith('audit-')).map(r=>r.key):domains[id].stages.C.keys;
  const rows=keys.map(key=>{const m=readMetric(key,a),n=readMetric(key,b);return {key,label:m.label,unit:m.unit,note:m.note,baseline:m.value,edited:n.value,delta:Number.isFinite(m.value)&&Number.isFinite(n.value)?n.value-m.value:null}});
  if(a.audit&&b.audit){const left=auditRows(id,a.audit),right=auditRows(id,b.audit);for(const r of left){const s=right.find(x=>x.label===r.label);if(s)rows.push({key:r.key,label:r.label,unit:r.unit,note:r.note,baseline:r.value,edited:s.value,delta:s.value-r.value})}}
- const curveKeys=purposeId(b.h)!=='text'&&id==='compute'?['aiUnitRate','itKW']:purposeId(b.h)!=='text'&&id==='data'?['aiProductQueueGB','aiProductDeliveredGB']:domains[id].curves;
+ const curveKeys=purposeId(b.h)!=='text'&&id==='compute'?['aiUnitRate','itKW']:id==='data'?['aiProductQueueGB','aiProductDeliveredGB']:domains[id].curves;
  const curves=curveKeys.map(key=>({key,label:registry[key].label,unit:effectiveUnit(registry[key].unit,b),baseline:series(key,a),edited:series(key,b)}));
  const missionCurves=[];
  if(a.audit?.dayStats?.length&&b.audit?.dayStats?.length){

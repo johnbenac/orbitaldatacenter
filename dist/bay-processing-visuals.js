@@ -1,6 +1,7 @@
 // Portable ground articles and animated explanatory cues. Their dimensions and
 // motion are schematic PDR planning aids, not loading hardware or procedures.
 import * as T from './vendor/three.module.js';
+import {addGroundTube,groundConnectionRecords} from './ground-connection-routing.js';
 const V=(x=0,y=0,z=0)=>new T.Vector3(x,y,z),clamp=x=>Math.max(0,Math.min(1,Number(x)||0));
 const metal=(color,metalness=.3)=>new T.MeshStandardMaterial({color,metalness,roughness:.48});
 
@@ -35,18 +36,13 @@ export function buildPropellantService(ctx){
  const z=Math.max(R+2.05,platformFront+2.75),span=Math.max(1.05,Math.min(1.45,R*.34)),anchors=[],flows=[],indicators=[];
  const frontDisc=(p,x,y,z,r,len,m)=>{const o=cylinder(p,x,y,z,r,r,len,m,undefined,24);o.rotation.x=Math.PI/2;return o;};
  const coupling=(parent,at,color,name)=>{
-  const m=frontDisc(parent,at.x,at.y,at.z,.062,.075,color);m.name=name;m.userData.bayRole='interface';return m;
+  const m=frontDisc(parent,at.x,at.y,at.z,.062,.075,color);const gp=m.geometry.parameters;m.geometry=new T.CylinderGeometry(gp.radiusTop,gp.radiusBottom,gp.height,gp.radialSegments,gp.heightSegments,true);m.name=name;m.userData.routingFitting=true;m.userData.bayRole='interface';return m;
  };
  function route(start,end,side){
-  const path=new T.CurvePath(),clear=Math.max(platformFront+.32,portZ+.43,h.fairing.stack[0].radiusM+.25);
-  const a=V(start.x,floor+.06,start.z-.48),b=V(end.x,floor+.06,clear+.6),c=V(end.x,.22,clear);
-  path.add(new T.CubicBezierCurve3(start,start.clone().add(V(0,0,-.27)),a.clone().add(V(0,0,.20)),a));
-  path.add(new T.LineCurve3(a,b));
-  path.add(new T.CubicBezierCurve3(b,b.clone().add(V(0,0,-.35)),V(end.x,-.15,clear),c));
-  path.add(new T.CubicBezierCurve3(c,V(end.x,portY-.37,clear),V(end.x,portY,clear+.02),end));
-  const lead=new T.Mesh(new T.TubeGeometry(path,56,.044,8,false),side?oxidizer:fuel);
-  lead.name=side?'Dedicated oxidizer transfer line':'Dedicated fuel transfer line';lead.userData.bayRole='interface';group.add(lead);
-  return {path,lead};
+  const radius=.016,clear=Math.max(platformFront+.45,portZ+.45,h.fairing.stack[0].radiusM+.30),bottom=floor+radius+.025,depart=start.clone().add(V(0,0,-.32));
+  const points=[start,depart,V(depart.x,bottom,depart.z),V(end.x,bottom,clear),V(end.x,portY,clear),end];
+  const tube=addGroundTube(group,{id:'bay:propellant:'+ (side?'oxidizer':'fuel')+':transfer',name:side?'Dedicated oxidizer transfer line':'Dedicated fuel transfer line',points,radiusM:radius,bendRadiusM:.12,material:side?oxidizer:fuel,segments:128});tube.mesh.userData.bayRole='interface';
+  return {path:tube.mesh.geometry.parameters.path,lead:tube.mesh};
  }
  for(let i=0;i<2;i++){
   const x=(i?1:-1)*span,p=new T.Group(),accent=i?oxidizer:fuel,fluid=i?'oxidizer':'fuel';
@@ -60,8 +56,14 @@ export function buildPropellantService(ctx){
   box(p,-.24,1.07,.295,.31,.48,.024,accent);
   const receiver=cylinder(p,.40,.65,-.06,.18,.18,.76,recovery,undefined,28);receiver.name=i?'Oxidizer closed recovery receiver':'Fuel closed recovery receiver';
   cylinder(p,.40,1.06,-.06,.065,.18,.07,steel);
-  const recoveryPath=new T.CatmullRomCurve3([V(-.24,2.06,0),V(-.24,2.18,-.24),V(.40,2.18,-.24),V(.40,1.11,-.06)]);
-  const closed=new T.Mesh(new T.TubeGeometry(recoveryPath,24,.026,8,false),recovery);closed.name=i?'Separate oxidizer recovery circuit':'Separate fuel recovery circuit';p.add(closed);
+  const manifold=box(p,-.24,2.16,0,.34,.12,.18,steel);manifold.name=fluid+' source isolation manifold';
+  const supplyStart=V(-.45,2.16,0),supplyEnd=V(-.24,.43,-.6425),returnStart=V(-.04,2.16,0),returnEnd=V(.40,1.11,-.06);
+  for(const [xx,len] of [[-.43,.04],[-.055,.03]]){const socket=cylinder(p,xx,2.16,0,.025,.025,len,steel);socket.rotation.z=Math.PI/2;const gp=socket.geometry.parameters;socket.geometry=new T.CylinderGeometry(gp.radiusTop,gp.radiusBottom,gp.height,gp.radialSegments,gp.heightSegments,true);socket.name=fluid+' manifold service fitting';socket.userData.routingFitting=true;}
+  const supplyPoints=[supplyStart,V(-.65,2.16,0),V(-.65,2.16,-.50),V(-.65,.43,-.50),V(-.24,.43,-.50),supplyEnd];
+  addGroundTube(p,{id:'bay:propellant:'+fluid+':skid-supply',name:fluid+' source to isolated outlet',points:supplyPoints,radiusM:.016,bendRadiusM:.075,material:accent,segments:96});
+  const returnPoints=[returnStart,V(.16,2.16,0),V(.40,2.16,0),V(.40,1.30,0),V(.40,1.30,-.06),returnEnd];
+  addGroundTube(p,{id:'bay:propellant:'+fluid+':recovery',name:i?'Separate oxidizer recovery circuit':'Separate fuel recovery circuit',points:returnPoints,radiusM:.012,bendRadiusM:.025,material:recovery,segments:96});
+  const manifoldStem=cylinder(p,-.24,2.095,0,.035,.035,.07,steel);manifoldStem.name=fluid+' vessel manifold connection';
   box(p,.27,1.35,.42,.63,.52,.16,dark).name=i?'Oxidizer controls':'Fuel controls';
   for(const xx of [.10,.40]){frontDisc(p,xx,1.40,.51,.073,.025,steel);frontDisc(p,xx,1.40,.526,.058,.008,glow);}
   namePlate(p,0,.35,.65,1.31,i?'OXIDIZER':'FUEL',i?'#9bc6e2':'#e6b074');
@@ -92,9 +94,9 @@ export function buildPropellantService(ctx){
  namePlate(sign,0,1.61,.04,1.43,'HAZARDOUS CELL','#e7bd6d');namePlate(sign,0,1.40,.04,1.43,'PLANNING SCHEMATIC','#d0d9d9');
  sign.name='Hazardous cell planning sign';anchors.push({id:'hazardous-cell',title:'Hazardous processing cell',detail:'Schematic · access controlled',anchor:sign,kind:'facility',lens:'equipment',priority:105});
  const equipmentAnchor=V(0,floor+1.05,z),portAnchor=V(portX,portY,portZ+.115);
- return {group,anchors,equipmentAnchor,portAnchor,update(state,connected){
+ return {group,anchors,equipmentAnchor,portAnchor,getRoutingSnapshot:()=>({routes:groundConnectionRecords(group)}),update(state,connected){
   for(const {id,cue} of flows)cue.update(state?.progress,connected?state?.flow?.[id]:0);
   for(const {id,indicator} of indicators)indicator.update(state?.fill?.[id],connected);
-  group.traverse(o=>{if(o.userData.processingConnection)o.visible=!!connected;});
+  group.traverse(o=>{if(o.userData.processingConnection)o.visible=o.userData.routingPresent=!!connected;});
  }};
 }

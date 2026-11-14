@@ -1,5 +1,8 @@
 import {architectureFamily,architectureTerminalStations} from './architecture-families.js';
 import {installedCommunications} from './communications-packages.js';
+import {electricalBoxLayout} from './electrical-architecture.js';
+import {cableInstallationMassElements,workerOpticsMassElements} from './cable-installation-mass.js';
+import {radiatorPanelMaterialRectangles} from './radiator-surface-area.js';
 // Installed mass and body stations. Distances in m, masses in kg. Instance stations
 // for a group use equal unit masses unless its measured weight shares are supplied.
 import {deploymentLayout,leafPose,mechanismPose,terminalLayout,leafAxes} from './deployment.js';
@@ -47,7 +50,7 @@ export function heliumDistribution(p,remainingKg){
 export function equipmentAllocations(h){
  const d=h.input,p=h.propulsion,m=p.massKg,communications=installedCommunications(h),by=Object.fromEntries(h.massLedger.map(v=>[v.id,v]));
  const specs=[
- ['01.01','compute'],['01.02','host'],['01.03','storage'],['01.04','switch',h.serviceArchitecture.fabric.massKg],
+ ['01.01','compute'],['01.02','host'],['01.03','storage'],['01.04','switch',h.serviceArchitecture.fabric.massKg-(h.serviceArchitecture.fabric.workerOptics?.massKg||0)],
  ['02.01','array'],['02.02','battery'],['02.03','switch',h.energySystem.masses.electricalKg],['03.01','radiator'],['03.02','coolant'],['03.03','blanket'],
  ['04.01','cmg',by.cmg.kg-6-.0015*d.dipoleAm2],['04.02','cmg',.0015*d.dipoleAm2],['04.03','cmg',6],
  ['05.01','terminals',communications.masses.sBandKg],['05.02','terminals',communications.masses.kaKg],['05.03','terminals',communications.masses.opticalKg],
@@ -55,7 +58,8 @@ export function equipmentAllocations(h){
  ['06.04','tanks',m.oxidizerShell],['06.05','tanks',m.heliumShell],['06.06','fuel'],['06.07','oxidizer'],['06.08','pressurant'],
  ['07.01','structure'],['07.02','skin'],['07.03','shield'],['07.04','hinges'],['07.05','cables'],['08.01','switch',12],['09.01','adapter']
  ];
- return specs.map(([wbs,id,kg])=>({wbs,id,kg:kg??by[id].kg,group:by[id].group}));
+ if(by.optics)specs.splice(4,0,['01.05','optics']);
+ return [...specs.map(([wbs,id,kg])=>({wbs,id,kg:kg??by[id].kg,group:by[id].group})),...(h.cableInstallationHardware?.parts||[]).map(part=>({wbs:part.wbs,id:part.ledgerId,kg:part.massKg,group:'Hardware',installationPartId:part.id}))];
 }
 function leafGroups(h,deploy,attitude){
  const g=deploymentLayout(h),pose=mechanismPose(g,deploy,h.input.solarTiltDeg,attitude);
@@ -68,17 +72,34 @@ function leafGroups(h,deploy,attitude){
   for(let k=0;k<3;k++)center[k]+=(1-exposed)*w.rollRadius*normal[k];
   return center;
  });
- const rad=pose.banks.map(b=>mean(g.descriptors.filter(d=>d.type==='rad'&&d.end===b.end).map(d=>xyz(leafPose(g,d,deploy,h.input.solarTiltDeg,attitude)))));
+ const rad=pose.banks.map(b=>{
+  const pieces=g.descriptors.filter(d=>d.type==='rad'&&d.end===b.end).flatMap(d=>{const p=leafPose(g,d,deploy,h.input.solarTiltDeg,attitude),axes=leafAxes(p);return radiatorPanelMaterialRectangles(h,d).map(piece=>({area:piece.areaM2,center:[p.x,p.y,p.z].map((value,axis)=>value+piece.centerM.reduce((offset,coordinate,k)=>offset+coordinate*axes[k][axis],0))}));});
+  const area=pieces.reduce((total,piece)=>total+piece.area,0);return mean(pieces.map(piece=>piece.center),pieces.map(piece=>piece.area/area));
+ });
  const mechanisms=jointStations(pose).map(q=>q.centroidM);
  return {pv,rad,mechanisms};
 
 }
 const fixedCentroids=new WeakMap();
+const electricalStationLayouts=new WeakMap();
 function partsAt(h,deploy,attitude){
  const p=h.propulsion,d=h.input,w=h.bodyWidthM,b=h.bodyHeightM,l=h.bodyLengthM;
  const supplied=p.stations||{},rows=equipmentAllocations(h);
+ let electrical=electricalStationLayouts.get(h);
+ if(!electrical){
+  electrical={};
+  if(h.energySystem?.electrical&&h.rackLayout&&h.serviceArchitecture){
+   const layout=electricalBoxLayout(h);
+   for(const wbs of ['01.04','02.03','08.01']){
+    const boxes=layout.filter(box=>box.wbs===wbs);if(!boxes.length)continue;
+    const stationsM=boxes.map(box=>box.positionM),stationShares=boxes.map(()=>1/boxes.length);
+    electrical[wbs]={stationsM,stationShares,centroidM:mean(stationsM,stationShares)};
+   }
+   electricalStationLayouts.set(h,electrical);
+  }
+ }
  const leaves=leafGroups(h,deploy,attitude),engines=p.engines.map(e=>e.throatZ!=null?[e.x,e.y,.5*(e.throatZ+e.z)]:[e.x,.5*(e.throatY+e.y),e.z]);
- const terminals=terminalMassElements(h,attitude);
+ const terminals=terminalMassElements(h,attitude),installation=cableInstallationMassElements(h,deploy,attitude),optics=workerOpticsMassElements(h,deploy,attitude);
  const stack=h.fairing?.stack||[],bus=stack.find(v=>/insulated bus/i.test(v.part)),adapter=stack[0];
  const suppliedPoint=(wbs,id)=>supplied[wbs]||supplied[id]||[0,0,0];
  const radii=p.tanks.map(xyz);
@@ -88,6 +109,14 @@ function partsAt(h,deploy,attitude){
   '09.01':[[0,0,adapter&&bus?(adapter.z0M+h.payloadInterface.upperFaceStationM-bus.z0M-bus.z1M)/2:-l*.5-.24]]
  };
  for(const row of rows){
+  if(row.wbs==='01.05'){
+   row.stationsM=optics.map(part=>part.centroidM);row.stationShares=optics.map(part=>part.massKg/row.kg);row.centroidM=mean(row.stationsM,row.stationShares);continue;
+  }
+  if(row.installationPartId){
+   const pieces=installation.filter(part=>part.partId===row.installationPartId);
+   row.stationsM=pieces.map(part=>part.centroidM);row.stationShares=pieces.map(part=>part.massKg/row.kg);row.centroidM=mean(row.stationsM,row.stationShares);row.movingStationCount=pieces.filter(part=>part.moving).length;continue;
+  }
+  if(electrical[row.wbs]){Object.assign(row,electrical[row.wbs]);continue;}
   if(h.payloadLocation==='radiator'&&['03.02','07.03'].includes(row.wbs)){
    const g=deploymentLayout(h),desc=g.descriptors.find(d=>d.type==='rad'),pose=leafPose(g,desc,deploy,h.input.solarTiltDeg,attitude),axes=leafAxes(pose),q=h.energySystem.thermal.passive||{};
    const localKg=Math.min(row.kg,row.wbs==='07.03'?(h.payloadShieldKg||0):(q.spreaderKg||0)+(q.heatPipeKg||0)+(q.mountKg||0));
@@ -129,7 +158,7 @@ function partsAt(h,deploy,attitude){
 const memo=new WeakMap();
 export function componentMassProperties(h,remainingKg=h.propellantKg,deployedFraction=1,adapterAttached=false,cache=true,attitude=null){
  const p=h.propulsion,loaded=p.fuelKg+p.oxidizerKg,liquid=Math.min(loaded,Math.max(0,remainingKg??loaded));
- const frac=Math.max(0,Math.min(1,deployedFraction)),poses=memo.get(h)??{};
+ const frac=Math.max(0,Math.min(1,deployedFraction)),revision=h.electricalMassRevision||0,saved=memo.get(h),poses=saved?.massRevision===revision?saved:{massRevision:revision};
  let base=cache&&!attitude&&poses[frac];
  if(!base){base=partsAt(h,frac,attitude);if(cache&&!attitude&&(frac===0||frac===1)){poses[frac]=base;memo.set(h,poses)}}
  const gas=heliumDistribution(p,liquid),dryGrowth=h.input.structureMargin??0;
@@ -153,7 +182,7 @@ export function componentCentroid(h,remainingKg,deploy=1,adapterAttached=false,a
  // Fixed-mixture liquids and regulated ullage masses vary linearly with remaining
  // stock. Interpolate first moments, then divide by the instantaneous total mass.
  if(attitude||deploy!==0&&deploy!==1)return componentMassProperties(h,remainingKg,deploy,adapterAttached,false,attitude).cm;
- let poses=momentCache.get(h);if(!poses){poses={};momentCache.set(h,poses)}
+ const revision=h.electricalMassRevision||0;let poses=momentCache.get(h);if(!poses||poses.massRevision!==revision){poses={massRevision:revision};momentCache.set(h,poses)}
  const key=deploy+'/'+adapterAttached;
  const ends=poses[key]??=( [componentMassProperties(h,0,deploy,adapterAttached),componentMassProperties(h,h.propellantKg,deploy,adapterAttached)] );
  const f=Math.min(1,Math.max(0,remainingKg/h.propellantKg)),mass=ends[0].massKg*(1-f)+ends[1].massKg*f;

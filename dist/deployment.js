@@ -1,5 +1,7 @@
 // Body +Z is launch-up. All coordinates are metres; pivots stay on the structure.
 import {architectureFamily} from './architecture-families.js';
+import {protectedFluidAllocation} from './protected-fluid-allocation.js';
+import {familyAppendageDimensions as appendageDimensions} from './family-appendage-dimensions.js';
 const clamp=v=>Math.min(1,Math.max(0,v));
 const ramp=(u,a,b)=>{const t=clamp((u-a)/(b-a));return t*t*(3-2*t);};
 const D=Math.PI/180;
@@ -70,12 +72,12 @@ export function deploymentLayout(h){
  if(cache.has(h))return cache.get(h);
  const family=architectureFamily(h);
  if(family.geometryKind!=='protected-core'){const g=familyDeploymentLayout(h,family);cache.set(h,g);return g;}
- const w=h.bodyWidthM,bh=h.bodyHeightM,l=h.bodyLengthM,ww=h.wingWidthM,wl=h.wingLengthM,rw=h.radiatorWidthM,panelCount=Math.max(2,Math.min(8,2*Math.round((h.radiatorPanelsPerBank??h.input?.radiatorPanelsPerBank??2)/2))),r=h.radiatorLengthM/panelCount+.14;
+ const w=h.bodyWidthM,bh=h.bodyHeightM,l=h.bodyLengthM,ww=h.wingWidthM,wl=h.wingLengthM,rw=h.radiatorWidthM,panelCount=Math.max(2,Math.min(8,2*Math.round((h.radiatorPanelsPerBank??h.input?.radiatorPanelsPerBank??2)/2))),r=h.radiatorLengthM/panelCount+(family.id==='heatlift-study'?.26:.14);
  const coreRadiusM=.125,blanketGaugeM=.002,packedRollM=Math.sqrt(coreRadiusM**2+blanketGaugeM*wl/Math.PI);
  // Hardware attaches to the four long faces. Z measures station along the launch spine.
- const radRoot=l/2-r-.16,rootY=bh/2+.24,hingeStand=panelCount>2?.060:.082;
+ const radRoot=l/2-r-.16,fluidStandOffReserveM=family.id==='heatlift-study'?Math.max(1.30,.25*panelCount-.105)-protectedFluidAllocation.rootStandOffM:0,rootY=bh/2+protectedFluidAllocation.rootStandOffM+fluidStandOffReserveM,hingeStand=family.id==='heatlift-study'?.125:panelCount>2?.070:.082;
  const rootX=w/2+packedRollM+.12,mountZ=ww/2+.145+.54*packedRollM,center=0;
- const mounts=[],g={familyId:family.id,architectureFamilyId:family.id,panelCount,w,bh,l,ww,wl,rw,r,rootX,mountZ,center,radRoot,rootY,hingeStand,packedRollM,coreRadiusM,blanketGaugeM,mounts,descriptors:[]};
+ const mounts=[],g={familyId:family.id,architectureFamilyId:family.id,panelCount,w,bh,l,ww,wl,rw,r,rootX,mountZ,center,radRoot,rootY,hingeStand,fluidStandOffReserveM,packedRollM,coreRadiusM,blanketGaugeM,mounts,descriptors:[]};
  const support=(foot,seat,role)=>({foot,seat,role});
  for(const side of [-1,1])for(const end of [-1,1]){
   const z=center+end*mountZ,x=side*rootX,root=[x,0,z],footX=side*w/2;
@@ -96,7 +98,7 @@ export function deploymentLayout(h){
   mounts.push({id:'bank '+end,kind:'radiator',face:(side>0?'+':'−')+'Y',side,end,root,supports,stowedCenter:[0,ry+side*(panelCount-2)*hingeStand,radRoot+r/2]});
  }
  for(const side of [-1,1])for(const end of [-1,1])g.descriptors.push({type:'pv',side,end,j:0,width:wl,depth:ww,thickness:.006,normalOffset:0});
- for(const end of [-1,1])for(let j=0;j<panelCount;j++)g.descriptors.push({type:'rad',end,j,width:rw,depth:r-.14,thickness:.07,normalOffset:0});
+ for(const end of [-1,1])for(let j=0;j<panelCount;j++)g.descriptors.push({type:'rad',end,j,width:rw,depth:h.radiatorLengthM/panelCount,thickness:.07,normalOffset:0});
  cache.set(h,g);return g;
 }
 function wingPose(g,side,end,s,t,attitude){
@@ -159,12 +161,19 @@ export function leafCorners(p,d){const [a,,b]=leafAxes(p),width=p.width??d.width
 const addV=(a,b,k=1)=>a.map((x,i)=>x+k*b[i]);
 const rotY=(a,t)=>[a[0]*Math.cos(t)+a[2]*Math.sin(t),a[1],-a[0]*Math.sin(t)+a[2]*Math.cos(t)];
 const rotZ=(a,t)=>[a[0]*Math.cos(t)-a[1]*Math.sin(t),a[0]*Math.sin(t)+a[1]*Math.cos(t),a[2]];
-function axesAt(yaw,roll,pitch){return [[1,0,0],[0,Math.cos(pitch),Math.sin(pitch)],[0,-Math.sin(pitch),Math.cos(pitch)]].map(a=>rotY(rotZ(a,roll),yaw));}
+// Trim is about the bank span axis, carried by the root pitch. Apply the
+// local roll before pitch; otherwise a large trim incorrectly reverses the
+// span direction and swings the deployed bank back through the service bus.
+function axesAt(yaw,roll,pitch){return leafAxes({pitch,roll}).map(a=>rotY(a,yaw));}
 function familyDeploymentLayout(h,f){
  const d=h.input||h,w=h.bodyWidthM,bh=h.bodyHeightM,l=h.bodyLengthM,ww=h.wingWidthM,wl=h.wingLengthM,rw=h.radiatorWidthM;
- const panelCount=f.radiatorBankCount===1?1:Math.max(2,Math.min(8,2*Math.round((h.radiatorPanelsPerBank??d.radiatorPanelsPerBank??2)/2))),depth=h.radiatorLengthM/panelCount,hingeStand=.045,r=depth+(panelCount>1?.04:0);
+ const panelCount=f.radiatorBankCount===1?1:Math.max(2,Math.min(8,2*Math.round((h.radiatorPanelsPerBank??d.radiatorPanelsPerBank??2)/2))),depth=h.radiatorLengthM/panelCount,hingeStand=f.radiatorTracking==='root-cant'?.125:.045,fluidStandOffReserveM=f.radiatorTracking==='root-cant'?Math.max(1.30,.25*panelCount-.105)-.09*(panelCount+1):0,r=depth+(panelCount>1?(f.radiatorTracking==='root-cant'?.26:.04):0);
  const coreRadiusM=.125,blanketGaugeM=.002,packedRollM=Math.sqrt(coreRadiusM**2+blanketGaugeM*wl/Math.PI),rootX=w/2+(h.solarRootOffsetM??(f.id==='starcloud-inline'?.20:packedRollM+.12));
- const g={custom:true,familyId:f.id,architectureFamilyId:f.id,family:f,panelCount,w,bh,l,ww,wl,rw,r,rootX,solarTipGapM:h.solarTipGapM??(packedRollM+.12),mountZ:0,center:0,radRoot:-r/2,rootY:bh/2+.20,hingeStand,packedRollM,coreRadiusM,blanketGaugeM,mounts:[],descriptors:[],wings:[],banks:[]};
+ // The neighboring folded leaf's root cap is farther out than the last leaf
+ // tip. Maximize its A*cos(fold)+B*sin(fold) projection over the full fold;
+ // the nearest opposing leaf controls all earlier equal-pitch leaves.
+ const foldedTipReachM=Math.hypot(r+appendageDimensions.radiatorTipCapHalfM,hingeStand+(appendageDimensions.radiatorThicknessM+appendageDimensions.radiatorFrameThicknessAdditionM)/2)-depth,collectorGapM=packedRollM+appendageDimensions.solarReelDiscRadialOverhangM+2*appendageDimensions.carriedCollectorClearanceM+appendageDimensions.carriedCollectorAxialCaseM+foldedTipReachM;
+ const g={custom:true,familyId:f.id,architectureFamilyId:f.id,family:f,panelCount,w,bh,l,ww,wl,rw,r,rootX,solarTipGapM:f.id==='starcloud-inline'?Math.max(h.solarTipGapM??0,collectorGapM):(h.solarTipGapM??(packedRollM+.12)),foldedTipReachM,mountZ:0,center:0,radRoot:-r/2,rootY:bh/2+(f.id==='redwire-platform'?.20:.09*(panelCount+1))+fluidStandOffReserveM,fluidStandOffReserveM,hingeStand,packedRollM,coreRadiusM,blanketGaugeM,mounts:[],descriptors:[],wings:[],banks:[]};
  const bank=(end,root,kind)=>({id:`radiator-bank-${g.banks.length}`,end,side:-end,root,kind,count:panelCount,width:rw,depth,panelPitch:r,stackSign:kind==='inline'?-1:kind==='cross'?end:-end});
  if(f.id==='redwire-platform')g.banks.push(bank(-1,[0,bh/2+.20,l/2+.15],'platform'));
  else if(f.id==='starcloud-inline')for(const side of [-1,1])g.banks.push(bank(-side,[side*rootX,0,-r/2],'inline'));
@@ -182,7 +191,7 @@ function familyDeploymentLayout(h,f){
   const stowedCenter=p.panelRoots.reduce((sum,point,j)=>addV(sum,addV(point,p.panelAxes[j][2],b.depth/2),1/b.count),[0,0,0]);
   const releaseAt=b.kind==='platform'?.025:b.kind==='inline'?(b.end<0?.025:.33):b.kind==='cross'?(b.end<0?.025:.31):(b.end<0?.46:.69);
   g.mounts.push({id:b.id,kind:'radiator',face:(b.kind==='platform'||b.side>0?'+':'−')+supportAxis.toUpperCase(),side:b.side,end:b.end,root:b.root,supports,stowedCenter,releaseAt,attachment:'service-bus',evidence:'Allocated paired hinge bearings and distal release supports.'});
-  for(let j=0;j<panelCount;j++)g.descriptors.push({id:`radiator-${g.banks.indexOf(b)}-${j}`,type:'rad',bankId:b.id,end:b.end,j,width:rw,depth,thickness:.07,normalOffset:b.stackSign*hingeStand,areaM2:rw*depth,emittingFaces:2});
+  for(let j=0;j<panelCount;j++)g.descriptors.push({id:`radiator-${g.banks.indexOf(b)}-${j}`,type:'rad',bankId:b.id,end:b.end,j,width:rw,depth,thickness:appendageDimensions.radiatorThicknessM,normalOffset:b.stackSign*hingeStand,areaM2:rw*depth,emittingFaces:2});
  }
  for(const side of [-1,1]){
   const root=f.id==='redwire-platform'?[side*rootX,0,0]:[side*rootX,0,0];
@@ -213,7 +222,7 @@ function familyBankPose(g,b,s,attitude){
   if(Number.isFinite(commanded))a=commanded*D;
   const trim=b.end<0?attitude?.upperRadiatorRollDeg:attitude?.lowerRadiatorRollDeg;if(Number.isFinite(trim))roll+=trim*D;
  }
- const root=b.root,panelPitches=Array.from({length:b.count},(_,j)=>a+(j%2?b.stackSign*Math.PI*(1-T):0)),panelAxes=panelPitches.map(p=>axesAt(yaw,roll,p)),panelRoots=[root];
+ const root=b.root,panelPitches=Array.from({length:b.count},(_,j)=>a+(j%2?b.stackSign*Math.PI*(1-T):0)),rootAxes=axesAt(yaw,roll,a),panelAxes=panelPitches.map(p=>{const c=Math.cos(p-a),sn=Math.sin(p-a);return [rootAxes[0],rootAxes[1].map((v,i)=>v*c+rootAxes[2][i]*sn),rootAxes[2].map((v,i)=>v*c-rootAxes[1][i]*sn)];}),panelRoots=[root];
  for(let j=1;j<b.count;j++){
   let next=addV(panelRoots[j-1],panelAxes[j-1][2],b.panelPitch);
   if(j%2===0)next=addV(next,panelAxes[j-1][1],4*b.stackSign*g.hingeStand);

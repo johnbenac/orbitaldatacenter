@@ -2,7 +2,9 @@
 
 Orbital Data Center is a static Three.js engineering workbench. The spacecraft, subsystem diagrams, event playback and exported results use one client-side numerical model. The distribution includes the renderer, its assets and the mission-integration worker.
 
-The current engineering basis is **workbench/model 22.0**, **design rules ODC-MB-001 Rev B**, and **r2 reference architecture families**, with the **ODC-01 Rev I** installation retained for legacy studies. The review target is preliminary design near the end of Phase B. Configurable missions evaluate an installed spacecraft; the workbench does not require every selectable mission to close.
+The current engineering basis is **workbench/model 22.0**, **design rules ODC-MB-001 Rev B**, and **r2 reference architecture families**, with the **ODC-01 Rev I** installation retained for legacy studies. This is a living preliminary design near the end-of-Phase-B level of detail; visitors are reviewers, and there is no formal PDR closure to achieve. Configurable missions evaluate an installed spacecraft; the workbench does not require every selectable mission to close.
+
+**Harnessing follows the Redwire trial: steps 1–3 only.** The [Redwire result](docs/harnessing-work/redwire-pdr-routing.md) records the installed-route inspection, platform inspection controls, selected-pose movement checks and individual harness mass accounting. Its master equipment list includes every complete harness, and the calculated cable/termination mass enters the vehicle totals once. See the [active scope](docs/harnessing-pdr-scope.md) and revised [Harnessing Plan](https://chatgpt.com/library?file_id=libfile_fde3_f-0f515944425c8191b5830d023851c0b1_0cb434008e808191ac4277e8c6f9d899&account_id=personal). The public preliminary review continues; other concepts remain queued until requested. Completed installation repairs remain; the detailed H12 material-proof campaign stays deferred.
 
 To run the checkout locally, start a static server from the project directory and open http://localhost:8000.
 

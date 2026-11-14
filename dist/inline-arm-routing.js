@@ -1,0 +1,59 @@
+import * as T from './vendor/three.module.js';
+import {deploymentLayout} from './deployment.js';
+import {connectionAnchor,normalInFrame,anchorInFrame} from './connection-geometry.js';
+import {roundedConnectionRoute,routeLength} from './connection-routes.js';
+import {hollowFluidFitting,routingMotionFor} from './flight-fluid-routing.js';
+import {accordionFlexAllocation,planarAccordionFlex} from './accordion-flex-routing.js';
+import {roleMaterial,tagMaterial} from './spacecraft-material-render.js';
+import {routingMatrix} from './routing-audit.js';
+
+// Paired source circuits keep their positive and return conductors adjacent.
+// Every physical conductor has an independent lane at every folded hinge. Their finite diameters and 15D bend allocations
+// determine the service-tray width; the coolant manifold is outside that tray.
+export const inlinePhysicalConductorCount=h=>h.energySystem.electrical.mppt.perWing*(h.energySystem.electrical.source.estimatedColdVocV>300?2:1);
+export function inlineArmServiceAllocation(h,{circuitCount=inlinePhysicalConductorCount(h),radiusM=null,bendRadiusM=null}={}){
+ const electrical=h.energySystem.electrical,diameter=radiusM?radiusM*2:electrical.source.estimatedColdVocV>300?(electrical.mppt.jointCircuitRatingA<=25.11?.0062:.0135):.0135,R=bendRadiusM??Math.max(.035,15*diameter),lanes=Math.ceil(circuitCount/2),hingeGroups=Math.max(1,h.radiatorPanelsPerBank-1),pitch=Math.max(.026,diameter+.012),railFirstM=.12,railLastM=railFirstM+(lanes*hingeGroups-1)*pitch,flex=accordionFlexAllocation({bendRadiusM:R}),fluidSpineOffsetM=Math.max(1.10,railLastM+.17);
+ return {circuitCount,lanes,hingeGroups,pitchM:pitch,radiusM:diameter/2,bendRadiusM:R,railFirstM,portOffsetM:railLastM,inletSetbackM:flex.movingSetbackM,outletSetbackM:flex.exitSetbackM,fluidSpineOffsetM,fluidPortOffsetM:fluidSpineOffsetM+.22,fluidInletSetbackM:.72,fluidOutletSetbackM:1.16};
+}
+const V=p=>new T.Vector3(...p);
+const transform=(points,frame,root)=>{const m=routingMatrix(frame,root);return points.map(p=>V(p).applyMatrix4(m).toArray());};
+
+// This covers the articulated arm only. The installation owns the actual
+// body→root rotary interface and final leaf→solar stator connections. No wire
+// is stretched directly from the body to the distant deployed source.
+export function createInlineArmServiceChain({factory,h,bankEnd,index,circuitCount=inlinePhysicalConductorCount(h),radiusM,bendRadiusM,id,material=null,installSupports=true}={}){
+ const g=deploymentLayout(h);if(g.familyId!=='starcloud-inline')throw Error('Inline arm service chain requires the paired inline architecture');if(!Number.isInteger(index)||index<0||index>=circuitCount)throw Error('Invalid inline circuit lane '+index);
+ const allocation=inlineArmServiceAllocation(h,{circuitCount,radiusM,bendRadiusM}),side=Math.floor(index/2)%2?1:-1,lane=Math.floor(index/4)*2+index%2,descriptors=g.descriptors.filter(d=>d.type==='rad'&&d.end===bankEnd).sort((a,b)=>a.j-b.j),root=factory.root,parts=[],sections=[],ports=[],flexes=[],mat=material||roleMaterial(h,'harness');if(!descriptors.length)throw Error('Unknown inline arm '+bankEnd);
+ const station=(desc,group)=>side*(desc.width/2+allocation.railFirstM+(group*allocation.lanes+lane)*allocation.pitchM);
+ for(const desc of descriptors){
+  const frame=factory.radiatorMeshes.get(desc);if(!frame)throw Error('Missing installed radiator frame '+desc.id);
+  const inletGroup=Math.max(0,desc.j-1),outletGroup=Math.min(allocation.hingeGroups-1,desc.j),startZ=-desc.depth/2+allocation.inletSetbackM,endZ=desc.depth/2-allocation.outletSetbackM,x0=station(desc,inletGroup),x1=station(desc,outletGroup);
+  if(endZ-startZ<.44)throw Error('Inline service tray cannot fit its declared bend leads in '+desc.id);
+  const entry=connectionAnchor(frame,[x0,0,startZ],[0,0,-1],id+' leaf '+desc.j+' entry clamp'),exit=connectionAnchor(frame,[x1,0,endZ],[0,0,1],id+' leaf '+desc.j+' exit clamp'),controls=Math.abs(x0-x1)<1e-9?[[x0,0,startZ],[x1,0,endZ]]:[[x0,0,startZ],[x0,0,startZ+.20],[x1,0,endZ-.20],[x1,0,endZ]],shape=roundedConnectionRoute(controls,bendRadiusM);
+  if(shape.bendLimited)throw Error('Inline rigid service section is bend limited: '+id+'/'+desc.j);
+  for(const anchor of [entry,exit]){anchor.userData={part:'harness',routingSupportCircuit:id,routingOwnerId:anchor.uuid};if(installSupports)parts.push(hollowFluidFitting(anchor,{outerRadiusM:radiusM+.006,boreRadiusM:radiusM+.004,lengthM:.018,material:mat,part:'harness',name:anchor.name+' open strain relief'}));}
+  if(installSupports)for(const t of [.20,.80]){const rail=x0+(x1-x0)*t,z=startZ+(endZ-startZ)*t,anchor=connectionAnchor(frame,[rail,0,z],[0,0,1],id+' supported edge tray clamp');if(Math.abs(x0-x1)>1e-8)continue;parts.push(hollowFluidFitting(anchor,{outerRadiusM:radiusM+.006,boreRadiusM:radiusM+.004,lengthM:.020,material:mat,part:'harness',name:anchor.name}));const width=Math.abs(rail)-desc.width/2-.010,stem=tagMaterial(new T.Mesh(new T.BoxGeometry(width,.008,.020),mat));stem.position.set(side*(desc.width/2+.010+width/2),-radiusM-.010,z);stem.userData={...stem.userData,part:'harness',routingSupportCircuit:id};stem.name=id+' edge clamp support';frame.add(stem);parts.push(stem);}
+  ports.push({entry,exit,frame,descriptor:desc});sections.push({id:id+':leaf-'+desc.j,kind:'rigid',frame,points:shape.points,lengthM:shape.lengthM,minimumBendRadiusM:shape.minimumBendRadiusM,motionModel:{...routingMotionFor(frame),bankTransverseRangeM:[Math.min(x0,x1),Math.max(x0,x1)]}});if(desc.j)flexes.push(accordionFlexAllocation({bendRadiusM,hingeIndex:desc.j,normalOffsetM:desc.normalOffset,pitchGapM:g.r-desc.depth,cradleM:-4*g.hingeStand}));
+ }
+ root.updateWorldMatrix(true,true);const restLengthM=sections.reduce((s,r)=>s+r.lengthM,0)+flexes.reduce((s,r)=>s+r.restLengthM,0),bank=g.banks.find(b=>b.end===bankEnd),coordinateBoundM=Math.hypot(...bank.root)+g.panelCount*(g.r+4*g.hingeStand)+g.rw/2+allocation.portOffsetM+Math.max(...flexes.map(f=>f.restLengthM),0)+.01,bufferDeviationM=Math.sqrt(3)*2**(Math.floor(Math.log2(coordinateBoundM))-24)+1e-7;
+ function sample(){
+  root.updateWorldMatrix(true,true);const points=[],motionSpans=[],records=[];let lengthM=0,minimum=Infinity,renderedLengthErrorM=0;
+  function append(section,partPoints,model){const bankMatrix=routingMatrix(ports[0].frame,root),bodyAxis=new T.Vector3(1,0,0).transformDirection(bankMatrix),bodyOrigin=new T.Vector3().applyMatrix4(bankMatrix),axis=bodyAxis.clone().transformDirection(root.matrixWorld),origin=bodyOrigin.clone().applyMatrix4(root.matrixWorld),range=model.bankTransverseRangeM;model={...model,transverseFrameId:ports[0].frame.uuid,transverseAxisBody:bodyAxis.toArray(),transverseOriginBody:bodyOrigin.toArray(),transverseAxisWorld:axis.toArray(),transverseOriginWorld:origin.toArray(),...(range&&Math.abs(range[1]-range[0])<1e-10?{planeAxisBody:bodyAxis.toArray(),planeOffsetBodyM:bodyOrigin.dot(bodyAxis)+range[0],planeAxis:axis.toArray(),planeOffsetM:origin.dot(axis)+range[0],planeRangeToleranceM:2e-6}:{})};const length=routeLength(partPoints),pointOffset=Math.max(0,points.length-1);records.push({...section,pointOffset,points:partPoints,motionModel:model});motionSpans.push({...model,startM:lengthM,endM:lengthM+length,sectionId:section.id});points.push(...(points.length?partPoints.slice(1):partPoints));lengthM+=length;minimum=Math.min(minimum,section.minimumBendRadiusM);}
+  sections.forEach((section,i)=>{
+   append(section,transform(section.points,section.frame,root),section.motionModel);
+   if(i===sections.length-1)return;const from=ports[i].exit,to=ports[i+1].entry,a=anchorInFrame(from,root).toArray(),b=anchorInFrame(to,root).toArray(),spec=flexes[i],fromTangent=normalInFrame(from,root).toArray(),toTangent=normalInFrame(to,root).negate().toArray(),matrix=routingMatrix(ports[i].frame,root),up=new T.Vector3(0,spec.upSign,0).transformDirection(matrix).toArray(),shape=planarAccordionFlex(a,b,{...spec,fromTangent,toTangent,up});
+   if(!shape.ok)throw Error('Inline articulated service section '+id+'/'+i+': '+shape.reason);
+   renderedLengthErrorM+=shape.renderedLengthErrorM;const sourceRadiusM=ports[i].exit.position.length(),model={kind:'planar-accordion',frameId:null,fromFrameId:routingMotionFor(from).frameId,toFrameId:routingMotionFor(to).frameId,bankEnd,leafIndex:i+1,restLengthM:spec.restLengthM,bendRadiusM:spec.bendRadiusM,sourceRadiusM,localMotionCoefficientM:spec.localMotionCoefficientM,minimumCenterDistanceM:spec.minimumCenterDistanceM,headingMarginM:spec.headingMarginM,bankTransverseRangeM:[from.position.x,from.position.x]};
+   append({id:id+':hinge-'+i,kind:'flex',minimumBendRadiusM:shape.minimumBendRadiusM,lengthM:shape.lengthM,developedLengthM:shape.developedLengthM,renderedLengthErrorM:shape.renderedLengthErrorM,selfWindows:shape.selfWindows,maximumSagittaM:shape.maximumSagittaM},shape.points,model);
+  });
+  const prefix=[0];for(let i=1;i<points.length;i++)prefix.push(prefix.at(-1)+V(points[i]).distanceTo(V(points[i-1])));
+  for(const record of records)for(const window of record.selfWindows||[]){let lo=record.pointOffset+window.startIndex,hi=record.pointOffset+window.endIndex;
+   if(window.startIndex===0){const direction=V(points[lo+1]).sub(V(points[lo])).normalize();while(lo>0&&V(points[lo]).sub(V(points[lo-1])).normalize().dot(direction)>1-1e-10)lo--;}
+   if(window.endIndex===record.points.length-1){const direction=V(points[hi]).sub(V(points[hi-1])).normalize();while(hi+1<points.length&&V(points[hi+1]).sub(V(points[hi])).normalize().dot(direction)>1-1e-10)hi++;}
+   const nominal=points.slice(lo,hi+1);if(nominal.length>80)throw Error('Accordion proof window exceeds the allocated constructed-vertex bound');const deviation=bufferDeviationM,sampleCount=3072,minimumSplitStepM=(restLengthM-renderedLengthErrorM)/(2*sampleCount),maximumArclengthErrorM=6*80*deviation+4*sampleCount*deviation**2/(minimumSplitStepM-2*deviation);
+   motionSpans.push({...record.motionModel,id:record.id+':'+window.id,sectionId:record.id+':'+window.id,proofOnly:true,startM:prefix[lo],endM:prefix[hi],nominalPointsBody:nominal.map(p=>[...p]),nominalPoints:nominal.map(p=>root.localToWorld(V(p)).toArray()),convexSelfProof:{kind:'bounded-turn',minimumBendRadiusM:record.minimumBendRadiusM,maximumTurnRad:Math.PI,maximumChordDeviationM:record.maximumSagittaM,maximumBufferDeviationM:deviation,maximumArclengthErrorM,radiusLowerBoundA:radiusM-1e-9,radiusUpperBoundA:radiusM+3*deviation+2e-6,basis:'Two consecutive circular subarcs plus tangent straights have at most pi absolute turn over the complete0..pi fold. Each rectangle arc is pi/2; each LSR arc is at most3*pi/2 and splits into four stable parts. The window has at most80 original vertices. Float32 coordinate error is bounded by half an ULP in each coordinate using the complete bank-root/hinge-span/transverse-lane/reservoir radius envelope. Greedy longest-segment resampling into3072 pieces gives every subdivided edge length at least totalLength/(2*3072); un-subdivided short edges use the direct six-epsilon bound. Summed endpoint projection and transverse rounding errors bound arclength distortion independently from the centreline envelope. Adjacent rigid straight stubs are included; actual nominal/buffer correspondence is checked.'}});
+  }
+  return {id,points,motionSpans,sections:records,minimumBendRadiusM:minimum,restLengthM,lengthM,renderedLengthErrorM,lengthToleranceM:renderedLengthErrorM+3e-5,from:ports[0].entry,to:ports.at(-1).exit};
+ }
+ return {id,bankEnd,index,side,lane,allocation,entry:ports[0].entry,exit:ports.at(-1).exit,ports,parts,sections,flexes,restLengthM,sample,basis:'Independent transverse stations for each circuit and each folded hinge. Rigid edge lanes join exact circular180degree service loops whose opposite-side slack reservoir conserves developed length; actual-buffer clearance and continuous-motion gates remain required.'};
+}

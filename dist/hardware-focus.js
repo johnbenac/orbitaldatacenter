@@ -32,7 +32,7 @@ export function focusHardware(root){
  const carrier=new T.MeshBasicMaterial({color:0x8197a1,transparent:true,opacity:.28,depthWrite:false,side:T.FrontSide,toneMapped:false});
  const ghost=new T.MeshBasicMaterial({color:0x92a6b4,transparent:true,opacity:.13,depthWrite:false,side:T.FrontSide,toneMapped:false});
  for(const material of [ghost,ghostLine,carrier]){material.userData.shared=true;material.userData.domainGhost=true;}
- root.traverse(o=>{if((o.isLine||o.isMesh)&&o.material&&!Array.isArray(o.material))items.push({o,original:o.material,part:hardwarePart(o)});});
+ root.traverse(o=>{if((o.isLine||o.isMesh)&&o.material&&!Array.isArray(o.material)&&!o.userData.sceneFlow&&!o.userData.electricalRaw)items.push({o,original:o.material,part:hardwarePart(o)});});
  let last='';
  function clear(){if(!last)return;for(const {o,original}of items){o.material=original;if(o.userData.missionPatch)o.visible=true;}last='';}
  return {apply(domain,selected='',exposeCargo=false){
@@ -58,6 +58,12 @@ export function focusHardware(root){
 }
 const materials={text:0x91d7cb,bulk:0xd7ad75,write:0x83d3c3,down:0x99bff2};
 export function dataRoutes(craft,h){
+ if(craft.electrical){
+  const electrical=craft.electrical,root=electrical.activity;root.name='Modeled electrical interface activity';
+  return {root,routes:[...electrical.harnesses.values()],update(s,visible,kind='data',options={}){
+   root.visible=visible;return electrical.update(s,{enabled:visible,focus:kind,mode:options.mode||'operational',time:options.time??s.t,reducedMotion:!!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches});
+  },destroy(){electrical.update({}, {enabled:false});root.visible=false;}};
+ }
  const root=new T.Group();root.name='Modeled data routes';const routes=[],w=h.bodyWidthM,b=h.bodyHeightM,l=h.bodyLengthM;
  const P=(x,y,z)=>V(x*w,y*b*craft.internal.scale.y+craft.internal.position.y,z*l);
  const inBus=o=>craft.root.worldToLocal(o.getWorldPosition(V()));
@@ -104,7 +110,7 @@ export function hardwareAnchor(id,c,h,s){
  const centre=o=>o?.getWorldPosition(V())||null,patch=c.apertures.patches?.[s.stationDirectionBody?.[0]>=0?1:0];
  switch(id){
  case 'compute':{const p=h.rackLayout.slots.at(-1);if(h.payloadLocation==='radiator'){const g=deploymentLayout(h),d=g.descriptors.find(d=>d.type==='rad'),pose=leafPose(g,d,s.deployment??1,h.input.solarTiltDeg,s),a=leafAxes(pose);return c.root.localToWorld(V(...[pose.x,pose.y,pose.z].map((v,k)=>v+a[0][k]*p.x+a[1][k]*(p.y+.06)+a[2][k]*p.z)));}return c.root.localToWorld(V(p.x,p.y,p.z));}
- case 'storage':return centre(c.recorder);case 'avionics':return centre(c.avionics);
+ case 'storage':return centre(c.recorder);case 'avionics':return centre(c.avionics);case 'fabric':return centre(c.electrical?.boxes.get('fabric-1')||c.fabric);case 'power':case 'pcdu':return centre(c.pcdu);case 'harness':return centre(c.electrical?.ports.get('C-EGSE:to')?.frame||c.pcdu);
  case 'dish':return centre(c.apertures.Ka);case 'optic':return centre(c.apertures.Optical);case 'patch':return centre(patch);
  case 'activeTerminal':{
   const t=s.terminalActivity?.find(a=>a.direction==='tx'&&a.services.payload>0)?.terminal||s.groundLink;

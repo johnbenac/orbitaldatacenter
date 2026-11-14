@@ -2,13 +2,15 @@
 // Distances are metres, mass kg, vessel volume L. Pressures below are absolute.
 import {componentMassProperties,heliumDistribution,componentCentroid} from './component-stations.js';
 import {terminalStations,deploymentLayout,leafPose,leafAxes} from './deployment.js';
+import {architectureFamily} from './architecture-families.js';
+import {protectedStorageAccommodation} from './protected-equipment-allocation.js';
 const gasR=2077.1,temperatureK=293.15,bottlePa=30e6,feedPa=1.65e6,endPa=2e6;
 const radius=litres=>Math.cbrt(.001*litres*3/(4*Math.PI));
 const gap=.06,coneDeg=30,installationDeg=1,rad=Math.PI/180;
 
 export const propulsionSources=[
  ['ESA · ATV service module','https://www.esa.int/content/view/full/194403','Flight reference for separate internal titanium propellant tanks, high-pressure helium and multiple pressure-fed reboost engines. ATV used eight liquid tanks, two helium bottles and four main engines.'],
- ['NASA · Apollo service propulsion system','https://ntrs.nasa.gov/api/citations/19740005081/downloads/19740005081.pdf','Flight system schematic and documented helium isolation, pressure regulation, separate propellant circuits, check valves and engine metering. Aerozine-50/NTO chemistry precedent.'],
+ ['NASA · Apollo service propulsion system','https://www.nasa.gov/history/60-years-ago-first-test-firing-of-the-apollo-service-propulsion-system/','AJ10-137 development and flight history, with the Aerozine-50/NTO chemistry precedent. The study feed-system arrangement is separately allocated.'],
  ['ArianeGroup · S400-15','https://www.space-propulsion.com/spacecraft-propulsion/apogee-motors/','MMH/MON apogee engine. Manufacturer lists 425 N nominal, 340–440 N range, 321 s nominal, 4.30 kg including valve and a 292 mm nozzle exit.'],
  ['ESA · ATV-3 flight facts','https://wsn.spaceflight.esa.int/docs/Factsheets/23%20ATV-3%20EA%20HR%20web.pdf','ATV-3 helium storage at 31 MPa anchors the 30 MPa screening assumption.'],
 ];
@@ -51,6 +53,14 @@ export function installPropulsion(p,d,g,ledger){
  const {ka,optical}=terminalStations(w,l,d);
  p.stations={'07.01':g.enclosure.framePositions,'01.01':racks,'01.02':racks,compute:[0,0,z(0)],host:[0,0,z(0)],switch:[-.313*w,h*.05,z(-.401)],storage:[.10*w,-h*.025,z(-.407)],'02.02':[0,1,2,3].map(i=>[(i-1.5)*.20*w,-h*.06,z(.408)]),terminals:[0,h*.50,0],'05.01':[[-w*.49,h*.26,l*.30],[w*.49,h*.26,l*.30]],'05.02':[ka[0],h*.50,ka[1]],'05.03':[optical[0],h*.50,optical[1]],coolant:[0,0,z(0)],'04.01':gyros,cmg:[0,0,gyros[0][2]],'06.02':[0,0,aft],hinges:[0,0,0]};
  p.installDims={'04.01':cmgDims,'01.03':[.55*w,.66*h,.137*free],'08.01':[.20*w,.37*h,.13*free]};
+ const family=architectureFamily(d);
+ if(family.id==='protected-core'&&family.kaTerminalCount===1&&family.sPatchCount===2){
+  const allocation=protectedStorageAccommodation(g,d,p);p.storageAccommodation=allocation;
+  // Retain an infeasible requested installation visibly; the assembly/routing
+  // gates reject it instead of hiding a full rack or moving into the tanks.
+  p.stations.storage=[...allocation.positionM];p.installDims['01.03']=[...allocation.envelopeM.size];
+  Object.assign(g.rackLayout,{physicalCapacity:allocation.physicalComputeCapacity,capacity:allocation.availableComputeCapacity,availableCapacity:allocation.availableComputeCapacity,spare:Math.max(0,allocation.availableComputeCapacity-g.rackLayout.installed),reservedStorageBays:[...allocation.reservedBays],reservedStorageSlots:allocation.reservedComputeSlots,storageAccommodation:allocation});
+ }
  const nozzleR=.146*Math.sqrt(d.thrustN/850),length=.38*Math.sqrt(d.thrustN/850),spacing=Math.max(nozzleR*1.35,Math.min(.20*w,.44)),throatZ=-l*.5-.035;
  p.engines=[-1,1].map(sign=>({x:sign*spacing,y:0,z:throatZ-length,exitRadiusM:nozzleR,throatZ}));
  const h0={...g,input:d,propulsion:p,massLedger:ledger,propellantKg:d.propellantKg};

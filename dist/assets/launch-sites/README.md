@@ -147,3 +147,5 @@ asynchronous loading/error handling, and disposal behavior. Imagery previews
 were also inspected for source gaps, offshore seams and visible detail limits.
 
 Acquired and reviewed: 2026-11-07.
+
+Source STAC items and image-processing records are packaged as single-file JSON ZIP archives. Their original JSON bytes and metadata are unchanged.

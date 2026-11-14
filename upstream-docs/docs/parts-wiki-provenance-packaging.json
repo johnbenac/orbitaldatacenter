@@ -1,0 +1,184 @@
+[
+  {
+    "path": "vendor/earth-detail/clouds-provenance.json",
+    "archive": "vendor/earth-detail/clouds-provenance.json.zip",
+    "originalBytes": 47116,
+    "archiveBytes": 15443,
+    "sha256": "fa3432432c4850a5237b6cd993adbd4003fa2b7af661c62b7165dc8c90ac161b"
+  },
+  {
+    "path": "vendor/earth-detail/night-provenance.json",
+    "archive": "vendor/earth-detail/night-provenance.json.zip",
+    "originalBytes": 155044,
+    "archiveBytes": 36789,
+    "sha256": "cff706b056098a0d74f0c812991f117937e43adf1f4b62dedeeb0b85562739dc"
+  },
+  {
+    "path": "vendor/earth-detail/day-provenance.json",
+    "archive": "vendor/earth-detail/day-provenance.json.zip",
+    "originalBytes": 129558,
+    "archiveBytes": 33111,
+    "sha256": "23d6faad7d5bfc25f2d2df9bc41cdf9343158b5ea19981800c1f536a3508beb4"
+  },
+  {
+    "path": "assets/launch-sites/pecan-island-sentinel-item.json",
+    "archive": "assets/launch-sites/pecan-island-sentinel-item.json.zip",
+    "originalBytes": 21274,
+    "archiveBytes": 2616,
+    "sha256": "f9b446ce1abaef368e6f290e9ee929abe468de49d8955e8fbd21d22e9f0b1568"
+  },
+  {
+    "path": "assets/launch-sites/vandenberg-sentinel-item.json",
+    "archive": "assets/launch-sites/vandenberg-sentinel-item.json.zip",
+    "originalBytes": 21157,
+    "archiveBytes": 2586,
+    "sha256": "8b8699bc70482e874a40a9ad09595a23ac54f22de54399c5437392b873dd0d8c"
+  },
+  {
+    "path": "assets/launch-sites/wenchang-sentinel-item.json",
+    "archive": "assets/launch-sites/wenchang-sentinel-item.json.zip",
+    "originalBytes": 21144,
+    "archiveBytes": 2575,
+    "sha256": "0d7b93ffcd717d6791e0532393852643c92db6e63195aec9d87fc731391816b4"
+  },
+  {
+    "path": "assets/launch-sites/starbase-sentinel-item.json",
+    "archive": "assets/launch-sites/starbase-sentinel-item.json.zip",
+    "originalBytes": 21144,
+    "archiveBytes": 2565,
+    "sha256": "321817e8691ec7c044d675f61be329cf85c45563b55b4efec56290554da51906"
+  },
+  {
+    "path": "assets/launch-sites/space-coast-sentinel-item.json",
+    "archive": "assets/launch-sites/space-coast-sentinel-item.json.zip",
+    "originalBytes": 21605,
+    "archiveBytes": 2688,
+    "sha256": "1d3be7abc49f88d1e521c8600fd170df98340920ed8e3f68ba4bb7ed4aaa7521"
+  },
+  {
+    "path": "assets/launch-sites/kourou-sentinel-item.json",
+    "archive": "assets/launch-sites/kourou-sentinel-item.json.zip",
+    "originalBytes": 47332,
+    "archiveBytes": 3545,
+    "sha256": "624f2e7978c6cf9859e310a1696193d1a90ee8f6c228a0d8965b2d2db82bcbb2"
+  },
+  {
+    "path": "assets/launch-sites/vandenberg-record.json",
+    "archive": "assets/launch-sites/vandenberg-record.json.zip",
+    "originalBytes": 8492,
+    "archiveBytes": 2465,
+    "sha256": "8dbe20932eded82b56553dcb6bf8001a19ac0280d5f587d0b0e44d66832b968e"
+  },
+  {
+    "path": "assets/launch-sites/cape-slc37-detail-record.json",
+    "archive": "assets/launch-sites/cape-slc37-detail-record.json.zip",
+    "originalBytes": 2732,
+    "archiveBytes": 941,
+    "sha256": "356eedd76decd9d4b2cf1a1be563d9f95d31041d827e67706ed836f5786418ff"
+  },
+  {
+    "path": "assets/launch-sites/kourou-record.json",
+    "archive": "assets/launch-sites/kourou-record.json.zip",
+    "originalBytes": 9366,
+    "archiveBytes": 2581,
+    "sha256": "a1850337526f44ef928205fd27f57fc1f41a10416a63bd585fe53119e7483d41"
+  },
+  {
+    "path": "assets/launch-sites/pecan-island-detail-record.json",
+    "archive": "assets/launch-sites/pecan-island-detail-record.json.zip",
+    "originalBytes": 2787,
+    "archiveBytes": 940,
+    "sha256": "ecbc86ec413be6d273e30e5d4e509f030fc9384db1c607bbfcb62d56f048ffba"
+  },
+  {
+    "path": "assets/launch-sites/pecan-island-record.json",
+    "archive": "assets/launch-sites/pecan-island-record.json.zip",
+    "originalBytes": 8153,
+    "archiveBytes": 2219,
+    "sha256": "dd7506ff9ff3c5b36b67beecd562e8a8ca417e76d2694367cf7c72ea076332f0"
+  },
+  {
+    "path": "assets/launch-sites/ksc-lc39a-detail-record.json",
+    "archive": "assets/launch-sites/ksc-lc39a-detail-record.json.zip",
+    "originalBytes": 3498,
+    "archiveBytes": 1234,
+    "sha256": "64baa8c8e7bc3162c09b61c97dae36a1497844b9462485f8582ecf748e55dec3"
+  },
+  {
+    "path": "assets/launch-sites/cape-slc41-detail-record.json",
+    "archive": "assets/launch-sites/cape-slc41-detail-record.json.zip",
+    "originalBytes": 2742,
+    "archiveBytes": 942,
+    "sha256": "e4f9102a642d4168ff263dd712adb13cbb6e6a323ef9ebeb7e9343089d264837"
+  },
+  {
+    "path": "assets/launch-sites/wenchang-record.json",
+    "archive": "assets/launch-sites/wenchang-record.json.zip",
+    "originalBytes": 4893,
+    "archiveBytes": 1689,
+    "sha256": "56548511d622ce6481abe32e721eaa01b6a34aa603db071520eecd4646b02bc7"
+  },
+  {
+    "path": "assets/launch-sites/vandenberg-slc3e-detail-record.json",
+    "archive": "assets/launch-sites/vandenberg-slc3e-detail-record.json.zip",
+    "originalBytes": 2899,
+    "archiveBytes": 1069,
+    "sha256": "e34f491e9b460940e0b508fafc615b7018bc0b3b1b0286f763e12123e448a735"
+  },
+  {
+    "path": "assets/launch-sites/vandenberg-slc6-detail-record.json",
+    "archive": "assets/launch-sites/vandenberg-slc6-detail-record.json.zip",
+    "originalBytes": 2950,
+    "archiveBytes": 1074,
+    "sha256": "7204108a68a0f77a859789251ced6136792f35201e419daf6c294582cbf40e82"
+  },
+  {
+    "path": "assets/launch-sites/kourou-detail-record.json",
+    "archive": "assets/launch-sites/kourou-detail-record.json.zip",
+    "originalBytes": 2852,
+    "archiveBytes": 1422,
+    "sha256": "1e5eede0b2d0c9ca8017b066dfccddeeac2f6f80fb8e700766670ab9c90f85c8"
+  },
+  {
+    "path": "assets/launch-sites/cape-lc16-detail-record.json",
+    "archive": "assets/launch-sites/cape-lc16-detail-record.json.zip",
+    "originalBytes": 3590,
+    "archiveBytes": 1243,
+    "sha256": "7b5433301c54d1722b8be81b089fe7070b847275c4f99251536118663e8b6830"
+  },
+  {
+    "path": "assets/launch-sites/space-coast-record.json",
+    "archive": "assets/launch-sites/space-coast-record.json.zip",
+    "originalBytes": 8103,
+    "archiveBytes": 2192,
+    "sha256": "a9f82c259726ae71b1d6bb428df2f30b64b97830180e7b016c9aa0b17b7f54b1"
+  },
+  {
+    "path": "assets/launch-sites/cape-lc36-detail-record.json",
+    "archive": "assets/launch-sites/cape-lc36-detail-record.json.zip",
+    "originalBytes": 2746,
+    "archiveBytes": 941,
+    "sha256": "59f2a17a05181fef9cd566cd267953b4c1ddd64ebc693d16b94f2b8111307215"
+  },
+  {
+    "path": "assets/launch-sites/starbase-record.json",
+    "archive": "assets/launch-sites/starbase-record.json.zip",
+    "originalBytes": 7327,
+    "archiveBytes": 1966,
+    "sha256": "6c41dd272d071c01d60b5a02f8661f67ee9c358c66f9e795d612eaf219f6bd89"
+  },
+  {
+    "path": "assets/launch-sites/starbase-detail-record.json",
+    "archive": "assets/launch-sites/starbase-detail-record.json.zip",
+    "originalBytes": 2733,
+    "archiveBytes": 931,
+    "sha256": "7c97218c6f19d0b62e75e343c61e7cb6f46a274d932b5eae8e109f210a355e5e"
+  },
+  {
+    "path": "vendor/earth/manifest.json",
+    "archive": "vendor/earth/manifest.json.zip",
+    "originalBytes": 16699,
+    "archiveBytes": 4881,
+    "sha256": "4433d91239d707c06a6c7fd0dde500a69e4b388fa07637183f9cc8a5471232c5"
+  }
+]

@@ -6,6 +6,7 @@ const stations = {
  mechanical:'alignment', avionics:'avionics', software:'avionics'
 };
 export const bayStationFor=domain=>stations[domain]??stations.conops;
+export const bayRoutingStationDomains=()=>Object.keys(stations);
 
 import {componentCentroid} from './component-stations.js';
 import {DEPLOY_END_S,commissioningClock} from './commissioning-clock.js';

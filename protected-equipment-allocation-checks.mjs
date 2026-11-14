@@ -1,0 +1,25 @@
+import assert from 'node:assert/strict';
+import {writeFileSync} from 'node:fs';
+import * as T from './dist/vendor/three.module.js';
+import {defaults,sizeDesign} from './dist/design.js';
+import {makeCraft} from './dist/craft.js';
+import {protectedStorageAccommodation} from './dist/protected-equipment-allocation.js';
+import {canvas} from './render-test-canvas.mjs';
+
+globalThis.document={createElement:()=>canvas()};
+const h=sizeDesign(defaults),allocation=h.propulsion.storageAccommodation,c=makeCraft(h,{installElectrical:false,planFluidRoutes:false});
+assert(allocation.ok,JSON.stringify(allocation.issues));assert.deepEqual(h.propulsion.stations.storage,allocation.positionM,'Mass and connector station must preserve the body allocation');
+c.root.updateWorldMatrix(true,true);
+const actual=new T.Box3().setFromObject(c.recorder),expected=new T.Box3(new T.Vector3(...allocation.boundsM.min),new T.Vector3(...allocation.boundsM.max));
+assert(actual.min.distanceTo(expected.min)<1e-9&&actual.max.distanceTo(expected.max)<1e-9,'Actual full recorder buffer envelope must equal the reserved bay');
+assert(c.recorder.getWorldPosition(new T.Vector3()).distanceTo(new T.Vector3(...allocation.positionM))<1e-9,'Body position must be converted through the scaled equipment drawing');
+const pieces=[];c.recorder.traverse(o=>{if(o.isMesh)pieces.push(new T.Box3().setFromObject(o));});let otherSolids=0;
+const inherited=(o,key)=>{for(let p=o;p;p=p.parent)if(p===c.recorder||p.userData?.[key])return true;return false;};
+c.root.traverse(o=>{if(!o.isMesh||inherited(o,'engineeringGraphic')||o.userData.physicalMaterial===false||o.material?.userData?.physicalMaterial===false||o.userData.dynamicConnection)return;otherSolids++;const b=new T.Box3().setFromObject(o);assert(!pieces.some(p=>p.intersectsBox(b)),'Recorder overlaps the conservative actual solid bounds: '+(o.name||o.userData.part||o.uuid));});
+assert.equal(h.rackLayout.capacity,h.rackLayout.physicalCapacity-allocation.reservedComputeSlots);assert.equal(h.rackLayout.spare,h.rackLayout.capacity-h.trays);assert.equal(allocation.reservedComputeSlots,20);assert(allocation.railGapM>.0136&&allocation.railGapM<.0137,'Do not invent clearance by dropping recorder rails');
+const fullRack={...h.rackLayout,slots:Array.from({length:h.rackLayout.bays},(_,bay)=>({bay,z:h.rackLayout.rackZ0M+(bay+.5)*h.rackLayout.pitchM[2]}))};
+const full=protectedStorageAccommodation({...h,rackLayout:fullRack});assert(!full.ok&&full.issues.some(i=>i.code==='storage-bay-unavailable'),'A fully populated rack must not acquire fictitious recorder volume');
+const narrow=protectedStorageAccommodation({...h,rackLayout:{...h.rackLayout,columns:1}});assert(!narrow.ok&&narrow.issues.some(i=>i.code==='storage-rack-upright-clearance'));
+const omitted=protectedStorageAccommodation(h,{...h.input,storageTB:13*h.input.diskModuleTB});assert(!omitted.ok&&omitted.issues.some(i=>i.code==='storage-module-realization-incomplete'));
+const report={ok:true,allocation,actualRecorderPieces:pieces.length,otherActualSolidBounds:otherSolids,negativeRegressions:['Fully occupied rack','Insufficient upright gap','Unrepresented storage modules'],scope:'Complete retained protected recorder drawing, exact installed body/mass station, conservative separation from other actual solid bounds, and truthful reserved compute capacity. Continuous line interference remains in the combined routing gate.'};
+const index=process.argv.indexOf('--output');if(index>=0)writeFileSync(process.argv[index+1],JSON.stringify(report,null,2));console.log(JSON.stringify(report));

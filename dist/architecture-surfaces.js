@@ -3,6 +3,7 @@ import {deploymentLayout,leafPose,leafAxes,deploymentSchedule} from './deploymen
 import {energySolarDelivery} from './energy-system.js';
 import {ramSilhouette} from './silhouette.js';
 import {dot,unit,R} from './orbit.js';
+import {radiatorPanelNetArea,radiatorPanelFrontBlockedArea} from './radiator-surface-area.js';
 const clip=(v,a,b)=>Math.max(a,Math.min(b,v)),SIGMA=5.670374419e-8;
 const add=(a,b,k=1)=>a.map((v,i)=>v+k*b[i]);
 function blockedByBody(p,dir,h){
@@ -35,9 +36,9 @@ export function resolvedSurfaces(h,g,deployment,fluxOnly,burnDirection,att,earth
  const toBody=v=>basis.map(a=>dot(v,a)),toECI=v=>basis[0].map((_,k)=>basis.reduce((s,a,i)=>s+a[k]*v[i],0));
  const sun=toBody(g.sunECI),earth=toBody(g.radial),sunlit=g.eclipse?0:1,external=g.carrierAttached?0:1,sinRadius=clip(R/(R+g.altitudeKm),0,1);
  const eps=d.emissivity*d.emissivityRetention**g.windowAgeYears,alpha=clip(d.absorptivity+d.alphaGrowth*g.windowAgeYears,0,1),albedoScale=1361*.30*Math.max(0,g.sunRadial);
- const panels=layout.descriptors.map(desc=>{const p=leafPose(layout,desc,deployment,d.solarTiltDeg,att),axes=leafAxes(p),width=p.width??desc.width,depth=p.depth??desc.depth;return {desc,p,axes,center:[p.x,p.y,p.z],width,depth,area:Math.max(0,width*depth)};});
+ const panels=layout.descriptors.map(desc=>{const p=leafPose(layout,desc,deployment,d.solarTiltDeg,att),axes=leafAxes(p),width=p.width??desc.width,depth=p.depth??desc.depth;return {desc,p,axes,center:[p.x,p.y,p.z],width,depth,area:desc.type==='rad'?radiatorPanelNetArea(h,desc):Math.max(0,width*depth)};});
  let solarArea=0,solarProjected=0,radArea=0,radSun=0,radEarth=0,radExposed=0,radCoupled=0,absorbed=0;
- const banks=[{area:0,exposed:0,coupled:0,absorbed:0,sun:0,earth:0,normal:[0,0,0]},{area:0,exposed:0,coupled:0,absorbed:0,sun:0,earth:0,normal:[0,0,0]}];
+ const banks=[{area:0,exposed:0,emitting:0,coupled:0,absorbed:0,sun:0,earth:0,normal:[0,0,0]},{area:0,exposed:0,emitting:0,coupled:0,absorbed:0,sun:0,earth:0,normal:[0,0,0]}];
  const samples=[];
  for(const p of panels){
   const n=p.axes[1],sunCos=dot(n,sun),shadow=external*illuminatedFraction(p,panels,sun,h);
@@ -51,10 +52,10 @@ export function resolvedSurfaces(h,g,deployment,fluxOnly,burnDirection,att,earth
   const flow=h.thermalTopology==='passive-local'||h.input.architectureFamily==='redwire-platform'?1:(index?motion.lowerFlow:motion.upperFlow);
   const ev=earthDiskView(dot(n,earth),sinRadius),sc=Math.abs(sunCos)*shadow,exposed=p.area*exposure;
   const kw=exposed*(alpha*(1361*sunlit*sc+albedoScale*ev)+eps*237*ev)/1000;
-  b.area+=p.area;b.exposed+=exposed;b.coupled+=p.area*flow;b.absorbed+=kw;b.sun+=exposed*sc;b.earth+=exposed*ev;
+  b.area+=p.area;b.exposed+=exposed;b.emitting+=Math.max(0,2*p.area-radiatorPanelFrontBlockedArea(h,p.desc))*exposure;b.coupled+=p.area*flow;b.absorbed+=kw;b.sun+=exposed*sc;b.earth+=exposed*ev;
   for(let k=0;k<3;k++)b.normal[k]+=n[k]*p.area;
   radArea+=p.area;radExposed+=exposed;radCoupled+=p.area*flow;radSun+=exposed*sc;radEarth+=exposed*ev;absorbed+=kw;
-  samples.push({id:p.desc.id??`rad-${p.desc.end}-${p.desc.j}`,kind:'radiator',areaM2:p.area,normalBody:n,illuminationFraction:shadow,solarCos:Math.abs(sunCos),exposureFraction:exposure});
+  samples.push({id:p.desc.id??`rad-${p.desc.end}-${p.desc.j}`,kind:'radiator',areaM2:p.area,emissionAreaM2:Math.max(0,2*p.area-radiatorPanelFrontBlockedArea(h,p.desc))*exposure,normalBody:n,illuminationFraction:shadow,solarCos:Math.abs(sunCos),exposureFraction:exposure});
  }
  const weighted=(n,area)=>area>0?n/area:0,cos=weighted(solarProjected,solarArea),radSunCos=weighted(radSun,radExposed),earthView=weighted(radEarth,radExposed);
  const view=n=>earthDiskView(dot(n,earth),sinRadius),boxArea=h.enclosure?.grossAreaM2||2*(h.bodyHeightM*h.bodyLengthM+h.bodyWidthM*h.bodyLengthM+h.bodyWidthM*h.bodyHeightM);
@@ -71,7 +72,7 @@ export function resolvedSurfaces(h,g,deployment,fluxOnly,burnDirection,att,earth
   upperEarthView:weighted(banks[0].earth,banks[0].exposed),lowerEarthView:weighted(banks[1].earth,banks[1].exposed),spaceViewFactor:1-earthView*.5,
   upperRadiatorNormalECI:normal(banks[0]),lowerRadiatorNormalECI:normal(banks[1]),radiatorNormalECI:normal(banks[0]),
   upperRadiatorFlow:weighted(banks[0].coupled,banks[0].area),lowerRadiatorFlow:weighted(banks[1].coupled,banks[1].area),upperAbsorbedKW:banks[0].absorbed,lowerAbsorbedKW:banks[1].absorbed,
-  upperEmissionCoeff:banks[0].exposed*2*eps*SIGMA/1000,lowerEmissionCoeff:banks[1].exposed*2*eps*SIGMA/1000,
+  upperEmissionCoeff:banks[0].emitting*eps*SIGMA/1000,lowerEmissionCoeff:banks[1].emitting*eps*SIGMA/1000,
   pvDeployment:motion.pv,radiatorDeployment:weighted(radCoupled,radArea),deploymentStep:motion.step,deploymentTitle:motion.title,enclosureSolarWm2,enclosureIRWm2,
   pvNormalECI:toECI(panels.find(p=>p.desc.type==='pv')?.axes[1]||[0,1,0]),ramBody,ramAreaM2:ramSilhouette(h,ramBody,deployment,att),solarIncidenceCos:cos,radiatorSunCos:radSunCos,earthView,
   solarKW:source.busKW,solarArrayInputKW,solarConversionLossKW:source.mpptLossKW,solarHarnessLossKW:source.arrayHarnessLossKW,solarHardwareCurtailedKW:source.curtailedKW,generationKW:source.busKW,emissivity:eps,absorptivity:alpha,

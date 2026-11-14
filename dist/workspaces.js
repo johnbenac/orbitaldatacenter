@@ -1,10 +1,11 @@
 export const pages={
+ facilities:['Test facilities atlas','map-pin','Explore real facilities, inspect dimensioned test systems, compare public capabilities and locate each campus.'],
  designs:['Design reference orbital data centers','orbit','Compare published designs and open a configured engineering study with its own architecture, equipment and timeline.'],
  mission:['Design rules & margins','book-open','The mission engineering approach, controlled margin policy, Goddard rule dispositions and evidence required for PDR.'],
  overview:['Mission explorer','orbit','Choose a spacecraft and follow it from payload integration to its final orbit.'],
  conops:['Mission CONOPS','orbit','Define the operating schedule, service objectives and end-of-service plan.'],
  environment:['Environment','sun','Trace natural environment drivers and spacecraft-induced loads to each receiver.'],
- data:['Data & Delivery','database','Reconcile generated, buffered, dropped and ground-received information.'],
+ data:['Payload Data Handling','database','Trace customer inputs, model state, payload fabric, storage and Earth receipt for the selected AI workload.'],
  orbit:['Flight Dynamics','orbit','Evaluate the mission orbit, access and eclipse geometry, maintenance demand and disposal allocations.'],
  compute:['Payload Operations','cpu','Select a workload and trace installed compute, memory, storage and customer acceptance through Earth receipt.'],
  comm:['Communications','radio','Inspect ground visibility, link budgets, and bytes delivered through each pass.'],
@@ -16,11 +17,11 @@ export const pages={
  launch:['Launch & Insertion','rocket','Compare stowed hardware, launch allowance, and the insertion sequence.'],
  launcher:['Launch vehicle','rocket','Compare provider references, recovery modes, upper stages and mission-specific launch allowances.'],
  mechanical:['Mechanical Design','box','Trace each installed component to its body coordinates, mass properties and terminal disposition.'],
- avionics:['Command & Data Handling','panels-top-left','Operate the spacecraft flight computer, command receiver and housekeeping recorder.'],
+ avionics:['Command & Data Handling','panels-top-left','Design the spacecraft avionics, electrical interfaces, connectors and harnesses; verify command, time and housekeeping paths.'],
  software:['Flight Software','workflow','Inspect the active mode, its reference, actuator feedback and the interlock permitting the next operation.'],
  architecture:['Spacecraft architecture','box','Inspect the selected reference architecture and the explicit workbench adaptation used by its installed design.'],
  timeline:['Master timeline','clock-3','Follow this design from ground processing through launch and the first operating checkout. Select a call to inspect its timing or replay it on the mission clock.'],
- parts:['Parts navigator','box','Explore each spacecraft, launcher, ground-support and launch-site component, its current geometry and linked equipment data.'],
+ parts:['Parts navigator','box','Explore each part at physical scale, inspect its planned verification settings, and follow the evidence from component to integrated system. Learn how it works, compare alternatives, and open the engineering references.'],
  equipment:['Master equipment list','list-checks','Trace each mass allocation to the installed hardware, its sizing basis and its published reference.'],
  materials:['Materials & finishes','box','Inspect documented materials, preliminary finish allocations, surface details and the texture bank linked to the master equipment list.'],
  sources:['Model & sources','book-open','Inspect the equations, assumptions, and reference hardware behind this design.'],
@@ -65,7 +66,7 @@ export const cfg={
 };
 Object.defineProperty(cfg,'purpose',{value:cfg.compute,enumerable:false});
 export const nowMetrics=['tokensPerSec|Compute throughput|tok/s','solarKW|Solar generation|kW','socPct|Battery charge|%','wetKg|Spacecraft mass|kg'];
-export const quickMap={launcher:['launcher','launchAllowanceKg','fairingM','fairingLengthM'],conops:['missionYears','requiredTps','duty','idleComputePolicy'],environment:['solarDriver','solarCyclePhase','ap','solarTiltDeg'],data:['bytesPerToken','bulkMbps','initialQueueGB','storageTB'],overview:['trayCount','altitudeKm','solarM2','batteryKWh'],orbit:['altitudeKm','ecc','inclinationDeg','raanDeg'],compute:['trayCount','batch','context','storageTB'],comm:['communicationsPackage','link','kaDishM','elevationDeg'],power:['powerArchitecture','batteryKWh','solarM2','socMin','chargeC'],thermal:['radiatorM2','thermalMode','appliedHeatKw','radiatorDesignK'],attitude:['attitude','rollDeg','dipoleAm2','cmgMomentumNms'],prop:['propellantKg','isp','mixtureRatio','yearsSupply'],mass:['trayCount','solarM2','batteryKWh','propellantKg'],launch:['launcher','launchAllowanceKg','trimDv','adapterKg']};
+export const quickMap={launcher:['launcher','launchAllowanceKg','fairingM','fairingLengthM'],conops:['missionYears','requiredTps','duty','idleComputePolicy'],environment:['solarDriver','solarCyclePhase','ap','solarTiltDeg'],data:['initialInputGB','inputSpoolGB','storageTB','serviceRoute'],overview:['trayCount','altitudeKm','solarM2','batteryKWh'],orbit:['altitudeKm','ecc','inclinationDeg','raanDeg'],compute:['trayCount','batch','context','storageTB'],comm:['communicationsPackage','link','kaDishM','elevationDeg'],power:['powerArchitecture','batteryKWh','solarM2','socMin','chargeC'],thermal:['radiatorM2','thermalMode','appliedHeatKw','radiatorDesignK'],attitude:['attitude','rollDeg','dipoleAm2','cmgMomentumNms'],prop:['propellantKg','isp','mixtureRatio','yearsSupply'],mass:['trayCount','solarM2','batteryKWh','propellantKg'],launch:['launcher','launchAllowanceKg','trimDv','adapterKg']};
 Object.defineProperty(quickMap,'purpose',{value:quickMap.compute,enumerable:false});
 export const overlayNames={pointing:'Pointing guides',thermal:'Component temperatures',sun:'Direct sunlight',albedo:'Earth albedo',ir:'Earth infrared',radiator:'Radiator emission',ram:'Relative wind',pressure:'Pressure force',thrust:'Chemical thrust',dimensions:'Vehicle dimensions'};
 export const componentMap={compute:'compute',host:'compute',switch:'compute',storage:'storage',battery:'battery',array:'solar',hinges:'solar',radiator:'radiator',coolant:'radiator',terminals:'communications',cmg:'cmg',tanks:'propellant',fuel:'propellant',oxidizer:'propellant',pressurant:'propellant',engine:'propulsion',margin:'structure',adapter:'adapter',shield:'structure',cables:'structure',structure:'structure',skin:'enclosure',blanket:'enclosure',frame:'structure',insulation:'enclosure'};
@@ -81,7 +82,6 @@ export function workspaceFor(id,h){
   return {...base,charts:expanded(base.charts),metrics:expanded(base.metrics),rows:expanded(base.rows)};
  }
  if(id==='compute')return {charts:['aiUnitRate|Onboard work rate|'+rate,'aiHostKW|Host demand|kW','aiProductDeliveredGB|Product received on Earth|GB','itKW|IT demand|kW'],metrics:['aiUnitRate|Onboard processing|'+rate,'aiUnitsComputed|Cumulative work|'+unit,'aiInputBufferGB|Staged input|GB','itKW|IT demand|kW'],rows:['$trays|Installed compute trays|','aiUnitsComputed|Computed since launch|'+unit,'aiInputConsumedGB|Input processed|GB','aiProductGeneratedGB|Customer product generated|GB','aiProductQueueGB|Awaiting Earth receipt|GB','aiProductDeliveredGB|Product received on Earth|GB','aiHostKW|Host demand|kW','aiFabricKW|Fabric demand|kW']};
- if(q.purposeId==='text')return base;
  if(id==='data')return {charts:['aiInputBufferGB|Staged input|GB','aiProductQueueGB|Customer product backlog|GB','aiProductGeneratedGB|Cumulative product generated|GB','aiProductDeliveredGB|Product received on Earth|GB'],metrics:['aiInputConsumedGB|Input consumed|GB','aiProductQueueGB|Awaiting delivery|GB','aiProductDeliveredGB|Earth receipt|GB','freeTB|Free recorder capacity|TB'],rows:['aiInputUploadedGB|Input received onboard|GB','aiInputBufferGB|Input available|GB','aiProductGeneratedGB|Generated product|GB','aiProductDeliveredGB|Returned product|GB','aiProductQueueGB|Queued product|GB','droppedGB|All traffic dropped|GB']};
  return base;
 }

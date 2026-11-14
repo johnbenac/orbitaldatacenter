@@ -21,6 +21,6 @@ export function launchContextBadge(launch,h,s){
  const xs=all.map(p=>p[0]),ys=all.map(p=>p[1]),xmin=Math.min(...xs),xmax=Math.max(...xs),ymin=Math.min(...ys),ymax=Math.max(...ys),k=Math.min(70/Math.max(1,xmax-xmin),52/Math.max(1,ymax-ymin));
  const paint={stage:'#68818c',upper:'#98b4b6',booster:'#a5a6a3',shell:'none',payload:'#e9b570',appendage:'#43505b'};
  const svg=shapes.map(({points,role})=>'<path d="M'+points.map(([x,y])=>[(43+(x-(xmin+xmax)*.5)*k).toFixed(2),(28-(y-(ymin+ymax)*.5)*k).toFixed(2)].join(' ')).join(' L')+(role==='shell'?'':' Z')+'" fill="'+paint[role]+'" stroke="'+(role==='payload'?'#ffe4ad':role==='shell'?'#72cfbd':'#a5b5bb')+'" stroke-width="'+(role==='shell'?1.2:.6)+'"/>').join('');
- const state=s.flightPhase==='integration'?'In high bay':s.flightPhase==='pad'?'On pad':s.flightPhase==='ascent'?'In ascent':s.cargoAccessHeld?'Cargo held':s.carrierAttached?'On carrier in orbit':'Released';
+ const state=s.launchHeld?'Launch held':s.assumedOrbit?'Assumed orbit':s.flightPhase==='integration'?'In high bay':s.flightPhase==='pad'?'On pad':s.flightPhase==='ascent'?'In ascent':s.cargoAccessHeld?'Cargo held':s.carrierAttached?'On carrier in orbit':'Released';
  return '<svg aria-hidden="true" width="86" height="57" viewBox="0 0 86 57">'+svg+'</svg><span style="display:block;font:9px/1.35 ui-monospace,monospace;color:#b4cbd2">'+state+' · '+Math.round(Math.max(0,s.altitudeKm||0))+' km</span>';
 }

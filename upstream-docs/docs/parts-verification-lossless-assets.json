@@ -1,0 +1,54 @@
+{
+  "note": "Exact-byte lossless packaging. Geometry coordinates, textures, metadata, provenance and licenses are unchanged.",
+  "files": [
+    {
+      "path": "dist/assets/launch-sites/vandenberg-geography.geojson",
+      "archive": "dist/assets/launch-sites/vandenberg-geography.geojson.zip",
+      "bytes": 49639,
+      "archiveBytes": 12707,
+      "sha256": "29105140feaa5616a13afe405e249f8a8dd1a0c8f26aa0ef2b7ff177f1fc1f17"
+    },
+    {
+      "path": "dist/assets/launch-sites/pecan-island-geography.geojson",
+      "archive": "dist/assets/launch-sites/pecan-island-geography.geojson.zip",
+      "bytes": 1482,
+      "archiveBytes": 570,
+      "sha256": "6ccbacd7dbff0dcf8225cbce84c496f479663548d0869e35be75a1e0d472997c"
+    },
+    {
+      "path": "dist/assets/launch-sites/kourou-geography.geojson",
+      "archive": "dist/assets/launch-sites/kourou-geography.geojson.zip",
+      "bytes": 10603,
+      "archiveBytes": 3714,
+      "sha256": "3018847ace6019fd11fd9181c6773289a2719de57f0742b1a0392ef67dc362ce"
+    },
+    {
+      "path": "dist/assets/launch-sites/space-coast-geography.geojson",
+      "archive": "dist/assets/launch-sites/space-coast-geography.geojson.zip",
+      "bytes": 7524,
+      "archiveBytes": 1919,
+      "sha256": "947425a35fccdb12d7f441c27076b26683b026db6a4fb0c5243f3c2df191ffd5"
+    },
+    {
+      "path": "dist/assets/launch-sites/wenchang-geography.geojson",
+      "archive": "dist/assets/launch-sites/wenchang-geography.geojson.zip",
+      "bytes": 23271,
+      "archiveBytes": 4264,
+      "sha256": "0fe7c88c38804508c6cf5022a9a1ea946c8345c4002d13d0677d9711dbe72087"
+    },
+    {
+      "path": "dist/assets/materials/manifest.json",
+      "archive": "dist/assets/materials/manifest.json.zip",
+      "bytes": 11831,
+      "archiveBytes": 1367,
+      "sha256": "e5b7445713081dd2443688e53664cc511deb7162e6c152deb981c4ca127a53fc"
+    },
+    {
+      "path": "dist/assets/materials/material-library.json",
+      "archive": "dist/assets/materials/material-library.json.zip",
+      "bytes": 48425,
+      "archiveBytes": 11455,
+      "sha256": "76419caf049bccee1217545f356803bb14539373fc1f792e3b351ae8519062dc"
+    }
+  ]
+}

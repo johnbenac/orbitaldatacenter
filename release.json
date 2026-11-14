@@ -1,32 +1,28 @@
 {
-  "release": "v63",
+  "release": "v73",
   "source_host": "boiler",
-  "source_path": "/home/johnb/Downloads/orbital-data-center-v63.zip.part01 + orbital-data-center-v63.zip.part02",
-  "archive_sha256": "d7948e6b8e8131f1bb06272b3b693ed4feb9472876e83e4b03c388a96223450b",
+  "source_path": "/home/johnb/Downloads/Orbital-Data-Center-Source-v73.zip",
+  "archive_sha256": "18b2c08f1e3febc01914363492f482f915ef274f69f5aa878f71c513efc84a5e",
   "static_directory": "dist",
   "checks_passed": [
-    "2469 asset manifest entries",
-    "205 JavaScript syntax checks",
-    "16 import and assembly regression tests",
-    "2648 upstream files match the archive",
-    "All application files fit the Cloudflare Pages file-size limit",
-    "Desktop and mobile startup, WebGL rendering, fixed footer and Blender OG metadata; no browser errors or failed assets"
+    "Archive SHA-256 matches the source host; all 5453 files match the bundled SHA256SUMS",
+    "2586 asset index entries (dist/assets.json.zip); every listed file exists",
+    "305 JavaScript syntax checks in dist",
+    "No deployable file exceeds the Cloudflare Pages 25 MiB limit",
+    "24 import and assembly regression tests",
+    "2910 upstream-owned files recorded; repeat import is a no-op",
+    "design-test.mjs and ai-core-checks.mjs",
+    "Desktop and mobile: assembled pages, workbench startup with a WebGL flight view, local footer, canonical, Open Graph and structured data; no console errors, failed requests or HTTP errors"
+  ],
+  "checks_failed": [
+    "deployment-checks.mjs fails: the pathfinder deployment sweep flags wing -1/-1 (wound photovoltaic blanket against rotary electrical stator housing). It passes on v63.",
+    "engine-checks.mjs fails at engine-checks.mjs:85 (a mission plan is not feasible). Not compared with v63.",
+    "scene-interaction-checks.mjs fails: the thermal skin maps 5 nodes where the suite expects 6 (coolant missing). It also failed on v63, at a later point and with a different error."
   ],
   "validation_notes": [
-    "Split archive concatenated in numeric part order; original parts and combined archive retained outside Git.",
-    "Bundled Git history excluded from source import; upstream application and tests imported without patches.",
-    "Full numerical validation remains with the upstream team per user instruction."
-  ],
-  "source_parts": [
-    {
-      "source_path": "/home/johnb/Downloads/orbital-data-center-v63.zip.part01",
-      "size": 418005332,
-      "sha256": "3479ea1daeff55be44c03f9a14f40b00335164a15213d6e699d6adc036c6b7e4"
-    },
-    {
-      "source_path": "/home/johnb/Downloads/orbital-data-center-v63.zip.part02",
-      "size": 418005331,
-      "sha256": "affb2bfb6b8a00a67124b7dbd3926eec67d2a6420b27072ba59e6be55248f734"
-    }
+    "Single archive; imported by scripts/import-release.py, which now accepts the packed dist/assets.json.zip index.",
+    "Skipped as provenance and not committed: docs/harnessing-work/ and __export_metadata__/ (2547 files, 913267435 bytes). Developer AGENTS.md, dotfiles and the CI workflow are stored inert under upstream-docs/.",
+    "Upstream application and tests were imported without patches. The three failing suites above are upstream's own and are recorded, not fixed here.",
+    "Full numerical validation remains with the upstream team."
   ]
 }

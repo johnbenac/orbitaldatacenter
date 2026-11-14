@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {readFileSync,statSync} from 'node:fs';
+import {readStaticAssetIndex} from './asset-index-fixture.mjs';
 import {createSimulation} from './dist/model.js';
 import {sizeDesign} from './dist/design.js';
 import {nominalCheckoutDesign} from './verification-fixtures.mjs';
@@ -99,7 +100,7 @@ for(const c of chapters){
  const scenario={schema:'odc-scenario/1',modelVersion:'4.0',design:mission,view};
  assert.deepEqual(decodeScenario(encodeScenario(scenario)),scenario);
 }
-const assets=JSON.parse(readFileSync(new URL('./dist/assets.json',import.meta.url),'utf8'));
+const assets=await readStaticAssetIndex();
 assert.equal(new Set(assets).size,assets.length);
 for(const file of assets)assert.ok(statSync(new URL('./dist/'+file,import.meta.url)).isFile(),file);
 for(const file of ['app.js','matrix-ui.js','matrix.css','mission-presets.js','flight-chapters.js','domain-analysis.js','domain-analysis.css','deployment.js','entry.js','disposal-views.js'])assert.ok(assets.includes(file),file);

@@ -2,7 +2,7 @@
 export function canvas(){
  const c={width:1,height:1,frame:null};
  const image=(w,h)=>({width:w,height:h,data:new Uint8ClampedArray(w*h*4)});
- const ctx={clearRect(){},getImageData(){return c.frame||image(c.width,c.height);},createImageData:image,
+ const ctx={clearRect(){},measureText(text){return {width:String(text).length*5.5};},getImageData(){return c.frame||image(c.width,c.height);},createImageData:image,
  putImageData(v){c.frame=v;},drawImage(src){
   if(!src.frame){const im=image(c.width,c.height);im.data.fill(210);c.frame=im;return;}
   const w=c.width,h=c.height,from=src.frame;if(from.width===w&&from.height===h){c.frame=from;return;}

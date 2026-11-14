@@ -1,14 +1,14 @@
 // A history entry is a place in the workbench. The installed design stays shared.
 const visitKey='odc-navigation';
-const placeKeys=['partId','partsCategory','partsQuery','partView','phase','domain','chapter','camera','start','t','scope','detail','instruments','event','inspect','tradeKey','referencePreview','referenceCompared','purposePreview','rfFilter','rfPage','commBench','timelineRow','timelineSegment','timelineAll','timelineFollow','teachEvent','teachFolded','bayLens','launchLens','deploymentLens','thermalNode','flightLoop'];
+const placeKeys=['facilityId','facilityAssetId','facilityView','facilityFilter','partId','partsCategory','partsQuery','partView','phase','domain','chapter','camera','start','t','scope','detail','instruments','event','inspect','tradeKey','referencePreview','referenceCompared','purposePreview','rfFilter','rfPage','commBench','timelineRow','timelineSegment','timelineAll','timelineFollow','teachEvent','teachFolded','bayLens','launchLens','deploymentLens','thermalNode','flightLoop'];
 const filters=['data-mel-search','data-mel-sub','data-mel-evidence','data-mech-find','data-mech-sub','data-mech-pose'];
-const scrollBoxes=['.parts-tree','#rail','#nav','.mtl-scroll','.mel-scroll','.mech-planes','.rc-table-scroll'];
+const scrollBoxes=['.fa-list','.parts-tree','#rail','#nav','.mtl-scroll','.mel-scroll','.mech-planes','.rc-table-scroll'];
 function visible(selector){return Array.from(document.querySelectorAll(selector)).find(el=>el.getClientRects().length)}
 function whereFocused(){
  const el=document.activeElement;
  if(!el||el===document.body)return null;
  if(el.id)return '#'+CSS.escape(el.id);
- for(const name of [...filters,'data-part-select','data-parts-query','data-parts-filter','data-mtl-select','data-mtl-row','data-mtl-jump','data-mtl-step','data-lens','data-domain','data-phase','data-page','data-mount','data-action']){
+ for(const name of [...filters,'data-facility-select','data-facility-query','data-facility-filter','data-facility-asset','data-part-select','data-parts-query','data-parts-filter','data-mtl-select','data-mtl-row','data-mtl-jump','data-mtl-step','data-lens','data-domain','data-phase','data-page','data-mount','data-action']){
   if(!el.hasAttribute(name))continue;
   const plane=el.closest('[data-mech-plane]'),region=el.closest('#nav,#lifecycle');
   const prefix=plane?'[data-mech-plane="'+plane.dataset.mechPlane+'"] ':region?'#'+region.id+' ':'';
@@ -44,14 +44,14 @@ export function workspaceHistory(readView,restoreView,sharedHash,afterRestore=()
  const snapshot=()=>{
   const v=readView();return Object.fromEntries([...placeKeys,'reference'].map(k=>[k,v[k]]));
  };
- const key=v=>v.phase+'/'+(v.reference||v.domain)+(v.reference==='parts'?'/'+(v.partId||''):'');
+ const key=v=>v.phase+'/'+(v.reference||v.domain)+(v.reference==='parts'?'/'+(v.partId||''):v.reference==='facilities'?'/'+(v.facilityId||'')+'/'+(v.facilityAssetId||''):'');
  const entryId=()=>globalThis.crypto?.randomUUID?.()||Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);
  let currentId=history.state?.odcVisit||entryId(),disabled=false;
  const rewrite=(record,url)=>history.replaceState({...history.state,odcVisit:currentId,[visitKey]:record},'',url);
  let route,lastPlace,restoring=false,pendingRestore=null,installedCenter=readView().referenceCenterId||null;
  const placeURL=v=>{
   const url=new URL(location.href);
-  for(const k of ['phase','domain','subsystem','reference','row','events','segment','chapter','camera','met','field','preview','bay','lens','play','center','part','family'])url.searchParams.delete(k);
+  for(const k of ['phase','domain','subsystem','reference','row','events','segment','chapter','camera','met','field','preview','bay','lens','play','center','part','family','facility','system','facilityView'])url.searchParams.delete(k);
   const center=readView().referenceCenterId;
   if(center){
    // Startup modifiers have already been consumed. They must not override a
@@ -62,6 +62,7 @@ export function workspaceHistory(readView,restoreView,sharedHash,afterRestore=()
   url.searchParams.set('phase',v.phase);url.searchParams.set('domain',v.domain);
   if(v.reference)url.searchParams.set('reference',v.reference);
   if(v.reference==='parts'){if(v.partId)url.searchParams.set('part',v.partId);if(v.partsCategory)url.searchParams.set('family',v.partsCategory);}
+  if(v.reference==='facilities'){if(v.facilityId)url.searchParams.set('facility',v.facilityId);if(v.facilityAssetId)url.searchParams.set('system',v.facilityAssetId);if(v.facilityView)url.searchParams.set('facilityView',v.facilityView);}
   if(['D','E','F'].includes(v.phase))url.searchParams.set('chapter',v.chapter);
   if(url.hash.startsWith('#design='))url.hash=sharedHash();
   return url;

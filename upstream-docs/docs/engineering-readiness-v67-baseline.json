@@ -1,0 +1,485 @@
+{
+  "baseline": "v67 599b403897b579c8f921e192319fa7ce955df032",
+  "scope": "Actual parts-navigator thermal settings, before v68 allocations",
+  "counts": [
+    {
+      "referenceId": "custom-study",
+      "offered": 25,
+      "ready": 3,
+      "blocked": 22
+    },
+    {
+      "referenceId": "redwire-8kw",
+      "offered": 26,
+      "ready": 3,
+      "blocked": 23
+    },
+    {
+      "referenceId": "starcloud-3",
+      "offered": 25,
+      "ready": 3,
+      "blocked": 22
+    },
+    {
+      "referenceId": "starmind-ai1",
+      "offered": 24,
+      "ready": 3,
+      "blocked": 21
+    },
+    {
+      "referenceId": "orbital-1-202609",
+      "offered": 25,
+      "ready": 3,
+      "blocked": 22
+    },
+    {
+      "referenceId": "orbital-1-202606",
+      "offered": 25,
+      "ready": 3,
+      "blocked": 22
+    },
+    {
+      "referenceId": "star-catcher-self-powered",
+      "offered": 25,
+      "ready": 3,
+      "blocked": 22
+    }
+  ],
+  "failures": [
+    {
+      "itemId": "flight:01.01.01",
+      "title": "Payload cold plates / local spreader",
+      "setting": "thermal-vacuum",
+      "references": [
+        "custom-study",
+        "redwire-8kw",
+        "starcloud-3",
+        "starmind-ai1",
+        "orbital-1-202609",
+        "orbital-1-202606",
+        "star-catcher-self-powered"
+      ],
+      "missing": [
+        "Missing matching thermal plan"
+      ]
+    },
+    {
+      "itemId": "flight:01.02",
+      "title": "Host electronics, memory and tray carrier",
+      "setting": "thermal-vacuum",
+      "references": [
+        "custom-study",
+        "redwire-8kw",
+        "starcloud-3",
+        "starmind-ai1",
+        "orbital-1-202609",
+        "orbital-1-202606",
+        "star-catcher-self-powered"
+      ],
+      "missing": [
+        "Allocate cold and hot article targets for this item; parent temperature context is insufficient."
+      ]
+    },
+    {
+      "itemId": "flight:01.03",
+      "title": "Solid-state storage modules",
+      "setting": "thermal-vacuum",
+      "references": [
+        "custom-study",
+        "redwire-8kw",
+        "starcloud-3",
+        "starmind-ai1",
+        "orbital-1-202609",
+        "orbital-1-202606",
+        "star-catcher-self-powered"
+      ],
+      "missing": [
+        "Allocate cold and hot article targets for this item; parent temperature context is insufficient."
+      ]
+    },
+    {
+      "itemId": "flight:01.04",
+      "title": "Payload network fabric and host interfaces",
+      "setting": "thermal-vacuum",
+      "references": [
+        "custom-study",
+        "redwire-8kw",
+        "starcloud-3",
+        "starmind-ai1",
+        "orbital-1-202609",
+        "orbital-1-202606",
+        "star-catcher-self-powered"
+      ],
+      "missing": [
+        "Allocate cold and hot article targets for this item; parent temperature context is insufficient."
+      ]
+    },
+    {
+      "itemId": "flight:02.01",
+      "title": "Solar wings with cells and substrates",
+      "setting": "thermal-vacuum",
+      "references": [
+        "custom-study",
+        "redwire-8kw",
+        "starcloud-3",
+        "starmind-ai1",
+        "orbital-1-202609",
+        "orbital-1-202606",
+        "star-catcher-self-powered"
+      ],
+      "missing": [
+        "Allocate cold and hot article targets for this item; parent temperature context is insufficient."
+      ]
+    },
+    {
+      "itemId": "flight:02.01.02",
+      "title": "Cell coverglass",
+      "setting": "thermal-cycle",
+      "references": [
+        "custom-study",
+        "redwire-8kw",
+        "starcloud-3",
+        "starmind-ai1",
+        "orbital-1-202609",
+        "orbital-1-202606",
+        "star-catcher-self-powered"
+      ],
+      "missing": [
+        "Article mass (kg) is unallocated for this item.",
+        "Specific heat (J/kg/K) is unallocated for this item.",
+        "Exposed radiating area (m²) is unallocated for this item.",
+        "Dissipated load (W) is unallocated for this item.",
+        "Mounting-interface conductance (W/K) is unallocated for this item.",
+        "IR emittance is unallocated for this item.",
+        "Solar absorptance is unallocated for this item.",
+        "Allocate cold and hot article targets for this item; parent temperature context is insufficient."
+      ]
+    },
+    {
+      "itemId": "flight:02.03",
+      "title": "Power conditioning and distribution",
+      "setting": "thermal-vacuum",
+      "references": [
+        "custom-study",
+        "redwire-8kw",
+        "starcloud-3",
+        "starmind-ai1",
+        "orbital-1-202609",
+        "orbital-1-202606",
+        "star-catcher-self-powered"
+      ],
+      "missing": [
+        "Allocate cold and hot article targets for this item; parent temperature context is insufficient."
+      ]
+    },
+    {
+      "itemId": "flight:03.01.01",
+      "title": "Radiator emitting finish",
+      "setting": "thermal-cycle",
+      "references": [
+        "custom-study",
+        "redwire-8kw",
+        "starcloud-3",
+        "starmind-ai1",
+        "orbital-1-202609",
+        "orbital-1-202606",
+        "star-catcher-self-powered"
+      ],
+      "missing": [
+        "Article mass (kg) is unallocated for this item.",
+        "Specific heat (J/kg/K) is unallocated for this item.",
+        "Exposed radiating area (m²) is unallocated for this item.",
+        "Dissipated load (W) is unallocated for this item.",
+        "Mounting-interface conductance (W/K) is unallocated for this item.",
+        "IR emittance is unallocated for this item.",
+        "Solar absorptance is unallocated for this item.",
+        "Allocate cold and hot article targets for this item; parent temperature context is insufficient."
+      ]
+    },
+    {
+      "itemId": "flight:03.02",
+      "title": "Liquid loop and cold-control equipment",
+      "setting": "thermal-vacuum",
+      "references": [
+        "custom-study",
+        "redwire-8kw",
+        "starcloud-3",
+        "starmind-ai1",
+        "orbital-1-202609",
+        "orbital-1-202606",
+        "star-catcher-self-powered"
+      ],
+      "missing": [
+        "Article mass (kg) is unallocated for this item.",
+        "Specific heat (J/kg/K) is unallocated for this item.",
+        "Exposed radiating area (m²) is unallocated for this item.",
+        "Dissipated load (W) is unallocated for this item.",
+        "Mounting-interface conductance (W/K) is unallocated for this item.",
+        "IR emittance is unallocated for this item.",
+        "Solar absorptance is unallocated for this item."
+      ]
+    },
+    {
+      "itemId": "flight:03.03.01",
+      "title": "Amber outer blanket covers",
+      "setting": "thermal-cycle",
+      "references": [
+        "custom-study",
+        "redwire-8kw",
+        "starcloud-3",
+        "starmind-ai1",
+        "orbital-1-202609",
+        "orbital-1-202606",
+        "star-catcher-self-powered"
+      ],
+      "missing": [
+        "Article mass (kg) is unallocated for this item.",
+        "Specific heat (J/kg/K) is unallocated for this item.",
+        "Exposed radiating area (m²) is unallocated for this item.",
+        "Dissipated load (W) is unallocated for this item.",
+        "Mounting-interface conductance (W/K) is unallocated for this item.",
+        "IR emittance is unallocated for this item.",
+        "Solar absorptance is unallocated for this item.",
+        "Allocate cold and hot article targets for this item; parent temperature context is insufficient."
+      ]
+    },
+    {
+      "itemId": "flight:03.03.02",
+      "title": "White outer blanket covers",
+      "setting": "thermal-cycle",
+      "references": [
+        "custom-study",
+        "redwire-8kw",
+        "starcloud-3",
+        "starmind-ai1",
+        "orbital-1-202609",
+        "orbital-1-202606",
+        "star-catcher-self-powered"
+      ],
+      "missing": [
+        "Article mass (kg) is unallocated for this item.",
+        "Specific heat (J/kg/K) is unallocated for this item.",
+        "Exposed radiating area (m²) is unallocated for this item.",
+        "Dissipated load (W) is unallocated for this item.",
+        "Mounting-interface conductance (W/K) is unallocated for this item.",
+        "IR emittance is unallocated for this item.",
+        "Solar absorptance is unallocated for this item.",
+        "Allocate cold and hot article targets for this item; parent temperature context is insufficient."
+      ]
+    },
+    {
+      "itemId": "flight:04.01",
+      "title": "Pyramid-mounted CMGs and drive electronics",
+      "setting": "thermal-vacuum",
+      "references": [
+        "custom-study",
+        "redwire-8kw",
+        "starcloud-3",
+        "starmind-ai1",
+        "orbital-1-202609",
+        "orbital-1-202606",
+        "star-catcher-self-powered"
+      ],
+      "missing": [
+        "Allocate cold and hot article targets for this item; parent temperature context is insufficient."
+      ]
+    },
+    {
+      "itemId": "flight:04.02",
+      "title": "Magnetic unload rods and drive stages",
+      "setting": "thermal-vacuum",
+      "references": [
+        "custom-study",
+        "redwire-8kw",
+        "starcloud-3",
+        "starmind-ai1",
+        "orbital-1-202609",
+        "orbital-1-202606",
+        "star-catcher-self-powered"
+      ],
+      "missing": [
+        "Allocate cold and hot article targets for this item; parent temperature context is insufficient."
+      ]
+    },
+    {
+      "itemId": "flight:04.03",
+      "title": "Attitude sensors and electronics",
+      "setting": "thermal-vacuum",
+      "references": [
+        "custom-study",
+        "redwire-8kw",
+        "starcloud-3",
+        "starmind-ai1",
+        "orbital-1-202609",
+        "orbital-1-202606",
+        "star-catcher-self-powered"
+      ],
+      "missing": [
+        "Dissipated load (W) is unallocated for this item.",
+        "Allocate cold and hot article targets for this item; parent temperature context is insufficient."
+      ]
+    },
+    {
+      "itemId": "flight:05.01",
+      "title": "S-band patches and tracking, telemetry and command radio",
+      "setting": "thermal-vacuum",
+      "references": [
+        "custom-study",
+        "redwire-8kw",
+        "starcloud-3",
+        "starmind-ai1",
+        "orbital-1-202609",
+        "orbital-1-202606",
+        "star-catcher-self-powered"
+      ],
+      "missing": [
+        "Allocate cold and hot article targets for this item; parent temperature context is insufficient."
+      ]
+    },
+    {
+      "itemId": "flight:05.01.01",
+      "title": "S-band patch dielectric face",
+      "setting": "thermal-cycle",
+      "references": [
+        "custom-study",
+        "redwire-8kw",
+        "starcloud-3",
+        "starmind-ai1",
+        "orbital-1-202609",
+        "orbital-1-202606",
+        "star-catcher-self-powered"
+      ],
+      "missing": [
+        "Article mass (kg) is unallocated for this item.",
+        "Specific heat (J/kg/K) is unallocated for this item.",
+        "Exposed radiating area (m²) is unallocated for this item.",
+        "Dissipated load (W) is unallocated for this item.",
+        "Mounting-interface conductance (W/K) is unallocated for this item.",
+        "IR emittance is unallocated for this item.",
+        "Solar absorptance is unallocated for this item.",
+        "Allocate cold and hot article targets for this item; parent temperature context is insufficient."
+      ]
+    },
+    {
+      "itemId": "flight:05.02",
+      "title": "Ka-band reflector, positioner and RF chain",
+      "setting": "thermal-vacuum",
+      "references": [
+        "custom-study",
+        "redwire-8kw",
+        "starcloud-3",
+        "orbital-1-202609",
+        "orbital-1-202606",
+        "star-catcher-self-powered"
+      ],
+      "missing": [
+        "Allocate cold and hot article targets for this item; parent temperature context is insufficient."
+      ]
+    },
+    {
+      "itemId": "flight:05.03",
+      "title": "Optical terminals and fine pointing assemblies",
+      "setting": "thermal-vacuum",
+      "references": [
+        "custom-study",
+        "redwire-8kw",
+        "starcloud-3",
+        "starmind-ai1",
+        "orbital-1-202609",
+        "orbital-1-202606",
+        "star-catcher-self-powered"
+      ],
+      "missing": [
+        "Allocate cold and hot article targets for this item; parent temperature context is insufficient."
+      ]
+    },
+    {
+      "itemId": "flight:05.03.03",
+      "title": "Optical terminal housing finish",
+      "setting": "thermal-cycle",
+      "references": [
+        "custom-study",
+        "redwire-8kw",
+        "starcloud-3",
+        "starmind-ai1",
+        "orbital-1-202609",
+        "orbital-1-202606",
+        "star-catcher-self-powered"
+      ],
+      "missing": [
+        "Article mass (kg) is unallocated for this item.",
+        "Specific heat (J/kg/K) is unallocated for this item.",
+        "Exposed radiating area (m²) is unallocated for this item.",
+        "Dissipated load (W) is unallocated for this item.",
+        "Mounting-interface conductance (W/K) is unallocated for this item.",
+        "IR emittance is unallocated for this item.",
+        "Solar absorptance is unallocated for this item.",
+        "Allocate cold and hot article targets for this item; parent temperature context is insufficient."
+      ]
+    },
+    {
+      "itemId": "flight:06.02",
+      "title": "Pressurization and liquid feed assembly",
+      "setting": "thermal-vacuum",
+      "references": [
+        "custom-study",
+        "redwire-8kw",
+        "starcloud-3",
+        "starmind-ai1",
+        "orbital-1-202609",
+        "orbital-1-202606",
+        "star-catcher-self-powered"
+      ],
+      "missing": [
+        "Exposed radiating area (m²) is unallocated for this item.",
+        "Allocate cold and hot article targets for this item; parent temperature context is insufficient."
+      ]
+    },
+    {
+      "itemId": "flight:07.04",
+      "title": "Wing and radiator deployment and tracking drives",
+      "setting": "thermal-vacuum",
+      "references": [
+        "custom-study",
+        "redwire-8kw",
+        "starcloud-3",
+        "starmind-ai1",
+        "orbital-1-202609",
+        "orbital-1-202606",
+        "star-catcher-self-powered"
+      ],
+      "missing": [
+        "Exposed radiating area (m²) is unallocated for this item.",
+        "Allocate cold and hot article targets for this item; parent temperature context is insufficient."
+      ]
+    },
+    {
+      "itemId": "flight:08.01",
+      "title": "Flight avionics and GNSS navigation",
+      "setting": "thermal-vacuum",
+      "references": [
+        "custom-study",
+        "redwire-8kw",
+        "starcloud-3",
+        "starmind-ai1",
+        "orbital-1-202609",
+        "orbital-1-202606",
+        "star-catcher-self-powered"
+      ],
+      "missing": [
+        "Allocate cold and hot article targets for this item; parent temperature context is insufficient."
+      ]
+    },
+    {
+      "itemId": "flight:03.02.01",
+      "title": "Local heat pipes and thermal straps",
+      "setting": "thermal-vacuum",
+      "references": [
+        "redwire-8kw"
+      ],
+      "missing": [
+        "Missing matching thermal plan"
+      ]
+    }
+  ]
+}

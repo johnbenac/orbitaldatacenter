@@ -1,0 +1,48 @@
+name: Engineering input readiness
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  numerical-defaults:
+    runs-on: ubuntu-latest
+    # Full finite-radius interval proofs cover every shipped configuration.
+    # An exhausted time budget fails the job; it never grants partial coverage.
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Check every installed line and continuously certify every motion
+        run: npm run check:routing -- --output "$RUNNER_TEMP/routing-publication.json"
+      - name: Check facility provenance, fixed geometry and article fit contracts
+        run: npm run check:facilities
+      - name: Check thermal physics, convergence and controller integration
+        run: |
+          node thermal-analysis-checks.mjs
+          node thermal-convergence-checks.mjs
+          node thermal-engineering-controller-checks.mjs
+          node thermal-engineering-ui-checks.mjs
+      - name: Check electrical interfaces, physical routes and part navigation
+        run: npm run check:electrical
+      - name: Reconcile payload custody for every reference and workload
+        run: npm run check:payload-data
+      - name: Check readiness contracts and regression detection
+        run: node engineering-readiness-checks.mjs
+      - name: Audit every reference and execute offered thermal scenarios
+        run: node scripts/check-engineering-readiness.mjs --solves offered --output "$RUNNER_TEMP/engineering-readiness.json"
+      - name: Retain the complete readiness report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: engineering-readiness
+          path: |
+            ${{ runner.temp }}/engineering-readiness.json
+            ${{ runner.temp }}/routing-publication*.json
+          if-no-files-found: ignore

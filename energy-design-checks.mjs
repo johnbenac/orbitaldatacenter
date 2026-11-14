@@ -8,6 +8,7 @@ import {buildEquipmentList} from './dist/equipment-list.js';
 import {assessResourceDomains} from './dist/pdr-resources.js';
 import {surfaces} from './dist/physics.js';
 import {servedPowerLoads} from './dist/workspaces.js';
+import {buildReferenceDesign} from './dist/reference-configurations.js';
 
 // Focused PDR regressions: fixed installed hardware, actual interface limits,
 // electrical/thermal conservation, cold control and exported accounting.
@@ -127,6 +128,11 @@ test('Pump operating point, fluid inventory and heat capacity use consistent SI 
   assert.ok(t.loopHardwareCapacityKJK>=t.loopFluidKg*t.fluid.heatCapacityJkgK/1000);
   assert.ok(t.radiatorCapacityKJK>=t.radiatorFluidKg*t.fluid.heatCapacityJkgK/1000);
   assert.ok(Math.abs(t.couplingResidualKW)<1e-5);
+});
+
+test('Installed rotary coolant paths retain mass, finite-bore loss and unselected-fluid limits',()=>{
+ for(const id of ['starmind-ai1','orbital-1-202606','starcloud-3']){const vehicle=sizeDesign(buildReferenceDesign(id)),thermal=vehicle.energySystem.thermal,allocation=thermal.rotaryFluidAccounting;assert.ok(allocation.channelCount>0);near(allocation.allocatedMassKg,allocation.axisCount*allocation.allocatedMassPerAxisKg);near(allocation.hardwareMassKg,allocation.allocatedMassKg+allocation.externalFeederMetalKg);assert.ok(allocation.nominalPressureDropPa>0);assert.ok(thermal.loopHardwareKg>allocation.hardwareMassKg);for(const loop of thermal.loops||[thermal]){const p=loop.nominal;near(p.totalPa,p.header.pressurePa+p.branch.pressurePa+p.radiator.pressurePa+p.rotary.pressurePa+p.coldPlatePa);near(loop.rotaryFluidAccounting.fluidInventoryKg,loop.rotaryFluidAccounting.internalFluidVolumeM3*loop.fluid.densityKgM3);}if(allocation.replacesInterleafHoses){assert.equal(thermal.layout.extraFlexM,0);assert.equal(thermal.layout.branchMinorK,12);}}
+ const hot=sizeDesign(buildReferenceDesign('star-catcher-self-powered')).energySystem.thermal;assert.ok(hot.loopHardwareKg>hot.heatPump.massKg);assert.equal(hot.rotaryFluidAccounting.nominalPressureDropPa,null);assert.equal(hot.rotaryFluidAccounting.pressureDropStatus,'unclosed-working-fluid-selection');assert.equal(hot.rotaryFluidAccounting.qualificationStatus,'supplier-evidence-open');
 });
 
 test('Temperature ladder uses actual flow and flags unsupported phase/property states',()=>{

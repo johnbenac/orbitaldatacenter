@@ -19,9 +19,11 @@ for(const input of designs){
   if(r.parentId)assert(ids.has(r.parentId),'Missing parent of '+r.id);
   for(const id of r.relatedIds)assert(ids.has(id),'Missing related part '+id);
   for(const source of r.sources)assert.equal(new URL(source.url,'https://odc.test/').protocol,'https:');
-  if(r.category!=='flight'||r.massAccounting==='included-in-parent')assert.equal(r.extendedMassKg,undefined,'Non-additive row gained mass');
+  if(r.category!=='flight')assert.equal(r.extendedMassKg,undefined,'Ground/provider record entered the flight mass boundary');
+  if(r.massAccounting==='included-in-parent'&&r.extendedMassKg!==undefined){assert(r.electricalDefinition,'Explicit child mass needs a controlled allocation definition');assert(Number.isFinite(r.extendedMassKg)&&r.extendedMassKg>=0);assert.equal(c.byId[r.parentId].massAccounting,'mel-allocation');}
   for(const item of r.facts)assert(item.label&&item.value!==undefined,'Missing fact in '+r.id);
  }
+ for(const row of mel.rows){const children=c.records.filter(r=>r.parentId==='flight:'+row.wbs&&r.massAccounting==='included-in-parent'&&r.extendedMassKg!==undefined);const total=children.reduce((sum,r)=>sum+r.extendedMassKg,0);assert(total<=row.extendedMassKg+1e-8,'Child allocations exceed parent '+row.wbs);if(['07.05','08.01'].includes(row.wbs))assert(Math.abs(total-row.extendedMassKg)<1e-8,'Controlled electrical children do not close to parent '+row.wbs);}
  assert.deepEqual(c.flightTotals,mel.totals);
  assert.equal(!!c.byId['launch:upper'],launchFleet[input.launcher].stages>1);
  assert.equal(c.records.filter(r=>/^launch:booster-\d+$/.test(r.id)).length,launchFleet[input.launcher].boosters);
@@ -34,7 +36,10 @@ for(const input of designs){
 const h=sizeDesign(seed),c=buildPartsCatalog(h),resolve=s=>resolveScenePart(c,s)?.id;
 assert.equal(resolve({category:'flight',materialRole:'propellant-tank',rootKeys:['tankMap.fuel']}),'flight:06.03.01');
 assert.equal(resolve({category:'flight',materialRole:'propellant-tank',rootKeys:['tankMap.oxidizer']}),'flight:06.04.01');
-assert.equal(resolve({category:'flight',materialRole:'electronics-case',rootKeys:['avionics']}),'flight:08.01');
+assert.equal(resolve({category:'flight',materialRole:'electronics-case',rootKeys:['avionics']}),'flight:08.01.01','Avionics enclosure detail is now unique after separating payload switch and PCDU');
+assert.equal(resolve({category:'flight',rootKeys:['avionics']}),'flight:08.01');
+assert.equal(resolve({category:'flight',rootKeys:['pcdu']}),'flight:02.03');
+assert.equal(resolve({category:'flight',rootKeys:['fabric']}),'flight:01.04');
 assert.equal(resolve({category:'flight',instrument:'activeTerminal',rootKeys:['dish']}),'flight:05.02');
 assert.equal(resolve({category:'flight',instrument:'activeTerminal',rootKeys:['optic']}),'flight:05.03');
 assert.equal(resolve({category:'launch',name:'Engine nozzle',rootKey:'parts.upper'}),'launch:upper-engines');
@@ -52,8 +57,8 @@ assert.equal(resolveScenePart(c,{id:'not-a-part'}),null);
 // Every MEL lens, including nested material details, keeps stable part links.
 class Control{value='';innerHTML='';dataset={};handlers={};addEventListener(type,fn){this.handlers[type]=fn}setAttribute(){}focus(){}}
 const controls=new Map(),find=selector=>{if(!controls.has(selector))controls.set(selector,new Control());return controls.get(selector)};
-const lenses=['mass','materials','power','dimensions','heritage','maturity'].map(lens=>Object.assign(new Control(),{dataset:{lens}}));
+const lenses=['mass','electrical','materials','power','dimensions','heritage','maturity'].map(lens=>Object.assign(new Control(),{dataset:{lens}}));
 bindEquipmentList({dataset:{},matches:()=>true,querySelector:find,querySelectorAll:()=>lenses},h);
-for(const lens of lenses){lens.handlers.click();const html=find('.mel-scroll').innerHTML;assert(html.includes('data-open-part="flight:01.01"'));assert(html.includes('data-part-thumbnail="flight:01.01"'));if(lens.dataset.lens==='materials')assert(html.includes('data-open-part="flight:01.01.01"'));}
+for(const lens of lenses){lens.handlers.click();const html=find('.mel-scroll').innerHTML;const linked=lens.dataset.lens==='electrical'?'flight:07.05.10':'flight:01.01';assert(html.includes('data-open-part="'+linked+'"'));assert(html.includes('data-part-thumbnail="'+linked+'"'));if(lens.dataset.lens==='materials')assert(html.includes('data-open-part="flight:01.01.01"'));}
 releaseFiles();
-console.log('Parts catalog: '+designs.length+' design/launcher combinations, all MEL allocations, non-additive boundaries, exact scene selectors and six MEL lenses verified.');
+console.log('Parts catalog: '+designs.length+' design/launcher combinations, all MEL allocations, non-additive boundaries, exact scene selectors and seven MEL lenses verified.');

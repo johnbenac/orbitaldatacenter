@@ -32,7 +32,7 @@ export function hardwareDetailBudget({gpu=true,deviceMemory=globalThis.navigator
 }
 
 function candidateMesh(o){
- if(!o.isMesh||!o.geometry?.attributes?.position||o.isInstancedMesh||o.isSkinnedMesh||o.userData.hardwareDetail)return false;
+ if(!o.isMesh||!o.geometry?.attributes?.position||o.isInstancedMesh||o.isSkinnedMesh||o.userData.hardwareDetail||o.userData.hardwareDetailExclude||o.userData.dynamicConnection)return false;
  for(let p=o;p;p=p.parent){const d=p.userData||{};if(d.hardwareDetail||d.landscape||d.engineeringGraphic||d.sceneFlow||d.serviceCue||d.launchCloud||d.waterEffect||d.exhaust||d.missionPatch||d.launchMarking)return false;}
  const m=materials(o);return m.length>0&&!m.every(m=>m.userData?.physicalMaterial===false);
 }

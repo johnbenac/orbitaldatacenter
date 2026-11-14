@@ -59,6 +59,28 @@ export function superHeavyDeparture(t){
  }
  return {...recoveryCommand(elapsed,c),sideM,axialM};
 }
+
+// A continuous enclosure of the exact piecewise midpoint integrator above.
+// Within a 0.25 s step, the already accumulated position/velocity are fixed;
+// only h and the command at u+h/2 vary. Interval products enclose that entire
+// partial step. The result therefore covers every real time, not just a list
+// of sampled departure poses. Used by finite-radius launch routing proofs.
+export function superHeavyDepartureEnvelope(start,end){
+ if(!Number.isFinite(start)||!Number.isFinite(end)||end<start)throw new Error('Invalid departure envelope interval');
+ const c=launchClockFor('starship'),duration=c.boostbackCutoff-c.stageSeparation,lo=Math.max(0,Math.min(duration,start-c.stageSeparation)),hi=Math.max(0,Math.min(duration,end-c.stageSeparation)),ignite=c.boostbackStart-c.stageSeparation;
+ const product=(a,b)=>[Math.min(a[0]*b[0],a[0]*b[1],a[1]*b[0],a[1]*b[1]),Math.max(a[0]*b[0],a[0]*b[1],a[1]*b[0],a[1]*b[1])],rampRange=(a,b,x,y)=>[smooth((x-a)/(b-a)),smooth((y-a)/(b-a))],complement=r=>[1-r[1],1-r[0]];
+ const angleRange=[recoveryCommand(lo,c).angleRad,recoveryCommand(hi,c).angleRad],side=[Infinity,-Infinity],axial=[Infinity,-Infinity];let x=0,y=0,vx=0,vy=0;
+ function accelerationRange(a,b){
+  const pilot=complement(rampRange(duration-1,duration,a,b)).map(v=>v*.82),middle=product(rampRange(ignite,ignite+3,a,b),complement(rampRange(duration-7,duration-2,a,b))),outer=product(rampRange(ignite+2,ignite+7,a,b),complement(rampRange(duration-17,duration-12,a,b))),accel=[0,1].map(i=>47*(5*pilot[i]+8*middle[i]+20*outer[i])/33),angle=[recoveryCommand(a,c).angleRad,recoveryCommand(b,c).angleRad],s=[Math.min(Math.sin(angle[0]),Math.sin(angle[1])),angle[0]<=Math.PI/2&&angle[1]>=Math.PI/2?1:Math.max(Math.sin(angle[0]),Math.sin(angle[1]))],co=[Math.cos(angle[1]),Math.cos(angle[0])],sa=product(s,accel),ca=product(co,accel);
+  return {x:[-sa[1],-sa[0]],y:ca.map(v=>v-10.5)};
+ }
+ for(let u=0;u<=hi;u+=.25){
+  const h0=Math.max(0,lo-u),h1=Math.min(.25,hi-u);
+  if(h1>=0&&h0<=h1){const a=accelerationRange(u+h0*.5,u+h1*.5),squared=[h0*h0*.5,h1*h1*.5];for(const [range,p,v,acc]of [[side,x,vx,a.x],[axial,y,vy,a.y]]){const velocity=product([v,v],[h0,h1]),acceleration=product(acc,squared);range[0]=Math.min(range[0],p+velocity[0]+acceleration[0]);range[1]=Math.max(range[1],p+velocity[1]+acceleration[1]);}}
+  const cmd=recoveryCommand(u+.125,c),accel=47*(5*cmd.coreThrottle+8*cmd.middleThrottle+20*cmd.outerThrottle)/33,ax=-Math.sin(cmd.angleRad)*accel,ay=Math.cos(cmd.angleRad)*accel-10.5;x+=(vx+ax*.125)*.25;y+=(vy+ay*.125)*.25;vx+=ax*.25;vy+=ay*.25;
+ }
+ return {sideM:side.map((v,i)=>v+(i?1:-1)*1e-8),axialM:axial.map((v,i)=>v+(i?1:-1)*1e-8),angleRad:angleRange,basis:'Interval arithmetic over every partial 0.25 s midpoint-integration step, sharing the renderer’s exact command law.'};
+}
 // The aft inspection camera clears the separating booster's rendered envelope.
 export function shipEngineViewAvailable(id,t){
  return id==='starship'&&t>=launchClockFor(id).stageSeparation+45&&t<INSERTION_MET;

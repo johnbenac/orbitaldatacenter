@@ -9,7 +9,7 @@ import {createSimulation} from './dist/model.js';
 import {createScene} from './dist/scene.js';
 
 class Element{
- constructor(){this.children=[];this.style={};this.events={};this.attributes={};this.width=160;this.height=100;}
+ constructor(){this.children=[];this.style={};this.dataset={};this.events={};this.attributes={};this.width=160;this.height=100;}
  append(...children){this.children.push(...children);}
  replaceChildren(){this.children=[];}
  getBoundingClientRect(){return {width:this.width,height:this.height,left:0,top:0};}
@@ -69,7 +69,9 @@ function lights(studio){
   }
  }
 }
-viewer.setDomain('conops','E');viewer.setChapter('operations');
+// Keep the article geometry fixed while comparing lighting pixels. Automatic
+// detail refinement may add legitimate hardware between successive frames.
+viewer.setHardwareDetail('low');viewer.setDomain('conops','E');viewer.setChapter('operations');
 for(const view of ['spacecraft','core']){
  viewer.setView(view);viewer.update(hardware,night);viewer.setLightingMode('realistic');
  const [sky,dark]=paint();lights(false);

@@ -4,6 +4,8 @@
 import {componentMassProperties,equipmentAllocations,terminalMassElements,mechanismStations} from './component-stations.js';
 import {equipmentResources} from './equipment-resources.js';
 import {deploymentLayout,mechanismPose,leafPose,leafAxes} from './deployment.js';
+import {cableInstallationMassElements,workerOpticsMassElements} from './cable-installation-mass.js';
+import {radiatorPanelMaterialRectangles,radiatorPanelNetArea} from './radiator-surface-area.js';
 
 export const inertiaReferences=[
  {name:'NASA NESC · mass properties and rotational dynamics',url:'https://ntrs.nasa.gov/api/citations/20220013375/downloads/20220013375.pdf',note:'Sections 3.3–3.5 describe component moments and products, the parallel-axis theorem and Euler equations. Section 8.9 uses a centered wall-wetting liquid-shell approximation.'},
@@ -92,7 +94,7 @@ function intrinsicElement(id,massKg,centroidM,intrinsicTensorKgM2,axes=BODY_AXES
 
 const fixedCache=new WeakMap();
 function fixedShape(h,row){
- let cache=fixedCache.get(h);if(!cache){cache=new Map();fixedCache.set(h,cache)}
+ const revision=h.electricalMassRevision||0;let cache=fixedCache.get(h);if(!cache||cache.massRevision!==revision){cache=new Map();cache.massRevision=revision;fixedCache.set(h,cache)}
  if(cache.has(row.wbs))return cache.get(row.wbs);
  const {wbs,stationsM,stationShares,centroidM}=row,w=h.bodyWidthM,b=h.bodyHeightM,l=h.bodyLengthM;
  const resource=equipmentResources({wbs,quantity:stationsM.length},h);
@@ -132,8 +134,11 @@ function movingSurfaces(h,rows,deploy,attitude){
   elements.push({...intrinsicElement(prefix+'-roll',mass*(1-fraction),rolled,cylinderInertia(mass*(1-fraction),wing.rollRadius,g.ww,axes,2,g.coreRadiusM),axes),wbs:'02.01',kind:'solarRoll',symmetryAxis:2,spinAngleRad:wing.rollAngle});
  }
  for(const d of g.descriptors.filter(d=>d.type==='rad')){
-  const p=leafPose(g,d,deploy,h.input.solarTiltDeg,attitude),axes=leafAxes(p),mass=radiator.predictedKg*(d.width*d.depth)/g.descriptors.filter(q=>q.type==='rad').reduce((a,q)=>a+q.width*q.depth,0);
-  elements.push({...intrinsicElement('radiator-'+d.end+'-'+d.j,mass,[p.x,p.y,p.z],boxInertia(mass,[d.width,d.thickness,d.depth],axes),axes),wbs:'03.01',kind:'radiatorLeaf'});
+  const p=leafPose(g,d,deploy,h.input.solarTiltDeg,attitude),axes=leafAxes(p),area=g.descriptors.filter(q=>q.type==='rad').reduce((a,q)=>a+radiatorPanelNetArea(h,q),0);
+  for(const [index,piece]of radiatorPanelMaterialRectangles(h,d).entries()){
+   const mass=radiator.predictedKg*piece.areaM2/area,center=[p.x,p.y,p.z].map((value,axis)=>value+piece.centerM.reduce((offset,coordinate,k)=>offset+coordinate*axes[k][axis],0));
+   elements.push({...intrinsicElement('radiator-'+d.end+'-'+d.j+'-'+index,mass,center,boxInertia(mass,[piece.widthM,d.thickness,piece.depthM],axes),axes),wbs:'03.01',kind:'radiatorLeaf'});
+  }
  }
  return elements;
 }
@@ -159,20 +164,31 @@ function jointElements(h,rows,deploy,attitude){
   return {...intrinsicElement(station.id,mass,center,boxInertia(mass,[.16,.16,.20])),wbs:'07.04',kind:'mechanismJoint'};
  });
 }
+function cableInstallationElements(h,deploy,attitude){
+ const growth=1+(h.input.structureMargin??0);
+ return cableInstallationMassElements(h,deploy,attitude).map(part=>{
+  const mass=part.massKg*growth,tensor=part.intrinsicTensorPerKg?Array.from({length:9},(_,index)=>{const i=Math.floor(index/3),j=index%3;let value=0;for(let a=0;a<3;a++)for(let b=0;b<3;b++)value+=part.axes[a][i]*part.intrinsicTensorPerKg[a*3+b]*part.axes[b][j];return mass*value;}):boxInertia(mass,part.dimensionsM,part.axes);
+  return {...part,massKg:mass,intrinsicTensorKgM2:tensor,kind:'cableInstallationHardware'};
+ });
+}
+function opticsElements(h,deploy,attitude){
+ const growth=1+(h.input.structureMargin??0);
+ return workerOpticsMassElements(h,deploy,attitude).map(part=>({...part,massKg:part.massKg*growth,intrinsicTensorKgM2:boxInertia(part.massKg*growth,part.dimensionsM,part.axes),kind:'workerOptics'}));
+}
 const movingMassCache=new WeakMap();
 // Geometry-only path for mechanism angular momentum and rate derivatives.
 // Each axes array contains local X/Y/Z unit vectors in the body frame.
 // Tip-roll mass moves from the annulus into its blanket during deployment.
 export function movingMassElements(h,{deployment=1,attitude=null}={}){
- let rows=movingMassCache.get(h);
+ const revision=h.electricalMassRevision||0,saved=movingMassCache.get(h);let rows=saved?.massRevision===revision?saved.rows:null;
  if(!rows){
   const growth=1+(h.input.structureMargin??0);
   const pose=mechanismPose(deploymentLayout(h),1),counts={'02.01':pose.wings.length,'03.01':pose.banks.length,'07.04':mechanismStations(h).length};
   rows=equipmentAllocations(h).filter(r=>Object.hasOwn(counts,r.wbs)).map(r=>({...r,predictedKg:r.kg*growth,stationShares:Array(counts[r.wbs]).fill(1/counts[r.wbs])}));
-  movingMassCache.set(h,rows);
+  movingMassCache.set(h,{massRevision:revision,rows});
  }
  const u=Math.max(0,Math.min(1,deployment)),payload=h.payloadLocation==='radiator'?payloadElements(h,componentMassProperties(h,h.propellantKg,u,false,true,attitude).rows,u,attitude).filter(p=>p.moving):[];
- return [...movingSurfaces(h,rows,u,attitude),...payload,...terminalElements(h,attitude).filter(p=>p.moving),...jointElements(h,rows,u,attitude)];
+ return [...movingSurfaces(h,rows,u,attitude),...payload,...terminalElements(h,attitude).filter(p=>p.moving),...jointElements(h,rows,u,attitude),...cableInstallationElements(h,u,attitude).filter(p=>p.moving),...opticsElements(h,u,attitude).filter(p=>p.moving)];
 }
 function liquidShape(h,row){
  const tank=h.propulsion.tanks[Number(row.wbs.slice(3))-6],density=row.wbs==='06.06'?h.input.fuelDensity:h.input.oxidizerDensity;
@@ -195,16 +211,21 @@ const poseKeys=['wingPitchDeg','upperRadiatorPitchDeg','lowerRadiatorPitchDeg','
 // memory while allowing a control step and its finite-difference poses to recur.
 export function componentInertia(h,{remainingKg=h.propellantKg,deployment=1,adapterAttached=false,attitude=null}={}){
  const deploy=Math.max(0,Math.min(1,deployment)),left=Math.max(0,Math.min(h.propellantKg,remainingKg));
- const key=[left,deploy,Number(adapterAttached),...poseKeys.map(k=>attitude?.[k]??''),...(attitude?.dishBoresightBody??attitude?.dish??[]),...(attitude?.opticalBoresightBody??attitude?.optic??[])].join('/');
+ const key=[h.electricalMassRevision||0,left,deploy,Number(adapterAttached),...poseKeys.map(k=>attitude?.[k]??''),...(attitude?.dishBoresightBody??attitude?.dish??[]),...(attitude?.opticalBoresightBody??attitude?.optic??[])].join('/');
  let cache=recent.get(h);if(!cache){cache=new Map();recent.set(h,cache)}
  if(cache.has(key))return cache.get(key);
  const properties=componentMassProperties(h,left,deploy,adapterAttached,true,attitude),{rows,cm}=properties;
- const surfaces=movingSurfaces(h,rows,deploy,attitude),payload=payloadElements(h,rows,deploy,attitude),terminals=terminalElements(h,attitude),joints=jointElements(h,rows,deploy,attitude),tensorKgM2=zero(),contributions=[];
+ const surfaces=movingSurfaces(h,rows,deploy,attitude),payload=payloadElements(h,rows,deploy,attitude),terminals=terminalElements(h,attitude),joints=jointElements(h,rows,deploy,attitude),installation=cableInstallationElements(h,deploy,attitude),optics=opticsElements(h,deploy,attitude),tensorKgM2=zero(),contributions=[];
  for(const row of rows){
   let tensor,basis;
-  if(row.wbs==='02.01'||row.wbs==='03.01'){
+  if(row.installationPartId){
+   tensor=aboutPoint(installation.filter(part=>part.partId===row.installationPartId),cm);
+   basis='Actual boxes and annular material pieces at their installed body/platform frames; separately named rotary internal estimates use uniform allocated envelopes. Each physical assembly enters the ledger once.';
+  }else if(row.wbs==='01.05'){
+   tensor=aboutPoint(optics,cm);basis='Individual LR4 module envelopes at their actual allocated box/port interfaces. Compute-side modules follow the payload platform; switch-side modules remain fixed.';
+  }else if(row.wbs==='02.01'||row.wbs==='03.01'){
    tensor=aboutPoint(surfaces.filter(p=>p.wbs===row.wbs),cm);
-   basis=row.wbs==='02.01'?'Uniform wing mass split by paid-out length between each exposed blanket and its annular tip roll. Positions and axes follow the deployment geometry.':'Area-weighted radiator leaf volumes at their actual family deployment and operating poses; mass sums to the equipment allocation.';
+   basis=row.wbs==='02.01'?'Uniform wing mass split by paid-out length between each exposed blanket and its annular tip roll. Positions and axes follow the deployment geometry.':'Area-weighted remaining radiator material at the actual family pose. The Redwire root relief is excluded from plate mass, centroid and inertia; positive rectangular pieces sum to the equipment allocation.';
   }else if(h.payloadLocation==='radiator'&&['01.01','01.02','03.02','07.03'].includes(row.wbs)){
    tensor=aboutPoint(payload.filter(p=>p.wbs===row.wbs),cm);basis='Compute packages follow the deployable local radiator platform; auxiliary host allocation remains in the bus.';
   }else if(row.wbs==='05.02'||row.wbs==='05.03'){

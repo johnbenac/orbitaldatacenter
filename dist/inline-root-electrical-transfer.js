@@ -1,0 +1,48 @@
+import * as T from './vendor/three.module.js';
+import {deploymentLayout} from './deployment.js';
+import {connectionAnchor} from './connection-geometry.js';
+import {hollowFluidFitting} from './flight-fluid-routing.js';
+import {roleMaterial,tagMaterial} from './spacecraft-material-render.js';
+import {inlineRootConnectorLayout,inlineRootElectricalDimensions as D} from './inline-root-electrical-dimensions.js';
+const V=p=>new T.Vector3(...p);
+
+// Two explicitly represented rotary stages carry each declared two-conductor
+// source circuit across the allocated yaw/roll root. External cable sections
+// terminate on real fixed and rotating receptacles; no continuous wire is
+// pretended to pass through this two-axis joint. Contact capability and life
+// are open supplier-application requirements, not validated by this geometry.
+export function createInlineRootElectricalTransfer({factory,h,bankEnd,circuitIds,radiusM=.00675,connectorDiameterM=.042,connectorLengthM=.065,polesPerCable=1,material=null}={}){
+ const g=deploymentLayout(h),bank=g.banks?.find(b=>b.end===bankEnd);if(g.familyId!=='starcloud-inline'||!bank||!Array.isArray(circuitIds)||!circuitIds.length||new Set(circuitIds).size!==circuitIds.length)throw Error('Invalid inline root electrical channel declaration');
+ const descriptor=g.descriptors.find(d=>d.type==='rad'&&d.end===bankEnd&&d.j===0),first=factory.radiatorMeshes.get(descriptor),root=factory.root,metal=material||roleMaterial(h,'deployment-hardware'),contact=roleMaterial(h,'rf-contact'),id='inline-root-transfer:'+bankEnd,partId='flight:02.01',body=new T.Group(),yaw=new T.Group(),rotor=new T.Group(),parts=[],channels=[],matingConnectors=[],layout=inlineRootConnectorLayout({circuitCount:circuitIds.length,connectorDiameterM,connectorLengthM});
+ body.name=id+' fixed stator';body.position.set(...bank.root);body.userData={part:'solar',physicalPartId:partId,rotaryElectricalInterface:true,routingMotion:{kind:'rigid',frameId:'body',attachment:'body'}};root.add(body);
+ yaw.name=id+' yawing carrier';yaw.position.set(...bank.root);yaw.userData={part:'solar',physicalPartId:partId,rotaryElectricalInterface:true};yaw.userData.routingMotion={kind:'root-gimbal',frameId:yaw.uuid,bankEnd,axis:'yaw'};root.add(yaw);
+ rotor.name=id+' rolling output';rotor.position.set(0,-descriptor.normalOffset,-descriptor.depth/2);rotor.userData={part:'solar',physicalPartId:partId,rotaryElectricalInterface:true};first.add(rotor);
+ function mesh(parent,geometry,mat,name,position=[0,0,0]){const o=tagMaterial(new T.Mesh(geometry,mat));o.name=name;o.position.set(...position);o.userData={...o.userData,part:'solar',physicalPartId:partId,rotaryElectricalInterface:true};parent.add(o);parts.push(o);return o;}
+ function neck(parent,a,b,name){const va=V(a),vb=V(b),delta=vb.clone().sub(va),o=mesh(parent,new T.CylinderGeometry(D.channelRadiusM,D.channelRadiusM,delta.length(),12),metal,name,va.clone().add(vb).multiplyScalar(.5).toArray());o.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),delta.normalize());return o;}
+ const yawHousing=connectionAnchor(body,[0,D.yawBearingY,0],[0,1,0],id+' fixed yaw bearing'),rollHousing=connectionAnchor(yaw,[0,0,D.rollBearingZ],[0,0,1],id+' carried roll bearing');
+ parts.push(hollowFluidFitting(yawHousing,{outerRadiusM:D.bearingRadiusM,boreRadiusM:D.bearingBoreM,lengthM:D.bearingLengthM,material:metal,part:'solar',name:id+' open yaw stator housing'}),hollowFluidFitting(rollHousing,{outerRadiusM:D.bearingRadiusM,boreRadiusM:D.bearingBoreM,lengthM:D.bearingLengthM,material:metal,part:'solar',name:id+' open roll stator housing'}));
+ // A carried yoke connects the two bearing housings on the side opposite the
+ // fixed receptacles. Its solids remain part of every flight clearance audit.
+ mesh(yaw,new T.BoxGeometry(.035,.60,.035),metal,id+' yaw carrier upright',[0,.30,.25]);mesh(yaw,new T.BoxGeometry(.035,.035,.48),metal,id+' roll carrier arm',[0,0,.025]);
+ function port(parent,position,normal,name,channelId,role){const frame=connectionAnchor(parent,position,normal,name),portId=channelId+':'+role,outer=Math.max(connectorDiameterM/2,radiusM+.004);frame.userData={part:'harness',physicalPartId:partId,electricalPortId:portId,rotaryElectricalCircuitId:channelId};const socket=connectionAnchor(frame,[0,0,-.006],[0,0,1],name+' fixed receptacle'),plug=new T.Group();plug.name=name+' removable cable plug';frame.add(plug);parts.push(hollowFluidFitting(socket,{outerRadiusM:outer,boreRadiusM:outer*.89,lengthM:connectorLengthM*.70-.006,material:metal,part:'harness',name:name+' open receptacle'}),hollowFluidFitting(plug,{outerRadiusM:outer*.85,boreRadiusM:radiusM+.004,lengthM:connectorLengthM*.50,material:metal,part:'harness',name:name+' open cable plug'}));const exit=connectionAnchor(plug,[0,0,0],[0,0,1],name+' cable exit');exit.userData={part:'harness',physicalPartId:partId,electricalPortId:portId,rotaryElectricalCircuitId:channelId,routingOwnerId:frame.uuid};const fixture={id:portId,frame,plug,exit,matingTravel:.045,circuitId:channelId,role};exit.userData.routingMatingFixtureId=portId;matingConnectors.push(fixture);return exit;}
+ // Place the whole gland between the actual transverse frame rails. A hole
+ // through wall skins does not grant a passage through an uncut frame member.
+ const connectorPitch=layout.pitchM,lastRow=layout.lastRow,wallX=Math.sign(bank.root[0])*h.bodyWidthM/2,frameBounds=[];root.updateWorldMatrix(true,true);const inverse=root.matrixWorld.clone().invert();root.traverse(o=>{if(!o.isMesh||o.userData.materialRole!=='primary-frame')return;if(!o.geometry.boundingBox)o.geometry.computeBoundingBox();frameBounds.push(o.geometry.boundingBox.clone().applyMatrix4(inverse.clone().multiply(o.matrixWorld)));});
+ // During the allocated quarter-turn root roll, a rotating port at positive
+ // local Y reaches no lower than minus its complete X reach. Keep the fixed
+ // distribution bank below that swept band, including the removable plug and
+ // its full withdrawal stroke. The bank can therefore enter its wall gland
+ // without crossing a carried channel enclosure at any root angle.
+ const statorTopY=layout.statorTopYM,statorBaseY=layout.statorBaseYM;
+ if(bank.root[1]+statorBaseY-.05<=-h.bodyHeightM/2)throw Error('Inline fixed electrical distribution bank exceeds the allocated body face');
+ const statorOffsetZ=layout.statorOffsetCandidatesM.find(z=>{const throat=new T.Box3(V([wallX-.05,bank.root[1]+statorBaseY-.05,bank.root[2]+z-.05]),V([wallX+.05,bank.root[1]+statorTopY+.05,bank.root[2]+z+3*connectorPitch+.05]));return frameBounds.every(bounds=>!bounds.intersectsBox(throat));});
+ if(statorOffsetZ===undefined)throw Error('Inline electrical gland has no allocated uncut-frame passage: '+id);
+ circuitIds.forEach((circuitId,index)=>{
+  const {side,lane,row,column,statorYM,rotorPositionM}=layout.ports[index],statorPosition=[-Math.sign(bank.root[0])*D.fixedPortXM,statorYM,statorOffsetZ+column*connectorPitch],statorNormal=[-Math.sign(bank.root[0]),0,0],rotorPosition=[...rotorPositionM],rotorNormal=[side,0,0],stator=port(body,statorPosition,statorNormal,id+' '+circuitId+' fixed receptacle',circuitId,'root-stator'),output=port(rotor,rotorPosition,rotorNormal,id+' '+circuitId+' rotating receptacle',circuitId,'root-rotor');
+  neck(body,[0,statorPosition[1],0],statorPosition.map((v,i)=>v-statorNormal[i]*.045),id+' '+circuitId+' fixed channel enclosure');neck(rotor,[0,0,-.30],rotorPosition.map((v,i)=>v-rotorNormal[i]*.045),id+' '+circuitId+' rotating channel enclosure');
+  for(const [polarityIndex,polarity]of(polesPerCable===1?[index%2?'positive':'return']:['positive','return']).entries()){const k=index*polesPerCable+polarityIndex,station=(k-(circuitIds.length*polesPerCable-1)/2)*.008,y=.58+station,z=-.215+station,outer=mesh(yaw,new T.TorusGeometry(.164,.0025,8,32),contact,id+' '+circuitId+' '+polarity+' yaw collector',[0,y,0]);outer.rotation.x=Math.PI/2;const inner=mesh(rotor,new T.TorusGeometry(.164,.0025,8,32),contact,id+' '+circuitId+' '+polarity+' roll collector',[0,0,z]);for(const m of [outer,inner])m.userData.rotaryElectricalCircuitId=circuitId+'/'+polarity;mesh(body,new T.BoxGeometry(.012,.005,.012),contact,id+' fixed yaw brush',[.164,y,0]).userData.rotaryElectricalCircuitId=circuitId+'/'+polarity;mesh(yaw,new T.BoxGeometry(.012,.012,.005),contact,id+' carried roll brush',[.164,0,z]).userData.rotaryElectricalCircuitId=circuitId+'/'+polarity;}
+  channels.push({id:id+':'+circuitId,circuitId,partId,stator,rotor:output,statorPortId:stator.userData.electricalPortId,rotorPortId:output.userData.electricalPortId,poles:polesPerCable,polarity:polesPerCable===1?(index%2?'positive':'return'):'paired',circuitInstance:polesPerCable===1?Math.floor(index/2):index,rotaryStages:2,slidingContactsPerCircuit:2*polesPerCable,scope:'Body-fixed cable → yaw sliding contacts → carried roll contacts → first-leaf cable; two polarities remain individually identified.',qualification:'Project accommodation; source voltage/current, loss, isolation, wear, torque and supplier life qualification remain open.'});
+ });
+ function update(){root.updateWorldMatrix(true,true);first.updateWorldMatrix(true,false);const m=root.matrixWorld.clone().invert().multiply(first.matrixWorld),forward=new T.Vector3(0,0,1).transformDirection(m);yaw.rotation.y=Math.atan2(forward.x,forward.z);yaw.updateMatrixWorld(true);}
+ update();return {id,partId,bankEnd,body,yaw,rotor,parts,channels,matingConnectors,layout,statorPorts:new Map(channels.map(c=>[c.circuitId,c.stator])),rotorPorts:new Map(channels.map(c=>[c.circuitId,c.rotor])),update,qualification:'Explicit two-axis rotary electrical transfer allocation; external cable and collision checks do not qualify the sliding-contact hardware.'};
+}

@@ -1,0 +1,708 @@
+{
+  "sourceCommit": "86acb2c3b9254da97a142a0a56c4463359a889db",
+  "method": "libjpeg quantized-DCT coefficient copy, optimized progressive Huffman coding, all APP/COM markers retained",
+  "optimizer": "scripts/lossless-jpeg-optimize.c",
+  "checker": "scripts/check-lossless-jpeg.py",
+  "libraryVersion": "libjpeg-turbo 2.1.5 (system library, JPEG ABI 62)",
+  "records": [
+    {
+      "dimensions": [
+        4096,
+        4096
+      ],
+      "originalBytes": 6903402,
+      "optimizedBytes": 6470309,
+      "bytesSaved": 433093,
+      "rgbaExact": true,
+      "quantizationExact": true,
+      "appAndCommentMarkersExact": true,
+      "originalFileSha256": "ae7146eca68be5f87d25e082287aad74a24602c0da7bfd081790a994c18fefb4",
+      "optimizedFileSha256": "2f95608b2b41600213887a9657b66523833acb40f67ebf4414d0f5a33a8b9959",
+      "decodedRgbaSha256": "a523f545cf6dd8ee344d8a46e9017dcfe41072ee49b2d219896daf7bd19280df",
+      "path": "dist/assets/launch-sites/cape-slc37-detail.jpg"
+    },
+    {
+      "dimensions": [
+        4096,
+        4096
+      ],
+      "originalBytes": 7153857,
+      "optimizedBytes": 6702219,
+      "bytesSaved": 451638,
+      "rgbaExact": true,
+      "quantizationExact": true,
+      "appAndCommentMarkersExact": true,
+      "originalFileSha256": "911591ff81dafcfea60af995e98cfc3703ec36e72f7000d590b15bed5a916346",
+      "optimizedFileSha256": "43e80f397928377d024ad33148d6afc6a397d1d2aa82924a7ba2c37250b9bd16",
+      "decodedRgbaSha256": "548848fd183d255a1c4d035372147c5645d3046ee0bda5a0e98f90a11595d1d8",
+      "path": "dist/assets/launch-sites/cape-slc41-detail.jpg"
+    },
+    {
+      "dimensions": [
+        4096,
+        4096
+      ],
+      "originalBytes": 3344419,
+      "optimizedBytes": 3282866,
+      "bytesSaved": 61553,
+      "rgbaExact": true,
+      "quantizationExact": true,
+      "appAndCommentMarkersExact": true,
+      "originalFileSha256": "94941da7e019470e13ee2389549046ff38a2215c6d450bb27a9eae1d89882b0f",
+      "optimizedFileSha256": "2601d234b4f8c6252f9a8f148c71fabd107b0c06d8126a99c9eb47d9b1a98300",
+      "decodedRgbaSha256": "a17fa85db24e4b981cbbd241baac807032e45aacda7d17cb6562bf80488c731a",
+      "path": "dist/assets/launch-sites/kourou-regional.jpg"
+    },
+    {
+      "dimensions": [
+        4096,
+        4096
+      ],
+      "originalBytes": 6122871,
+      "optimizedBytes": 5809028,
+      "bytesSaved": 313843,
+      "rgbaExact": true,
+      "quantizationExact": true,
+      "appAndCommentMarkersExact": true,
+      "originalFileSha256": "9bfa994f057829a07b20e083a5b84cd29f7b6d2410781153b464f7394b080f3a",
+      "optimizedFileSha256": "2f7efd50635a30bf8bdf07d233f7aa3393de1ecdcc3da8495606da3f8fdb98de",
+      "decodedRgbaSha256": "23f00f58f015b9f5a2f3a90d0fc233d99ceb13e9c526570e83f0b0fbf6730e2b",
+      "path": "dist/assets/launch-sites/ksc-lc39a-detail.jpg"
+    },
+    {
+      "dimensions": [
+        4096,
+        4096
+      ],
+      "originalBytes": 6187864,
+      "optimizedBytes": 5877545,
+      "bytesSaved": 310319,
+      "rgbaExact": true,
+      "quantizationExact": true,
+      "appAndCommentMarkersExact": true,
+      "originalFileSha256": "430cba4edeb175c04c5535533199dd747a41f9bab4dc6ef3aa2c80a886defbe9",
+      "optimizedFileSha256": "7de4e90a20192c64a9d2cdeb685cf539ffe99dd33010d0f94efd89af1ab1e291",
+      "decodedRgbaSha256": "fe559c5bb01367779bec43e572c22e5a46553c0f5645c5bb2c531e1c47568259",
+      "path": "dist/assets/launch-sites/pecan-island-detail.jpg"
+    },
+    {
+      "dimensions": [
+        4096,
+        4096
+      ],
+      "originalBytes": 5462328,
+      "optimizedBytes": 5207420,
+      "bytesSaved": 254908,
+      "rgbaExact": true,
+      "quantizationExact": true,
+      "appAndCommentMarkersExact": true,
+      "originalFileSha256": "dc853af2ee9a2c7e5c6a0b256bf58ab2a028393ac2fe84f6e731f376ac71cbde",
+      "optimizedFileSha256": "9a3652e0199b4f12ceba52c7b20197608030a504989dcf6ab5468461be6a57c4",
+      "decodedRgbaSha256": "08704a5eff50041e4cb39e7264d23b4d9a46b81059374004ba221a28da2d18f8",
+      "path": "dist/assets/launch-sites/pecan-island-regional.jpg"
+    },
+    {
+      "dimensions": [
+        4096,
+        4096
+      ],
+      "originalBytes": 5020217,
+      "optimizedBytes": 4826529,
+      "bytesSaved": 193688,
+      "rgbaExact": true,
+      "quantizationExact": true,
+      "appAndCommentMarkersExact": true,
+      "originalFileSha256": "f61013a967e20df9a0d97449f39e7d0f6309c9069b0a1a145dbeba66ce30acd6",
+      "optimizedFileSha256": "7e249323ce4be17612c0bd0aa8ae581aa5e1e333f3af439889ca7760b0e48f64",
+      "decodedRgbaSha256": "a41c46f9f7148217ec3ce6cd41cece3ddbcdbae4d215ad8758e2d26dd365ca4d",
+      "path": "dist/assets/launch-sites/space-coast-regional.jpg"
+    },
+    {
+      "dimensions": [
+        4096,
+        4096
+      ],
+      "originalBytes": 4963433,
+      "optimizedBytes": 4774404,
+      "bytesSaved": 189029,
+      "rgbaExact": true,
+      "quantizationExact": true,
+      "appAndCommentMarkersExact": true,
+      "originalFileSha256": "f372bf43acb6ed7c03e13f5c3ab6313d8fd502dcd975faf4b4e7ef95dad8fa21",
+      "optimizedFileSha256": "4c7e111333faaab70bfe2b36be2cf2de1ad226ebe7d930b5097491011fd220e5",
+      "decodedRgbaSha256": "7cbaadb0225a887dcafeed7d25e5857597dba8a6991c7a24df7e121a168bdb65",
+      "path": "dist/assets/launch-sites/starbase-detail.jpg"
+    },
+    {
+      "dimensions": [
+        4096,
+        4096
+      ],
+      "originalBytes": 3779604,
+      "optimizedBytes": 3663973,
+      "bytesSaved": 115631,
+      "rgbaExact": true,
+      "quantizationExact": true,
+      "appAndCommentMarkersExact": true,
+      "originalFileSha256": "7d776a0caa0a7270ce1312a568231120aa8e95b9ec54486a6e6f6e69d0809fbf",
+      "optimizedFileSha256": "624d8355ced2ec00fadaa4139661e46406c14783fcc66acf5157f179c3c455d6",
+      "decodedRgbaSha256": "34106b42310c998bd16a8840227da0f7116cae8a3f7faec88703f3714f4dc6d7",
+      "path": "dist/assets/launch-sites/starbase-regional.jpg"
+    },
+    {
+      "dimensions": [
+        4096,
+        4096
+      ],
+      "originalBytes": 4538573,
+      "optimizedBytes": 4306932,
+      "bytesSaved": 231641,
+      "rgbaExact": true,
+      "quantizationExact": true,
+      "appAndCommentMarkersExact": true,
+      "originalFileSha256": "c07dcca796aed2d882156ee1e9588d36d1495d51bf4d124931b5fc1628549261",
+      "optimizedFileSha256": "4e0cc2144d11aeea572a293ff43e8eb0cea07a8166ce613452f142e073a8641d",
+      "decodedRgbaSha256": "7f97620dcd9136b42b4d0f8b747119d53ac2e611ce9b50e2cd534a54e6e60d55",
+      "path": "dist/assets/launch-sites/vandenberg-regional.jpg"
+    },
+    {
+      "dimensions": [
+        4096,
+        4096
+      ],
+      "originalBytes": 6048442,
+      "optimizedBytes": 5820354,
+      "bytesSaved": 228088,
+      "rgbaExact": true,
+      "quantizationExact": true,
+      "appAndCommentMarkersExact": true,
+      "originalFileSha256": "642dec541cda8d8051771c132c3fad02de2e132935acd9bb4068efe30ded11ad",
+      "optimizedFileSha256": "3741d91b3807f37d14f7a53dbf542edf4fc97b420d4e84325a7d04c9c5e03d64",
+      "decodedRgbaSha256": "33025b02e2f4214cc35d586ac3aa5fa9df102bac54a128d408c5c5662feea109",
+      "path": "dist/assets/launch-sites/vandenberg-slc3e-detail.jpg"
+    },
+    {
+      "dimensions": [
+        4096,
+        4096
+      ],
+      "originalBytes": 5619915,
+      "optimizedBytes": 5410375,
+      "bytesSaved": 209540,
+      "rgbaExact": true,
+      "quantizationExact": true,
+      "appAndCommentMarkersExact": true,
+      "originalFileSha256": "93006fba9ed0c64e4834fceffaa747c8a9b248eadd533e1d40bfc466d640c675",
+      "optimizedFileSha256": "89b767b2dd4bc704e9d4d246a36da4b4746af1f93f357f5fa9eb9724369bc56a",
+      "decodedRgbaSha256": "410c7722f8b305e2e7bd206af7dd000889ce53385ffbbfda458631a6b3ebc345",
+      "path": "dist/assets/launch-sites/vandenberg-slc6-detail.jpg"
+    },
+    {
+      "dimensions": [
+        2048,
+        2048
+      ],
+      "originalBytes": 1389112,
+      "optimizedBytes": 1321238,
+      "bytesSaved": 67874,
+      "rgbaExact": true,
+      "quantizationExact": true,
+      "appAndCommentMarkersExact": true,
+      "originalFileSha256": "a835719ba3a6e903231dfdccf2d43f1fbd32a1961b4ca22bdef78fa1da762b65",
+      "optimizedFileSha256": "ccac288f797aa89a29e3e323f3a68e2e95b257efd143ea8bc196df79595215ec",
+      "decodedRgbaSha256": "3b386f0aee88f597867cf6c5986419e013dc2a66c20abda31b954bc6f712c3dd",
+      "path": "dist/assets/launch-sites/wenchang-regional.jpg"
+    }
+  ],
+  "totalOriginalBytes": 66534037,
+  "totalOptimizedBytes": 63473192,
+  "totalBytesSaved": 3060845,
+  "scope": "JPEG encoding only; all image paths, decoded pixels, dimensions, quantization tables and APP/COM metadata retained. No application, model, design-data or geometry change.",
+  "headerSources": [
+    "https://github.com/libjpeg-turbo/libjpeg-turbo/blob/2.1.5/jpeglib.h",
+    "https://github.com/libjpeg-turbo/libjpeg-turbo/blob/2.1.5/jmorecfg.h",
+    "https://github.com/libjpeg-turbo/libjpeg-turbo/blob/2.1.5/jconfig.h.in"
+  ],
+  "packageComparison": {
+    "before": {
+      "fileCount": 2583,
+      "fileBytes": 268110385,
+      "expandedTarBytes": 270080000,
+      "compressedBytes": 258856606
+    },
+    "after": {
+      "fileCount": 2583,
+      "fileBytes": 265049540,
+      "expandedTarBytes": 267018240,
+      "compressedBytes": 255525509
+    },
+    "limitBytes": 268435456,
+    "headroomBytes": 1417216,
+    "identicalFileInventory": true,
+    "onlyChangedPayloadsAreVerifiedJpegs": true,
+    "unchangedPayloadFileCount": 2570
+  },
+  "independentMarkerReview": {
+    "sourceCommit": "86acb2c3b9254da97a142a0a56c4463359a889db",
+    "scope": "All 13 selected JPEGs; original bytes recovered from committed source; optimized bytes from working tree match saved proof hashes. No repository edits.",
+    "completeJpegMarkerStreamsCompared": true,
+    "allPassed": true,
+    "records": [
+      {
+        "path": "dist/assets/launch-sites/cape-slc37-detail.jpg",
+        "originalSha256": "ae7146eca68be5f87d25e082287aad74a24602c0da7bfd081790a994c18fefb4",
+        "optimizedSha256": "2f95608b2b41600213887a9657b66523833acb40f67ebf4414d0f5a33a8b9959",
+        "completeStreamAppAndCommentMarkersExact": true,
+        "metadataMarkerCount": 1,
+        "metadataPayloadBytes": 14,
+        "frameParametersExact": true,
+        "width": 4096,
+        "height": 4096,
+        "dataPrecision": 8,
+        "components": [
+          {
+            "id": 1,
+            "horizontalSampling": 1,
+            "verticalSampling": 1,
+            "quantizationTable": 0
+          },
+          {
+            "id": 2,
+            "horizontalSampling": 1,
+            "verticalSampling": 1,
+            "quantizationTable": 1
+          },
+          {
+            "id": 3,
+            "horizontalSampling": 1,
+            "verticalSampling": 1,
+            "quantizationTable": 1
+          }
+        ],
+        "noTrailingDataAfterEoi": true,
+        "originalScanCount": 1,
+        "optimizedScanCount": 10
+      },
+      {
+        "path": "dist/assets/launch-sites/cape-slc41-detail.jpg",
+        "originalSha256": "911591ff81dafcfea60af995e98cfc3703ec36e72f7000d590b15bed5a916346",
+        "optimizedSha256": "43e80f397928377d024ad33148d6afc6a397d1d2aa82924a7ba2c37250b9bd16",
+        "completeStreamAppAndCommentMarkersExact": true,
+        "metadataMarkerCount": 1,
+        "metadataPayloadBytes": 14,
+        "frameParametersExact": true,
+        "width": 4096,
+        "height": 4096,
+        "dataPrecision": 8,
+        "components": [
+          {
+            "id": 1,
+            "horizontalSampling": 1,
+            "verticalSampling": 1,
+            "quantizationTable": 0
+          },
+          {
+            "id": 2,
+            "horizontalSampling": 1,
+            "verticalSampling": 1,
+            "quantizationTable": 1
+          },
+          {
+            "id": 3,
+            "horizontalSampling": 1,
+            "verticalSampling": 1,
+            "quantizationTable": 1
+          }
+        ],
+        "noTrailingDataAfterEoi": true,
+        "originalScanCount": 1,
+        "optimizedScanCount": 10
+      },
+      {
+        "path": "dist/assets/launch-sites/kourou-regional.jpg",
+        "originalSha256": "94941da7e019470e13ee2389549046ff38a2215c6d450bb27a9eae1d89882b0f",
+        "optimizedSha256": "2601d234b4f8c6252f9a8f148c71fabd107b0c06d8126a99c9eb47d9b1a98300",
+        "completeStreamAppAndCommentMarkersExact": true,
+        "metadataMarkerCount": 1,
+        "metadataPayloadBytes": 14,
+        "frameParametersExact": true,
+        "width": 4096,
+        "height": 4096,
+        "dataPrecision": 8,
+        "components": [
+          {
+            "id": 1,
+            "horizontalSampling": 1,
+            "verticalSampling": 1,
+            "quantizationTable": 0
+          },
+          {
+            "id": 2,
+            "horizontalSampling": 1,
+            "verticalSampling": 1,
+            "quantizationTable": 1
+          },
+          {
+            "id": 3,
+            "horizontalSampling": 1,
+            "verticalSampling": 1,
+            "quantizationTable": 1
+          }
+        ],
+        "noTrailingDataAfterEoi": true,
+        "originalScanCount": 1,
+        "optimizedScanCount": 10
+      },
+      {
+        "path": "dist/assets/launch-sites/ksc-lc39a-detail.jpg",
+        "originalSha256": "9bfa994f057829a07b20e083a5b84cd29f7b6d2410781153b464f7394b080f3a",
+        "optimizedSha256": "2f7efd50635a30bf8bdf07d233f7aa3393de1ecdcc3da8495606da3f8fdb98de",
+        "completeStreamAppAndCommentMarkersExact": true,
+        "metadataMarkerCount": 1,
+        "metadataPayloadBytes": 14,
+        "frameParametersExact": true,
+        "width": 4096,
+        "height": 4096,
+        "dataPrecision": 8,
+        "components": [
+          {
+            "id": 1,
+            "horizontalSampling": 1,
+            "verticalSampling": 1,
+            "quantizationTable": 0
+          },
+          {
+            "id": 2,
+            "horizontalSampling": 1,
+            "verticalSampling": 1,
+            "quantizationTable": 1
+          },
+          {
+            "id": 3,
+            "horizontalSampling": 1,
+            "verticalSampling": 1,
+            "quantizationTable": 1
+          }
+        ],
+        "noTrailingDataAfterEoi": true,
+        "originalScanCount": 1,
+        "optimizedScanCount": 10
+      },
+      {
+        "path": "dist/assets/launch-sites/pecan-island-detail.jpg",
+        "originalSha256": "430cba4edeb175c04c5535533199dd747a41f9bab4dc6ef3aa2c80a886defbe9",
+        "optimizedSha256": "7de4e90a20192c64a9d2cdeb685cf539ffe99dd33010d0f94efd89af1ab1e291",
+        "completeStreamAppAndCommentMarkersExact": true,
+        "metadataMarkerCount": 1,
+        "metadataPayloadBytes": 14,
+        "frameParametersExact": true,
+        "width": 4096,
+        "height": 4096,
+        "dataPrecision": 8,
+        "components": [
+          {
+            "id": 1,
+            "horizontalSampling": 1,
+            "verticalSampling": 1,
+            "quantizationTable": 0
+          },
+          {
+            "id": 2,
+            "horizontalSampling": 1,
+            "verticalSampling": 1,
+            "quantizationTable": 1
+          },
+          {
+            "id": 3,
+            "horizontalSampling": 1,
+            "verticalSampling": 1,
+            "quantizationTable": 1
+          }
+        ],
+        "noTrailingDataAfterEoi": true,
+        "originalScanCount": 1,
+        "optimizedScanCount": 10
+      },
+      {
+        "path": "dist/assets/launch-sites/pecan-island-regional.jpg",
+        "originalSha256": "dc853af2ee9a2c7e5c6a0b256bf58ab2a028393ac2fe84f6e731f376ac71cbde",
+        "optimizedSha256": "9a3652e0199b4f12ceba52c7b20197608030a504989dcf6ab5468461be6a57c4",
+        "completeStreamAppAndCommentMarkersExact": true,
+        "metadataMarkerCount": 1,
+        "metadataPayloadBytes": 14,
+        "frameParametersExact": true,
+        "width": 4096,
+        "height": 4096,
+        "dataPrecision": 8,
+        "components": [
+          {
+            "id": 1,
+            "horizontalSampling": 1,
+            "verticalSampling": 1,
+            "quantizationTable": 0
+          },
+          {
+            "id": 2,
+            "horizontalSampling": 1,
+            "verticalSampling": 1,
+            "quantizationTable": 1
+          },
+          {
+            "id": 3,
+            "horizontalSampling": 1,
+            "verticalSampling": 1,
+            "quantizationTable": 1
+          }
+        ],
+        "noTrailingDataAfterEoi": true,
+        "originalScanCount": 1,
+        "optimizedScanCount": 10
+      },
+      {
+        "path": "dist/assets/launch-sites/space-coast-regional.jpg",
+        "originalSha256": "f61013a967e20df9a0d97449f39e7d0f6309c9069b0a1a145dbeba66ce30acd6",
+        "optimizedSha256": "7e249323ce4be17612c0bd0aa8ae581aa5e1e333f3af439889ca7760b0e48f64",
+        "completeStreamAppAndCommentMarkersExact": true,
+        "metadataMarkerCount": 1,
+        "metadataPayloadBytes": 14,
+        "frameParametersExact": true,
+        "width": 4096,
+        "height": 4096,
+        "dataPrecision": 8,
+        "components": [
+          {
+            "id": 1,
+            "horizontalSampling": 1,
+            "verticalSampling": 1,
+            "quantizationTable": 0
+          },
+          {
+            "id": 2,
+            "horizontalSampling": 1,
+            "verticalSampling": 1,
+            "quantizationTable": 1
+          },
+          {
+            "id": 3,
+            "horizontalSampling": 1,
+            "verticalSampling": 1,
+            "quantizationTable": 1
+          }
+        ],
+        "noTrailingDataAfterEoi": true,
+        "originalScanCount": 1,
+        "optimizedScanCount": 10
+      },
+      {
+        "path": "dist/assets/launch-sites/starbase-detail.jpg",
+        "originalSha256": "f372bf43acb6ed7c03e13f5c3ab6313d8fd502dcd975faf4b4e7ef95dad8fa21",
+        "optimizedSha256": "4c7e111333faaab70bfe2b36be2cf2de1ad226ebe7d930b5097491011fd220e5",
+        "completeStreamAppAndCommentMarkersExact": true,
+        "metadataMarkerCount": 1,
+        "metadataPayloadBytes": 14,
+        "frameParametersExact": true,
+        "width": 4096,
+        "height": 4096,
+        "dataPrecision": 8,
+        "components": [
+          {
+            "id": 1,
+            "horizontalSampling": 1,
+            "verticalSampling": 1,
+            "quantizationTable": 0
+          },
+          {
+            "id": 2,
+            "horizontalSampling": 1,
+            "verticalSampling": 1,
+            "quantizationTable": 1
+          },
+          {
+            "id": 3,
+            "horizontalSampling": 1,
+            "verticalSampling": 1,
+            "quantizationTable": 1
+          }
+        ],
+        "noTrailingDataAfterEoi": true,
+        "originalScanCount": 1,
+        "optimizedScanCount": 10
+      },
+      {
+        "path": "dist/assets/launch-sites/starbase-regional.jpg",
+        "originalSha256": "7d776a0caa0a7270ce1312a568231120aa8e95b9ec54486a6e6f6e69d0809fbf",
+        "optimizedSha256": "624d8355ced2ec00fadaa4139661e46406c14783fcc66acf5157f179c3c455d6",
+        "completeStreamAppAndCommentMarkersExact": true,
+        "metadataMarkerCount": 1,
+        "metadataPayloadBytes": 14,
+        "frameParametersExact": true,
+        "width": 4096,
+        "height": 4096,
+        "dataPrecision": 8,
+        "components": [
+          {
+            "id": 1,
+            "horizontalSampling": 1,
+            "verticalSampling": 1,
+            "quantizationTable": 0
+          },
+          {
+            "id": 2,
+            "horizontalSampling": 1,
+            "verticalSampling": 1,
+            "quantizationTable": 1
+          },
+          {
+            "id": 3,
+            "horizontalSampling": 1,
+            "verticalSampling": 1,
+            "quantizationTable": 1
+          }
+        ],
+        "noTrailingDataAfterEoi": true,
+        "originalScanCount": 1,
+        "optimizedScanCount": 10
+      },
+      {
+        "path": "dist/assets/launch-sites/vandenberg-regional.jpg",
+        "originalSha256": "c07dcca796aed2d882156ee1e9588d36d1495d51bf4d124931b5fc1628549261",
+        "optimizedSha256": "4e0cc2144d11aeea572a293ff43e8eb0cea07a8166ce613452f142e073a8641d",
+        "completeStreamAppAndCommentMarkersExact": true,
+        "metadataMarkerCount": 1,
+        "metadataPayloadBytes": 14,
+        "frameParametersExact": true,
+        "width": 4096,
+        "height": 4096,
+        "dataPrecision": 8,
+        "components": [
+          {
+            "id": 1,
+            "horizontalSampling": 1,
+            "verticalSampling": 1,
+            "quantizationTable": 0
+          },
+          {
+            "id": 2,
+            "horizontalSampling": 1,
+            "verticalSampling": 1,
+            "quantizationTable": 1
+          },
+          {
+            "id": 3,
+            "horizontalSampling": 1,
+            "verticalSampling": 1,
+            "quantizationTable": 1
+          }
+        ],
+        "noTrailingDataAfterEoi": true,
+        "originalScanCount": 1,
+        "optimizedScanCount": 10
+      },
+      {
+        "path": "dist/assets/launch-sites/vandenberg-slc3e-detail.jpg",
+        "originalSha256": "642dec541cda8d8051771c132c3fad02de2e132935acd9bb4068efe30ded11ad",
+        "optimizedSha256": "3741d91b3807f37d14f7a53dbf542edf4fc97b420d4e84325a7d04c9c5e03d64",
+        "completeStreamAppAndCommentMarkersExact": true,
+        "metadataMarkerCount": 1,
+        "metadataPayloadBytes": 14,
+        "frameParametersExact": true,
+        "width": 4096,
+        "height": 4096,
+        "dataPrecision": 8,
+        "components": [
+          {
+            "id": 1,
+            "horizontalSampling": 1,
+            "verticalSampling": 1,
+            "quantizationTable": 0
+          },
+          {
+            "id": 2,
+            "horizontalSampling": 1,
+            "verticalSampling": 1,
+            "quantizationTable": 1
+          },
+          {
+            "id": 3,
+            "horizontalSampling": 1,
+            "verticalSampling": 1,
+            "quantizationTable": 1
+          }
+        ],
+        "noTrailingDataAfterEoi": true,
+        "originalScanCount": 1,
+        "optimizedScanCount": 10
+      },
+      {
+        "path": "dist/assets/launch-sites/vandenberg-slc6-detail.jpg",
+        "originalSha256": "93006fba9ed0c64e4834fceffaa747c8a9b248eadd533e1d40bfc466d640c675",
+        "optimizedSha256": "89b767b2dd4bc704e9d4d246a36da4b4746af1f93f357f5fa9eb9724369bc56a",
+        "completeStreamAppAndCommentMarkersExact": true,
+        "metadataMarkerCount": 1,
+        "metadataPayloadBytes": 14,
+        "frameParametersExact": true,
+        "width": 4096,
+        "height": 4096,
+        "dataPrecision": 8,
+        "components": [
+          {
+            "id": 1,
+            "horizontalSampling": 1,
+            "verticalSampling": 1,
+            "quantizationTable": 0
+          },
+          {
+            "id": 2,
+            "horizontalSampling": 1,
+            "verticalSampling": 1,
+            "quantizationTable": 1
+          },
+          {
+            "id": 3,
+            "horizontalSampling": 1,
+            "verticalSampling": 1,
+            "quantizationTable": 1
+          }
+        ],
+        "noTrailingDataAfterEoi": true,
+        "originalScanCount": 1,
+        "optimizedScanCount": 10
+      },
+      {
+        "path": "dist/assets/launch-sites/wenchang-regional.jpg",
+        "originalSha256": "a835719ba3a6e903231dfdccf2d43f1fbd32a1961b4ca22bdef78fa1da762b65",
+        "optimizedSha256": "ccac288f797aa89a29e3e323f3a68e2e95b257efd143ea8bc196df79595215ec",
+        "completeStreamAppAndCommentMarkersExact": true,
+        "metadataMarkerCount": 1,
+        "metadataPayloadBytes": 14,
+        "frameParametersExact": true,
+        "width": 2048,
+        "height": 2048,
+        "dataPrecision": 8,
+        "components": [
+          {
+            "id": 1,
+            "horizontalSampling": 1,
+            "verticalSampling": 1,
+            "quantizationTable": 0
+          },
+          {
+            "id": 2,
+            "horizontalSampling": 1,
+            "verticalSampling": 1,
+            "quantizationTable": 1
+          },
+          {
+            "id": 3,
+            "horizontalSampling": 1,
+            "verticalSampling": 1,
+            "quantizationTable": 1
+          }
+        ],
+        "noTrailingDataAfterEoi": true,
+        "originalScanCount": 1,
+        "optimizedScanCount": 10
+      }
+    ]
+  }
+}

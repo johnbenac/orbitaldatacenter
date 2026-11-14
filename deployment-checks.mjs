@@ -71,7 +71,13 @@ function stowedMeshMargin(h,craft){
  return margin;
 }
 function fixedBoxes(craft){
- const ignore=new Set([craft.appendages,craft.internal,craft.service,craft.gyroPack,...craft.plumes]);
+ // Electrical equipment is inside the same accommodation as `internal` but
+ // uses an unscaled body frame. A batched flexible harness is not a rigid
+ // filled OBB spanning all its branches: that proxy falsely occupies empty
+ // space through the whole spacecraft. electrical-geometry-checks audits its
+ // actual tube buffers, port support, minimum bends and changing poses. The
+ // stowed mesh keep-in above still includes every rendered harness vertex.
+ const ignore=new Set([craft.appendages,craft.internal,craft.electricalEquipment,craft.harnesses,craft.service,craft.gyroPack,...craft.plumes]);
  const fixed=[];
  function visit(o){if(!o.visible||ignore.has(o))return;if(o.isMesh)fixed.push(meshBox(o));for(const c of o.children)visit(c);}
  visit(craft.root);return fixed;
@@ -105,17 +111,23 @@ function testSeparation(){
 function cylinderEnd(mesh,upper){return V(0,upper?.5:-.5,0).applyMatrix4(mesh.matrixWorld);}
 function connections(banks){
  let hinge=0,hose=0,developed=0;
- for(const {rootPin,rootSocket,elbowPin,elbowSocket,foldJoints,hoses} of banks){
+ for(const {rootPin,rootSocket,elbowPin,elbowSocket,foldJoints,hoses,pitchTransfers} of banks){
   for(const [pin,socket] of [[rootPin,rootSocket],[elbowPin,elbowSocket],...(foldJoints?foldJoints.map(j=>[j.pin,j.socket]):[])]){
    assert.notEqual(pin.parent,socket.parent,'Each half-hinge must belong to its own rigid body');
    hinge=Math.max(hinge,world(pin).distanceTo(world(socket)));
    const a=V(1,0,0).transformDirection(pin.matrixWorld),b=V(1,0,0).transformDirection(socket.matrixWorld);
    assert(a.dot(b)>1-1e-8,'Coaxial hinge axes');
   }
-  assert.equal(hoses.length,2*(1+(foldJoints?.length??1)),'Supply and return hoses at every installed hinge');
-  for(const {seg,restLength,fromPort,toPort} of hoses){
+  assert.equal(hoses.length,2*((pitchTransfers?0:1)+(foldJoints?.length??1)),'Supply and return at each hinge: coaxial root transfer or complete flexible pair');
+  if(pitchTransfers){assert.equal(Object.keys(pitchTransfers).length,2,'Independent supply and return pitch channels');for(const {inlet,outlet,stator,rotor} of Object.values(pitchTransfers)){
+   assert.notEqual(inlet.parent,outlet.parent,'Pitch transfer must attach to fixed and moving halves');
+   const a=V(0,1,0).transformDirection(stator.matrixWorld),b=V(0,1,0).transformDirection(rotor.matrixWorld),separation=world(rotor).sub(world(stator));
+   assert(a.dot(b)>1-1e-8,'Coaxial pitch fluid transfer axes');assert(separation.clone().addScaledVector(a,-separation.dot(a)).length()<tolerance,'Pitch transfer spindle remains on the shared axis');
+  }}
+  for(const {seg,tube,restLength,fromPort,toPort} of hoses){
    let last=world(fromPort),length=0;
-   for(const tube of seg){
+   if(tube){const points=tube.sampledPoints().map(p=>p.applyMatrix4(tube.mesh.matrixWorld));hose=Math.max(hose,points[0].distanceTo(last));for(let i=1;i<points.length;i++)length+=points[i].distanceTo(points[i-1]);last=points.at(-1);}
+   for(const tube of seg||[]){
     const start=cylinderEnd(tube,false),end=cylinderEnd(tube,true);
     hose=Math.max(hose,start.distanceTo(last));length+=end.distanceTo(start);last=end;
    }

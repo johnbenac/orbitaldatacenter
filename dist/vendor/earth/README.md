@@ -60,3 +60,5 @@ python scripts/prepare-earth-assets.py --download --source-dir /tmp/odc-earth-so
 The script pins all source SHA-256 values before processing. Existing originals can be placed in that directory using the filenames recorded in `manifest.json`; omit `--download` for an offline rebuild. Use `--output` for an alternate destination. Source TIFFs and full-resolution originals are not part of the deployed site.
 
 Processing consists of Lanczos resampling, tiled crops, neighboring-pixel gutters, grayscale cloud conversion, inverse-alpha water extraction and optimized progressive JPEG/PNG encoding. No sharpening, generated detail, geographic recoloring or fabricated weather is added. JPEG color images use no chroma subsampling; clouds are grayscale. Individual byte counts and checksums are in the manifest.
+
+The source manifest is preserved byte-for-byte in manifest.json.zip.

@@ -1,3 +1,4 @@
+import {protectedFluidAllocation} from './protected-fluid-allocation.js';
 import {architectureFamily,architectureTerminalStations} from './architecture-families.js';
 import {payloadFreeMET,INSERTION_MET} from './launch-effects-state.js';
 // Quaternions [x,y,z,w] actively rotate body vectors into Earth-centred inertial axes.
@@ -25,7 +26,7 @@ const rad2deg=1/DEG;
 const motionCaps={wingRateDegS:2,radiatorRateDegS:.4,radiatorTrimRateDegS:.75,radiatorTrimStopDeg:105,dishRateDegS:4,opticalRateDegS:3,terminalConeDeg:75,pointingToleranceDeg:.75};
 const limitCache=new WeakMap();
 export function attitudeLimits(h){
- if(limitCache.has(h))return limitCache.get(h);
+ const revision=h.electricalMassRevision||0,cached=limitCache.get(h);if(cached?.massRevision===revision)return cached.limits;
  const d=h.input,w=h.bodyWidthM,b=h.bodyHeightM,l=h.bodyLengthM;
  const properties=componentInertia(h),inertia=properties.diagonalKgM2;
  const maxI=Math.max(1,...properties.principalKgM2),H=.8*d.cmgMomentumNms,T=.8*d.cmgTorqueNm;
@@ -33,7 +34,7 @@ export function attitudeLimits(h){
  const k=deploymentLayout(h),ry=k.rootY,rz=k.radRoot;
  // Keep each swept panel entirely within its own side of the bank pair. Include
  // the hinge offset, sheet edge and clearance for fittings. Wider banks need more cant.
- const bankHalfWidthM=h.radiatorWidthM/2+.18,bankClearanceY=Math.max(.02,ry-b/2-.135-.25*Math.min(.40,.052*Math.min(w,b)));
+ const bankHalfWidthM=h.radiatorWidthM/2+.18,bankClearanceY=Math.max(.02,ry-b/2-.135-(k.custom?0:protectedFluidAllocation.rootPlumbingReserveM)-(k.fluidStandOffReserveM||0)-.25*Math.min(.40,.052*Math.min(w,b)));
  const bankCantDeg=clip(safeAcos(bankClearanceY/bankHalfWidthM)/DEG+1,45,89.96);
  // Bound each installed directional head by a sphere and screen the bank's
  // rotary cylinder. Omitted RF hardware cannot constrain a physical joint.
@@ -51,7 +52,7 @@ export function attitudeLimits(h){
  while(upperBankCantDeg>45&&!clearsTerminals(upperBankCantDeg))upperBankCantDeg=Math.max(45,upperBankCantDeg-.25);
  const upperTrimEnabled=clearsTerminals(upperBankCantDeg);
  const limits={...motionCaps,bankHalfWidthM,bankClearanceY,bankCantDeg,upperBankCantDeg,upperTrimEnabled,inertiaKgM2:inertia,inertiaTensorKgM2:properties.tensorKgM2,principalInertiaKgM2:properties.principalKgM2,maneuverMomentumNms:H,maneuverTorqueNm:T,bodyRateDegS,bodyAccelDegS2,prepointS:Math.ceil(180/bodyRateDegS+2*bodyRateDegS/bodyAccelDegS2+90)};
- limitCache.set(h,limits);return limits;
+ limitCache.set(h,{massRevision:revision,limits});return limits;
 }
 function multiply(a,b){
  const [x,y,z,w]=a,[i,j,k,l]=b;
@@ -237,6 +238,14 @@ export function bankTrimTravel(cant,l,upper=false){
  const clearance=l.bankClearanceY/(l.bankHalfWidthM*Math.cos(cant*DEG));
  return clearance>=1?l.radiatorTrimStopDeg:Math.asin(clip(clearance,0,1))/DEG;
 }
+export function bankTransitionTrimTravel(fromPitch,toPitch,l,upper=false){
+ // On the operating ±90° pitch range the smallest |pitch| has the tightest
+ // wall clearance. Limiting the complete step by that value keeps every
+ // interpolated pitch/roll pose inside the same continuous routing domain.
+ // The final 105° stop remains reachable once pitch has cleared the boundary.
+ const from=Number.isFinite(fromPitch)?fromPitch:toPitch,cant=from*toPitch<=0?0:Math.min(Math.abs(from),Math.abs(toPitch));
+ return bankTrimTravel(cant,l,upper);
+}
 function bankDrive(sign,fraction,oldPitch,oldRoll,ctx){
  const {u,dt,hold,park,cold,g,sun,earth,l,sunriseSlew}=ctx;
  if(u<1){
@@ -251,7 +260,7 @@ function bankDrive(sign,fraction,oldPitch,oldRoll,ctx){
  const unwind=Math.abs(previous)>allowedThere+.01;
  const pitchGoal=hold||unwind?(oldPitch??sign*45):sign*targetCant;
  const [pitch,pitchRate]=moveAngle(pitchGoal,oldPitch,dt,l.radiatorRateDegS);
- const limit=bankTrimTravel(pitch,l,sign<0);
+ const limit=Math.min(bankTrimTravel(pitch,l,sign<0),bankTransitionTrimTravel(oldPitch,pitch,l,sign<0));
  const rollGoal=hold?previous:park||unwind?0:trimGoal(g.eclipse&&!sunriseSlew?earth:sun,pitch,limit,previous,coldCant);
  const [roll,rollRate]=moveAngle(rollGoal,oldRoll,dt,l.radiatorTrimRateDegS);
  return {pitch,roll,pitchGoal,rollGoal,limit,pitchRate,rollRate};

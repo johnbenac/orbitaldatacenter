@@ -6,14 +6,14 @@ import {launchClockFor} from './launch-effects-state.js';
 const defs={
  mechanical:{label:'Mechanical Design',camera:'spacecraft',parts:['structure','propulsion','propellant','compute','solar','radiator','cmg'],vectors:['dimensions']},
  software:{label:'Flight Software',camera:'spacecraft',parts:['avionics','solar','radiator','communications','cmg','propulsion']},
- avionics:{label:'Command & Data Handling',camera:'core',close:true,parts:['avionics','communications']},
+ avionics:{label:'Command & Data Handling',camera:'core',close:true,parts:['avionics','power','fabric','harness','communications']},
  conops:{label:'Mission operations',camera:'spacecraft',parts:[]},
  environment:{label:'Environmental coupling',camera:'spacecraft',parts:['solar','radiator','structure'],vectors:['sun','albedo','ir','ram']},
  orbit:{label:'Orbit & eclipse',camera:'orbit',parts:[]},
- compute:{label:'Payload Operations',camera:'core',parts:['compute','storage','avionics','communications'],close:true},
- data:{label:'Data & delivery',camera:'core',parts:['storage','avionics','communications'],close:true},
+ compute:{label:'Payload Operations',camera:'core',parts:['compute','storage','fabric','harness','communications'],close:true},
+ data:{label:'Payload Data Handling',camera:'core',parts:['storage','fabric','harness','communications'],close:true},
  comm:{label:'Communications',camera:'spacecraft',parts:['communications'],close:true},
- power:{label:'Electrical Power',camera:'spacecraft',parts:['solar','battery']},
+ power:{label:'Electrical Power',camera:'spacecraft',parts:['solar','battery','power','harness']},
  thermal:{label:'Thermal',camera:'core',parts:[],close:true},
  attitude:{label:'Attitude control',camera:'spacecraft',parts:['cmg','torquer','solar','radiator','communications']},
  prop:{label:'Propulsion',camera:'core',parts:['propellant','propulsion'],close:true},
@@ -29,7 +29,7 @@ export function recommendedDomainCamera(phase,domain){
  return defs[domain]?.camera||'spacecraft';
 }
 export const sceneColors={
- compute:'#68a0c5',storage:'#edbd76',avionics:'#6cd5c2',communications:'#85baf5',solar:'#6aa6c8',
+ compute:'#68a0c5',storage:'#edbd76',fabric:'#76d9da',power:'#f7b76a',harness:'#b6c6cc',avionics:'#6cd5c2',communications:'#85baf5',solar:'#6aa6c8',
  radiator:'#a9b8c4',structure:'#b6c6cc',battery:'#8dcfa3',cmg:'#d3ad70',torquer:'#89bfbc',
  propellant:'#b9a77c',propulsion:'#e6a56e',launcher:'#c6cfd4',booster:'#ce956b',fairing:'#cdc3a4',adapter:'#72bbac',payload:'#9ab6c0'
 };
@@ -74,8 +74,8 @@ export function domainInstruments(key,h,s,{view='spacecraft',reference=false}={}
   const command=flows.find(f=>f.services.command>0),rate=command?command.services.command*8000/command.seconds:0;
   return [item('avionics','avionics','Spacecraft flight computer',met(s.cdhKW*1000,'W'),'left'),item('patch','communications','Ground commands',bit(rate)+' received','right')];
  }
- case 'data':if(h.ai&&purposeId(h)!=='text')return [item('avionics','avionics','Customer input staged',bytes(s.aiInputBufferGB),'left'),item('storage','storage',purposeInfo(h).output,bytes(s.aiProductQueueGB)+' queued','left'),item('activeTerminal','communications','Returned to Earth',bytes(s.aiProductDeliveredGB),'right')];return [
-  {...item('avionics','avionics','Flight data switch',bit(rd.offered)+' offered','left'),detail:'Text '+bit(rd.text)+' · bulk '+bit(rd.bulk)},
+ case 'data':if(h.ai&&purposeId(h)!=='text')return [item('storage','storage','Customer input staged',bytes(s.aiInputBufferGB),'left'),item('storage','storage',purposeInfo(h).output,bytes(s.aiProductQueueGB)+' queued','left'),item('activeTerminal','communications','Returned to Earth',bytes(s.aiProductDeliveredGB),'right')];return [
+  {...item('fabric','fabric','Payload data switch',bit(rd.offered)+' offered','left'),detail:'Text '+bit(rd.text)+' · bulk '+bit(rd.bulk)},
   {...item('storage','storage','Payload recorder',bytes(s.queueGB)+' queued','left'),detail:'Text '+bytes(s.textQueueGB)+' · bulk '+bytes(s.bulkQueueGB)},
   {...item('activeTerminal','communications',payload?.peer||s.station||'Downlink terminal',link,'right'),detail:bytes(s.deliveredGB)+' delivered to ground'}
  ];

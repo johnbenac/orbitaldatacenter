@@ -1,3 +1,4 @@
+import {protectedStowedFluidFeatures} from './protected-fluid-accommodation.js';
 import {starshipCargoFit} from './starship-cargo.js';
 import {adapterEnvelopeM,spacecraftInterface} from './payload-interface.js';
 import {deploymentLayout,terminalLayout,terminalStations,leafPose,leafAxes,leafCorners,mechanismPose} from './deployment.js';
@@ -112,6 +113,14 @@ export function packedSections(g){
    2*(k.rootX+spoolRadius),2*(k.packedRollM+spoolRadius),drumEnvelope);
  }
  feature('Face-mounted radiator packs',k.radRoot-.27,k.radRoot+k.r+.13,2*radHalfWidth,2*radHalfHeight,Math.hypot(radHalfWidth,radHalfHeight));
+ // Retained hoses have finite diameter and a developed-length reservoir.
+ // Their restrained centreline capsules and actual elbow/return allocations
+ // receive their own axial intervals instead of fitting inside the bare sheet.
+ for(const fluid of protectedStowedFluidFeatures(k)){
+  const pad=fluid.paddingM,min=[0,1,2].map(i=>Math.min(...fluid.points.map(p=>p[i]))-pad),max=[0,1,2].map(i=>Math.max(...fluid.points.map(p=>p[i]))+pad),radius=Math.max(...fluid.points.map(p=>Math.hypot(p[0],p[1])))+pad;
+  feature(fluid.part,min[2],max[2],2*Math.max(Math.abs(min[0]),Math.abs(max[0])),2*Math.max(Math.abs(min[1]),Math.abs(max[1])),radius);
+  Object.assign(sections.at(-1),{bodyBoundsM:{min,max},basis:'Shared installed fluid allocation, eight-chord circular bends and full tube radius; checked against restrained rendered buffers.'});
+ }
  const {ka,optical}=terminalStations(w,l,{kaDishM,opticalApertureM:a});
  const kaZ=.62*kaDishM+.035,opZ=1.05*a+.025;
  feature('Parked terminal heads',Math.min(ka[1]-kaZ,optical[1]-opZ),Math.max(ka[1]+kaZ,optical[1]+opZ),2*Math.max(Math.abs(ka[0])+kaZ,Math.abs(optical[0])+opZ),

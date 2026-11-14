@@ -11,6 +11,8 @@ import {launchSiteFor,launchPropulsionFor} from './launch-sites.js';
 import {launchFleet} from './launch-fleet.js';
 import {launchClockFor,launchWaterSequence,INSERTION_MET} from './launch-effects-state.js';
 import {launchPath,ascentTrack} from './launch-path.js';
+import {launchHold} from './launch-compatibility.js';
+export {launchHold} from './launch-compatibility.js';
 
 const receiving={title:'NASA · GOES-U receipt and processing',url:'https://www.nasa.gov/directorates/smd/joint-agency-satellite-division/noaa/noaas-goes-u-arrives-in-florida-for-processing-ahead-of-launch/'};
 const campaign={title:'Arianespace · VA263 launch kit, campaign and flight sequence',url:'https://www.arianespace.com/app/uploads/sites/4/2025/03/PRESS_KIT_VA263_EN_FINAL_6_March.pdf'};
@@ -21,12 +23,6 @@ const number=(v,p=0)=>v.toLocaleString('en-US',{maximumFractionDigits:p});
 const launchBasis='Workbench ascent sequence';
 const planningBasis='Planning allowance · approximate day';
 const countBasis='Planned call · workbench schedule';
-
-export function launchHold(h){
- if(h.payloadInterface?.passes===false||!h.fairing.fit)return loadingHoldText(h);
- if(h.launchScreenMarginKg<0)return 'The stowed launch stack exceeds the tighter mission allowance or launcher reference by '+number(-h.launchScreenMarginKg)+' kg. Launch authorization is held in this baseline.';
- return null;
-}
 
 // Estimate the pressure peak on this particular trajectory, independent of
 // the published example times. Velocity is relative to a co-rotating atmosphere.

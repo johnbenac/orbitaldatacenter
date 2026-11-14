@@ -11,13 +11,14 @@ import {focusHardware} from './dist/hardware-focus.js';
 import {domainSceneSpecs} from './dist/domain-scene.js';
 import {softRenderer} from './dist/software-scene.js';
 import {canvas} from './render-test-canvas.mjs';
+import {readJsonResponse} from './dist/json-asset.js';
 
 // The flight meshes and their actual UV buffers are audited in Node. Asset
 // decoding and asynchronous browser repaint remain part of browser review.
 const painter=new Proxy({},{get:(_,key)=>['createLinearGradient','createRadialGradient'].includes(key)?()=>({addColorStop(){}}):()=>{},set:()=>true});
 globalThis.document={createElement:()=>({getContext:()=>painter})};
 const near=(actual,expected,label)=>assert.ok(Math.abs(actual-expected)<2e-5*Math.max(1,Math.abs(expected)),`${label}: ${actual} != ${expected}`);
-const manifest=JSON.parse(readFileSync(new URL('./dist/assets/materials/manifest.json',import.meta.url),'utf8'));
+const manifest=await readJsonResponse(new Response(readFileSync(new URL('./dist/assets/materials/manifest.json.zip',import.meta.url))),'manifest.json.zip');
 assert.equal(Object.keys(manifest.maps).length,Object.keys(spacecraftMaterials).length,'Every library material has a complete texture set');
 let assetCount=0;
 for(const [id,record] of Object.entries(spacecraftMaterials)){

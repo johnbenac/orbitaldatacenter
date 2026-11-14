@@ -353,10 +353,10 @@ function environment({h,d,s,day},id){
 }
 
 function data({h,d,s,day,events},id){
- if(h.ai&&purposeId(h)!=='text')return purpose({h,d,s,events},id);
+ if(h.ai)return purpose({h,d,s,events},id);
  const parts=[
  P('text','Output text','The tokenizer traffic model converts generated tokens to transmitted bytes before communication overhead.','bytesPerToken','compute',[row('Serialization',val(d.bytesPerToken,'B/tok')),row('Instantaneous generated text',val(s.tokensPerSec*d.bytesPerToken*8/1e6,'Mbit/s',4)),row('Text waiting',val(s.textQueueGB,'GB',4)),row('Text received',val(s.textDeliveredGB,'GB',4))]),
- P('bulk','Bulk products','Imagery, checkpoints and model packages occupy the bulk recorder queue independently of text token rates.','bulkMbps','storage',[row('Bulk offered when active',val(d.bulkMbps,'Mbit/s')),row('Initial payload',val(d.initialQueueGB,'GB')),row('Bulk waiting',val(s.bulkQueueGB,'GB')),row('Bulk received',val(s.bulkDeliveredGB,'GB'))]),
+ P('bulk','Bulk products','Explicit supplemental files and background transfer traffic occupy the shared recorder independently of the selected customer product. Local restart checkpoints are budgeted separately.','bulkMbps','storage',[row('Bulk offered when active',val(d.bulkMbps,'Mbit/s')),row('Initial payload',val(d.initialQueueGB,'GB')),row('Bulk waiting',val(s.bulkQueueGB,'GB')),row('Bulk received',val(s.bulkDeliveredGB,'GB'))]),
  P('recorder','Onboard recorder','Incoming products are limited by write rate and available capacity. The live queue gives the amount still awaiting offload.','storageTB','storage',[row('Raw / usable',val(h.storageTB,'TB')+' / '+val(h.usableTB,'TB')),row('Free capacity',val(s.freeTB,'TB')),row('Dropped bytes',val(s.droppedGB,'GB')),row('Current queue',val(s.queueGB,'GB'))]),
  P('received','Ground receipt','Separate ground-received output from on-board generation. Transfers cannot deliver more bytes than the queued and newly arrived data.','linkCapMbps','communications',[row('Text goodput',val(s.textGoodputMbps,'Mbit/s')),row('Bulk goodput',val(s.bulkGoodputMbps,'Mbit/s')),row('Received output tokens',val(s.tokensDelivered,'tok',0)),row('Window downlink',val(day.deliveredGB,'GB'))],events.find(e=>e.type==='contact'&&e.end>=s.t))];
  const art=T(37,36,'ONBOARD PRODUCTS','sd-over','start')+T(426,36,'GROUND RECEIPT','sd-over','start')+
@@ -381,16 +381,16 @@ function mechanical({h,d,s},id){
  pick(parts[2],419,67,150,116,glyph('rack',494,108,.7)+named(494,147,'Installed equipment',h.trays+' compute trays'));
  return info('Structural interfaces','From the separation ring to equipment attachments',parts,art,[legend('steel','Mechanical connection')],'Fixed load path');
 }
-function avionics({d,s},id){
+function avionics({h,d,s},id){
  const parts=[
- P('uplink','Ground command queue','S-band passes carry spacecraft commands to the flight computer. The queue can grow during loss of contact.','commandKbps','communications',[row('Offered',val(d.commandKbps,'kbit/s')),row('Earth backlog',val(s.uplinkQueueMB,'MB'))]),
+ P('uplink','Ground command queue','The installed command service delivers spacecraft commands to the flight computer. The queue can grow during loss of contact; an absent independent receiver remains an explicit shortfall.','commandKbps','communications',[row('Offered',val(d.commandKbps,'kbit/s')),row('Earth backlog',val(s.uplinkQueueMB,'MB'))]),
  P('flight','Spacecraft flight computer','The computer runs command sequences and supervises spacecraft subsystems. AI workloads execute on the separate payload trays.',null,'avionics',[row('Flight electronics demand',val(s.cdhKW,'kW',3)),row('Commands received',val(s.commandGoodputKbps,'kbit/s'))]),
- P('health','Housekeeping recorder','Stores time-tagged spacecraft health records between ground contacts. Capacity limits determine when older samples are overwritten.','hkRecorderMB','avionics',[row('Sample cadence',val(d.hkPeriodS,'s')),row('Recorder occupancy',val(s.hkStoredMB,'MB',3)),row('Overwritten',val(s.hkOverwrittenMB,'MB',3))])];
+ P('health','Housekeeping recorder','Stores time-tagged spacecraft health records in the local circular recorder. Capacity limits determine when older samples are overwritten; live telemetry reception and a future recorder dump are separate operations.','hkRecorderMB','avionics',[row('Sample cadence',val(d.hkPeriodS,'s')),row('Recorder occupancy',val(s.hkStoredMB,'MB',3)),row('Overwritten',val(s.hkOverwrittenMB,'MB',3))])];
  const art=flow(id,'M169 120H218','cyan',s.commandGoodputKbps>0)+flow(id,'M369 120H416','green',s.hkRateKbps>0)+
  pick(parts[0],22,62,147,119,glyph('patch',96,104,.83)+named(95,149,'Ground commands',val(s.commandGoodputKbps,'kbit/s')))+
  pick(parts[1],218,62,151,119,glyph('chip',292,105,.86)+named(294,149,'Flight computer',val(s.cdhKW*1000,'W')))+
  pick(parts[2],416,62,151,119,glyph('ssd',492,105,.81)+named(492,149,'Health recorder',val(s.hkStoredMB,'MB',2)));
- return info('Spacecraft avionics','Command execution and spacecraft health records',parts,art,[legend('cyan','Commands from Earth'),legend('green','Housekeeping telemetry')],s.flightPhase);
+ return info('Command and housekeeping path','Operational overview; the electrical workspace below defines all boxes, cards, connectors and harnesses',parts,art,[legend('cyan','Commands from Earth'),legend('green','Housekeeping telemetry')],s.flightPhase);
 }
 function software({s},id){
  const parts=[

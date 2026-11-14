@@ -1,5 +1,6 @@
 import {architectureFamily} from './architecture-families.js';
 import {installedCommunications} from './communications-packages.js';
+import {redwirePayloadTransferPolicy,redwirePayloadTransferAllocation} from './redwire-payload-transfer.js';
 // ODC payload and Earth-service interfaces. All installation quantities below
 // depend on installed inputs only; mission demand is evaluated in placement/route.
 // Mass, power and 80% usable-rate factors are controlled preliminary allocations.
@@ -124,22 +125,24 @@ export function serviceArchitecture(h={}){
  const diskReadGBs=nn(h.diskReadGBs,modules*nn(d.diskRead)),diskWriteGBs=nn(h.diskWriteGBs,modules*nn(d.diskWrite));
  const cablesM=endpointCount*b.cableRunM+interswitchLinks*b.interswitchRunM;
  const endpointNICs=dgx?0:trays; // The DGX reference already includes its NICs.
+ const rotaryOptics=architectureFamily(h).id==='redwire-platform'?redwirePayloadTransferAllocation({trayCount:trays,endpointPortGbps}):null;
+ const workerOptics=rotaryOptics?{id:'redwire-lr4-endpoints',wbs:'01.05',moduleCount:rotaryOptics.workerOpticsCount,unitMassKg:redwirePayloadTransferPolicy.workerOpticsMassKgPerModule,massKg:rotaryOptics.workerOpticsMassKg,powerW:rotaryOptics.workerOpticsPowerW,powerWPerModule:redwirePayloadTransferPolicy.workerOpticsPowerWPerModule,moduleDimensionsM:[.020,.015,.080],interface:redwirePayloadTransferPolicy.opticalInterface,sourceUrls:redwirePayloadTransferPolicy.sourceUrls.filter(url=>url.includes('nvidia.com')),massBasis:redwirePayloadTransferPolicy.opticsMassBasis,powerBasis:'Full 3.5 W maximum per powered LR4 module is carried at idle and active load. Existing switch/NIC allocations retain their electronics and cages; no historical transceiver credit is subtracted.'}:null;
  const switchMassKg=switchCount*5+usedSwitchPorts*.025,endpointNICMassKg=endpointNICs*.18,controllerMassKg=storageControllers*.7,cableMassKg=cablesM*.020;
- const idleKW=(switchCount*35+usedSwitchPorts*(1+.0125*endpointPortGbps)+endpointNICs*3+storageControllers*8)/1000;
- const activeKW=(switchCount*70+usedSwitchPorts*(1.8+.035*endpointPortGbps)+endpointNICs*(5+.05*endpointPortGbps)+storageControllers*25)/1000;
+ const idleKW=(switchCount*35+usedSwitchPorts*(1+.0125*endpointPortGbps)+endpointNICs*3+storageControllers*8+(workerOptics?.powerW||0))/1000;
+ const activeKW=(switchCount*70+usedSwitchPorts*(1.8+.035*endpointPortGbps)+endpointNICs*(5+.05*endpointPortGbps)+storageControllers*25+(workerOptics?.powerW||0))/1000;
  const fabric={
   id:'ODC-FAB-32',topology:single?'Single-stage switched fabric':'Three-stage leaf–spine fabric',protocol:'RDMA-capable packet fabric; flight implementation and firmware qualification open',
   requestedPerWorkerGbps:requested,endpointPortGbps,usableFraction:b.usableLineFraction,portUsableGbps,effectivePerWorkerGbps,
   switchPorts:b.switchPorts,leafEndpointPorts:single?b.switchPorts:b.leafEndpointPorts,leafCount,spineCount,switchCount,linksPerLeafSpine,uplinksPerLeaf,interswitchLinks,
   edgePortCount:endpointCount,computePorts:trays,storageControllers,gatewayPorts,usedSwitchPorts,availableSwitchPorts,maxSpinePortDemand,
   oneWayBisectionGbps:Math.floor(trays/2)*portUsableGbps*topologyRatio,allocatedBisectionGbps:Math.floor(trays/2)*effectivePerWorkerGbps,
-  switchMassKg,endpointNICMassKg,controllerMassKg,cableMassKg,massKg:switchMassKg+endpointNICMassKg+controllerMassKg+cableMassKg,
+  switchMassKg,endpointNICMassKg,controllerMassKg,cableMassKg,workerOptics,massKg:switchMassKg+endpointNICMassKg+controllerMassKg+cableMassKg+(workerOptics?.massKg||0),
   idleKW,activeKW,incrementalActiveKW:Math.max(0,activeKW-idleKW),storageLinkGBs,storageReadGBs:Math.min(diskReadGBs,storageLinkGBs),storageWriteGBs:Math.min(diskWriteGBs,storageLinkGBs),
   storagePerDirectionGBs:storageLinkGBs,sharedStorageDuplexGBs:2*storageLinkGBs,cableAllocationM:cablesM,maxEdgeCableM:b.cableRunM,topologySupported,fabricLineSupported,
   geometrySupported:finite(h.bodyLengthM)?h.bodyLengthM<=b.maxCoreLengthM:null,
   supported:topologySupported&&fabricLineSupported&&(!finite(h.bodyLengthM)||h.bodyLengthM<=b.maxCoreLengthM),
   marginMeaning:'80% is a payload/protocol efficiency allocation, not a NASA percentage margin.',
-  massPowerBasis:'Per switch: 5 kg plus 0.025 kg per populated switch port. External NIC: 0.18 kg. Storage controller: 0.7 kg. Installed cable: 0.020 kg/m. Electrical curves are project allocations.',
+  massPowerBasis:'Per switch: 5 kg plus 0.025 kg per populated switch port. External NIC: 0.18 kg. Storage controller: 0.7 kg. Installed cable: 0.020 kg/m. Electrical curves are project allocations.'+(workerOptics?' Switch/NIC rows own electronics and cages; named LR4 endpoint optics add their complete 50 g/module project mass and 3.5 W/module sourced maximum separately, with zero baseline credit.':''),
   singlePointDisposition:'One active fabric plane. Loss of a common switch can interrupt customer service. Flight command/control remains separate; reliability acceptance is open.',
   limits:[
    {id:'fabric-port',label:'Usable per-worker link allocation',actual:requested,limit:portUsableGbps,unit:'Gbit/s',within:fabricLineSupported},
@@ -236,7 +239,9 @@ function capacity(y,label,capacityValue,demandValue,unit){
 }
 
 export function renderComputeFabric(h={}){
- const a=serviceArchitecture(h),c=a.compute,f=a.fabric,p=a.placement,d=h.input||{},ai=h.ai||{};
+ const a=h.serviceArchitecture||serviceArchitecture(h),c=a.compute,f=a.fabric,p=a.placement,d=h.input||{},ai=h.ai||{};
+ const massStatus=h.installedHarnessAccounting?.status;
+ const cableBasis=massStatus==='installed-route-mass-adopted'?'Installed cuts + terminations in vehicle mass':massStatus==='model-estimate-adopted'?'Modeled lengths + terminations in vehicle mass':fmt(f.maxEdgeCableM,0)+' m endpoint cable allocation';
  const local=p.largestShardGB===null?'Local partition not evaluated':fmt(p.largestShardGB,2)+' / '+fmt(c.memoryPerAcceleratorGB,0)+' GB per device';
  const title='Installed compute, local shards and onboard fabric';
  let body=txt(28,59,f.topology+' · one spacecraft · selected hardware allocations',12,col.muted);
@@ -278,12 +283,12 @@ export function renderComputeFabric(h={}){
  ],col.blue);
  body+=capacity(370,'Usable collective rate per tray',f.portUsableGbps,f.requestedPerWorkerGbps,'Gbit/s');
  body+=capacity(427,'Scheduled application work',finite(ai.activeUnitsPerSec)&&finite(d.duty)?ai.activeUnitsPerSec*d.duty:null,ai.requiredRate,ai.unit?ai.unit+'/s':'work/s');
- body+=txt(28,485,'6 m endpoint cable allocation · 80% usable-rate allocation · local runtime and flight qualification open',12,col.muted);
+ body+=txt(28,485,cableBasis+' · 80% usable-rate allocation · qualification open',12,col.muted);
  return frame('odc-compute-fabric',title,'A repeatable compute tray connects through explicitly counted fabric ports, leaf and optional spine switches, local storage controllers and terminal gateways. Bars compare usable link allocation and selected-workload demand; device-level placement is a preliminary mapping.',510,body);
 }
 
 export function renderEarthServiceRoute(h={},snapshot={}){
- const a=serviceArchitecture(h),d=h.input||{},r=a.route,t=a.terminal;
+ const a=h.serviceArchitecture||serviceArchitecture(h),d=h.input||{},r=a.route,t=a.terminal;
  const relay=r.usesRelay,routeDetail=relay?'Allocated relay; provider unselected':'Geometric contacts; operator open';
  const capacityText=relay?fmt(r.effectiveUpMbps,0)+' up / '+fmt(r.effectiveDownMbps,0)+' down Mbit/s':'Range / pointing set rate';
  const interfaceTitle=relay?t.payloadOpticalTerminals+' optical payload terminal'+(t.payloadOpticalTerminals===1?'':'s'):!r.directPayloadTerminalInstalled?'Selected terminal not installed':d.link==='optical'?'Optical payload downlink':d.link==='s'?'S-band payload service':d.link==='auto'?'Installed terminal selection':'Ka payload downlink';

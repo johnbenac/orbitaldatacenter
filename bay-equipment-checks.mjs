@@ -58,7 +58,9 @@ for(const purpose of ['text','pretrain']){
  }
  // Every bench uses the flight article as its geometric reference. The
  // test hats and shrouds get disconnected before the spacecraft is lifted.
- const hw=sizeDesign(missionStarter(purpose)),craft=makeCraft(hw);
+ // This fixture test needs the actual aperture frames. Installed flight
+ // routing is exercised by its own combined geometry/publication gate.
+ const hw=sizeDesign(missionStarter(purpose)),craft=makeCraft(hw,{installElectrical:false,planFluidRoutes:false});
  for(const [bench,fixture,lead] of [['sband','Shielded S-band test hat','Shielded RF test coax'],['ka','Ka conducted RF test port','Shielded RF test coax'],['optical','Enclosed optical test head','Optical bench tether']]){
   const config={phase:'D',domain:'comm',commBench:bench},run=t=>launch.update({flightPhase:'integration',t,altitudeKm:0},'integration',config);
   run(-3599);launch.root.updateMatrixWorld(true);
@@ -72,7 +74,12 @@ for(const purpose of ['text','pretrain']){
   }
   const vertices=coax.geometry.attributes.position;
   for(let i=0;i<vertices.count;i++)assert.ok(coax.localToWorld(V().fromBufferAttribute(vertices,i)).y>=bay.floorY-.002);
-  run(-2600);assert.equal(hook.visible,false,bench+' test hookup retained on pickup');
+  run(-2600);
+  const held=!hw.payloadInterface.passes||/starship/i.test(hw.input.launcher)&&(!hw.fairing.fit||hw.fairing.cargoAccess?.fits===false);
+  // The handling controller holds an incompatible article at the checkout
+  // stand (-3000 s). A requested later clock is not permission to lift it.
+  // Test both the held fixture and removal when pickup is actually allowed.
+  assert.equal(hook.visible,held,bench+(held?' hookup removed despite the geometric pickup hold':' test hookup retained on pickup'));
  }
  const camera=new T.PerspectiveCamera();
  for(const [eye,hidden,shown] of [

@@ -4,13 +4,13 @@ const fields=Object.fromEntries(controls.map(c=>[c.key,c]));
 const dependencies={
  hkPeriodS:['Command & Data Handling','Electrical Power'],hkRecorderMB:['Command & Data Handling','Mechanical Design'],
  commandKbps:['Communications','Command & Data Handling'],cmgMomentumNms:['Attitude Determination & Control','Mechanical Design','Electrical Power','Mass Budget'],cmgTorqueNm:['Attitude Determination & Control','Propulsion','Electrical Power'],
- aiPurpose:['Payload Operations','Mission CONOPS','Data & Delivery','Communications','Electrical Power','Thermal','Mass Budget'],
+ aiPurpose:['Payload Operations','Mission CONOPS','Payload Data Handling','Communications','Electrical Power','Thermal','Mass Budget'],
  launchSite:['Launch Vehicle','Launch & Insertion','Flight Dynamics'],
  launcher:['Launch Vehicle','Launch & Insertion','Mass Budget','Flight Dynamics'],battery:['Electrical Power','Thermal','Mass Budget','Mechanical Design','Launch & Insertion'],
- compute:['Payload Operations','Data & Delivery','Electrical Power','Thermal','Mass Budget'],workload:['Payload Operations','Data & Delivery','Communications','Electrical Power'],
- storage:['Payload Operations','Data & Delivery','Electrical Power','Mass Budget'],pv:['Electrical Power','Environment','Attitude Determination & Control','Mass Budget'],coating:['Thermal','Environment','Electrical Power'],
- engine:['Propulsion','Flight Dynamics','Mass Budget','Mission CONOPS'],network:['Communications','Data & Delivery','Attitude Determination & Control','Electrical Power'],
- link:['Communications','Data & Delivery','Electrical Power','Attitude Determination & Control'],disposalMethod:['Mission CONOPS','Propulsion','Flight Dynamics','Mass Budget'],
+ compute:['Payload Operations','Payload Data Handling','Electrical Power','Thermal','Mass Budget'],workload:['Payload Operations','Payload Data Handling','Communications','Electrical Power'],
+ storage:['Payload Operations','Payload Data Handling','Electrical Power','Mass Budget'],pv:['Electrical Power','Environment','Attitude Determination & Control','Mass Budget'],coating:['Thermal','Environment','Electrical Power'],
+ engine:['Propulsion','Flight Dynamics','Mass Budget','Mission CONOPS'],network:['Communications','Payload Data Handling','Attitude Determination & Control','Electrical Power'],
+ link:['Communications','Payload Data Handling','Electrical Power','Attitude Determination & Control'],disposalMethod:['Mission CONOPS','Propulsion','Flight Dynamics','Mass Budget'],
  attitude:['Environment','Attitude Determination & Control','Electrical Power','Propulsion'],thermalMode:['Thermal','Electrical Power','Environment'],solarDriver:['Environment','Flight Dynamics','Propulsion']
 };
 // Each item is an independently entered requirement whose validity can change

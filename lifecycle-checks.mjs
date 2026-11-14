@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import {readStaticAssetIndex} from './asset-index-fixture.mjs';
 import {phases,lifecycleNav,chapterPhase,phaseFromView} from './dist/lifecycle.js';
 import {domainIds,phaseA,phaseHandoff,isEditable,observationCard,analysisControls} from './dist/matrix-ui.js';
 import {controls,defaults,sizeDesign,inverseSolve} from './dist/design.js';
@@ -36,6 +37,6 @@ assert.equal(requirements.length,1);assert.equal(requirements[0].specifiedRating
 assert.deepEqual(decodeScenario(encodeScenario(data)),data);
 const ready=retainFile('scenario',scenarioBlob(data),'unit-scenario.json');const markup=fileLink('scenario','Save JSON');assert(markup.includes('href="'+ready.url+'" download="unit-scenario.json"'));assert.deepEqual(await (await fetch(ready.url)).json(),data);
 retainFile('csv',telemetryBlob([{elapsed_s:1,soc_pct:90}]),'unit.csv');assert.equal(preparedFile('scenario'),ready);assert.match(await(await fetch(preparedFile('csv').url)).text(),/soc_pct/);assert.throws(()=>retainFile('scenario',new Blob([]),'bad.json'));assert.equal(preparedFile('scenario'),ready);releaseFiles();
-const assets=JSON.parse(fs.readFileSync(new URL('./dist/assets.json',import.meta.url)));
+const assets=await readStaticAssetIndex();
 for(const f of ['lifecycle.js','lifecycle.css','thermal-review.js','thermal-view.js','thermal-limits.js','thermal-colors.js','file-delivery.js','subsystem-diagrams.js','subsystem-diagrams.css'])assert(assets.includes(f),f);
 console.log('Phase precedence, design/flight editability, disposal settings, one-input trade selection, shared design, independent and derived temperature bounds, persistent native download URLs, and static asset manifest passed.');

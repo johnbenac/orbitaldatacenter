@@ -3,6 +3,7 @@
 // kept separate in the resolved manifest below.
 import {deploymentLayout,leafPose,leafAxes,leafCorners,deploymentStages,terminalStations} from './deployment.js';
 import {installedCommunications} from './communications-packages.js';
+import {redwireRootRelief,radiatorPanelNetArea} from './radiator-surface-area.js';
 export const architectureGeometryRevision='odc-geometry-2026-11-r2';
 
 const common={kaTerminalCount:1,sPatchCount:2,opticalTerminalCount:1,payloadLocation:'central-rack',radiatorBankCount:2,thermalTopology:'pumped',solarBasePitchDeg:0,radiatorTracking:'root-cant'};
@@ -85,6 +86,11 @@ export function architectureGeometry(input={},legacy={}){
   }else{rw=Math.min(Math.max(.8,bw-.12),Math.sqrt(rad/banks/2.6));rl=rad/(banks*rw);}
  }
  Object.assign(out,{bodyWidthM:bw,bodyHeightM:bh,bodyLengthM:bl,wingWidthM:ww,wingLengthM:wl,radiatorWidthM:rw,radiatorLengthM:rl,solarRootOffsetM,solarTipGapM});
+ if(f.id==='redwire-platform'){
+  const relief=redwireRootRelief(rw,rl);definition.payloadPlatform.rootRelief=relief;
+  Object.assign(out,{radiatorGrossM2:rad,radiatorReliefM2:relief.areaM2,radiatorNetM2:rad-relief.areaM2});
+  definition.allocations.push('Gross rectangular platform area is reduced by the actual hinge-root relief for material mass and radiating area; the outer envelope is retained.');
+ }
  definition.requestedSpanM=span||null;definition.requestedHeightM=height||null;
  definition.sourceDimensions=f.id==='redwire-platform'?{solarWingCount:2,referenceWingWidthM:2,referenceWingLengthM:20,referenceRadiatorSideM:3.25}:f.id==='starmind-cross'?{deployedSpanM:75,deployedHeightM:30}:{};
  if(span&&span<=bw+4*gap)definition.allocations.push('Requested span is smaller than the allocated bus/root clearance; automatic appendage dimensions are retained and this constraint is a shortfall.');
@@ -109,7 +115,7 @@ export function architectureTerminalStations(h){
 // and pose functions drive meshes, analysis and stowed-envelope evaluation.
 export function resolveArchitecture(h){
  const f=architectureFamily(h),g=deploymentLayout(h),d=h.input||{},definition=h.architectureDefinition||architectureGeometry(d,h).architectureDefinition;
- const surfaces=g.descriptors.map((s,i)=>{const p=leafPose(g,s,1,0);return {...s,id:s.id||`${s.type}-${i}`,areaM2:s.width*s.depth,emittingFaces:s.type==='rad'?2:1,positionM:[p.x,p.y,p.z],axes:leafAxes(p),poseDescriptor:s};});
+ const surfaces=g.descriptors.map((s,i)=>{const p=leafPose(g,s,1,0);return {...s,id:s.id||`${s.type}-${i}`,grossAreaM2:s.width*s.depth,areaM2:radiatorPanelNetArea(h,s),emittingFaces:s.type==='rad'?2:1,positionM:[p.x,p.y,p.z],axes:leafAxes(p),poseDescriptor:s};});
  const body=[];for(const x of [-.5,.5])for(const y of [-.5,.5])for(const z of [-.5,.5])body.push([x*h.bodyWidthM,y*h.bodyHeightM,z*h.bodyLengthM]);
  // Installed identity and source envelope use the canonical zero-command pose.
  // Operating pointing is evaluated separately and cannot change this manifest.

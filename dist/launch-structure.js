@@ -19,7 +19,7 @@ const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]]
 const moment=(cm,foot,force)=>cross(sub(cm,foot),force);
 const cache=new WeakMap();
 export function launchStructure(h){
- if(cache.has(h))return cache.get(h);
+ const massRevision=h.electricalMassRevision||0,cached=cache.get(h);if(cached?.massRevision===massRevision)return cached.screen;
  const geometry=deploymentLayout(h),stowed=componentMassProperties(h,h.propellantKg,0,false),a=assumedAccelG;
  const allocation=key=>stowed.rows.find(r=>r.wbs===key);
  const mounts=geometry.mounts.map(m=>{
@@ -41,7 +41,7 @@ export function launchStructure(h){
  const flangeZ=h.payloadInterface.deckZ,force=inertia(stowed.massKg,a),flangeMoment=moment(stowed.cm,[0,0,flangeZ],force);
  const screen={accelerationG:a,gravityMS2:g0,mounts,stowedScMassKg:stowed.massKg,stowedScCmM:stowed.cm,
   flangeZ,interfaceForceN:force,interfaceMomentNm:flangeMoment,interfaceBendingNm:Math.hypot(flangeMoment[0],flangeMoment[1])};
- cache.set(h,screen);return screen;
+ cache.set(h,{massRevision,screen});return screen;
 }
 export function mountLedger(h){
  return launchStructure(h).mounts.map(m=>({package:m.id,face:m.face,MEL:m.wbs,physical_kg:m.kg,

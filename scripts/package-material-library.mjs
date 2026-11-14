@@ -3,9 +3,10 @@ import {fileURLToPath} from 'node:url';
 import {resolve,dirname} from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {textureBankReadme} from '../dist/material-texture-download.js';
+import {readJsonResponse} from '../dist/json-asset.js';
 
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..'),assets=resolve(root,'dist/assets/materials');
-const manifest=JSON.parse(await readFile(resolve(assets,'manifest.json'),'utf8'));
+const manifest=await readJsonResponse(new Response(await readFile(resolve(assets,'manifest.json.zip'))),'manifest.json.zip');
 const metadata=Object.fromEntries(Object.entries(manifest.maps).map(([id,m])=>[id,{resolutionPx:m.resolutionPx,tileSizeM:m.tileSizeM}]));
 await writeFile(resolve(root,'dist/material-texture-metadata.js'),'// Generated from assets/materials/manifest.json by scripts/package-material-library.mjs.\nexport const materialTextureMetadata='+JSON.stringify(metadata)+';\n');
 const {spacecraftMaterials,materialLibraryRevision}=await import('../dist/spacecraft-materials.js');
@@ -27,8 +28,11 @@ with zipfile.ZipFile(out,'w',compression=zipfile.ZIP_DEFLATED,compresslevel=6) a
   i=zipfile.ZipInfo(name,date_time=(2026,11,7,0,0,0));i.compress_type=zipfile.ZIP_DEFLATED;i.external_attr=0o644<<16;z.writestr(i,data)
  add('README.txt',readme)
  add('material-library.json',(p/'material-library.json').read_bytes())
- add('texture-manifest.json',(p/'manifest.json').read_bytes())
+ add('texture-manifest.json',zipfile.ZipFile(p/'manifest.json.zip').read('manifest.json'))
  for f in sorted(p.glob('*.webp')):add('assets/materials/'+f.name,f.read_bytes())
+catalog=p/'material-library.json'
+with zipfile.ZipFile(p/'material-library.json.zip','w',compression=zipfile.ZIP_DEFLATED,compresslevel=9) as z:z.writestr(catalog.name,catalog.read_bytes())
+catalog.unlink()
 print(str(out)+' ('+str(out.stat().st_size)+' bytes)')
 `,assets,textureBankReadme],{stdio:'inherit'});
 console.log(Object.keys(spacecraftMaterials).length+' materials with complete texture sets and source records.');

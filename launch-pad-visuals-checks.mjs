@@ -5,6 +5,7 @@ import {launchFleet} from './dist/launch-fleet.js';
 import {launchSitesFor} from './dist/launch-sites.js';
 import {makeLaunch} from './dist/launch-scene.js';
 import {launchClockFor,launchRiseM} from './dist/launch-effects-state.js';
+import {routeFromTube,auditRoutes} from './dist/routing-audit.js';
 
 const brush=new Proxy({},{get:(_,k)=>['createRadialGradient','createLinearGradient'].includes(k)?()=>({addColorStop(){}}):()=>{}});
 globalThis.document={createElement:()=>({getContext:()=>brush})};
@@ -59,15 +60,30 @@ for(const launcher of Object.keys(launchFleet))for(const site of launchSitesFor(
    {name:'upper',part:lv.parts.upper,y0:-geo.upperLengthM,y1:0,r:geo.diameterM/2},
    ...lv.parts.boosters.map((part,i)=>({name:'booster '+i,part,y0:0,y1:part.userData.lengthM*.85,r:part.userData.radiusM}))
   ].filter(b=>b.part.visible).map(b=>({...b,inverse:b.part.matrixWorld.clone().invert()}));
-  for(const g of u.groups){if(g.internal)continue;for(const tail of g.tails)for(const segment of tail.segments){if(!segment.visible)continue;
-   for(const f of [-.5,-.25,0,.25,.5]){
-    const world=new T.Vector3(0,f,0).applyMatrix4(segment.matrixWorld);
+  // This is a visual smoke regression only. The separate launch-routing
+  // gate checks full finite-radius solids and continuous interval clearance.
+  for(const g of u.groups){if(g.internal)continue;for(const tail of g.tails){
+   assert(tail.flexTube?.mesh?.geometry?.attributes?.position,tag+' missing rendered flex tube');
+   const actual=routeFromTube(tail.flexTube,{id:tail.connection.id});assert(actual.points.length>1);
+   for(const coordinates of actual.points){const world=new T.Vector3(...coordinates);
     for(const body of bodies){
      const p=world.clone().applyMatrix4(body.inverse),inside=p.y>body.y0+.2&&p.y<body.y1-.2&&Math.hypot(p.x,p.z)<body.r-.02;
      assert(!inside,tag+' / '+tail.connection.id+' crosses '+body.name+' at T+'+t+' s');
     }
    }
   }}
+  const lengthSnapshot=u.routingSnapshot({frame:lv.parts.tower});assert.equal(lengthSnapshot.additionalIssues.length,0,tag+' physical cut-length evidence at T+'+t+': '+JSON.stringify(lengthSnapshot.additionalIssues));
+ }
+ if(launcher==='starship'&&site.id==='starbase-pad2'){
+  const payloadService=u.groups.find(g=>g.spec.id==='payload-service'),installedClearance=payloadService.clearance;
+  const checkPayload=()=>{const snapshot=u.routingSnapshot({frame:lv.parts.tower});return auditRoutes(snapshot.routes.filter(route=>['payload-power','payload-data'].includes(route.id)),snapshot.obstacles,{maxIssues:20,snapshotEvidence:snapshot});};
+  sample(4.46875);const installed=checkPayload();assert(installed.ok,tag+' rising grid fin must clear the actual withdrawn payload leads: '+JSON.stringify(installed.issues));
+  // Restore the old barrel-only stow allocation while retaining the actual
+  // drawn tube, wide grid-fin lattice and liftoff pose. This must reproduce
+  // the between-pose strike that a local endpoint-only design missed.
+  payloadService.clearance=3.015;sample(4.46875);const shortened=checkPayload();
+  assert(shortened.issues.some(issue=>{if(issue.code!=='solid-collision')return false;const object=lv.root.getObjectByProperty('uuid',issue.obstacleId?.replace('launch-solid:',''));for(let p=object;p;p=p.parent)if(p.name==='V3 lowered grid fin')return true;return false;}),tag+' shortened withdrawal must collide with the real rising grid fin');
+  payloadService.clearance=installedClearance;sample(-45);
  }
  sample(-45);
  const selected=u.design.connections.find(c=>c.id==='payload-power');lv.setPadConnection(selected.id);assert.equal(u.selectedConnection,selected.id);
@@ -78,4 +94,4 @@ for(const launcher of Object.keys(launchFleet))for(const site of launchSitesFor(
  sample(-45);assert(u.state.groups.every(g=>g.connected));
  routes++;
 }
-console.log(`${routes} vehicle/site routes and ${connections} service circuits: connected registration, owner attachment, site-specific utilities, released-lead clearance through T+4.5 s, ground retention, payload-release boundary, reversible cutaway and deterministic seek passed.`);
+console.log(`${routes} vehicle/site routes and ${connections} service circuits: connected registration, owner attachment, site-specific utilities, released-lead clearance and physical cut-length evidence through T+4.5 s, actual rising-grid-fin strike regression, ground retention, payload-release boundary, reversible cutaway and deterministic seek passed.`);

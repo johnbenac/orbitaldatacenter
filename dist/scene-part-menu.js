@@ -28,7 +28,8 @@ export function describeScenePart(object,{craft=null,launch=null,annotation=null
   if([entry.flight,entry.groundHead,entry.hose,...(entry.fixedMeshes||[])].some(node=>node&&chain.includes(node))){connectionId=id;umbilicalGroup=entry.groupId||umbilicalGroup;break;}
  }
  if(umbilicalGroup||connectionId)category='site';
- const item={id:partIds[0]||'',name:names[0]||'',names,partIds,materialRole:materialRoles[0]||'',materialRoles,
+ const physicalPartId=first('physicalPartId')||first('electricalItemId'),electricalItemIds=unique(data.flatMap(d=>Array.isArray(d.electricalItemIds)?d.electricalItemIds:[]));
+ const item={id:physicalPartId||partIds[0]||'',physicalPartId,electricalItemId:physicalPartId,electricalItemIds,name:names[0]||'',names,partIds,materialRole:materialRoles[0]||'',materialRoles,
   materialId:first('materialId'),stationId:first('stationId'),bayRole:first('bayRole'),assembly:first('assembly'),
   umbilicalGroup,connectionId,category,rootKey:rootKeys[0]||'',rootKeys:unique(rootKeys)};
  if(rootIndex!==null)item.rootIndex=rootIndex;

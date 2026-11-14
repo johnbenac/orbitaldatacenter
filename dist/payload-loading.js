@@ -1,14 +1,12 @@
 import {flightButtons} from './flight-transport.js';
 import {integrationProfile} from './integration-profiles.js';
 import {integrationState,INTEGRATION_TIMES} from './integration-sequence.js';
+import {loadingEnd,loadingHoldText} from './launch-compatibility.js';
+export {loadingEnd,loadingHoldText} from './launch-compatibility.js';
 
 const esc=v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
 const times=INTEGRATION_TIMES;
 export const hasLoadingDirector=domain=>domain==='launcher'||domain==='launch';
-export function loadingEnd(h){
- if(h.input.launcher==='starship'&&!h.fairing.fit)return times[1];
- return h.payloadInterface?.passes===false?times[1]:h.fairing.fit?times[6]:times[2];
-}
 export function loadingStages(h){
  const p=integrationProfile(h.input.launcher,h.input.launchSite),ship=p.kind==='ship-bay',horizontal=p.kind==='horizontal';
  if(ship)return [
@@ -29,11 +27,6 @@ export function loadingStages(h){
   [horizontal?'Align':'Reach mating station',horizontal?'The payload and receiving stage now share a horizontal axis. The last movement seats the joint.':'The transporter has reached the receiving station. The crane lifts the upright payload above the vehicle, aligns the mating faces and lowers the assembly.'],
   ['Mate to vehicle','The flight hardware now carries the payload through the mission adapter. The lifting rig can release the assembly.']
  ];
-}
-export function loadingHoldText(h){
- if(h.payloadInterface?.passes===false)return 'Loading holds before pickup. The fixed spacecraft interface fails the mechanical fit check. Inspect the adapter in Phase B.';
- if(h.input.launcher==='starship')return 'Side loading is held at checkout. The installed stack must fit both the internal envelope and the retained hatch and carriage. Inspect the clearances in Phase C.';
- return 'Loading holds before enclosure closure. The stowed spacecraft crosses the selected payload envelope. Inspect the clearance in Phase C.';
 }
 export function loadingPlayer(h,s,playing){
  const steps=loadingStages(h),end=loadingEnd(h),t=Math.min(s.t,end),step=integrationState(t).step;

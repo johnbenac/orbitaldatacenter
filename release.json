@@ -15,9 +15,9 @@
     "Desktop and mobile: assembled pages, workbench startup with a WebGL flight view, local footer, canonical, Open Graph and structured data; no console errors, failed requests or HTTP errors"
   ],
   "checks_failed": [
-    "deployment-checks.mjs fails: the pathfinder deployment sweep flags wing -1/-1 (wound photovoltaic blanket against rotary electrical stator housing). It passes on v63.",
-    "engine-checks.mjs fails at engine-checks.mjs:85 (a mission plan is not feasible). Not compared with v63.",
-    "scene-interaction-checks.mjs fails: the thermal skin maps 5 nodes where the suite expects 6 (coolant missing). It also failed on v63, at a later point and with a different error."
+    "deployment-checks.mjs fails on v73 and passes on v63 (regression): the pathfinder deployment sweep flags wing -1/-1, the wound photovoltaic blanket against the rotary electrical stator housing. Reproduced on node 20 and node 22.",
+    "scene-interaction-checks.mjs fails on v73 at its thermal-skin assertion (regression): the skin maps 5 nodes where the suite expects 6, with coolant missing. v63 passed that assertion; v63 fails the same suite later, in the test's fake DOM (no dataset), so the suite was already failing.",
+    "engine-checks.mjs fails at engine-checks.mjs:85 on v73 and on v63 (not a regression): the default 0.008-year disposal plan is infeasible because CMG pre-pointing misses the burn target, by 7.53 degrees on v63 and 58.49 degrees on v73."
   ],
   "validation_notes": [
     "Single archive; imported by scripts/import-release.py, which now accepts the packed dist/assets.json.zip index.",

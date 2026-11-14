@@ -1,4 +1,5 @@
 import hashlib
+import io
 import importlib.util
 import json
 from pathlib import Path
@@ -7,11 +8,22 @@ import struct
 import tempfile
 import unittest
 from html.parser import HTMLParser
+from zipfile import ZipFile
 
 ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location('build_site', ROOT / 'scripts/build-site.py')
 builder = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(builder)
+
+
+def read_index(root):
+    """Static-asset list from plain assets.json or the packed assets.json.zip."""
+    packed = Path(root) / 'assets.json.zip'
+    if packed.is_file():
+        with ZipFile(packed) as archive:
+            assert archive.namelist() == ['assets.json']
+            return json.loads(archive.read('assets.json'))
+    return json.loads((Path(root) / 'assets.json').read_text())
 
 
 class Head(HTMLParser):
@@ -54,13 +66,31 @@ class AssemblyTests(unittest.TestCase):
             self.assertIn('application/ld+json', text)
         self.assertIn(builder.ORIGIN + '/sitemap.xml', (self.output / 'robots.txt').read_text())
         self.assertIn(builder.ORIGIN + '/about/', (self.output / 'sitemap.xml').read_text())
-        assets = json.loads((self.output / 'assets.json').read_text())
+        assets = read_index(self.output)
         self.assertIn('_site/social-card.png', assets)
         self.assertIn('about/index.html', assets)
         self.assertTrue(all((self.output / name).is_file() for name in assets))
         data = (self.output / '_site/social-card.png').read_bytes()
         self.assertEqual(data[:8], b'\x89PNG\r\n\x1a\n')
         self.assertEqual(struct.unpack('>II', data[16:24]), (1200, 630))
+
+    def test_packed_asset_index_is_extended_in_place_and_repeatable(self):
+        dist = self.release / 'dist'
+        listed = read_index(dist)
+        if (dist / 'assets.json.zip').exists():
+            (dist / 'assets.json.zip').unlink()
+        (dist / 'assets.json').unlink(missing_ok=True)
+        with ZipFile(dist / 'assets.json.zip', 'w') as archive:
+            archive.writestr('assets.json', json.dumps(listed))
+        self.build()
+        self.assertFalse((self.output / 'assets.json').exists())
+        assets = read_index(self.output)
+        self.assertEqual(set(listed) | {'about/index.html', '_site/site.css', '_site/social-card.png',
+                                        'robots.txt', 'sitemap.xml', '404.html'}, set(assets))
+        self.assertTrue(all((self.output / name).is_file() for name in assets))
+        first = (self.output / 'assets.json.zip').read_bytes()
+        self.build()
+        self.assertEqual(first, (self.output / 'assets.json.zip').read_bytes())
 
     def test_source_is_untouched_and_assembly_is_repeatable(self):
         def hashes(root):

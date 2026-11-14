@@ -1,5 +1,6 @@
 """Exercise imports across releases and refusal before checkout mutation."""
 import importlib.util
+import io
 import json
 from pathlib import Path
 import tempfile
@@ -150,6 +151,108 @@ class ImportTests(unittest.TestCase):
         archive = self.archive({'dist/assets.json': b'["missing.js"]'})
         with self.assertRaisesRegex(ValueError, 'Listed asset is missing'):
             IMPORTER.plan_import(archive, self.repo)
+
+    def test_developer_repository_metadata_stays_inert(self):
+        archive = self.archive({'AGENTS.md': b'developer guide', '.gitignore': b'*',
+                                '.gitattributes': b'* text=auto',
+                                '.github/workflows/ci.yml': b'name: ci'})
+        with self.assertRaisesRegex(ValueError, 'Unexpected developer file'):
+            IMPORTER.plan_import(archive, self.repo)
+        archive = self.archive({'AGENTS.md': b'developer guide', '.gitignore': b'*',
+                                '.gitattributes': b'* text=auto',
+                                '.github/workflows/engineering-readiness.yml': b'name: ci'})
+        IMPORTER.apply_plan(IMPORTER.plan_import(archive, self.repo))
+        self.assertFalse((self.repo / 'AGENTS.md').exists())
+        self.assertFalse((self.repo / '.gitignore').exists())
+        self.assertFalse((self.repo / '.github').exists())
+        docs = self.repo / 'upstream-docs'
+        self.assertEqual('developer guide', (docs / 'AGENTS.md').read_text())
+        self.assertEqual('*', (docs / 'dot-gitignore').read_text())
+        self.assertTrue((docs / 'dot-gitattributes').is_file())
+        self.assertTrue((docs / 'github-workflows/engineering-readiness.yml').is_file())
+
+    def test_docs_mapped_and_working_evidence_skipped(self):
+        evidence = {'docs/harnessing-work/H01-receipt.md': b'work evidence',
+                    '__export_metadata__/manifest.json': b'{}'}
+        archive = self.archive({'docs/guide.md': b'guide', 'docs/thermal/chart.jpg': b'jpg',
+                                **evidence})
+        plan = IMPORTER.plan_import(archive, self.repo)
+        self.assertEqual({'files': 2, 'bytes': sum(map(len, evidence.values()))}, plan['skipped'])
+        self.assertIn('upstream-docs/docs/guide.md', plan['files'])
+        self.assertIn('upstream-docs/docs/thermal/chart.jpg', plan['files'])
+        self.assertFalse([n for n in plan['files'] if 'harnessing' in n or 'export' in n])
+        IMPORTER.apply_plan(plan)
+        self.assertFalse((self.repo / 'docs').exists())
+        again = IMPORTER.plan_import(archive, self.repo)  # manifest entries stay recognised
+        self.assertEqual([], again['added'] + again['changed'] + again['removed'])
+        (self.repo / 'upstream-docs/docs/guide.md').write_text('local edit')
+        with self.assertRaisesRegex(ValueError, 'local changes'):
+            IMPORTER.plan_import(archive, self.repo)
+
+    def test_skipped_evidence_does_not_count_toward_size_limit(self):
+        archive = self.archive({'docs/harnessing-work/huge.json': b'x'})
+
+        def open_archive(path):
+            z = ZipFile(path)
+            for info in z.infolist():
+                if info.filename.endswith('huge.json'):
+                    info.file_size = 900_000_000
+            return z
+        with patch.object(IMPORTER, 'ZipFile', open_archive):
+            plan = IMPORTER.plan_import(archive, self.repo)
+        self.assertEqual(900_000_000, plan['skipped']['bytes'])
+
+    def test_unrecognised_docs_dotfiles_still_refused(self):
+        with self.assertRaisesRegex(ValueError, 'Unexpected developer file'):
+            IMPORTER.plan_import(self.archive({'docs/.hidden/secret.md': b'x'}), self.repo)
+
+    def packed_index(self, names, member='assets.json', extra=None):
+        buffer = io.BytesIO()
+        with ZipFile(buffer, 'w') as z:
+            z.writestr(member, json.dumps(names))
+            for name, data in (extra or {}).items():
+                z.writestr(name, data)
+        return buffer.getvalue()
+
+    def packed_archive(self, index, keep_plain=False):
+        archive = self.archive({'dist/assets.json.zip': index})
+        if keep_plain:
+            return archive
+        with ZipFile(archive) as source:
+            items = [(i, source.read(i)) for i in source.infolist()
+                     if not i.filename.endswith('dist/assets.json')]
+        packed = self.base / 'v22-packed.zip'
+        with ZipFile(packed, 'w') as z:
+            for info, data in items:
+                z.writestr(info.filename, data)
+        return packed
+
+    def test_packed_asset_index_accepted(self):
+        archive = self.packed_archive(self.packed_index(['index.html', 'new.js']))
+        plan = IMPORTER.plan_import(archive, self.repo)
+        self.assertIn('dist/assets.json.zip', plan['files'])
+        self.assertNotIn('dist/assets.json', plan['files'])
+        IMPORTER.apply_plan(plan)
+        self.assertFalse((self.repo / 'dist/assets.json').exists())
+        again = IMPORTER.plan_import(archive, self.repo)
+        self.assertEqual([], again['added'] + again['changed'] + again['removed'])
+
+    def test_packed_asset_index_refusals(self):
+        cases = {'wrong member name': self.packed_index(['index.html', 'new.js'], 'other.json'),
+                 'extra member': self.packed_index(['index.html', 'new.js'], extra={'x.txt': 'x'}),
+                 'missing listed asset': self.packed_index(['index.html', 'gone.js']),
+                 'not a zip': b'not a zip file'}
+        for label, index in cases.items():
+            with self.subTest(label):
+                before = self.snapshot()
+                with self.assertRaises(ValueError):
+                    IMPORTER.plan_import(self.packed_archive(index), self.repo)
+                self.assertEqual(before, self.snapshot())
+
+    def test_plain_and_packed_index_together_or_neither_refused(self):
+        both = self.packed_archive(self.packed_index(['index.html', 'new.js']), keep_plain=True)
+        with self.assertRaisesRegex(ValueError, 'not both'):
+            IMPORTER.plan_import(both, self.repo)
 
     def test_production_extension_paths_reserved(self):
         for name in ['dist/_site/site.css', 'dist/about/index.html']:

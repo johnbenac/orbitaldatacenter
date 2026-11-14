@@ -8,6 +8,7 @@ from pathlib import Path
 import re
 import shutil
 import tempfile
+from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
 ROOT = Path(__file__).resolve().parents[1]
 ORIGIN = 'https://orbitaldatacenter.design'
@@ -100,6 +101,31 @@ def metadata(path, title, description):
     return '\n'.join(tags)
 
 
+def read_asset_index(stage):
+    """Read the developer's static-asset list; v73+ packs it as dist/assets.json.zip."""
+    packed = stage / 'assets.json.zip'
+    if packed.is_file():
+        with ZipFile(packed) as archive:
+            if archive.namelist() != ['assets.json']:
+                raise ValueError('assets.json.zip must contain only assets.json')
+            return json.loads(archive.read('assets.json'))
+    return json.loads((stage / 'assets.json').read_text())
+
+
+def write_asset_index(stage, assets):
+    """Write the list back in the developer's format, byte-for-byte repeatable."""
+    packed = stage / 'assets.json.zip'
+    if not packed.is_file():
+        (stage / 'assets.json').write_text(json.dumps(assets, indent=2) + '\n')
+        return
+    payload = (json.dumps(assets, separators=(',', ':'), ensure_ascii=False) + '\n').encode()
+    info = ZipInfo('assets.json', date_time=(2026, 11, 7, 0, 0, 0))
+    info.compress_type = ZIP_DEFLATED
+    info.external_attr = 0o644 << 16
+    with ZipFile(packed, 'w', compression=ZIP_DEFLATED, compresslevel=9) as archive:
+        archive.writestr(info, payload)
+
+
 def build(source=ROOT, output=ROOT / '.build/public', extensions=ROOT / 'extensions',
           github_published=False):
     source, output, extensions = Path(source).resolve(), Path(output).absolute(), Path(extensions).resolve()
@@ -163,13 +189,13 @@ def build(source=ROOT, output=ROOT / '.build/public', extensions=ROOT / 'extensi
             '<meta name="robots" content="noindex"><title>Page not found | Orbital Data Center</title>'
             '<body><h1>Page not found</h1><p><a href="/">Return to the workbench</a></p></body></html>')
         # Keep the app's downloadable static-site export self-contained as well.
-        assets = json.loads((stage / 'assets.json').read_text())
+        assets = read_asset_index(stage)
         assets = sorted(set(assets) | {'about/index.html', '_site/site.css', '_site/social-card.png',
                                       'robots.txt', 'sitemap.xml', '404.html'})
         for name in assets:
             if not (stage / name).is_file():
                 raise ValueError(f'Asset manifest references missing file: {name}')
-        (stage / 'assets.json').write_text(json.dumps(assets, indent=2) + '\n')
+        write_asset_index(stage, assets)
         if output.exists():
             shutil.rmtree(output)
         stage.rename(output)

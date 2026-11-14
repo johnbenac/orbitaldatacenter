@@ -39,6 +39,16 @@ part's checksum in `release.json`. The import size limit counts source files,
 excluding the skipped history bundle; an oversized bundle need not enter Git.
 The reviewed `tools/build-identity.py` generator is also upstream-owned; its
 generated artwork ships in `dist/` and does not need rebuilding for deployment.
+Developer repository metadata (`AGENTS.md`, `.gitignore`, `.gitattributes` and the
+`.github/workflows/engineering-readiness.yml` workflow) is stored inert under
+`upstream-docs/` (as `AGENTS.md`, `dot-gitignore`, `dot-gitattributes` and
+`github-workflows/`), so it can never replace our files or enable CI here. Developer
+`docs/**` is stored under `upstream-docs/docs/`. Two bulky provenance trees are skipped and
+reported, like `history.bundle`: `docs/harnessing-work/` (upstream engineering working
+evidence, about 900 MB in v73) and `__export_metadata__/`. They do not affect the website.
+The static-asset list may be plain `dist/assets.json` or, from v73, the one-file
+`dist/assets.json.zip`; a release must have exactly one, and the build assembles the
+extension files into whichever form the release uses.
 All other incoming root paths must be recognized developer files. Unexpected
 layouts require reviewing the ownership rules before import. The assembled
 `/_site/` and `/about/` namespaces are reserved for local features.

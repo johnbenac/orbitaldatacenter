@@ -2,6 +2,7 @@
 """Review or apply a developer ZIP without overwriting site-owned features."""
 import argparse
 import hashlib
+import io
 import json
 from pathlib import Path, PurePosixPath
 import stat
@@ -9,14 +10,31 @@ import tempfile
 from zipfile import BadZipFile, ZipFile
 
 MANIFEST = 'upstream-files.json'
-ROOT_DOCS = {'DESIGN.md', 'ENGINE.md', 'SCENE.md', 'requirements.txt', 'package.json'}
+ROOT_DOCS = {'DESIGN.md', 'ENGINE.md', 'SCENE.md', 'requirements.txt', 'package.json',
+             'package-lock.json'}
+# Large upstream working evidence and export bookkeeping are provenance, not source: like the
+# bundled Git history, they are skipped (and reported) rather than committed.
+SKIPPED_PREFIXES = ('docs/harnessing-work/', '__export_metadata__/')
 UPSTREAM_TOOLS = {'tools/build-identity.py', 'earth-gpu-checks.py',
                   'scripts/generate-launch-surfaces.py', 'scripts/prepare-earth-assets.py',
                   'scripts/prepare-earth-cloud-details.py', 'scripts/prepare-earth-day-detail.py',
                   'scripts/prepare-earth-detail-night.py', 'tools/build-launch-geography.py',
                   'scripts/generate-spacecraft-materials.py',
                   'scripts/launch-elevation-integrity.json',
-                  'scripts/package-launch-elevation.py', 'scripts/package-material-library.mjs'}
+                  'scripts/package-launch-elevation.py', 'scripts/package-material-library.mjs',
+                  'build-asset-index.py',
+                  'scripts/capture-redwire-harness-takeoff.mjs',
+                  'scripts/check-engineering-readiness.mjs', 'scripts/check-lossless-jpeg.py',
+                  'scripts/check-parts-knowledge-package.mjs', 'scripts/check-routing.mjs',
+                  'scripts/engineering-readiness-audit.mjs', 'scripts/flight-routing-receipts.mjs',
+                  'scripts/generate-thermal-allocation-basis.mjs',
+                  'scripts/lossless-jpeg-optimize.c', 'scripts/package-parts-knowledge.mjs',
+                  'scripts/plot-redwire-pdr-routes.py', 'scripts/render-redwire-installation.mjs',
+                  'scripts/routing-source-fingerprint.mjs',
+                  'src/parts-knowledge/part-knowledge-flight.js',
+                  'src/parts-knowledge/part-knowledge-ground.js',
+                  'src/parts-knowledge/part-knowledge-launch.js',
+                  'src/parts-knowledge/part-knowledge-materials.js'}
 MAPPED = {'README.md': 'upstream-docs/README.md',
           '.openai/hosting.json': 'upstream-docs/hosting.json',
           'VALIDATION-v21.0.md': 'upstream-docs/VALIDATION-v21.0.md',
@@ -25,7 +43,15 @@ MAPPED = {'README.md': 'upstream-docs/README.md',
               'upstream-docs/validation-power-interface-1793995613763.jpg',
           'validation-ui-work.jpg': 'upstream-docs/validation-ui-work.jpg',
           'validation-facility-labels.jpg': 'upstream-docs/validation-facility-labels.jpg',
-          'validation-processing-workbench.jpg': 'upstream-docs/validation-processing-workbench.jpg'}
+          'validation-processing-workbench.jpg': 'upstream-docs/validation-processing-workbench.jpg',
+          # Developer repository metadata stays inert: dotfiles and workflows must not take
+          # effect in this repository, and the developer's AGENTS.md must not replace ours.
+          'AGENTS.md': 'upstream-docs/AGENTS.md',
+          '.gitignore': 'upstream-docs/dot-gitignore',
+          '.gitattributes': 'upstream-docs/dot-gitattributes',
+          '.github/workflows/engineering-readiness.yml':
+              'upstream-docs/github-workflows/engineering-readiness.yml',
+          'RENDERING-REPAIR-QA.md': 'upstream-docs/RENDERING-REPAIR-QA.md'}
 MAPPED.update({name: 'upstream-docs/' + name for name in (
     'artifacts/spacecraft-texture-bank.zip',
     'docs/adaptive-hardware-detail-2026-11-07.md',
@@ -62,12 +88,19 @@ def safe_name(name):
     return PurePosixPath(*parts)
 
 
+def skipped(name):
+    return name == 'history.bundle' or name.startswith(SKIPPED_PREFIXES)
+
+
 def destination(name):
     if name in UPSTREAM_TOOLS:
         return name
     if name in MAPPED:
         return MAPPED[name]
     path = PurePosixPath(name)
+    if (path.parts[0] == 'docs' and len(path.parts) > 1
+            and not any(part.startswith('.') for part in path.parts)):
+        return 'upstream-docs/' + name
     if (path.parts[0] == 'dist' and len(path.parts) > 1
             and not any(part.startswith('.') for part in path.parts)
             and path.parts[1] not in ('_site', 'about')):
@@ -75,6 +108,16 @@ def destination(name):
     if len(path.parts) == 1 and (name in ROOT_DOCS or name.endswith('.mjs')):
         return name
     raise ValueError(f'Unexpected developer file; review ownership first: {name}')
+
+
+def owned(name):
+    """True when an ownership-manifest entry is a path this importer can produce."""
+    if name in MAPPED.values() or name.startswith('upstream-docs/docs/'):
+        return True
+    try:
+        return destination(name) == name
+    except ValueError:
+        return False
 
 
 def checked_path(repo, name):
@@ -85,6 +128,25 @@ def checked_path(repo, name):
         if path.is_symlink():
             raise ValueError(f'Refusing symbolic link in destination: {name}')
     return path
+
+
+def asset_index(files):
+    """Return the static-asset list from dist/assets.json or its one-file ZIP package."""
+    plain, packed = files.get('dist/assets.json'), files.get('dist/assets.json.zip')
+    if (plain is None) == (packed is None):
+        raise ValueError('Release must contain dist/assets.json or dist/assets.json.zip, not both.')
+    if packed is not None:
+        try:
+            with ZipFile(io.BytesIO(packed)) as z:
+                members = [item for item in z.infolist() if not item.is_dir()]
+                if len(members) != 1 or members[0].filename != 'assets.json':
+                    raise ValueError('dist/assets.json.zip must contain only assets.json.')
+                if members[0].file_size > 50_000_000:
+                    raise ValueError('dist/assets.json.zip index is too large.')
+                plain = z.read(members[0])  # verifies the CRC-32
+        except BadZipFile as error:
+            raise ValueError(f'dist/assets.json.zip is not a valid ZIP: {error}') from error
+    return json.loads(plain)
 
 
 def read_drop(archive):
@@ -100,6 +162,7 @@ def read_drop(archive):
                    for p, item in zip(names, entries)) else None
         seen = set()
         source_bytes = 0
+        omitted = {'files': 0, 'bytes': 0}
         for item, path in zip(entries, names):
             if stat.S_IFMT(item.external_attr >> 16) == stat.S_IFLNK:
                 raise ValueError(f'Symbolic link in archive: {item.filename}')
@@ -109,7 +172,9 @@ def read_drop(archive):
             if name in seen:
                 raise ValueError(f'Duplicate archive path: {name}')
             seen.add(name)
-            if name == 'history.bundle':
+            if skipped(name):
+                omitted['files'] += 1
+                omitted['bytes'] += item.file_size
                 continue
             source_bytes += item.file_size
             if source_bytes > 500_000_000:
@@ -118,16 +183,16 @@ def read_drop(archive):
             if target in files:
                 raise ValueError(f'Duplicate destination: {target}')
             files[target] = z.read(item)
-    if 'dist/index.html' not in files or 'dist/assets.json' not in files:
-        raise ValueError('Release must contain dist/index.html and dist/assets.json.')
-    assets = json.loads(files['dist/assets.json'])
+    if 'dist/index.html' not in files:
+        raise ValueError('Release must contain dist/index.html.')
+    assets = asset_index(files)
     if not isinstance(assets, list) or not all(isinstance(name, str) for name in assets):
-        raise ValueError('dist/assets.json must be an array of relative filenames.')
+        raise ValueError('The asset index must be an array of relative filenames.')
     for name in assets:
         safe_name(name)
         if 'dist/' + name not in files:
             raise ValueError(f'Listed asset is missing: {name}')
-    return files
+    return files, omitted
 
 
 def plan_import(archive, repo):
@@ -139,12 +204,12 @@ def plan_import(archive, repo):
     previous = old['files']
     for name, expected in previous.items():
         # A corrupt manifest must not claim independent feature directories.
-        if name not in MAPPED.values() and destination(name) != name:
+        if not owned(name):
             raise ValueError(f'Invalid ownership entry: {name}')
         path = checked_path(repo, name)
         if not path.is_file() or digest(path.read_bytes()) != expected:
             raise ValueError(f'Upstream file has local changes; commit/reconcile first: {name}')
-    files = read_drop(archive)
+    files, omitted = read_drop(archive)
     for name in files:
         path = checked_path(repo, name)
         if path.exists() and name not in previous:
@@ -165,7 +230,7 @@ def plan_import(archive, repo):
                 'files': {name: digest(data) for name, data in sorted(files.items())}}
     return {'archive': archive.name, 'archive_sha256': manifest['archive_sha256'],
             'added': added, 'changed': changed, 'removed': removed,
-            'files': files, 'manifest': manifest, 'repo': repo}
+            'skipped': omitted, 'files': files, 'manifest': manifest, 'repo': repo}
 
 
 def apply_plan(plan):
@@ -202,7 +267,8 @@ def main():
             apply_plan(plan)
     except (ValueError, OSError, KeyError, BadZipFile) as error:
         parser.exit(1, f'Import refused: {error}\n')
-    summary = {key: plan[key] for key in ('archive', 'archive_sha256', 'added', 'changed', 'removed')}
+    summary = {key: plan[key] for key in ('archive', 'archive_sha256', 'added', 'changed', 'removed',
+                                          'skipped')}
     summary['applied'] = args.apply
     print(json.dumps(summary, indent=2))
 

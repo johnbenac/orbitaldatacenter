@@ -1,0 +1,55 @@
+name: Deploy
+
+# Publishes main to production on Cloudflare Pages. It runs on every push to main and every 30 minutes;
+# the scheduled run only deploys when production is behind main, which also covers merges made by
+# auto-merge (those pushes do not start other workflows). The Cloudflare token exists only in the
+# "production" environment, which accepts the main branch only. A failed post-deploy check rolls
+# production back to the previous deployment.
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Record the live deployment
+        id: live
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          python3 scripts/pages-guard.py current | tee live.json
+          echo "id=$(jq -r .id live.json)" >> "$GITHUB_OUTPUT"
+          echo "commit=$(jq -r .commit_hash live.json)" >> "$GITHUB_OUTPUT"
+          echo "head=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Deploy and verify
+        if: github.event_name != 'schedule' || steps.live.outputs.commit != steps.live.outputs.head
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          WRANGLER_COMMAND: npx --yes wrangler@4.129.0
+        run: |
+          python3 deploy.py --no-record --commit-hash "${{ steps.live.outputs.head }}"
+          python3 scripts/pages-guard.py verify \
+            --previous-id "${{ steps.live.outputs.id }}" \
+            --index-sha256 "$(sha256sum .build/public/index.html | cut -d' ' -f1)"

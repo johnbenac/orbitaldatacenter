@@ -1,0 +1,26 @@
+# Pull requests that change any path below need the owner's approval before they merge.
+# Everything else (dist/, the root *.mjs suites, DESIGN.md, ENGINE.md, SCENE.md, src/, upstream-docs/
+# and the developer's tool scripts) merges automatically once the CI checks pass.
+/.github/ @johnbenac
+/AGENTS.md @johnbenac
+/deploy.py @johnbenac
+/baseline.json @johnbenac
+/publication.json @johnbenac
+/release.json @johnbenac
+/upstream-files.json @johnbenac
+/package.json @johnbenac
+/package-lock.json @johnbenac
+/.commitlintrc.cjs @johnbenac
+/.gitlint @johnbenac
+/.gitignore @johnbenac
+/extensions/ @johnbenac
+/tests/ @johnbenac
+/docs/ @johnbenac
+/graphics/ @johnbenac
+/deployment-records/ @johnbenac
+/scripts/build-site.py @johnbenac
+/scripts/import-release.py @johnbenac
+/scripts/check-release.py @johnbenac
+/scripts/ratchet.py @johnbenac
+/scripts/smoke-test.py @johnbenac
+/scripts/pages-guard.py @johnbenac

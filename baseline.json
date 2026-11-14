@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "suites": {
+    "ai-core": "pass",
+    "deployment": "fail",
+    "design": "pass",
+    "engine": "fail",
+    "scene-interaction": "fail"
+  }
+}

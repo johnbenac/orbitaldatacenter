@@ -1,0 +1,25 @@
+{
+  "id": "starcloud-3",
+  "city": "Giza, Egypt",
+  "latitude": 29.9792,
+  "longitude": 31.1342,
+  "city_projected": [
+    0.5000005960464478,
+    0.18000179529190063
+  ],
+  "clouds": false,
+  "camera_unchanged": true,
+  "craft_matrices_unchanged": true,
+  "camera_lens": 36.0965690612793,
+  "reference_metres": 230.3,
+  "reference_uniform_scale": 0.9999999867487722,
+  "reference_depth": 541.5936358642579,
+  "reference_projection": [
+    0.07324445992708206,
+    0.062289439141750336,
+    0.6256689429283142,
+    0.8177300691604614
+  ],
+  "craft_meshes": 350,
+  "reference_meshes": 1
+}

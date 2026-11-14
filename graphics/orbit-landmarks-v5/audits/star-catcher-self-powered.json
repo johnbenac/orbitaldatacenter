@@ -1,0 +1,25 @@
+{
+  "id": "star-catcher-self-powered",
+  "city": "Seattle",
+  "latitude": 47.6205,
+  "longitude": -122.3493,
+  "city_projected": [
+    0.5000005960464478,
+    0.1800008863210678
+  ],
+  "clouds": false,
+  "camera_unchanged": true,
+  "craft_matrices_unchanged": true,
+  "camera_lens": 37.5145378112793,
+  "reference_metres": 184.4,
+  "reference_uniform_scale": 1.0000000330993266,
+  "reference_depth": 427.04969709107286,
+  "reference_projection": [
+    0.24585096538066864,
+    0.046783387660980225,
+    0.3541492223739624,
+    0.8932173252105713
+  ],
+  "craft_meshes": 390,
+  "reference_meshes": 1
+}

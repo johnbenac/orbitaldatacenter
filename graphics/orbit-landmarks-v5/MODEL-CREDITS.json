@@ -1,0 +1,44 @@
+{
+  "liberty": {
+    "creator": "gravityjack",
+    "record": "https://zenodo.org/records/10316365",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "modifications": "Uniform metric scaling to46.05m statue height, orientation and relighting; no full pedestal."
+  },
+  "bigben": {
+    "creator": "noears6",
+    "record": "https://zenodo.org/records/10320774",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "modifications": "Uniform scaling to96.3m, orientation and relighting."
+  },
+  "eiffel": {
+    "creator": "Scott Marshall",
+    "record": "https://poly.pizza/m/aIpJchqtRTg",
+    "license": "CC BY 3.0",
+    "license_url": "https://creativecommons.org/licenses/by/3.0/",
+    "modifications": "Uniform scaling to324m, the historic2000\u20132022 height appropriate to this2019 asset; metallic surface treatment and relighting. The current tower is330m."
+  },
+  "pyramid": {
+    "creator": "Original geometry prepared for John Benac",
+    "record": null,
+    "license": "Project-authored source: AGPLv3",
+    "modifications": "New closed exterior,203 courses of individually modeled blocks,230.3m base side,138.8m surviving height and146.6m original slope. Masonry detail is illustrative, not a stone-by-stone archaeological survey."
+  },
+  "needle": {
+    "creator": "Intentional3D; Printables reupload Simon8668",
+    "record": "https://www.printables.com/model/237534-seattle-space-needle",
+    "original_source": "https://www.thingiverse.com/thing:567695",
+    "license": "Creative Commons Attribution\u2013ShareAlike (CC-BY-SA), as specified by the source",
+    "modifications": "Original Combined.stl structural geometry retained; normalized to184.4m, smooth/weighted normals and photographic white-paint/glazing materials. Original9STL files and source license records supplied."
+  },
+  "taj": {
+    "creator": "THE CUBE GUY / mishrau60",
+    "record": "https://sketchfab.com/3d-models/taj-mahal-c8eb2e89098746898b94f0b556ecdefe",
+    "license": "CC BY4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "archive": "https://huggingface.co/datasets/allenai/objaverse/resolve/main/glbs/000-135/c8eb2e89098746898b94f0b556ecdefe.glb",
+    "modifications": "Normalized to73m, oriented to its textured front, legacy diffuse/specular-gloss material converted to lit marble using original diffuse maps."
+  }
+}

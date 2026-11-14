@@ -1,0 +1,25 @@
+{
+  "id": "orbital-1-202609",
+  "city": "Paris",
+  "latitude": 48.8584,
+  "longitude": 2.2945,
+  "city_projected": [
+    0.5000002980232239,
+    0.18000106513500214
+  ],
+  "clouds": false,
+  "camera_unchanged": true,
+  "craft_matrices_unchanged": true,
+  "camera_lens": 41.713584899902344,
+  "reference_metres": 324.0,
+  "reference_uniform_scale": 0.009754110428986116,
+  "reference_depth": 888.0219014178457,
+  "reference_projection": [
+    0.1278066188097,
+    0.05752143636345863,
+    0.3321933448314667,
+    0.8824846744537354
+  ],
+  "craft_meshes": 372,
+  "reference_meshes": 87
+}

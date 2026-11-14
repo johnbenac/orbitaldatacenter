@@ -1,0 +1,25 @@
+{
+  "id": "orbital-1-202606",
+  "city": "London",
+  "latitude": 51.5007,
+  "longitude": -0.1246,
+  "city_projected": [
+    0.49999985098838806,
+    0.1799996793270111
+  ],
+  "clouds": false,
+  "camera_unchanged": true,
+  "craft_matrices_unchanged": true,
+  "camera_lens": 40.181236267089844,
+  "reference_metres": 96.3,
+  "reference_uniform_scale": 0.010302289805182423,
+  "reference_depth": 237.31281663848299,
+  "reference_projection": [
+    0.2577919065952301,
+    0.050640005618333817,
+    0.3422081172466278,
+    0.889360249042511
+  ],
+  "craft_meshes": 292,
+  "reference_meshes": 5
+}

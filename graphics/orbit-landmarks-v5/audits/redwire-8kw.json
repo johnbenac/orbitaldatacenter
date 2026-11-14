@@ -1,0 +1,25 @@
+{
+  "id": "redwire-8kw",
+  "city": "New York City",
+  "latitude": 40.6892,
+  "longitude": -74.0445,
+  "city_projected": [
+    0.5000000596046448,
+    0.1800008863210678
+  ],
+  "clouds": false,
+  "camera_unchanged": true,
+  "craft_matrices_unchanged": true,
+  "camera_lens": 36.392826080322266,
+  "reference_metres": 46.05,
+  "reference_uniform_scale": 1.0083392986940913,
+  "reference_depth": 108.68721430125163,
+  "reference_projection": [
+    0.17380884289741516,
+    0.06661790609359741,
+    0.3461911678314209,
+    0.8933838605880737
+  ],
+  "craft_meshes": 179,
+  "reference_meshes": 3
+}

@@ -1,0 +1,10 @@
+Explore the design of orbital data centers.
+
+Publicly disclosed concepts, illustrated with familiar landmarks: New York, Giza, Agra, Paris, London and Seattle. The spacecraft use the original Orbital Data Center workbench model configurations; these are our visualizations.
+
+http://orbitaldatacenter.design
+https://github.com/johnbenac/orbitaldatacenter
+
+Model credits: Statue of Liberty by gravityjack (https://zenodo.org/records/10316365), Big Ben by noears6 (https://zenodo.org/records/10320774), and Taj Mahal by THE CUBE GUY / mishrau60 (https://sketchfab.com/3d-models/taj-mahal-c8eb2e89098746898b94f0b556ecdefe), CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Eiffel Tower by Scott Marshall (https://poly.pizza/m/aIpJchqtRTg), CC BY 3.0 (https://creativecommons.org/licenses/by/3.0/), shown in its 2019, 324 m configuration. Space Needle by Intentional3D, reuploaded by Simon8668 (https://www.printables.com/model/237534-seattle-space-needle; original https://www.thingiverse.com/thing:567695), CC Attribution–ShareAlike. Models were scaled, oriented, relit and assigned photographic materials; Needle geometry is the downloaded model. Pyramid exterior is original modeled geometry. Earth textures: Solar System Scope / INOVE, CC BY 4.0, https://www.solarsystemscope.com/textures/ . Sky: NASA/SVS Deep Star Maps 2020, Ernie Wright, https://svs.gsfc.nasa.gov/4851/ .
+
+Modified illustration: CC BY-SA 4.0, https://creativecommons.org/licenses/by-sa/4.0/ . Third-party component rights and company marks remain with their respective owners.

@@ -1,0 +1,25 @@
+{
+  "id": "starmind-ai1",
+  "city": "Agra, India",
+  "latitude": 27.1751,
+  "longitude": 78.0421,
+  "city_projected": [
+    0.5000008940696716,
+    0.18000097572803497
+  ],
+  "clouds": false,
+  "camera_unchanged": true,
+  "craft_matrices_unchanged": true,
+  "camera_lens": 38.842220306396484,
+  "reference_metres": 73.0,
+  "reference_uniform_scale": 0.07385879786042468,
+  "reference_depth": 214.1231980587984,
+  "reference_projection": [
+    0.07232742756605148,
+    0.03805205971002579,
+    0.6276727914810181,
+    0.8427044749259949
+  ],
+  "craft_meshes": 351,
+  "reference_meshes": 259
+}

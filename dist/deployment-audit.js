@@ -37,7 +37,7 @@ export const deploymentAudit={
       "axialClearanceM": 4.351263393,
       "evidence": {
         "status": "remeasured",
-        "label": "Completed sweep · full suite timed out",
+        "label": "Completed sweep · 2c86938 · suite timed out",
         "command": "node deployment-checks.mjs",
         "verificationCommand": "python3 scripts/ratchet.py --lane fast",
         "reproductionCommand": "ODC_AUDIT_ONLY=pathfinder node deployment-checks.mjs",
@@ -58,7 +58,8 @@ export const deploymentAudit={
           "dist/cable-installation-mass.js": "d6138320a07e6f07da17c6f8b3548df966079493ae9587310bcf6a5675260da6",
           "deployment-checks.mjs": "7144d91d8aae02b7c1b2dc859eb7017ba252a9a540f4c033af7459a19597bdf2",
           "protected-solar-collector-checks.mjs": "748fe43d04b0d892b01a25ce1736a029595a6f811ac2c811392ecf59d528c501"
-        }
+        },
+        "sourceCommit": "2c86938f88fef5196eb2ad839c404b913d491665"
       }
     },
     {
@@ -94,7 +95,7 @@ export const deploymentAudit={
       "axialClearanceM": 1.0229933,
       "evidence": {
         "status": "remeasured",
-        "label": "Completed sweep · full suite timed out",
+        "label": "Completed sweep · 2c86938 · suite timed out",
         "command": "node deployment-checks.mjs",
         "verificationCommand": "python3 scripts/ratchet.py --lane fast",
         "reproductionCommand": "ODC_AUDIT_ONLY=reference node deployment-checks.mjs",
@@ -115,7 +116,8 @@ export const deploymentAudit={
           "dist/cable-installation-mass.js": "d6138320a07e6f07da17c6f8b3548df966079493ae9587310bcf6a5675260da6",
           "deployment-checks.mjs": "7144d91d8aae02b7c1b2dc859eb7017ba252a9a540f4c033af7459a19597bdf2",
           "protected-solar-collector-checks.mjs": "748fe43d04b0d892b01a25ce1736a029595a6f811ac2c811392ecf59d528c501"
-        }
+        },
+        "sourceCommit": "2c86938f88fef5196eb2ad839c404b913d491665"
       }
     },
     {
@@ -151,7 +153,7 @@ export const deploymentAudit={
       "axialClearanceM": 1.0229933,
       "evidence": {
         "status": "remeasured",
-        "label": "Completed sweep · full suite timed out",
+        "label": "Completed sweep · 2c86938 · suite timed out",
         "command": "node deployment-checks.mjs",
         "verificationCommand": "python3 scripts/ratchet.py --lane fast",
         "reproductionCommand": "ODC_AUDIT_ONLY=optical node deployment-checks.mjs",
@@ -172,7 +174,8 @@ export const deploymentAudit={
           "dist/cable-installation-mass.js": "d6138320a07e6f07da17c6f8b3548df966079493ae9587310bcf6a5675260da6",
           "deployment-checks.mjs": "7144d91d8aae02b7c1b2dc859eb7017ba252a9a540f4c033af7459a19597bdf2",
           "protected-solar-collector-checks.mjs": "748fe43d04b0d892b01a25ce1736a029595a6f811ac2c811392ecf59d528c501"
-        }
+        },
+        "sourceCommit": "2c86938f88fef5196eb2ad839c404b913d491665"
       }
     },
     {
@@ -252,7 +255,7 @@ export const deploymentAudit={
       }
     }
   ],
-  "evidenceNote": "Pathfinder, Reference and Optical were remeasured at 2401 poses each on the recorded source. The full suite reached its unchanged 3000-second limit before Carrier completed. Carrier and Scale retain their earlier numerical snapshots and are explicitly archived.",
+  "evidenceNote": "Pathfinder, Reference and Optical were remeasured at 2401 poses each on the recorded source. The full suite reached its unchanged 3000-second limit before Carrier completed. Carrier and Scale retain their earlier numerical snapshots and are explicitly archived. The recorded command and source hashes identify source snapshot 2c86938.",
   "verification": {
     "command": "node deployment-checks.mjs",
     "via": "python3 scripts/ratchet.py --lane fast",
@@ -269,6 +272,7 @@ export const deploymentAudit={
       "scale"
     ],
     "runFinishedUtc": "2026-11-15T02:33:41.343586+00:00",
-    "note": "The three completed presets passed. Carrier did not complete before the suite limit, and Scale was not reached. This is not a complete passing deployment suite."
+    "note": "The three completed presets passed. Carrier did not complete before the suite limit, and Scale was not reached. This is not a complete passing deployment suite.",
+    "sourceCommit": "2c86938f88fef5196eb2ad839c404b913d491665"
   }
 };

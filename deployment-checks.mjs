@@ -11,6 +11,7 @@ import {makeCraft} from './dist/craft.js';
 import {deploymentLayout,mechanismPose,leafPose,leafAxes} from './dist/deployment.js';
 import {DEPLOY_DURATION_S} from './dist/commissioning-clock.js';
 import {auditProtectedSolarCollectors} from './protected-solar-collector-checks.mjs';
+import {auditProtectedSolarSupportVariants} from './protected-solar-support-checks.mjs';
 
 const painter=new Proxy({}, {get:(_,k)=>k==='createLinearGradient'?()=>({addColorStop(){}}):()=>{}});
 globalThis.document={createElement:()=>({getContext:()=>painter})};
@@ -304,6 +305,7 @@ export function auditOperatingAngles(h,wingStep=10,bankStep=5,trimPoses=[]){
  return {count,minGapM:closest.value,pair:closest.names,angles:closest.u};
 }
 if(process.argv[1]?.endsWith('deployment-checks.mjs')){
+ auditProtectedSolarSupportVariants();
  testSeparation();
  assert(payoutError(1,2,.25,.2,.45)>.8,'Wrong winding sense must fail payout conservation');
  const impossible=sizeDesign({...missionStarter('text'),fairingM:1,fairingLengthM:2}),cramped=makeCraft(impossible);

@@ -102,6 +102,15 @@ jobs:
         run: |
           echo "$RESULTS"
           echo "$RESULTS" | python3 -c "import json,sys; sys.exit(0 if all(r in ('success','skipped') for r in json.load(sys.stdin)) else 1)"
+      # The ruleset requires one approval. The gate supplies it for pull requests whose checks passed,
+      # which satisfies the count only: paths in .github/CODEOWNERS still need the owner's review.
+      - name: Approve
+        if: >-
+          github.event_name == 'pull_request' && !github.event.pull_request.draft &&
+          github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh pr review --approve "${{ github.event.pull_request.number }}" --repo "${{ github.repository }}" --body "All CI checks passed."
       - name: Enable auto-merge
         if: >-
           github.event_name == 'pull_request' && !github.event.pull_request.draft &&

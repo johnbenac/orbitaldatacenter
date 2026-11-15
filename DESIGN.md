@@ -10,3 +10,4 @@ The launch vehicle domain covers ten configurations in eight families. Each cata
 Changing the carrier keeps the mission-specific payload allowance and selects the new carrier’s reference profile. The model screens launched stack mass against both the allowance and the LEO reference, then evaluates the actual folded stack against the tapered keep-in. A positive reference margin does not calculate orbit-specific launch performance. The separate insertion workspace follows the payload stack and spacecraft trim. The shared 540 s ascent-to-release interval is an illustrative mission timeline.
 
 Run `node launch-fleet-checks.mjs` for the independent mass screens, option persistence, cross-fleet fit comparison, source records, and phase-specific selection controls.
+<!-- These preliminary design notes remain open to ongoing review. -->

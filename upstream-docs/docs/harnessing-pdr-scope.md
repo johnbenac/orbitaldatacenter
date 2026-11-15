@@ -1,14 +1,22 @@
 # Harnessing scope for the living preliminary design
 
-**Active direction: 14 November 2026.** This replaces the old harness-recovery
+**Active direction: 15 November 2026.** This replaces the old harness-recovery
 dependency chain as the project's working plan. The user reset the scope to
 preliminary design: fix harnesses crossing intact walls, occupying unintended
 space, missing connections or interfering with the depicted mechanisms.
 
 The site is a living preliminary design and its visitors are reviewers. There
-is no formal PDR closure. The current authorized trial is **PDR-1 through PDR-3
-for Redwire only** (`redwire-8kw` / `redwire-platform`). Other concepts remain
-queued until requested, even if Redwire's trial is successful.
+is no formal PDR closure. The current authorized work is **PDR-1 through PDR-3
+for the SpaceX reference** (`starmind-ai1` / `starmind-cross`), following the
+Redwire trial. The user requested this next concept explicitly and directed
+the work through GitHub pull requests using PR #10's bounded check pattern.
+Other concepts remain queued until requested.
+
+The root `AGENTS.md` defines the current branch, review and publication flow.
+The fast ratchet includes Pathfinder deployment only; the full deployment
+sweep remains nightly. Add bounded checks for changed SpaceX hardware to the
+existing fast suites. Do not revive the old evidence archive or all-facility
+campaign as a prerequisite to this preliminary layout work.
 
 The canonical [Harnessing Plan](https://chatgpt.com/library?file_id=libfile_fde3_f-0f515944425c8191b5830d023851c0b1_0cb434008e808191ac4277e8c6f9d899&account_id=personal)
 contains the full revised plan and disposition of the old tasks. This note is
@@ -34,13 +42,13 @@ to make a defective route appear acceptable.
 
 | Step | Deliverable |
 | --- | --- |
-| **PDR-1: inspect Redwire** | Inspect the actual `redwire-8kw` routes and identify wall, endpoint, corridor or major-interference defects. Start with the compute-platform deployment/wall problem. Keep a short issue/pose record. |
-| **PDR-2: repair and install Redwire** | Correct demonstrated route, endpoint, passage and major-clash defects; install the chosen geometry in the scene and retain useful before/after views. |
-| **PDR-3: Redwire movement and estimates** | Inspect stowed, deployed and mechanism-critical intermediate states. Review slack, bends and length. Include individual harnesses and their cable/termination mass in the master equipment list; carry the calculated mass through the vehicle totals and affected estimates without double counting. |
+| **PDR-1: inspect SpaceX** | Inspect the actual `starmind-ai1` routes and identify wall, endpoint, corridor or major-interference defects. Distinguish body-fixed equipment distribution from the moving solar interfaces. Keep a short issue/pose record. |
+| **PDR-2: repair and install SpaceX** | Correct demonstrated route, endpoint, passage and major-clash defects; install the chosen geometry and its physical supports in the scene. |
+| **PDR-3: SpaceX movement and estimates** | Inspect stowed, deployed and mechanism-critical intermediate states. Review slack, bends and length. Include individual harnesses, terminations and added installation hardware in the MEL; carry their mass through the vehicle totals and affected estimates without double counting. |
 
 Keep the inspected scope, changes, findings and remaining uncertainty visible
 as ongoing design status for visitors. This is not a fourth formal closure
-task, and it does not authorize work on another concept.
+task, and it does not authorize work on an additional concept.
 
 The user explicitly included the harness mass-accounting correction in this
 trial. Replace the old coarse allowance with the calculated installed
@@ -58,17 +66,17 @@ electrical/optical interface are part of this assignment. Account for their
 hardware, current capacity, losses, optical budget and mass effects; a
 collision-free unsupported loop is not a completed installation.
 
-**Active assignment: complete PDR-1 through PDR-3 for Redwire as a trial.**
+**Active assignment: complete PDR-1 through PDR-3 for the SpaceX reference.**
 Execution findings belong in the implementation status and evidence; this scope
 instruction does not claim any result. The twelve IDs in `routingCraftCatalog()`
-remain the wider inventory, but only Redwire is active. June Orbital, Starmind,
+remain the wider inventory. Preserve Redwire's installed repair. June Orbital,
 Starcloud and the other concepts are queued, not implied passes or automatic
 next tasks. Reuse prior evidence only where installed routing and relevant poses
 are genuinely equivalent.
 
 Animation and selected poses support preliminary movement accommodation, not a
 continuous-motion or fatigue certificate. Ground, TVAC, bay and launch scenes
-enter the current work only if needed to understand a demonstrated Redwire
+enter the current work only if needed to understand a demonstrated SpaceX
 routing problem. The former all-facility campaign and all 180
 spacecraft/launcher/site outcomes are not prerequisites. Major routing defects
 remain visible issues in the declared scope; incomplete coverage is explicit.
@@ -82,12 +90,14 @@ Use `dist/routing-inspector.js` for selection, pose inspection and route evidenc
 answer a concrete question those tools cannot answer.
 
 Preserve H05–H09's installed June repairs and H11's integrated Starmind
-`P-SA-1/2` repair. H11 retained 109 other native planning failures; those remain
-queued with Starmind until that concept is requested. It did not accept the
-whole spacecraft.
+`P-SA-1/2` repair. H11 retained 109 other native planning failures. That is a
+historical result, not a current-source count or an acceptance of the whole
+spacecraft. The requested SpaceX work must inspect demonstrated major defects
+without treating every detailed H11 task as an automatic dependency.
 
-The H12 detailed internal collector proposal remains unhooked and outside this
-Redwire trial. If collector work is later requested, preliminary design may use an
+The historical H12 detailed internal collector proposal remains unhooked. The
+current collector repair uses the preliminary design scope and does not resume
+that campaign. Preliminary design may use an
 explicitly preliminary functional junction/enclosure with real external
 connections, circuit identity, intended passages and an allocated support/cable
 envelope. Detailed copper, insulation and contact interfaces are not required
@@ -112,8 +122,8 @@ change alone does not require a geometry or numerical test campaign.
 A future **preliminary-design snapshot** records the scope actually inspected,
 changes and remaining findings for visitors. Use affected functional checks
 and normal application/build checks, with remaining engineering limitations
-visible. Publication of the current Redwire redesign is explicitly requested.
-Ongoing preliminary review and
+visible. The requested SpaceX work follows the root GitHub PR and deployment
+contract; no ZIP or Sites archive is the publication mechanism. Ongoing preliminary review and
 detailed engineering verification have separate dispositions: existing
 validators retain their predicates, failures and unknowns. Never describe a
 PDR review as a pass of the full engineering gate.
@@ -121,7 +131,7 @@ PDR review as a pass of the full engineering gate.
 The full gate remains required for a release claiming complete engineering
 verification and for engineering changes outside this harnessing PDR scope,
 including thermal models and other numerical capabilities. See `AGENTS.md`.
-The active Redwire assignment authorizes implementation and focused checks for
+The active SpaceX assignment authorizes implementation and focused checks for
 steps 1–3. This document records scope, not completed execution or deployment.
 
 See [implementation status](routing-implementation-status.md) for current work

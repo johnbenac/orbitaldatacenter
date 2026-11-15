@@ -168,7 +168,7 @@ function axesAt(yaw,roll,pitch){return leafAxes({pitch,roll}).map(a=>rotY(a,yaw)
 function familyDeploymentLayout(h,f){
  const d=h.input||h,w=h.bodyWidthM,bh=h.bodyHeightM,l=h.bodyLengthM,ww=h.wingWidthM,wl=h.wingLengthM,rw=h.radiatorWidthM;
  const panelCount=f.radiatorBankCount===1?1:Math.max(2,Math.min(8,2*Math.round((h.radiatorPanelsPerBank??d.radiatorPanelsPerBank??2)/2))),depth=h.radiatorLengthM/panelCount,hingeStand=f.radiatorTracking==='root-cant'?.125:.045,fluidStandOffReserveM=f.radiatorTracking==='root-cant'?Math.max(1.30,.25*panelCount-.105)-.09*(panelCount+1):0,r=depth+(panelCount>1?(f.radiatorTracking==='root-cant'?.26:.04):0);
- const coreRadiusM=.125,blanketGaugeM=.002,packedRollM=Math.sqrt(coreRadiusM**2+blanketGaugeM*wl/Math.PI),rootX=w/2+(h.solarRootOffsetM??(f.id==='starcloud-inline'?.20:packedRollM+.12));
+ const coreRadiusM=.125,blanketGaugeM=.002,packedRollM=Math.sqrt(coreRadiusM**2+blanketGaugeM*wl/Math.PI),rootX=w/2+(h.solarRootCollector?.rootStandOffM??h.solarRootOffsetM??(f.id==='starcloud-inline'?.20:packedRollM+.12));
  // The neighboring folded leaf's root cap is farther out than the last leaf
  // tip. Maximize its A*cos(fold)+B*sin(fold) projection over the full fold;
  // the nearest opposing leaf controls all earlier equal-pitch leaves.
@@ -200,6 +200,7 @@ function familyDeploymentLayout(h,f){
   const p=familyWingPose(g,wing,stowed,0),center=addV(p.root,p.axes[1],p.rollRadius),attachment=wing.bankEnd===null?'service-bus':`radiator-bank-${g.banks.findIndex(b=>b.end===wing.bankEnd)}`,supports=[];
   if(wing.bankEnd===null)for(const end of [-1,1])supports.push(support(addV(p.root,p.axes[2],end*ww*.36),'root'));
   for(const end of [-1,1])supports.push(support(addV(center,p.axes[2],end*(ww/2+.06)),'restraint'));
+  if(f.id==='starmind-cross'&&h.solarRootCollector?.originalSolarSupports){const original=h.solarRootCollector.originalSolarSupports[g.wings.length-1];supports.forEach((s,i)=>{s.foot=[...original[i].foot];});}
   const releaseAt=wing.bankEnd!==null?(wing.bankEnd<0?.025:.33):f.id==='redwire-platform'?.42:f.id==='starmind-cross'?.63:.015;
   g.mounts.push({id:wing.id,kind:'solar',face:(side<0?'−':'+')+'X',side,end:1,root:p.root,supports,stowedCenter:center,releaseAt,attachment,evidence:wing.bankEnd===null?'Allocated root bearings and solar cassette release supports.':'Cassette root rides on the radiator arm. Temporary service-bus release supports carry the folded launch package.'});
  }

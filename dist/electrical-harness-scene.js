@@ -18,6 +18,32 @@ function cylinder(parent,radius,length,z,material,name,sides=12,endRadius=radius
 function ancestryData(o,key){for(let p=o;p;p=p.parent)if(p.userData?.[key]!=null)return p.userData[key];}
 function ownMaterial(h,role,color){const m=roleMaterial(h,role).clone();m.userData={...m.userData,shared:false};if(color)m.color.set(color);return m;}
 
+// A clamped payload trunk has a fixed installed pose, but its retainer-release
+// sequence is not an allocated connector service loop. Keep that distinction
+// at the physical plug control as well as in the inspection viewer.
+export function createElectricalMatingControl({hardware,architecture,cards,ports,routes,groundPortRoots,refresh,lines=[]}){
+ const reason='Release the payload harness retainers before connector withdrawal; that service sequence is not modeled in this preliminary installation.';
+ const restrictedPorts=new Set();
+ if(hardware?.input?.referenceCenterId==='starmind-ai1'&&hardware.architectureFamilyId==='starmind-cross')for(const line of lines){
+  if(line.mountedPayload!==true||line.serviceWithdrawalAssessment!=='unassessed')continue;
+  for(const id of [line.r?.spec?.fromPortId,line.r?.spec?.toPortId])if(id)restrictedPorts.add(id);
+ }
+ function matingTargets(itemId){
+  const connector=architecture.connectorDetails.find(c=>c.itemId===itemId),assembly=architecture.assemblies.find(c=>c.itemId===itemId);
+  return connector?[connector.exemplarPortId]:assembly?[routes.get(assembly.exemplarHarnessId).spec.toPortId]:[...ports.values()].filter(c=>c.port.itemId===itemId).slice(0,1).map(c=>c.port.id);
+ }
+ const matingRestriction=itemId=>matingTargets(itemId).some(id=>restrictedPorts.has(id))?reason:null;
+ const canMate=itemId=>!matingRestriction(itemId)&&(cards.has(itemId)||itemId==='ground:egse-cable'||matingTargets(itemId).length>0);
+ function mating(itemId,progress=1){
+  const portIds=matingTargets(itemId),p=clamp(progress),e=p*p*(3-2*p),targets=new Set(portIds);let changed=false;
+  for(const definition of architecture.cards){const card=cards.get(definition.itemId);if(card)card.position.z=definition.positionM[2]+(definition.itemId===itemId?Math.max(.06,definition.dimensionsM[2]*1.4)*(1-e):0);}
+  for(const [i,g] of groundPortRoots.entries()){const female=g.getObjectByName('Panel receptacle');if(female)female.position.z=itemId==='ground:egse-cable'&&i===1?-.06*(1-e):0;}
+  for(const c of ports.values()){const z=targets.has(c.port.id)&&!restrictedPorts.has(c.port.id)?c.matingTravel*(1-e):0;if(Math.abs(z-c.plug.position.z)>1e-10){c.plug.position.z=z;changed=true;}}
+  if(changed)refresh(false);return !matingRestriction(itemId)&&(cards.has(itemId)||itemId==='ground:egse-cable'||portIds.length>0);
+ }
+ return {mating,canMate,matingRestriction};
+}
+
 // Merge the overview by function and material. Individual sources remain
 // available to the part navigator, but hundreds of ports are not hundreds of
 // draw calls in the orbital scene. Buffers are reused on every moving pose.
@@ -194,17 +220,7 @@ export function installElectricalHarnessScene(factory,h,{planFluidRoutes=true}={
   else for(const [id,g] of boxes)if(graphByBox.get(id).itemId===itemId){selected.push(g);for(const c of ports.values())if(c.port.boxId===id){c.detail.visible=true;selected.push(c.detail);}}
   return selected;
  }
- function matingTargets(itemId){
-  const connector=architecture.connectorDetails.find(c=>c.itemId===itemId),assembly=architecture.assemblies.find(c=>c.itemId===itemId),portIds=connector?[connector.exemplarPortId]:assembly?[routes.get(assembly.exemplarHarnessId).spec.toPortId]:[...ports.values()].filter(c=>c.port.itemId===itemId).slice(0,1).map(c=>c.port.id);
-  return portIds;
- }
- function mating(itemId,progress=1){
-  const portIds=matingTargets(itemId),p=clamp(progress),e=p*p*(3-2*p),targets=new Set(portIds);let changed=false;
-  for(const definition of architecture.cards){const card=cards.get(definition.itemId);if(card)card.position.z=definition.positionM[2]+(definition.itemId===itemId?Math.max(.06,definition.dimensionsM[2]*1.4)*(1-e):0);}
-  for(const [i,g] of groundPortRoots.entries()){const female=g.getObjectByName('Panel receptacle');if(female)female.position.z=itemId==='ground:egse-cable'&&i===1?-.06*(1-e):0;}
-  for(const c of ports.values()){const z=targets.has(c.port.id)?c.matingTravel*(1-e):0;if(Math.abs(z-c.plug.position.z)>1e-10){c.plug.position.z=z;changed=true;}}
-  if(changed)refresh(false);return cards.has(itemId)||itemId==='ground:egse-cable'||portIds.length>0;
- }
+ const {mating,canMate,matingRestriction}=createElectricalMatingControl({hardware:h,architecture,cards,ports,routes,groundPortRoots,refresh,lines:installedRouting.lines});
  function matchingRoutes(itemId){const a=architecture.assemblies.find(a=>a.itemId===itemId);if(a)return [routes.get(a.exemplarHarnessId)];const c=architecture.connectorDetails.find(c=>c.itemId===itemId);if(c)return [...routes.values()].filter(r=>r.spec.fromPortId===c.exemplarPortId||r.spec.toPortId===c.exemplarPortId);return [...routes.values()].filter(r=>r.from.port.itemId===itemId||r.to.port.itemId===itemId||itemId==='flight:07.05'||itemId==='flight:01.04'&&r.spec.kind==='data');}
  function rateFor(r,s){
   const a=r.spec,served=Number(s.cdhServedKW||0)>0||Number(s.powerServiceFraction||0)>0;
@@ -248,6 +264,6 @@ export function installElectricalHarnessScene(factory,h,{planFluidRoutes=true}={
    return {id:c.port.id,boxId:c.port.boxId,panelId:panel?.id||null,surfaceErrorM,faceMarginM:marginM,faceBounds:{min:min.toArray(),max:max.toArray()},axis,normal,frameId:actual.frame.uuid};
   });
  }
- factory.electrical={architecture,boxes,ports,extraPorts:installedRouting.inline?.extraPorts||new Map(),matingConnectors:installedRouting.inline?.matingConnectors||[],harnesses:routes,connectors,cards,groundLead,update,mating,canMate:itemId=>cards.has(itemId)||itemId==='ground:egse-cable'||matingTargets(itemId).length>0,selectionFor,articlePorts,audit,auditPorts,refresh,kinds:electricalKinds,overview,activity,routing:installedRouting,activityFor:itemId=>itemId==='ground:egse-cable'?[groundMarker]:architecture.assemblies.some(a=>a.itemId===itemId)?matchingRoutes(itemId).flatMap(r=>r.markers):[]};
+ factory.electrical={architecture,boxes,ports,extraPorts:installedRouting.inline?.extraPorts||new Map(),matingConnectors:installedRouting.inline?.matingConnectors||[],harnesses:routes,connectors,cards,groundLead,update,mating,canMate,matingRestriction,selectionFor,articlePorts,audit,auditPorts,refresh,kinds:electricalKinds,overview,activity,routing:installedRouting,activityFor:itemId=>itemId==='ground:egse-cable'?[groundMarker]:architecture.assemblies.some(a=>a.itemId===itemId)?matchingRoutes(itemId).flatMap(r=>r.markers):[]};
  finalizeCraftMaterials(harnesses);return factory;
 }

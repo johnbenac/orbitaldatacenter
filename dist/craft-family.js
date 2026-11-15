@@ -6,6 +6,7 @@ import {clusterState} from './attitude-dynamics.js';
 import {tagMaterial,engineeringGraphic,planeMaterialUV,cylinderMaterialUV,sphereMaterialUV,finalizeCraftMaterials} from './spacecraft-material-render.js';
 import {connectionTube,connectionAnchor,anchorInFrame,normalInFrame} from './connection-geometry.js';
 import {inlineArmServiceAllocation} from './inline-arm-routing.js';
+import {starmindLoopTwoSupplyAccommodation} from './starmind-harness-routing.js';
 import {familyAppendageDimensions as appendageDimensions} from './family-appendage-dimensions.js';
 import {protectedSolarCollectorMaterialGeometry} from './protected-solar-collector.js';
 import {installRadiatorFluidTransfer} from './radiator-fluid-transfer.js';
@@ -60,22 +61,22 @@ export function makeFamilyCraft(h,kit){
   const lug=box(root,point[0],point[1],point[2]-thickness/2,size,size,thickness,role('launch-interface'),'structure');lug.name='Allocated '+f.launchInterface+' hardpoint';
   const pin=cyl(root,point[0],point[1],point[2]-thickness/2,.02,.02,thickness+.025,mechanismMat,'structure',24);pin.rotation.x=Math.PI/2;
  }
- const supportBars=[],collectorSupports=f.id==='protected-core'?h.solarRootCollector?.hardwareSchedule||[]:[];let solarSupportInstance=0;
+ const supportBars=[],collectorSupports=['protected-core','starmind-cross'].includes(f.id)?h.solarRootCollector?.hardwareSchedule||[]:[];let solarSupportInstance=0;
  for(const m of g.mounts){
   const collector=m.kind==='solar'?collectorSupports[solarSupportInstance++]:null;
   for(const [index,s]of m.supports.entries()){
    const piece=collector?.materialPieces.find(p=>p.id==='support-extension-'+index),extension=piece?.lengthM||0,
-    rodFoot=extension?[s.foot[0]+m.side*extension,s.foot[1],s.foot[2]]:s.foot;
+    rodFoot=piece?.rodFootM||(extension?[s.foot[0]+m.side*extension,s.foot[1],s.foot[2]]:s.foot);
    if(piece){
     // The same fixed hollow material is present whichever communications
     // package selected this renderer. Only the original rod may retract.
     const tube=tagMaterial(new T.Mesh(protectedSolarCollectorMaterialGeometry(T,piece),mechanismMat));
-    tube.position.set(...piece.positionM.map((x,i)=>x+collector.positionM[i]));tube.name=s.role==='restraint'?'Fixed launch-lock guide extension':'Fixed solar-root pedestal extension';
+    tube.position.set(...piece.positionM.map((x,i)=>x+collector.positionM[i]));tube.name=f.id==='starmind-cross'?'Fixed solar support stand extension':s.role==='restraint'?'Fixed launch-lock guide extension':'Fixed solar-root pedestal extension';
     Object.assign(tube.userData,{part:'solar',physicalPartId:collector.itemId,electricalItemIds:[collector.itemId],installationHardwareId:collector.id,materialPieceId:piece.id});root.add(tube);
    }
    // Communications selection retains the legacy root/restraint mechanisms:
    // the root shaft meets the sleeve; the sliding lock keeps its guide clearance.
-   const rodRadius=piece?piece.outerRadiusM*(s.role==='restraint'?.60:1):beam*.28;
+   const rodRadius=piece?.rodRadiusM??(piece?piece.outerRadiusM*(s.role==='restraint'?.60:1):beam*.28);
    const bar=dynamicLine(root,rodRadius,mechanismMat,'structure');link(bar,rodFoot,s.seat);bar.name=s.role==='restraint'?'Allocated telescoping launch restraint':'Appendage root support';const releaseEnd=m.releaseAt??(m.kind==='radiator'?(m.end<0?.46:.69):.04),releaseStart=Math.max(0,releaseEnd-.025),lengthM=v(...rodFoot).distanceTo(v(...s.seat)),retractedLengthM=Math.min(.04,lengthM);
    if(s.role==='restraint')bar.userData.routingMotion={kind:'release-restraint',frameId:bar.uuid,attachment:'body',startProgress:releaseStart,endProgress:releaseEnd,strokeM:lengthM-retractedLengthM};
    supportBars.push({bar,role:s.role,foot:s.foot,rodFoot,seat:s.seat,releaseStart,releaseEnd,lengthM,retractedLengthM});
@@ -235,17 +236,19 @@ export function makeFamilyCraft(h,kit){
    const swivel=join(appendages,...jointCenter,'radiator');swivel.name=pipeLabel+(multiAxis?' allocated two-axis coolant swivel':' allocated hinge-axis rotary coolant union');const union=ell(swivel,0,0,0,.115,.115,.115,mechanismMat,'radiator');union.userData.routingInterface=true;union.userData.qualification='Project accommodation; pressure, leakage, torque and life qualification remain open.';
    if(!multiAxis){const support=dynamicLine(appendages,.026,mechanismMat,'radiator');link(support,bank.root,jointCenter);support.name='Extended coolant hinge bearing support';}
    if(Math.abs(station[2]-p.forwardDeckZ)<.20)station[2]=p.forwardDeckZ+.24;
+   const supplyAccommodation=starmindLoopTwoSupplyAccommodation(h,{bankIndex,side});
+   if(supplyAccommodation)for(let k=0;k<3;k++)station[k]+=supplyAccommodation.stationOffsetM[k];
    const locatedStation=locateFluidFeedthrough(root,{axis,sign,positionM:station,dimensionsM:[w,b,l],ignoreRoot:appendages});station.splice(0,3,...locatedStation);const port=addRoutingFeedthrough({id:`coolant-${bankIndex+1}-${side>0?'supply':'return'}`,axis,sign,positionM:station,radiusM:.034,part:'radiator',straightM:inline?.02:.06}),sourceZ=source.getWorldPosition(v(0,0,0)).z;
    if(sourceZ>p.forwardDeckZ&&port.inner.position.z<p.forwardDeckZ){
     const bulk=addRoutingFeedthrough({id:pipeLabel+' equipment bulkhead',axis:'z',sign:-1,panelId:'equipment-bulkhead',positionM:[side*.15,-b*.32,p.forwardDeckZ],radiusM:.034,part:'radiator',straightM:.06});
     fluidLink(source,bulk.inner,{name:pipeLabel+' forward supported internal pipe',circuitId,parent:root,via:(a,bb)=>{const z=a.z+.36,y=bb.y;return [a.clone().add(v(0,.26,0)),v(a.x,a.y+.26,z),v(a.x,y,z),v(bb.x,y,z),v(bb.x,y,bb.z+.30)];}});
     fluidLink(bulk.boreIn,bulk.boreOut,{name:pipeLabel+' equipment bulkhead passage',circuitId,parent:root,bendRadiusM:0,via:()=>[]});
     fluidLink(bulk.outer,port.inner,{name:pipeLabel+' aft supported internal pipe',circuitId,parent:root,via:(a,bb)=>{const x=bb.x-sign*.26;return [v(a.x,a.y,bb.z),v(x,a.y,bb.z),v(x,bb.y,bb.z)];}});
-   }else fluidLink(source,port.inner,{name:pipeLabel+' supported internal pipe',circuitId,parent:root,via:(a,bb)=>{const pa=a.clone().add(v(0,.26,0)),pb=bb.clone().addScaledVector(v(...normal),-.26);return [pa,v(pa.x,pa.y,pb.z),v(pb.x,pa.y,pb.z),pb];}});
+   }else fluidLink(source,port.inner,{name:pipeLabel+' supported internal pipe',circuitId,parent:root,via:(a,bb)=>{const proposal=starmindLoopTwoSupplyAccommodation(h,{bankIndex,side,a:a.toArray(),b:bb.toArray()});if(proposal)return proposal.controlPoints.slice(1,-1).map(point=>v(...point));const pa=a.clone().add(v(0,.26,0)),pb=bb.clone().addScaledVector(v(...normal),-.26);return [pa,v(pa.x,pa.y,pb.z),v(pb.x,pa.y,pb.z),pb];}});
    fluidLink(port.boreIn,port.boreOut,{name:pipeLabel+' bulkhead passage',circuitId,parent:root,bendRadiusM:0,via:()=>[]});
    const inletPoint=inline?[bank.root[0]-sign*.11,-(.34+side*.06),bank.root[2]-.30]:multiAxis?[bank.root[0]+side*.20,bank.root[1],bank.root[2]+fixedFeedZSign*(bankSpec?.kind==='rack'?.20:-1.10)]:[jointCenter[0],jointCenter[1]-Math.sign(jointCenter[1])*.13,jointCenter[2]],inletNormal=inline?[-sign,0,0]:multiAxis?[0,-Math.sign(bank.root[1]),0]:[0,-Math.sign(jointCenter[1]),0],inlet=connectionAnchor(appendages,inletPoint,inletNormal,pipeLabel+' fixed union inlet');inlet.userData.routingOwnerId=swivel.uuid;hollowFluidFitting(inlet,{lengthM:.04,material:tubeMat,name:'Open rotary union inlet fitting'});inlet.userData.routingOwnerIds=[swivel.uuid,inlet.uuid];
    if(multiAxis){const neck=dynamicLine(swivel,.025,mechanismMat,'radiator');link(neck,[0,0,0],inletPoint.map((x,i)=>x-bank.root[i]-inletNormal[i]*.04));neck.name='Fixed two-axis union inlet neck';}
-   fluidLink(port.outer,inlet,{name:pipeLabel+' fixed union feed',circuitId,parent:root,bendRadiusM:.108,via:(a,bb)=>{if(inline)return [a.clone().add(v(sign*.15,0,0)),bb.clone().add(v(-sign*.15,0,0))];if(multiAxis){const y=(a.y+bb.y)/2;return [v(a.x,y,a.z),v(bb.x,y,bb.z)];}return [a.clone().add(v(sign*.18,0,0)),v(bb.x,a.y,bb.z)];}});
+   fluidLink(port.outer,inlet,{name:pipeLabel+' fixed union feed',circuitId,parent:root,bendRadiusM:.108,via:(a,bb)=>{const proposal=starmindLoopTwoSupplyAccommodation(h,{bankIndex,side,a:a.toArray(),b:bb.toArray(),section:'union'});if(proposal)return proposal.controlPoints.slice(1,-1).map(point=>v(...point));if(inline)return [a.clone().add(v(sign*.15,0,0)),bb.clone().add(v(-sign*.15,0,0))];if(multiAxis){const y=(a.y+bb.y)/2;return [v(a.x,y,a.z),v(bb.x,y,bb.z)];}return [a.clone().add(v(sign*.18,0,0)),v(bb.x,a.y,bb.z)];}});
    const rotor=join(firstFrame,0,0,0,'radiator'),local=multiAxis?[side*.17,inline?appendageDimensions.inlineRootFluidOutletYM:Math.sign(bank.root[1])*.34,hingeLocalZ-(inline?.08:.40)]:[side*(jointDistance+.15),-hingeNormalOffset,hingeLocalZ];
    if(multiAxis){box(rotor,side*.08,local[1],local[2]+.025,.18,2*appendageDimensions.inlineRootFluidManifoldHalfYM,.08,mechanismMat,'radiator').name='Moving two-axis coolant outlet manifold';const neck=dynamicLine(rotor,.030,mechanismMat,'radiator');link(neck,[0,-hingeNormalOffset,hingeLocalZ],[side*.08,local[1],local[2]+.025]);neck.name='Moving two-axis union outlet neck';}
    else{const bearing=connectionAnchor(rotor,local,[side,0,0],'Rotary outlet bearing');hollowFluidFitting(bearing,{outerRadiusM:.060,boreRadiusM:.025,lengthM:.15,material:mechanismMat,name:'Open rotating coolant bearing'});}

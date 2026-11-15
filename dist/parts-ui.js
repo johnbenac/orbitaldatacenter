@@ -100,7 +100,7 @@ export function mountPartsNavigator(host,{catalog,hardware,state,simulation,view
   find('[data-part-rotate]').checked=!!viewerState.autoRotate;
   const animations=viewerState.animations||[],bar=find('[data-part-animation-bar]'),select=find('[data-part-animation]');
   bar.hidden=viewerState.available===false||!animations.length;
-  host.querySelectorAll('[data-verification-animation]').forEach(b=>{const id=b.dataset.verificationAnimation,ready=viewerState.available===true&&(id==='mate'?!viewerState.contextOnly:id==='fixture'?['vibration','load-frame','deployment'].includes(b.dataset.verificationSetting):animations.some(a=>a.id===id));b.disabled=!ready;if(!ready)b.title=!viewerState.available||viewerState.contextOnly?viewerState.geometryStatus||'This allocation has no independent geometry.':'This allocation has no independent animation in the current model.';else b.removeAttribute('title');});
+  host.querySelectorAll('[data-verification-animation]').forEach(b=>{const id=b.dataset.verificationAnimation,ready=viewerState.available===true&&(id==='mate'?!viewerState.contextOnly&&!viewerState.matingRestriction:id==='fixture'?['vibration','load-frame','deployment'].includes(b.dataset.verificationSetting):animations.some(a=>a.id===id));b.disabled=!ready;if(!ready)b.title=id==='mate'&&viewerState.matingRestriction?viewerState.matingRestriction:!viewerState.available||viewerState.contextOnly?viewerState.geometryStatus||'This allocation has no independent geometry.':'This allocation has no independent animation in the current model.';else b.removeAttribute('title');});
   host.querySelectorAll('[data-part-verification] [data-part-setting]').forEach(b=>{b.disabled=viewerState.available===false;});
   const signature=animations.map(a=>a.id).join('/');
   if(select.dataset.signature!==signature){select.dataset.signature=signature;select.innerHTML=animations.map(a=>'<option value="'+esc(a.id)+'">'+esc(a.label)+'</option>').join('');chosenAnimation=animations[0]?.id||'';}
@@ -113,8 +113,9 @@ export function mountPartsNavigator(host,{catalog,hardware,state,simulation,view
   const progress=Math.max(0,Math.min(100,100*(viewerState.progress||0)));
   if(document.activeElement!==find('[data-part-progress]'))find('[data-part-progress]').value=String(progress);
   find('[data-part-progress-value]').textContent=Math.round(progress)+'%';
-  status.classList.toggle('parts-context-note',!!viewerState.available&&!!viewerState.contextOnly);
+  status.classList.toggle('parts-context-note',!!viewerState.available&&(!!viewerState.contextOnly||!!viewerState.matingRestriction));
   if(viewerState.available===false||viewerState.contextOnly)showMessage(viewerState.geometryStatus||'No separate geometry is represented for this allocation.');
+  else if(viewerState.matingRestriction)showMessage('Service withdrawal is unassessed. '+viewerState.matingRestriction);
   else if(viewerState.available)showMessage('');
  }
  function saveOptions(){Object.assign(optionState,{facilityAssetId:viewerState.facility?.assetId||viewerState.facilityAssetId||optionState.facilityAssetId||null,mode:viewerState.mode||optionState.mode,detailMode:viewerState.detailMode||optionState.detailMode,context:!!viewerState.context,setting:viewerState.setting||optionState.setting,scaleMode:viewerState.scaleMode||optionState.scaleMode,projection:viewerState.projection||optionState.projection,axes:!!viewerState.axes,lighting:viewerState.lighting||optionState.lighting,exposureEV:viewerState.exposureEV??optionState.exposureEV,thermalScale:viewerState.thermalScale||optionState.thermalScale});onState({partView:{...optionState}});}

@@ -7,11 +7,12 @@ import {createSimulation} from './dist/model.js';
 import {makeCraft} from './dist/craft.js';
 import {makeLaunch} from './dist/launch-scene.js';
 import {groundProcessingState} from './dist/ground-processing.js';
+import {launchCompatibility} from './dist/launch-compatibility.js';
 import {temperatureColor,thermalSkin,thermalScales} from './dist/thermal-view.js';
 import {createScene} from './dist/scene.js';
 
 class Element{
- constructor(){this.children=[];this.style={};this.events={};this.attributes={};this.width=160;this.height=100;}
+ constructor(){this.children=[];this.style={};this.events={};this.attributes={};this.dataset={};this.width=160;this.height=100;}
  append(...children){this.children.push(...children);}
  replaceChildren(){this.children=[];}
  getBoundingClientRect(){return {width:this.width,height:this.height,left:0,top:0};}
@@ -32,10 +33,19 @@ globalThis.document={createElement,createElementNS:(_,tag)=>createElement(tag)};
 globalThis.ResizeObserver=class{observe(){}disconnect(){}};
 let pendingFrame;globalThis.requestAnimationFrame=fn=>{pendingFrame=fn;return 1};globalThis.cancelAnimationFrame=()=>{};
 globalThis.window={devicePixelRatio:1};
+globalThis.location={search:''};
 
 const h=sizeDesign({}),sim=createSimulation(h),snap=sim.at(7800),q=snap.thermalQualification;
 assert.equal(q.length,6);const craft=makeCraft(h),skin=thermalSkin(craft.root);
 assert.deepEqual(skin.mappedNodes.sort(),q.map(r=>r.id).sort());
+// Fluid routing rebuilds the tube buffers, but must retain each real thermal
+// passage's temperature mapping without colouring propellant as coolant.
+const coolantLinks=craft.fluidConnections.filter(c=>c.part==='radiator');
+assert(coolantLinks.length>0);
+assert(coolantLinks.some(c=>c.fromPort),'Include radiator hinge hoses');
+assert(coolantLinks.some(c=>!c.fromPort),'Include fixed thermal passages');
+for(const c of coolantLinks)assert.equal(c.tube.mesh.userData.thermalNode,'coolant',c.name);
+for(const c of craft.fluidConnections.filter(c=>c.part==='propulsion'))assert.equal(c.tube.mesh.userData.thermalNode,undefined,c.name);
 const initial=new Map();craft.root.traverse(o=>{if(o.isMesh)initial.set(o,o.material);});
 skin.apply(q);
 for(const [mesh,old] of initial){
@@ -57,6 +67,15 @@ assert.equal(battery.material.color.getHex(),temperatureColor(snap.batteryK,'ful
 assert.equal(temperatureColor(-10),temperatureColor(180));assert.equal(temperatureColor(500),temperatureColor(380));
 assert.equal(temperatureColor(NaN),null);
 skin.destroy();for(const [mesh,old]of initial)assert.equal(mesh.material,old);
+// Redwire uses sealed passive heat pipes. Its stable `coolant` node represents
+// local transport temperature, and must not require invented pump hardware.
+const passiveHardware=sizeDesign({architectureFamily:'redwire-platform'}),passiveCraft=makeCraft(passiveHardware,{installElectrical:false,planFluidRoutes:false}),passiveSkin=thermalSkin(passiveCraft.root);
+assert.deepEqual(passiveSkin.mappedNodes.sort(),q.map(r=>r.id).sort());
+assert.equal(passiveCraft.thermalPumps.length,0);
+const heatPipes=passiveCraft.fluidConnections.filter(c=>c.fluidKind==='sealed-heat-pipe');
+assert(heatPipes.length>0);
+for(const c of heatPipes)assert.equal(c.tube.mesh.userData.thermalNode,'coolant',c.name);
+passiveSkin.destroy();
 const launch=makeLaunch(h),stowed=thermalSkin(launch.root);assert.deepEqual(stowed.mappedNodes.sort(),['enclosure','radiator']);stowed.destroy();
 const box=new Element(),picks=[],changes=[],scene=createScene(box,{onPick:id=>picks.push(id),onThermalScale:id=>changes.push(id)}),canvas=box.children[0];
 function fire(type,x,y,id=1,button=0,pointerType='mouse'){
@@ -152,6 +171,9 @@ function rimDrag(){
  fire('pointermove',x,y+r);fire('pointerup',x,y+r);
 }
 const closeVector=(a,b)=>a.distanceTo(b)<1e-7;
+// This block checks the body Z axis. The default orbit camera instead keeps
+// the orbital radial axis upright, independently of the spacecraft attitude.
+const previousCameraMode=scene.getCameraMode();scene.setCameraMode('body');
 for(const view of ['core','spacecraft','orbit']){
  scene.setDomain('compute','E');scene.setChapter('operations');scene.setView(view);scene.update(h,snap);scene.resetCamera();
  canvas.events.wheel({deltaY:-115,preventDefault(){}});
@@ -176,17 +198,23 @@ for(const view of ['core','spacecraft','orbit']){
  const restored=cameraFrame();assert(closeVector(restored.up,rolled.up)&&closeVector(restored.eye,rolled.eye));
  scene.resetCamera();
 }
+scene.setCameraMode(previousCameraMode);
 // The launch camera serves both space and Earth. Scrub back into the bay, onto
 // the pad and through high ascent after a roll in orbital insertion.
-scene.setDomain('launcher','D');scene.setView('launch');scene.setChapter('insertion');scene.update(h,sim.at(700));scene.resetCamera();
+// Use a catalogue launcher that fits the physical vehicle. A fairing-held
+// baseline correctly stays in the bay and cannot exercise an insertion roll.
+const launchHardware=sizeDesign({launcher:'glenn'}),launchSimulation=createSimulation(launchHardware);
+assert(launchCompatibility(launchHardware).ok,'Insertion camera fixture must pass the actual launch compatibility gates');
+scene.setDomain('launcher','D');scene.setView('launch');scene.setChapter('insertion');scene.update(launchHardware,launchSimulation.at(700));scene.resetCamera();
+assert.equal(box.attributes['data-free-orbit'],'true','Insertion fixture must reach the orbital camera');
 const insertion=cameraFrame();rimDrag();const rolledInsertion=cameraFrame();assert(closeVector(rolledInsertion.right,insertion.up));
 for(const [chapter,t] of [['integration',-1500],['pad',-8],['ascent',450]]){
- scene.setChapter(chapter);scene.update(h,sim.at(t));const ground=cameraFrame();
+ scene.setChapter(chapter);scene.update(launchHardware,launchSimulation.at(t));const ground=cameraFrame();
  assert(Math.abs(ground.right.y)<1e-7&&ground.up.y>0,chapter+': entering this view inherited a roll');
  rimDrag();const moved=cameraFrame();assert(Math.abs(moved.right.y)<1e-7&&moved.up.y>0,chapter+': vertical tilted under an edge drag');
  assert(moved.eye.distanceTo(ground.eye)>1e-3,chapter+': ground orbit stopped responding');
 }
-scene.setChapter('insertion');scene.update(h,sim.at(700));
+scene.setChapter('insertion');scene.update(launchHardware,launchSimulation.at(700));
 const returned=cameraFrame();
 scene.setCameraState({launch:scene.getCameraState().launch.slice(0,6)});
 const withoutRoll=cameraFrame();
@@ -216,6 +244,9 @@ scene.setView('launch');scene.update(h,sim.at(-300));paintFrame();assert(!vector
 scene.setView('spacecraft');scene.update(h,sim.at(6402));paintFrame();assert(!vectorLabels().includes('station'));
 const shadow=sim.at(6402),original=structuredClone(shadow);
 assert.ok(shadow.eclipse);assert.equal(shadow.solarKW,0);
+// Pixel comparisons hold geometry fixed. Adaptive detail intentionally refines
+// across frames on a wall-clock budget and is tested in hardware-detail-checks.
+scene.setHardwareDetail('low');
 scene.setDomain('conops','E');scene.setChapter('operations');scene.setView('spacecraft');scene.update(h,shadow);
 scene.setLightingMode('realistic');
 for(const view of ['spacecraft','core']){

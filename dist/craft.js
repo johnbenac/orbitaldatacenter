@@ -200,7 +200,7 @@ function fluidSocket(parent,position,ports,name,{straight=false,heightM=.08}={})
 }
 function flexible(fromPort,toPort,side,mat,owner,bankEnd){
  const group=join(appendages,0,0,0,'radiator'),start=marker(group,0,0,0),end=marker(group,0,0,0),name='Radiator hinge flexible '+(side>0?'supply':'return')+' '+hoses.length;
- const tube=connectionTube(group,{radius:F.flexRadiusM,material:mat,part:'radiator',segments:96,radialSegments:8,bendRadiusM:F.flexBendM,name});tube.mesh.userData.fluidConnectionId=name;
+ const tube=connectionTube(group,{radius:F.flexRadiusM,material:mat,part:'radiator',segments:96,radialSegments:8,bendRadiusM:F.flexBendM,name});tube.mesh.userData.fluidConnectionId=name;thermalMesh(tube.mesh,'coolant');
  const h={id:name,name,fromPort,toPort,a:fromPort,b:toPort,start,end,side,tube,parent:group,group,restLength:F.flexLengthM,restLengthM:F.flexLengthM,radiusM:F.flexRadiusM,bendRadiusM:F.flexBendM,part:'radiator',circuitId:'legacy-thermal-'+bankEnd,motionModel:{kind:'constant-length-u',physicalLengthBasis:'perpendicular-two-quarter-fillets',arcSteps:8,fromFrameId:routingMotionFor(fromPort).frameId,toFrameId:routingMotionFor(toPort).frameId,bankEnd,minimumChordM:.185,maximumChordM:.84}};hoses.push(h);owner.push(h);fluidConnections.push(h);
 }
 for(const end of [-1,1]){
@@ -417,7 +417,7 @@ internal.scale.z=propulsion.equipmentLengthM/l;internal.position.z=propulsion.eq
 const shelf=box(root,0,0,propulsion.forwardDeckZ,w*.94,hgt*.94,.017,frameMat,'structure');shelf.name='Aft tank support bulkhead';const shelfRouting=registerRoutingBox(shelf,'z',1,'equipment-bulkhead');shelfRouting.internal=true;routingWalls.push(shelfRouting);
 const addRoutingFeedthrough=routingFeedthroughFactory({root,walls:routingWalls,dimensionsM:[w,hgt,l],material:wallMat,registry:routingFeedthroughs});
 function legacyFluidLink(a,bb,{part='propulsion',radius=.01,name,parent=service,via=null,bendRadiusM=Math.max(.03,radius*4),circuitId=null,planRouting=false}={}){
- const tube=connectionTube(parent,{radius,material:part==='radiator'?tubeMat:feedMat,part,name,bendRadiusM,segments:96,radialSegments:8});tube.mesh.userData.fluidConnectionId=name;fluidConnections.push({id:name,name,a,b:bb,tube,parent,via,part,radiusM:radius,bendRadiusM,circuitId,planRouting});return tube;
+ const tube=connectionTube(parent,{radius,material:part==='radiator'?tubeMat:feedMat,part,name,bendRadiusM,segments:96,radialSegments:8});tube.mesh.userData.fluidConnectionId=name;if(part==='radiator')thermalMesh(tube.mesh,'coolant');fluidConnections.push({id:name,name,a,b:bb,tube,parent,via,part,radiusM:radius,bendRadiusM,circuitId,planRouting});return tube;
 }
 const fluidFitting=(parent,point,normal,name,radius=.018)=>{const port=connectionAnchor(parent,point,normal,name);hollowFluidFitting(port,{outerRadiusM:radius,boreRadiusM:radius*.90,lengthM:.024,material:feedMat,part:'propulsion',name:name+' open fitting'});port.userData.routingOwnerId=parent.uuid;return port;};
 for(const [i,e] of propulsion.engines.entries())addRoutingFeedthrough({id:'injector-deck-'+i,axis:'z',sign:-1,positionM:[e.x,e.y,-l/2],radiusM:e.exitRadiusM*.40+.012,part:'propulsion',straightM:.04});
@@ -459,7 +459,10 @@ for(const tip of legacyRadiatorTips){const x=kin.rw/2+F.returnOuterMarginM,a=tip
 const retainedFluidPipes=[];root.traverse(o=>{if(o.isMesh&&o.userData.staticFluidLine)retainedFluidPipes.push(o);});
 for(const [index,old] of retainedFluidPipes.entries()){
  const spec=old.userData.staticFluidLine,parent=old.parent,p=v(...spec.points[0]),q=v(...spec.points[1]),direction=q.clone().sub(p).normalize(),a=connectionAnchor(parent,p.toArray(),direction.toArray(),'Rigid pipe inlet '+index),bb=connectionAnchor(parent,q.toArray(),direction.clone().negate().toArray(),'Rigid pipe outlet '+index),name='Retained '+spec.role+' '+index;
- let owner=parent;while(owner&&!owner.userData.assembly)owner=owner.parent;const tube=connectionTube(parent,{radius:spec.radiusM,material:old.material,part:old.userData.part||'radiator',bendRadiusM:0,segments:96,radialSegments:8,name});tube.mesh.userData.fluidConnectionId=name;fluidConnections.push({id:name,name,a,b:bb,tube,parent,via:()=>[],part:'radiator',radiusM:spec.radiusM,bendRadiusM:0,circuitId:owner?.userData.assembly?.startsWith('bank ')?'legacy-thermal-'+owner.userData.assembly.slice(5):'retained-rigid-passages'});old.removeFromParent();
+ let owner=parent;while(owner&&!owner.userData.assembly)owner=owner.parent;const tube=connectionTube(parent,{radius:spec.radiusM,material:old.material,part:old.userData.part||'radiator',bendRadiusM:0,segments:96,radialSegments:8,name});tube.mesh.userData.fluidConnectionId=name;
+ // Replacing a rigid passage preserves the thermal surface it represents.
+ if(old.userData.thermalNode)thermalMesh(tube.mesh,old.userData.thermalNode);
+ fluidConnections.push({id:name,name,a,b:bb,tube,parent,via:()=>[],part:'radiator',radiusM:spec.radiusM,bendRadiusM:0,circuitId:owner?.userData.assembly?.startsWith('bank ')?'legacy-thermal-'+owner.userData.assembly.slice(5):'retained-rigid-passages'});old.removeFromParent();
 }
 function updateLegacyFluidConnections(){root.updateMatrixWorld(true);for(const c of fluidConnections)if(!c.fromPort){if(c.staticSampledPoints){c.tube.update(c.staticSampledPoints,{sampled:true,minimumBendRadiusM:c.staticBendRadiusM});continue;}const a=anchorInFrame(c.a,c.parent),b=anchorInFrame(c.b,c.parent),r=c.bendRadiusM;c.tube.update(c.staticPlan||[a,...(c.via?c.via(a,b):[a.clone().addScaledVector(normalInFrame(c.a,c.parent),r*2.2),b.clone().addScaledVector(normalInFrame(c.b,c.parent),r*2.2)]),b]);}}
 function updateHose(h){

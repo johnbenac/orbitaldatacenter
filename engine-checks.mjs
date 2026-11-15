@@ -5,6 +5,7 @@ import {defaults} from './dist/design.js';
 import {createSimulation} from './dist/model.js';
 import {DEPLOY_END_S} from './dist/commissioning-clock.js';
 import {deploymentLayout} from './dist/deployment.js';
+import {attitudeLimits} from './dist/attitude-guidance.js';
 import {ramSilhouette} from './dist/silhouette.js';
 import {chronologicalAudit} from './dist/mission-worker.js';
 import {groundSites,DAY,YEAR} from './dist/orbit.js';
@@ -82,6 +83,18 @@ const audit=chronologicalAudit({...defaults,missionYears:.008}),ae=createSimulat
 const siteMission=createSimulation({...defaults,...launchPath(defaults).angles}),t0=siteMission.at(0),insert=siteMission.at(540);near(t0.altitudeKm,0,1e-8);near(siteMission.at(-120).altitudeKm,0,1e-8);near(siteMission.at(539.999).altitudeKm,insert.altitudeKm,.001);
 for(let i=0;i<3;i++){near(siteMission.at(539.999).positionECI[i],insert.positionECI[i],.009);near(siteMission.at(539.999).velocityECI[i],insert.velocityECI[i],.0001);}
 const missionModel=createSimulation({...defaults,missionYears:.008}),plan=missionModel.disposal(),beforeIgn=missionModel.at(plan.start),cut=missionModel.at(plan.cutoff),entry=missionModel.at(plan.entry),final=missionModel.at(missionModel.duration);
+// Long retrograde prepoint must retain the physical momentum-removal path.
+// The reported failure saturated the CMGs while the scheduler inhibited
+// magnetic unloading for the entire slew, including the final payload-off hold.
+const settled=missionModel.at(plan.start-.001),prepointSamples=[.1,.25,.5,.75].map(fraction=>missionModel.at(plan.start-(1-fraction)*settled.prepointLeadWindowS));
+assert.ok(prepointSamples.some(sample=>sample.attitudeMode==='prepoint'&&sample.desat&&Math.hypot(...sample.magTorqueEciNm)>0&&sample.coilKW>0),'Prepoint uses powered magnetic torque when momentum unloading is requested.');
+assert.equal(settled.attitudeMode,'prepoint');assert.equal(settled.unloadInhibit,'','Payload shutdown does not disable attitude momentum management.');
+assert.ok(settled.burnAxisErrorDeg<=attitudeLimits(missionModel.hardware).pointingToleranceDeg,'The achieved thrust axis satisfies the unchanged ignition tolerance.');
+for(const sample of [...prepointSamples,settled]){
+ assert.ok(sample.momentumNms<=defaults.cmgMomentumNms+1e-6,'Prepoint stays within the installed CMG momentum limit.');
+ assert.ok(Math.hypot(...sample.attitudeDynamics.appliedTorqueNm)<=defaults.cmgTorqueNm+1e-6,'Prepoint stays within the installed CMG torque limit.');
+ assert.ok(sample.attitudeDynamics.angularMomentumResidualNms<1e-8,'Magnetic unloading preserves the vector angular-momentum balance.');
+}
 assert.ok(plan.feasible&&plan.cutoff>plan.start&&plan.entry>plan.cutoff);near(cut.perigeeKm,plan.goal,.0001);near(entry.altitudeKm,120,.0001);near(cut.propellantKg,entry.propellantKg);near(entry.propellantKg,final.propellantKg);near(beforeIgn.propellantKg-cut.propellantKg,plan.usedKg,.00001);near(cut.disposalPaidDv,9.80665*defaults.isp*Math.log(beforeIgn.wetKg/cut.wetKg),.000001);near((plan.cutoff-plan.start)*defaults.thrustN,plan.usedKg*9.80665*defaults.isp,.001);
 assert.equal(entry.flightPhase,'entry');assert.ok(entry.velocityECI.reduce((a,v,i)=>a+v*entry.positionECI[i],0)<0);assert.equal(cut.tokensPerSec,0);
 const bad=createSimulation({...defaults,missionYears:.007,propellantKg:1,trimDv:0}),bf=bad.at(bad.duration);assert.equal(bf.disposalStatus,'infeasible');near(bf.disposalUsedKg,0);near(bf.propellantKg,1);assert.equal(bad.disposal().entry,null);assert.equal(bad.at(bad.ignition+1).burn,false);

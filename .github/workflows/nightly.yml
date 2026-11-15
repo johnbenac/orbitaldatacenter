@@ -13,8 +13,13 @@ permissions:
 
 jobs:
   extended:
+    name: extended ${{ matrix.suite }}
     runs-on: ubuntu-latest
     timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [engine, deployment-full, upstream-publish]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -24,13 +29,13 @@ jobs:
         with:
           python-version: '3.12'
       - run: npm install --no-audit --no-fund
-      - run: python3 scripts/ratchet.py --lane extended --jobs 1
+      - run: python3 scripts/ratchet.py --lane extended --only ${{ matrix.suite }}
       - name: Report a regression
         if: failure()
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          title="Nightly extended checks regressed"
+          title="Nightly extended checks regressed (${{ matrix.suite }})"
           if [ -z "$(gh issue list --state open --search "$title in:title" --json number --jq '.[].number')" ]; then
             gh issue create --title "$title" \
               --body "A suite that passed in baseline.json no longer passes. Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"

@@ -41,10 +41,11 @@ approval. Credentials, tokens and `.env` files never belong in the repository or
 ### The regression ratchet
 
 `baseline.json` records which developer suites pass. `python3 scripts/ratchet.py --lane fast` runs
-`design-test.mjs`, `ai-core-checks.mjs`, `scene-interaction-checks.mjs` and `deployment-checks.mjs`.
-A suite that passes in the baseline must keep passing. A suite that already fails does not block,
-and fixing one is welcome: say so in the pull request and the owner raises the baseline. The
-nightly job runs the long suites (`engine-checks.mjs` and `npm run check:publish`).
+`design-test.mjs`, `ai-core-checks.mjs`, `scene-interaction-checks.mjs` and `deployment-checks.mjs`
+for the Pathfinder preset. A suite that passes in the baseline must keep passing. A suite that
+already fails does not block, and fixing one is welcome: say so in the pull request and the owner
+raises the baseline. The nightly job runs the long suites as separate jobs: `engine-checks.mjs`,
+the full `deployment-checks.mjs` sweep and `npm run check:publish`.
 
 ## Development and Tests
 

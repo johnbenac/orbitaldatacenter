@@ -62,6 +62,17 @@ class RatchetTests(unittest.TestCase):
         self.assertEqual(0, code)
         self.assertEqual({'ok': 'pass', 'bad': 'fail'}, written['suites'])
 
+    def test_suite_environment_is_passed_to_the_command(self):
+        spec = dict(lane='fast', timeout=60, env={'ODC_PROBE': 'seen'},
+                    cmd=[sys.executable, '-c', 'import os,sys; sys.exit(0 if os.environ.get("ODC_PROBE")=="seen" else 1)'])
+        with patch.object(RATCHET, 'SUITES', {'probe': spec}):
+            self.assertEqual('pass', RATCHET.run_suite('probe', ROOT)[1]['status'])
+
+    def test_fast_lane_runs_one_deployment_preset_and_the_full_sweep_is_extended(self):
+        self.assertEqual('pathfinder', RATCHET.SUITES['deployment']['env']['ODC_AUDIT_ONLY'])
+        self.assertEqual('extended', RATCHET.SUITES['deployment-full']['lane'])
+        self.assertNotIn('ODC_AUDIT_ONLY', RATCHET.SUITES['deployment-full'].get('env', {}))
+
     def test_repository_baseline_covers_every_fast_suite(self):
         baseline = json.loads((ROOT / 'baseline.json').read_text())['suites']
         fast = [n for n, s in RATCHET.SUITES.items() if s['lane'] == 'fast']

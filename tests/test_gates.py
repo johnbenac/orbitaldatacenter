@@ -21,6 +21,7 @@ def load(name):
 
 RATCHET = load('ratchet')
 RELEASE = load('check-release')
+GUARD = load('pages-guard')
 
 
 class RatchetTests(unittest.TestCase):
@@ -122,6 +123,38 @@ class ReleaseCheckTests(unittest.TestCase):
         self.assertEqual([], RELEASE.check(self.dist))
         (self.dist / 'app.js').write_text('export const = ;\n')
         self.assertTrue(any('app.js' in p for p in RELEASE.check(self.dist)))
+
+
+class PagesGuardTests(unittest.TestCase):
+    INDEX = b'<html><link rel="canonical" href="https://example.test/"></html>'
+    SHA = __import__('hashlib').sha256(INDEX).hexdigest()
+
+    def problems(self, pages):
+        def fetch(url):
+            return pages.get(url, (404, b''))
+        ok = (200, b'')
+        base = {'https://example.test/about/': ok, 'https://example.test/assets.json.zip': ok,
+                'https://example.test/robots.txt': ok}
+        base.update(pages)
+        with patch.object(GUARD, 'fetch', lambda url: base.get(url, (404, b''))):
+            return GUARD.site_problems('https://example.test', self.SHA, 'https://x.pages.dev')
+
+    def test_edge_injected_script_on_the_custom_domain_is_accepted(self):
+        injected = self.INDEX.replace(b'</html>', b'<script src="https://cf.example/beacon.js"></script></html>')
+        self.assertEqual([], self.problems({'https://x.pages.dev/': (200, self.INDEX),
+                                            'https://example.test/': (200, injected)}))
+
+    def test_stale_deployment_is_detected_on_the_untouched_address(self):
+        result = self.problems({'https://x.pages.dev/': (200, b'old build'),
+                                'https://example.test/': (200, self.INDEX)})
+        self.assertTrue(any('not the freshly built' in p for p in result))
+
+    def test_missing_pages_and_canonical_are_detected(self):
+        result = self.problems({'https://x.pages.dev/': (200, self.INDEX),
+                                'https://example.test/': (200, b'<html></html>'),
+                                'https://example.test/about/': (500, b'')})
+        self.assertTrue(any('canonical' in p for p in result))
+        self.assertTrue(any('/about/' in p for p in result))
 
 
 if __name__ == '__main__':

@@ -10,6 +10,7 @@ import {radiusAt} from './dist/fairings.js';
 import {makeCraft} from './dist/craft.js';
 import {deploymentLayout,mechanismPose,leafPose,leafAxes} from './dist/deployment.js';
 import {DEPLOY_DURATION_S} from './dist/commissioning-clock.js';
+import {auditProtectedSolarCollectors} from './protected-solar-collector-checks.mjs';
 
 const painter=new Proxy({}, {get:(_,k)=>k==='createLinearGradient'?()=>({addColorStop(){}}):()=>{}});
 globalThis.document={createElement:()=>({getContext:()=>painter})};
@@ -214,6 +215,7 @@ function verifyPlateBounds(q,b){
 }
 export function auditDeployment(h,steps=2400){
  const g=deploymentLayout(h),craft=makeCraft(h),m=craft.mechanismAudit;
+ auditProtectedSolarCollectors(h,craft,0);
  assert(m,'No rendered mechanism measurement points');
  assert.equal(m.wings.length,4);assert.equal(m.banks.length,2);
  craft.plumes.forEach(o=>o.visible=false);

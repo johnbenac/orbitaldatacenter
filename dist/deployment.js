@@ -76,7 +76,7 @@ export function deploymentLayout(h){
  const coreRadiusM=.125,blanketGaugeM=.002,packedRollM=Math.sqrt(coreRadiusM**2+blanketGaugeM*wl/Math.PI);
  // Hardware attaches to the four long faces. Z measures station along the launch spine.
  const radRoot=l/2-r-.16,fluidStandOffReserveM=family.id==='heatlift-study'?Math.max(1.30,.25*panelCount-.105)-protectedFluidAllocation.rootStandOffM:0,rootY=bh/2+protectedFluidAllocation.rootStandOffM+fluidStandOffReserveM,hingeStand=family.id==='heatlift-study'?.125:panelCount>2?.070:.082;
- const rootX=w/2+packedRollM+.12,mountZ=ww/2+.145+.54*packedRollM,center=0;
+ const rootX=w/2+(h.solarRootCollector?.rootStandOffM??(packedRollM+.12)),mountZ=ww/2+.145+.54*packedRollM,center=0;
  const mounts=[],g={familyId:family.id,architectureFamilyId:family.id,panelCount,w,bh,l,ww,wl,rw,r,rootX,mountZ,center,radRoot,rootY,hingeStand,fluidStandOffReserveM,packedRollM,coreRadiusM,blanketGaugeM,mounts,descriptors:[]};
  const support=(foot,seat,role)=>({foot,seat,role});
  for(const side of [-1,1])for(const end of [-1,1]){

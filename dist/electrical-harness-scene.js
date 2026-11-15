@@ -6,6 +6,7 @@ import {connectionTube,connectionAnchor,anchorInFrame,normalInFrame} from './con
 import {architectureFamily} from './architecture-families.js';
 import {createInstalledElectricalRouting} from './installed-electrical-routing.js';
 import {familyAppendageDimensions as appendageDimensions} from './family-appendage-dimensions.js';
+import {installProtectedSolarCollectorGeometry} from './protected-solar-collector.js';
 
 const V=(x=0,y=0,z=0)=>new T.Vector3(x,y,z),Z=V(0,0,1),Y=V(0,1,0),clamp=x=>Math.max(0,Math.min(1,Number(x)||0));
 const parts={power:'power',control:'avionics',data:'fabric',rf:'communications'};
@@ -84,13 +85,25 @@ export function installElectricalHarnessScene(factory,h,{planFluidRoutes=true}={
    if(host){host.geometry.computeBoundingBox();const bb=host.geometry.boundingBox,worldScale=host.getWorldScale(V());dimensions=bb.getSize(V()).multiply(worldScale).toArray();localCenter=bb.getCenter(V()).multiply(worldScale).toArray();const frame=group(host.parent,spec.label+' connector datum',{part:'battery',electricalItemIds:[spec.itemId]});frame.position.copy(host.position);frame.quaternion.copy(host.quaternion);const parentScale=frame.getWorldScale(V());frame.scale.set(1/parentScale.x,1/parentScale.y,1/parentScale.z);host.userData.explicitElectricalPorts=true;host=frame;}
   }else if(spec.hostKey==='wings'){
    const wing=factory.wings[spec.instance],base=wing?.base||wing?.table;if(base){const stator=group(root,spec.label+' fixed rotary interface',{part:'solar',physicalPartId:spec.itemId,rotaryElectricalInterface:true,routingMotion:spec.deploymentMotion?{kind:'solar-stator',wingId:'solar-'+spec.instance}:{kind:'rigid',frameId:'body',attachment:'body'}});solarStators.push({frame:stator,instance:spec.instance});poseSolarStators();host=group(stator,spec.label+' junction enclosure',{part:'solar',electricalItemIds:[spec.itemId],collectorAccommodation:spec.collectorAccommodation||null});host.position.set(...spec.positionM);dimensions=[.14,.09,.14];cuboid(host,dimensions,[0,0,0],metal,'Solar source stator enclosure',{explicitElectricalPorts:true,part:'solar'});
+    const collector=h.solarRootCollector?.hardwareSchedule?.[spec.instance];
     if(spec.statorInboardOffsetM){
-     root.updateWorldMatrix(true,true);const station=root.worldToLocal(stator.localToWorld(V(0,.095,0))),side=Math.sign(station.x)||1,target=V(...spec.statorBodyPositionM),railX=side*(h.bodyWidthM/2-Math.max(.018,Math.min(h.bodyWidthM,h.bodyHeightM,h.bodyLengthM)*.024)-.045),path=[station,V(railX,station.y,station.z),V(railX,target.y,target.z),target];
+     // The body outlet retains its graph datum. Its fixed collector rail now
+     // starts on the inboard cassette, rather than crossing the stowed roll.
+     const stationLocal=collector?V(-collector.side*h.solarRootCollector.inboardCenterM,.149,0):V(0,.095,0);
+     root.updateWorldMatrix(true,true);const station=root.worldToLocal(stator.localToWorld(stationLocal)),side=Math.sign(station.x)||1,target=V(...spec.statorBodyPositionM),railX=side*(h.bodyWidthM/2-Math.max(.018,Math.min(h.bodyWidthM,h.bodyHeightM,h.bodyLengthM)*.024)-.045),path=[station,V(railX,station.y,station.z),V(railX,target.y,target.z),target];
      for(let j=1;j<path.length;j++){const a=path[j-1],b=path[j],length=a.distanceTo(b);if(length<1e-7)continue;const casing=mesh(root,new T.CylinderGeometry(.026,.026,length,24),metal,'Stationary insulated collector rail casing',{part:'solar',physicalPartId:spec.itemId,rigidElectricalBusbarHousing:true,fixedCollectorBoxId:spec.id,assemblyContactBasis:'Rigid insulated collector housing terminates inside its own junction enclosure; this does not exempt any routed cable from material collision checks.'});casing.position.copy(a).add(b).multiplyScalar(.5);casing.quaternion.setFromUnitVectors(Y,b.clone().sub(a).normalize());}
      factory.addRoutingFeedthrough({id:'solar-stator-shaft-'+spec.instance,axis:'x',sign:side,positionM:station.toArray(),radiusM:.036,part:'solar',straightM:.13});
     }
-    const ring=mesh(stator,new T.TorusGeometry(.115,.012,8,24),metal,'Rotary electrical stator housing',{part:'solar',physicalPartId:spec.itemId});ring.rotation.y=Math.PI/2;
-    const channels=2*h.energySystem.electrical.mppt.jointCircuitsPerWing;for(let k=0;k<channels;k++){const x=(k-(channels-1)/2)*appendageDimensions.solarContactAxialPitchM,circuit='P-SA-'+(spec.instance+1)+'/channel-'+(Math.floor(k/2)+1)+'/'+(k%2?'positive':'return'),track=mesh(base,new T.TorusGeometry(.089,appendageDimensions.solarContactTubeRadiusM,6,24),contact,'Rotary collector · '+circuit,{part:'solar',physicalPartId:spec.itemId,rotaryElectricalCircuitId:circuit});track.rotation.y=Math.PI/2;track.position.x=x;cuboid(stator,[.005,.014,.018],[x,.090,0],contact,'Stator contact · '+circuit,{part:'solar',physicalPartId:spec.itemId,rotaryElectricalCircuitId:circuit});}
+    if(collector){
+     // Render the very same annular/box pieces used by the MEL and inertia
+     // takeoff. Rotating tracks and their carrier share the wing pitch frame;
+     // fixed casing and brushes remain supported by the stationary rail.
+     installProtectedSolarCollectorGeometry({T,part:collector,stator,rotor:base,materials:{metal,contact,insulator},sourceItemId:spec.itemId,createMesh:mesh});
+     stator.userData.collectorAllocation=h.solarRootCollector.revision;
+    }else{
+     const ring=mesh(stator,new T.TorusGeometry(.115,.012,8,24),metal,'Rotary electrical stator housing',{part:'solar',physicalPartId:spec.itemId});ring.rotation.y=Math.PI/2;
+     const channels=2*h.energySystem.electrical.mppt.jointCircuitsPerWing;for(let k=0;k<channels;k++){const x=(k-(channels-1)/2)*appendageDimensions.solarContactAxialPitchM,circuit='P-SA-'+(spec.instance+1)+'/channel-'+(Math.floor(k/2)+1)+'/'+(k%2?'positive':'return'),track=mesh(base,new T.TorusGeometry(.089,appendageDimensions.solarContactTubeRadiusM,6,24),contact,'Rotary collector · '+circuit,{part:'solar',physicalPartId:spec.itemId,rotaryElectricalCircuitId:circuit});track.rotation.y=Math.PI/2;track.position.x=x;cuboid(stator,[.005,.014,.018],[x,.090,0],contact,'Stator contact · '+circuit,{part:'solar',physicalPartId:spec.itemId,rotaryElectricalCircuitId:circuit});}
+    }
     stator.userData.interfaceBasis=spec.scope;stator.userData.qualification='Project accommodation; supplier application and life evidence required';
    }
   }else if(spec.hostKey==='patches'){

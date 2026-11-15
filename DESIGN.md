@@ -11,3 +11,20 @@ Changing the carrier keeps the mission-specific payload allowance and selects th
 
 Run `node launch-fleet-checks.mjs` for the independent mass screens, option persistence, cross-fleet fit comparison, source records, and phase-specific selection controls.
 <!-- These preliminary design notes remain open to ongoing review. -->
+
+## Protected-core solar electrical collectors
+
+Each solar root has a complete electrical cassette inboard of its wound blanket and mechanical
+bearing. The stationary case and brushes attach to the body; the copper contacts and dielectric
+carrier rotate with the wing. Contact count determines the bay length, with 12 mm allocated
+material clearance at the bearing and body pedestal. This clearance is a design dimension.
+
+Four separate MEL assemblies, WBS 07.08.01–04, own the cassette and added hollow support
+extensions. The same material pieces supply rendered geometry, mass, center of gravity and
+inertia. Their stations enter the tank and engine alignment calculation before installation.
+Existing bearing and launch-lock rods retain their lengths, and body connector datums stay fixed.
+
+Run `node protected-solar-collector-checks.mjs` for the bounded material, motion, mass and
+thrust-alignment checks. Run `ODC_AUDIT_ONLY=pathfinder node deployment-checks.mjs` for the
+2,401-pose Pathfinder deployment sweep. These are preliminary geometric checks; they do not
+establish continuous-motion clearance or structural qualification.

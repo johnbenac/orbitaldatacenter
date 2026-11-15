@@ -1,4 +1,4 @@
-// Reproduce with node deployment-checks.mjs 2400 --ai --write
+// Saved deployment evidence; provenance and scope are recorded per row.
 export const aiDeploymentAudit={
   "posesPerPreset": 2401,
   "stepSeconds": 0.5,
@@ -30,12 +30,18 @@ export const aiDeploymentAudit={
       "maxHingeGapM": 0,
       "maxHoseEndErrorM": 0,
       "maxLengthErrorM": 0,
-      "maxHoseLengthErrorM": 0.000001039,
+      "maxHoseLengthErrorM": 1.039e-06,
       "deployClear": true,
       "meshFitMarginM": 0.497326026,
       "fit": true,
       "radialClearanceM": 1.122232623,
-      "axialClearanceM": 7.0649933
+      "axialClearanceM": 7.0649933,
+      "evidence": {
+        "status": "archived",
+        "label": "Archived · earlier geometry",
+        "retainedInCommit": "64b478f199575262531d33236e6d70ff4fd675d7",
+        "note": "Unchanged numerical snapshot retained from the pre-repair source. It is not a measurement of the current geometry."
+      }
     },
     {
       "id": "voice",
@@ -63,12 +69,18 @@ export const aiDeploymentAudit={
       "maxHingeGapM": 0,
       "maxHoseEndErrorM": 0,
       "maxLengthErrorM": 0,
-      "maxHoseLengthErrorM": 0.000001039,
+      "maxHoseLengthErrorM": 1.039e-06,
       "deployClear": true,
       "meshFitMarginM": 0.363480282,
       "fit": true,
       "radialClearanceM": 0.173088176,
-      "axialClearanceM": 2.10291889
+      "axialClearanceM": 2.10291889,
+      "evidence": {
+        "status": "archived",
+        "label": "Archived · earlier geometry",
+        "retainedInCommit": "64b478f199575262531d33236e6d70ff4fd675d7",
+        "note": "Unchanged numerical snapshot retained from the pre-repair source. It is not a measurement of the current geometry."
+      }
     },
     {
       "id": "batch",
@@ -96,12 +108,18 @@ export const aiDeploymentAudit={
       "maxHingeGapM": 0,
       "maxHoseEndErrorM": 0,
       "maxLengthErrorM": 0,
-      "maxHoseLengthErrorM": 0.000001039,
+      "maxHoseLengthErrorM": 1.039e-06,
       "deployClear": true,
       "meshFitMarginM": 0.497326026,
       "fit": true,
       "radialClearanceM": 0.700247417,
-      "axialClearanceM": 5.448230657
+      "axialClearanceM": 5.448230657,
+      "evidence": {
+        "status": "archived",
+        "label": "Archived · earlier geometry",
+        "retainedInCommit": "64b478f199575262531d33236e6d70ff4fd675d7",
+        "note": "Unchanged numerical snapshot retained from the pre-repair source. It is not a measurement of the current geometry."
+      }
     },
     {
       "id": "agents",
@@ -129,12 +147,18 @@ export const aiDeploymentAudit={
       "maxHingeGapM": 0,
       "maxHoseEndErrorM": 0,
       "maxLengthErrorM": 0,
-      "maxHoseLengthErrorM": 0.000001039,
+      "maxHoseLengthErrorM": 1.039e-06,
       "deployClear": true,
       "meshFitMarginM": 0.497326026,
       "fit": true,
       "radialClearanceM": 0.416659337,
-      "axialClearanceM": 3.932451876
+      "axialClearanceM": 3.932451876,
+      "evidence": {
+        "status": "archived",
+        "label": "Archived · earlier geometry",
+        "retainedInCommit": "64b478f199575262531d33236e6d70ff4fd675d7",
+        "note": "Unchanged numerical snapshot retained from the pre-repair source. It is not a measurement of the current geometry."
+      }
     },
     {
       "id": "finetune",
@@ -162,12 +186,18 @@ export const aiDeploymentAudit={
       "maxHingeGapM": 0,
       "maxHoseEndErrorM": 0,
       "maxLengthErrorM": 0,
-      "maxHoseLengthErrorM": 0.000001039,
+      "maxHoseLengthErrorM": 1.039e-06,
       "deployClear": true,
       "meshFitMarginM": 0.39498401,
       "fit": true,
       "radialClearanceM": 0.391099638,
-      "axialClearanceM": 3.959107725
+      "axialClearanceM": 3.959107725,
+      "evidence": {
+        "status": "archived",
+        "label": "Archived · earlier geometry",
+        "retainedInCommit": "64b478f199575262531d33236e6d70ff4fd675d7",
+        "note": "Unchanged numerical snapshot retained from the pre-repair source. It is not a measurement of the current geometry."
+      }
     },
     {
       "id": "pretrain",
@@ -195,12 +225,19 @@ export const aiDeploymentAudit={
       "maxHingeGapM": 0,
       "maxHoseEndErrorM": 0,
       "maxLengthErrorM": 0,
-      "maxHoseLengthErrorM": 0.000001039,
+      "maxHoseLengthErrorM": 1.039e-06,
       "deployClear": true,
       "meshFitMarginM": -20.23689741,
       "fit": false,
       "radialClearanceM": -6.165352209,
-      "axialClearanceM": -20.285956424
+      "axialClearanceM": -20.285956424,
+      "evidence": {
+        "status": "archived",
+        "label": "Archived · earlier geometry",
+        "retainedInCommit": "64b478f199575262531d33236e6d70ff4fd675d7",
+        "note": "Unchanged numerical snapshot retained from the pre-repair source. It is not a measurement of the current geometry."
+      }
     }
-  ]
+  ],
+  "evidenceNote": "Per-row saved evidence. Archived rows describe earlier geometry; only remeasured rows identify a later verification snapshot."
 };

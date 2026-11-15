@@ -7,6 +7,7 @@ import {tagMaterial,engineeringGraphic,planeMaterialUV,cylinderMaterialUV,sphere
 import {connectionTube,connectionAnchor,anchorInFrame,normalInFrame} from './connection-geometry.js';
 import {inlineArmServiceAllocation} from './inline-arm-routing.js';
 import {familyAppendageDimensions as appendageDimensions} from './family-appendage-dimensions.js';
+import {protectedSolarCollectorMaterialGeometry} from './protected-solar-collector.js';
 import {installRadiatorFluidTransfer} from './radiator-fluid-transfer.js';
 import {declareRotaryFluidChannel,fluidInterfaceAllocationReport} from './fluid-interface-allocation.js';
 import {createRoutingWall,addRoutingWallLayer,routingFeedthroughFactory,perforatedPanelGeometry,constantLengthHingeRoute,registerRoutingBox,planStaticFluidConnections,joinedFluidRoutes,fluidPhysicalMeshes,installColdPlateCollection,flightFluidSnapshot,auditFlightFluidSnapshot,bindFluidJunctions,hollowFluidFitting,locateFluidFeedthrough,routingMotionFor} from './flight-fluid-routing.js';
@@ -59,12 +60,27 @@ export function makeFamilyCraft(h,kit){
   const lug=box(root,point[0],point[1],point[2]-thickness/2,size,size,thickness,role('launch-interface'),'structure');lug.name='Allocated '+f.launchInterface+' hardpoint';
   const pin=cyl(root,point[0],point[1],point[2]-thickness/2,.02,.02,thickness+.025,mechanismMat,'structure',24);pin.rotation.x=Math.PI/2;
  }
- const supportBars=[];
- for(const m of g.mounts)for(const s of m.supports){
-  const bar=dynamicLine(root,beam*.28,mechanismMat,'structure');link(bar,s.foot,s.seat);bar.name=s.role==='restraint'?'Allocated telescoping launch restraint':'Appendage root support';const releaseEnd=m.releaseAt??(m.kind==='radiator'?(m.end<0?.46:.69):.04),releaseStart=Math.max(0,releaseEnd-.025),lengthM=v(...s.foot).distanceTo(v(...s.seat)),retractedLengthM=Math.min(.04,lengthM);
-  if(s.role==='restraint')bar.userData.routingMotion={kind:'release-restraint',frameId:bar.uuid,attachment:'body',startProgress:releaseStart,endProgress:releaseEnd,strokeM:lengthM-retractedLengthM};
-  supportBars.push({bar,role:s.role,foot:s.foot,seat:s.seat,releaseStart,releaseEnd,lengthM,retractedLengthM});
-  ell(root,...s.foot,beam*.8,beam*.8,beam*.8,mechanismMat,'structure');
+ const supportBars=[],collectorSupports=f.id==='protected-core'?h.solarRootCollector?.hardwareSchedule||[]:[];let solarSupportInstance=0;
+ for(const m of g.mounts){
+  const collector=m.kind==='solar'?collectorSupports[solarSupportInstance++]:null;
+  for(const [index,s]of m.supports.entries()){
+   const piece=collector?.materialPieces.find(p=>p.id==='support-extension-'+index),extension=piece?.lengthM||0,
+    rodFoot=extension?[s.foot[0]+m.side*extension,s.foot[1],s.foot[2]]:s.foot;
+   if(piece){
+    // The same fixed hollow material is present whichever communications
+    // package selected this renderer. Only the original rod may retract.
+    const tube=tagMaterial(new T.Mesh(protectedSolarCollectorMaterialGeometry(T,piece),mechanismMat));
+    tube.position.set(...piece.positionM.map((x,i)=>x+collector.positionM[i]));tube.name=s.role==='restraint'?'Fixed launch-lock guide extension':'Fixed solar-root pedestal extension';
+    Object.assign(tube.userData,{part:'solar',physicalPartId:collector.itemId,electricalItemIds:[collector.itemId],installationHardwareId:collector.id,materialPieceId:piece.id});root.add(tube);
+   }
+   // Communications selection retains the legacy root/restraint mechanisms:
+   // the root shaft meets the sleeve; the sliding lock keeps its guide clearance.
+   const rodRadius=piece?piece.outerRadiusM*(s.role==='restraint'?.60:1):beam*.28;
+   const bar=dynamicLine(root,rodRadius,mechanismMat,'structure');link(bar,rodFoot,s.seat);bar.name=s.role==='restraint'?'Allocated telescoping launch restraint':'Appendage root support';const releaseEnd=m.releaseAt??(m.kind==='radiator'?(m.end<0?.46:.69):.04),releaseStart=Math.max(0,releaseEnd-.025),lengthM=v(...rodFoot).distanceTo(v(...s.seat)),retractedLengthM=Math.min(.04,lengthM);
+   if(s.role==='restraint')bar.userData.routingMotion={kind:'release-restraint',frameId:bar.uuid,attachment:'body',startProgress:releaseStart,endProgress:releaseEnd,strokeM:lengthM-retractedLengthM};
+   supportBars.push({bar,role:s.role,foot:s.foot,rodFoot,seat:s.seat,releaseStart,releaseEnd,lengthM,retractedLengthM});
+   ell(root,...s.foot,beam*.8,beam*.8,beam*.8,mechanismMat,'structure');
+  }
  }
  // Real photovoltaic area is represented once per installed blanket. Cell
  // texture pitch stays approximately constant as a blanket pays out.
@@ -321,7 +337,7 @@ export function makeFamilyCraft(h,kit){
   for(const bank of rads){const p=motion.banks.find(q=>q.end===bank.end);for(const [name,point] of [['rootPin',p.root],['rootSocket',p.root],['elbowPin',p.elbow],['elbowSocket',p.elbow],['tip',p.tip]])at(bank[name],point);}
   for(const j of jointLinks){const b=motion.banks.find(q=>q.end===j.end),previous=b.panelRoots[j.j-1],desc=g.descriptors.find(s=>s.type==='rad'&&s.end===j.end&&s.j===j.j-1),end=plus(previous,(b.panelAxes?.[j.j-1]||leafAxes({pitch:b.panelPitches[j.j-1],roll:b.roll}))[2],desc.depth);at(j.pin,end);at(j.socket,b.panelRoots[j.j]);link(j.bar,end,b.panelRoots[j.j]);}
   updateFluidConnections();
-  for(const support of supportBars)if(support.role==='restraint'){const q=Math.max(0,Math.min(1,(progress-support.releaseStart)/(support.releaseEnd-support.releaseStart))),fraction=support.lengthM?1-q*(1-support.retractedLengthM/support.lengthM):0;link(support.bar,support.foot,support.foot.map((x,i)=>x+(support.seat[i]-x)*fraction));}
+  for(const support of supportBars)if(support.role==='restraint'){const q=Math.max(0,Math.min(1,(progress-support.releaseStart)/(support.releaseEnd-support.releaseStart))),fraction=support.lengthM?1-q*(1-support.retractedLengthM/support.lengthM):0;link(support.bar,support.rodFoot,support.rodFoot.map((x,i)=>x+(support.seat[i]-x)*fraction));}
  }
  positionPanels(1);
  let fluidRoutingPlans=kit.planFluidRoutes===false?[]:planStaticFluidConnections(root,fluidConnections);updateFluidConnections();

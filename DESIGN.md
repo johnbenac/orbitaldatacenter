@@ -108,7 +108,7 @@ synthetic accounting fixtures out of other models and follows PR #10's bounded f
   interline clearance, inner-body placement, reservation ownership and obstruction rejection.
 - `starmind-mounted-service-checks.mjs`: seated physical plugs, unchanged travel requirements,
   explicit unassessed status and rejection of both direct and nominal withdrawal animation.
-- `starmind-battery-aisle-checks.mjs`: two guarded battery-aisle proposals, full bends,
+- `starmind-battery-aisle-checks.mjs`: three guarded battery-aisle proposals, full bends,
   real connector straights, mutual clearance and obstruction rejection.
 - `starmind-interior-route-checks.mjs`: the relocated service feed and three worker leads,
   complete body containment, terminal straights, full bends and ordinary obstruction rejection.

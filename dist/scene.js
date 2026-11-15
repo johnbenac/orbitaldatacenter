@@ -17,7 +17,8 @@ import {createLaunchSiteView} from './launch-site-view.js';
 import {makeLaunch} from './launch-scene.js';
 import {positionLiveCraft} from './launch-craft-placement.js';
 import {makeCraft} from './craft.js';
-import {buildElectricalArchitecture,reconcileRedwireInstalledMassFromCraft} from './electrical-architecture.js';
+import {buildElectricalArchitecture,reconcileInstalledMassFromCraft,installedElectricalLayoutKey} from './electrical-architecture.js';
+import {supportsInstalledHarnessMass} from './installed-harness-mass.js';
 import {createPointingGuide,pointingGeometry,pointingViewAllowed} from './pointing-guide.js';
 import {thermalSkin,temperatureLegend} from './thermal-view.js';
 import {domainSceneSpecs,domainInstruments} from './domain-scene.js';
@@ -39,16 +40,12 @@ const V=(x=0,y=0,z=0)=>new T.Vector3(x,y,z),Y=V(0,1,0),TAU=Math.PI*2,clamp=(x,a,
 const cameraView=s=>/launch|fairing/i.test(s)?'launch':/earth|orbit/i.test(s)?'orbit':/core/i.test(s)?'core':'spacecraft';
 const pickAliases={enclosure:"structure",pv:'solar',array:'solar',arrays:'solar',radiators:'radiator',cmgs:'cmg',antennas:'communications',tanks:'propellant',coolant:'radiator',batteries:'battery',shielding:'structure',engine:'propulsion',prop:'propellant',attitude:'cmg',battery:'battery',trays:'compute'};
 const defaultPose={spacecraft:[.61,.49],core:[2.60,.47],orbit:[.54,.33],launch:[.46,.27],bay:[.40,.29]};
-const redwireLayoutKeys=new WeakMap();
-function redwireElectricalLayoutKey(h){
- if(h.architectureFamilyId!=='redwire-platform')return '';
- if(redwireLayoutKeys.has(h))return redwireLayoutKeys.get(h);
- const graph=buildElectricalArchitecture(h),key=JSON.stringify({
-  boxes:graph.boxes.map(b=>[b.id,b.frame,b.positionM,b.dimensionsM,b.connectorPanels]),
-  ports:graph.ports.map(p=>[p.id,p.boxId,p.positionM,p.normal,p.connectorTypeId,p.quantity,p.instanceOffsetsM,p.packing]),
-  harnesses:graph.harnesses.map(a=>[a.id,a.quantity,a.fromPortId,a.toPortId,a.connectorTypeId,a.wire.awg,a.wire.areaMM2,a.cableDiameterM,a.bendRadiusM,a.routing])
- });
- redwireLayoutKeys.set(h,key);return key;
+const installedLayoutKeys=new WeakMap();
+function hardwareElectricalLayoutKey(h){
+ if(!supportsInstalledHarnessMass(h))return '';
+ if(installedLayoutKeys.has(h))return installedLayoutKeys.get(h);
+ const key=installedElectricalLayoutKey(buildElectricalArchitecture(h));
+ installedLayoutKeys.set(h,key);return key;
 }
 export function bayWorkAreaPoints(launch,h){
  const {shell,payload,upper,lower}=launch.parts,{station,floorY,layout}=launch.bay,r=h.stowedDiameterM/2;
@@ -964,7 +961,7 @@ export function createScene(container,{onPick=()=>{},onOpenPart=null,getPartInfo
  function positionVehicle(){
   positionLiveCraft(craftGroup,{view,launch,launchFrame,state:s,hardware:h,fitHalfHeight:Math.max(size.fitHeight*.5,size.fitWidth*.5/(w/Math.max(1,ht)))});
  }
- function update(hardware,snapshot){if(!hardware||!snapshot)return;const previousHardware=h;h=hardware;s=snapshot;flightFrame=flightFrames(s);let k=[redwireElectricalLayoutKey(h),h.architectureFamilyId||h.input.architectureFamily,h.physicalArchitecture?.revision,h.input.architectureSpanM,h.input.architectureHeightM,h.input.pv,h.input.coating,h.input.communicationsPackage,h.trays,h.storageTB,h.input.diskModuleTB,h.bodyLengthM,h.bodyWidthM,h.bodyHeightM,h.wingLengthM,h.wingWidthM,h.radiatorLengthM,h.radiatorWidthM,h.radiatorPanelsPerBank,h.input.kaDishM,h.input.opticalApertureM,h.tankVolumeL,h.fuelKg,h.oxidizerKg,h.input.thrustN,h.input.engine,...h.propulsion.tanks.flatMap(o=>[o.x,o.y,o.z,o.volumeL]),...h.propulsion.engines.map(o=>o.x+','+o.z)].join('/');if(k!==meshKey){partMenu.close();if(craft){craftDetail?.dispose();craftDetail=null;detailFocus=null;craftSkin?.destroy();craftSkin=null;craftFocus?.destroy();craftFocus=null;custody?.destroy();custody=null;craftGroup.remove(craft.root);disposeGroup(craft.root);}meshKey=k;craft=makeCraft(h);craftDetail=createHardwareDetail(craft.root,{family:'flight',hardware:h,renderer,gpu,onWake:()=>request()});craftGroup.add(craft.root);let span=Math.max(craft.wingspan,craft.spanZ);size={span,fitWidth:Math.max(craft.wingspan*1.05,craft.spanZ*.60),fitHeight:Math.max(craft.wingspan*.29+craft.spanZ*.36,span*.48)};pickables=[craft.root];overlayStale=true;}else if(previousHardware!==h&&h.architectureFamilyId==='redwire-platform'){reconcileRedwireInstalledMassFromCraft(h,craft);}
+ function update(hardware,snapshot){if(!hardware||!snapshot)return;const previousHardware=h;h=hardware;s=snapshot;flightFrame=flightFrames(s);let k=[hardwareElectricalLayoutKey(h),h.architectureFamilyId||h.input.architectureFamily,h.physicalArchitecture?.revision,h.input.architectureSpanM,h.input.architectureHeightM,h.input.pv,h.input.coating,h.input.communicationsPackage,h.trays,h.storageTB,h.input.diskModuleTB,h.bodyLengthM,h.bodyWidthM,h.bodyHeightM,h.wingLengthM,h.wingWidthM,h.radiatorLengthM,h.radiatorWidthM,h.radiatorPanelsPerBank,h.input.kaDishM,h.input.opticalApertureM,h.tankVolumeL,h.fuelKg,h.oxidizerKg,h.input.thrustN,h.input.engine,...h.propulsion.tanks.flatMap(o=>[o.x,o.y,o.z,o.volumeL]),...h.propulsion.engines.map(o=>o.x+','+o.z)].join('/');if(k!==meshKey){partMenu.close();if(craft){craftDetail?.dispose();craftDetail=null;detailFocus=null;craftSkin?.destroy();craftSkin=null;craftFocus?.destroy();craftFocus=null;custody?.destroy();custody=null;craftGroup.remove(craft.root);disposeGroup(craft.root);}meshKey=k;craft=makeCraft(h);craftDetail=createHardwareDetail(craft.root,{family:'flight',hardware:h,renderer,gpu,onWake:()=>request()});craftGroup.add(craft.root);let span=Math.max(craft.wingspan,craft.spanZ);size={span,fitWidth:Math.max(craft.wingspan*1.05,craft.spanZ*.60),fitHeight:Math.max(craft.wingspan*.29+craft.spanZ*.36,span*.48)};pickables=[craft.root];overlayStale=true;}else if(previousHardware!==h&&supportsInstalledHarnessMass(h)){reconcileInstalledMassFromCraft(h,craft);}
  updateLaunch();syncRotationMode();navReadings=orbitVectorsAvailable(view,s)&&flightFrame&&!(view==='launch'&&launchFrame?.reference)?orbitVectorReadings(s):[];actuate();stagingBounds=chapter!=='commissioning'&&s.deployment<.995&&s.deployment>.0001?new T.Box3().setFromObject(craft.root):null;if(overlayStale||layers.length||domainSceneSpecs[focus]?.vectors?.length||['attitude','prop'].includes(focus)){arrows();overlayStale=false;}if(selected)selectionBox();updateOrbit();positionVehicle();updatePointing();orbit.visible=view==='orbit';setBg();updateThermal();request();}
  function setView(v){const next=cameraView(v);if(next===view&&craft)return;partMenu.close();detailFocus=null;cancelGestures();if(hoverHit)leave({clientX:hoverHit.x,clientY:hoverHit.y});view=next;setBg();if(craft)update(h,s);else request();}
  function thermalRow(hit){return (!focus||focus==='thermal'||thermalEnabled())&&hit?.node?(s.thermalQualification||[]).find(r=>r.id===hit.node)||null:null;}

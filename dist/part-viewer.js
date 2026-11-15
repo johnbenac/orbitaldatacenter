@@ -17,6 +17,13 @@ const facilitySettings=new Set(['vibration','thermal-vacuum','thermal-cycle','ac
 const scaleModes=new Set(['auto','none','banana','person','ruler','container']);
 const raf=fn=>requestAnimationFrame(fn),caf=id=>cancelAnimationFrame(id);
 
+export function partInspectionAnimations(record,{setting,available,contextOnly,electricalMate,matingRestriction,fixtureAnimated}={}){
+ const animations=partAnimations(record).filter(a=>a.id!=='mate'||!matingRestriction);
+ if(setting==='fit-check'&&available&&!contextOnly&&!matingRestriction)animations.push({id:'mate',label:electricalMate?'Connector mating rehearsal':'Nominal mating rehearsal'});
+ if(fixtureAnimated&&available)animations.push({id:'fixture',label:'Test-setting walkthrough'});
+ return animations;
+}
+
 // A single instance is used by a focused page, or by the shared thumbnail queue.
 // Source geometry belongs to this instance; presentation materials are private.
 export function createPartViewer(container,{onSelect,onStatus,onChange,onHoldPlayback,offscreen=false,width=320,height=220,facilityAssetId=null}={}){
@@ -31,7 +38,7 @@ export function createPartViewer(container,{onSelect,onStatus,onChange,onHoldPla
  const hemi=new T.HemisphereLight(0xe4f0ff,0x8f9caa,1.3),key=new T.DirectionalLight(0xffedcf,3.2),rim=new T.DirectionalLight(0xaccfff,1.4);scene.add(hemi,key,rim,key.target,rim.target);
  const softbox=new T.DirectionalLight(0xfff1db,2.65),bounce=new T.DirectionalLight(0xdcecff,1.6);scene.add(softbox,bounce,softbox.target,bounce.target);
  const rendering=createLaunchRendering(renderer,gpu),models=new Map(),materials=new Set(),pairs=[];
- const state={available:false,geometryStatus:'Choose a part to inspect.',contextOnly:false,animations:[],animationId:null,progress:1,playing:false,mode:'materials',detailMode:'high',context:false,setting:offscreen?'studio':'review',facilityAssetId:null,scaleMode:'auto',projection:'perspective',axes:false,autoRotate:false,lighting:'studio',exposureEV:0,thermalScale:'full'};
+ const state={available:false,geometryStatus:'Choose a part to inspect.',contextOnly:false,matingRestriction:null,animations:[],animationId:null,progress:1,playing:false,mode:'materials',detailMode:'high',context:false,setting:offscreen?'studio':'review',facilityAssetId:null,scaleMode:'auto',projection:'perspective',axes:false,autoRotate:false,lighting:'studio',exposureEV:0,thermalScale:'full'};
  let configKey='',model=null,record=null,snapshot={},selection=null,selectedObjects=new Set(),detailRevision=-1,renderMs=0,camera=perspective,w=width,ht=height,radius=1,distance=5,yaw=.8,pitch=.42,target=V(),revision=0,holds=0,appearance=null,recording=null,capturing=false;
  const bounds=new T.Box3(),box=new T.Box3(),size=V(),center=V(),trackedCenter=V(),raycaster=new T.Raycaster(),pointer=new T.Vector2();
  let stage=null,parentRecord=null,parentSelection=null,stageOffset=V(),partSize=V(),mateTravel=0;
@@ -40,6 +47,7 @@ export function createPartViewer(container,{onSelect,onStatus,onChange,onHoldPla
  const initialFacility=getFacilityAsset(facilityAssetId);if(initialFacility)facilitySelections.set(initialFacility.kind,initialFacility.id);
  const electricalItem=()=>record?.render?.electricalItemId||record?.id;
  const electricalMate=()=>!!model?.factory.electrical?.canMate(electricalItem());
+ const matingRestriction=()=>model?.factory.electrical?.matingRestriction?.(electricalItem())||null;
  const reducedMotion=()=>!!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
  const getState=()=>({...state,animations:state.animations.map(a=>({...a})),scaleReferences:stage?.references||[],settingStats:stage?.stats||null,facility:stage?.facility||null,modeledSizeM:partSize.toArray(),detailStats:model?.detail?.stats()||null,thermal:thermalRun?{available:!!thermalFrame,runId:thermalRun.id,modelId:thermalRun.modelId,caseId:thermalRun.caseId,status:'predicted',timeS:thermalFrame?.timeS??0,durationS:thermalRun.frames?.at(-1)?.timeS??0,progress:thermalProgress,mappedMeshes:thermalMapped,scale:state.thermalScale}:null,renderer:gpu?'webgl':'canvas',width:w,height:ht});
  function report(status=false){const value=getState();if(status)onStatus?.(value);onChange?.(value);}
@@ -48,9 +56,8 @@ export function createPartViewer(container,{onSelect,onStatus,onChange,onHoldPla
  function dropDisplay(){objects.clear();pairs.length=0;for(const m of materials)m.dispose();materials.clear();}
  function dropStage(){if(stage){scene.remove(stage.root);stage.dispose();stage=null;}stageBounds.makeEmpty();overlay?.getContext('2d')?.clearRect(0,0,overlay.width,overlay.height);}
  function animationsForSetting(){
-  state.animations=partAnimations(record);
-  if(state.setting==='fit-check'&&state.available&&!state.contextOnly)state.animations.push({id:'mate',label:electricalMate()?'Connector mating rehearsal':'Nominal mating rehearsal'});
-  if(stage?.animated&&state.available)state.animations.push({id:'fixture',label:'Test-setting walkthrough'});
+  state.matingRestriction=matingRestriction();
+  state.animations=partInspectionAnimations(record,{...state,electricalMate:electricalMate(),fixtureAnimated:stage?.animated});
  }
  const displayMode=()=>appearance?.thermal===true&&thermalFrame?'thermal':appearance?.thermal===false&&state.mode==='thermal'?'materials':state.mode;
  function sourceThermalNode(source){
@@ -129,7 +136,7 @@ export function createPartViewer(container,{onSelect,onStatus,onChange,onHoldPla
  function sync(){
   model?.factory.root.updateMatrixWorld(true);
   presentationOffset.set(0,0,0);
-  if(state.animationId==='mate'&&!electricalMate()){const p=state.progress*state.progress*(3-2*state.progress);presentationOffset.x=-mateTravel*(1-p);}
+  if(state.animationId==='mate'&&!electricalMate()&&!state.matingRestriction){const p=state.progress*state.progress*(3-2*state.progress);presentationOffset.x=-mateTravel*(1-p);}
   else if(state.animationId==='fixture'&&stage?.contentOffset)presentationOffset.copy(stage.contentOffset);
   for(const {source,object,ghost} of pairs){object.geometry=source.geometry;object.matrix.copy(source.matrixWorld);if(!ghost){object.matrix.elements[12]+=presentationOffset.x;object.matrix.elements[13]+=presentationOffset.y;object.matrix.elements[14]+=presentationOffset.z;}object.matrixWorldNeedsUpdate=true;object.visible=visiblePartObject(source);
    if(!ghost&&displayMode()==='materials'){const src=array(source.material),dst=array(object.material);for(let i=0;i<src.length;i++){dst[i].opacity=src[i].opacity;dst[i].visible=src[i].visible;if(src[i].map!==dst[i].map){dst[i].map=src[i].map;dst[i].needsUpdate=true;}}}
@@ -228,7 +235,7 @@ export function createPartViewer(container,{onSelect,onStatus,onChange,onHoldPla
   thermalRun=thermalFrame=thermalDisplay=null;thermalMapped=thermalProgress=0;if(state.mode==='thermal')state.mode='materials';
   model?.detail?.clear();detailRevision=-1;selectedObjects=new Set();
   if(signature!==configKey){dropDisplay();for(const m of models.values())m.dispose();models.clear();model=null;configKey=signature;}
-  record=next;snapshot=s||{};parentRecord=options.parentRecord||null;parentSelection=null;state.playing=false;state.progress=1;state.animationId=null;state.animations=partAnimations(record);dropStage();
+  record=next;snapshot=s||{};parentRecord=options.parentRecord||null;parentSelection=null;state.playing=false;state.progress=1;state.animationId=null;state.matingRestriction=null;state.animations=partAnimations(record);dropStage();
   if(settings.has(options.setting))state.setting=options.setting;else if(options.context===true)state.setting='installed';
   if(Object.prototype.hasOwnProperty.call(options,'facilityAssetId')){const requested=getFacilityAsset(options.facilityAssetId);if(!options.facilityAssetId)facilitySelections.delete(state.setting);else if(requested?.kind===state.setting)facilitySelections.set(state.setting,requested.id);}
   state.facilityAssetId=null;

@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import {execFileSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
 import {defaults,sizeDesign,inverseSolve,checks,presets,applyPreset,estimateLife,validateDesign,enumeratePresets} from './dist/design.js';
 import {DEPLOY_END_S} from './dist/commissioning-clock.js';
 import {createSimulation} from './dist/model.js';
@@ -12,4 +14,8 @@ const sim=createSimulation(reference),fresh=createSimulation(sizeDesign(JSON.par
 for(const type of ['contact','trim','reboost']){const event=events.find(e=>e.type===type);if(!event && type==='trim')continue;assert.ok(event, type);const t=(event.start+event.end)/2,a=sim.at(t),b=fresh.at(t);for(const key of ['batteryKWh','propellantKg','junctionK','queueGB','deployment','momentumNms'])assert.equal(a[key],b[key],`${type} roundtrip ${key}`)}
 const early=events.find(e=>e.type==='contact'&&e.end<DEPLOY_END_S);if(early)assert.equal(sim.at(early.end).deliveredGB,sim.at(early.start).deliveredGB);
 const event=events.find(e=>e.type==='contact'&&e.start>DEPLOY_END_S),before=sim.at(event.start),after=sim.at(event.end);assert.ok(after.deliveredGB>before.deliveredGB);assert.ok(Math.abs((after.queueGB-before.queueGB)+(after.deliveredGB-before.deliveredGB)-(after.generatedGB-before.generatedGB))<1e-5);
-console.log(`${checks().length} scalar checks, all presets, workload trades, fleet options, initial infeasibility, mass and byte closure, deterministic pass and burn reconstruction: pass`);
+// Keep bounded installation checks in the existing fast gate. Each CLI owns
+// its fixture cache, so synthetic takeoffs cannot change another model check.
+for(const name of ['starmind-harness-mass-checks.mjs','starmind-harness-installation-checks.mjs','starmind-solar-collector-checks.mjs','starmind-payload-routing-checks.mjs','starmind-mounted-service-checks.mjs','starmind-battery-aisle-checks.mjs','starmind-interior-route-checks.mjs','starmind-fluid-accommodation-checks.mjs'])
+ execFileSync(process.execPath,[fileURLToPath(new URL(name,import.meta.url))],{stdio:'inherit'});
+console.log(`${checks().length} scalar checks, all presets, workload trades, fleet options, initial infeasibility, mass and byte closure, deterministic pass and burn reconstruction, bounded Starmind installation: pass`);

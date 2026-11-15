@@ -206,13 +206,25 @@ export function sizeDesign(input={}){
  const installedElectronicsKw=acceleratorKw+serviceDesign.compute.extraHostActiveKW+serviceDesign.fabric.activeKW;
  const radiatorNetM2=geometryDefinition.radiatorNetM2??d.radiatorM2;
  const installGeometry={...geometryDefinition,input:d,solarM2:d.solarM2,radiatorM2:radiatorNetM2};
- const energySystem=deriveEnergySystem({input:d,trays,chips,cmg,acceleratorKw,installedElectronicsKw,storageKw,solarM2:d.solarM2,radiatorM2:d.radiatorM2,batteryKWh:d.batteryKWh,...installGeometry});
- if(family.id==='protected-core'){
-  const solarRootCollector=protectedSolarCollectorAllocation({wingLengthM,contactCount:2*energySystem.electrical.mppt.jointCircuitsPerWing});
+ let energySystem=deriveEnergySystem({input:d,trays,chips,cmg,acceleratorKw,installedElectronicsKw,storageKw,solarM2:d.solarM2,radiatorM2:d.radiatorM2,batteryKWh:d.batteryKWh,...installGeometry});
+ if(family.id==='protected-core'||family.id==='starmind-cross'){
+  let solarRootCollector=protectedSolarCollectorAllocation({wingLengthM,contactCount:2*energySystem.electrical.mppt.jointCircuitsPerWing});
+  if(family.id==='starmind-cross'){
+   const original=deploymentLayout({...installGeometry}),originalStandOffM=original.rootX-bodyWidthM/2,spanM=bodyWidthM+2*(originalStandOffM+wingLengthM),contactCount=solarRootCollector.contactCount;
+   // Retain the source span and installed photovoltaic area while making a
+   // real cassette bay. The slightly shorter/wider blanket is an explicit
+   // project packaging allocation, not a new manufacturer dimension.
+   for(let i=0;i<24;i++){wingLengthM=(spanM-bodyWidthM)/2-solarRootCollector.rootStandOffM;solarRootCollector=protectedSolarCollectorAllocation({wingLengthM,contactCount});}
+   wingWidthM=d.solarM2/(family.solarWingCount*wingLengthM);
+   for(const target of[geometryDefinition,installGeometry])Object.assign(target,{wingLengthM,wingWidthM,solarRootOffsetM:solarRootCollector.rootStandOffM});
+   Object.assign(solarRootCollector,{revision:'starmind-solar-collector-bay-r1',originalStandOffM,supportExtensionM:solarRootCollector.rootStandOffM-originalStandOffM,originalSupportRodRadiusM:Math.min(.17,Math.min(bodyWidthM,bodyHeightM)*.052)*.28,originalSolarSupports:original.mounts.filter(m=>m.kind==='solar').map(m=>m.supports.map(s=>({role:s.role,foot:[...s.foot],seat:[...s.seat]})))});
+   geometryDefinition.architectureDefinition.allocations.push('The complete inboard electrical cassettes occupy explicit supported root bays. Blanket length and width preserve the installed photovoltaic area and stated deployed span; the original body hardpoints and support rod vectors are retained.');
+   energySystem=deriveEnergySystem({input:d,trays,chips,cmg,acceleratorKw,installedElectronicsKw,storageKw,solarM2:d.solarM2,radiatorM2:d.radiatorM2,batteryKWh:d.batteryKWh,...installGeometry});
+  }
   geometryDefinition.solarRootCollector=installGeometry.solarRootCollector=solarRootCollector;
   solarRootCollector.hardwareSchedule=protectedSolarCollectorHardware(installGeometry,deploymentLayout(installGeometry));
  }
- const collectorParts=cableInstallationHardware(installGeometry.solarRootCollector?.hardwareSchedule||[]),collectorHardware=collectorParts.length?{parts:collectorParts,totalMassKg:collectorParts.reduce((sum,part)=>sum+part.massKg,0),materialMassKg:collectorParts.reduce((sum,part)=>sum+part.materialMassKg,0),allocatedInternalMassKg:0,basis:'Four separately owned solar electrical cassettes and only the added root/lock support length, from the shared material schedule. Each part enters mass, center of gravity and inertia once.'}:null;
+ const collectorParts=cableInstallationHardware(installGeometry.solarRootCollector?.hardwareSchedule||[]),collectorHardware=collectorParts.length?{parts:collectorParts,totalMassKg:collectorParts.reduce((sum,part)=>sum+part.massKg,0),materialMassKg:collectorParts.reduce((sum,part)=>sum+part.materialMassKg,0),allocatedInternalMassKg:0,basis:(family.id==='starmind-cross'?'Two':'Four')+' separately owned solar electrical cassettes and only the added root/lock support length, from the shared material schedule. Each part enters mass, center of gravity and inertia once.'}:null;
  // Propulsion aligns the installed tanks and engine mounts before the final
  // hardware object exists. It needs the same material stations as the final
  // mass model; ledger rows alone do not enumerate installation components.
@@ -236,10 +248,10 @@ export function sizeDesign(input={}){
  hardware.physicalArchitecture=resolveArchitecture(hardware);
  hardware.assemblyChecks=architectureAssemblyChecks(hardware);
  hardware.serviceArchitecture=serviceArchitecture(hardware);
- // Redwire carries the current unscaled cable/termination estimate in every
+ // Redwire and Starmind carry the unscaled cable/termination estimate in every
  // sizing path. A matching native takeoff refines it before simulation/export;
  // scene construction can later replace model cuts with actual installed cuts.
- if(family.id==='redwire-platform')buildElectricalArchitecture(hardware);
+ if(family.id==='redwire-platform'||family.id==='starmind-cross')buildElectricalArchitecture(hardware);
  hardware.architecture=deriveArchitectureTrade(hardware);
  hardware.applicability=architectureApplicability(hardware);
  return hardware;

@@ -1,5 +1,5 @@
 import * as T from './vendor/three.module.js';
-import {reconcileInstalledElectricalRouting,electricalBoxMoves} from './electrical-architecture.js';
+import {reconcileInstalledElectricalRouting,electricalBoxMoves,installedLinePlanningAssessment} from './electrical-architecture.js';
 import {anchorInFrame,normalInFrame} from './connection-geometry.js';
 import {obstacleFromMesh,routeFromTube,auditRoutes,routeClearance,routingMatrix} from './routing-audit.js';
 import {planElectricalRoute,fixedLengthFlex} from './electrical-routing.js';
@@ -16,6 +16,9 @@ import {inspectFixedCollectorHardware,inspectInstalledEquipmentHardware} from '.
 import {allocatePcduPayloadComb,inspectPcduPayloadComb} from './pcdu-routing-comb.js';
 import {prepareAcceptedJuneRackPowerTrays} from './rack-power-trays.js';
 import {createRedwireHarnessInstallation,redwirePanelRouteControls,redwirePanelLane} from './redwire-harness-installation.js';
+import {createStarmindHarnessInstallation} from './starmind-harness-installation.js';
+import {allocateStarmindPayloadDeparture} from './starmind-harness-routing.js';
+import {allocateStarmindPayloadRoutes} from './starmind-payload-routing.js';
 const V=p=>new T.Vector3(...(p||[0,0,0]));
 const inherited=(o,key)=>{for(let p=o;p;p=p.parent)if(p.userData?.[key]!=null)return p.userData[key];};
 export const electricalRoutingDiagnostics={onBeforeRoute:null,onRoute:null,onServiceRoute:null,onBeforeService:null,onPlanningContext:null,onTrayInstallation:null};
@@ -31,6 +34,122 @@ export function starmindCollectorStaticHint(h,layout,line,a,b,na,nb,waypoints=[]
  if(h.input?.referenceCenterId!=='starmind-ai1'||layout.familyId!=='starmind-cross'||line.id!=='P-SA-1/2'||spec?.id!=='P-SA-1'||spec.fromBoxId!=='solar-root-1'||spec.toBoxId!=='pcdu'||spec.fromPortId!=='P-SA-1:from'||spec.toPortId!=='P-SA-1:to'||spec.terminationAllowanceM!==.3||line.radiusM!==.00675||line.bendRadiusM!==.135||line.r.from.matingTravel!==.045||line.r.to.matingTravel!==.045||!zero(line.r.from.plug.position)||!zero(line.r.to.plug.position)||line.fromEscape||line.toEscape||line.fromPortal||line.toPortal||waypoints.length)return null;
  if(!near(a,[-1.9782798074995969,.7766492071371994,-.18280000000000002])||!near(b,[-1.0269325992139549,-.2241873113848126,-2.4924897022735237])||!near(na,[0,0,-1])||!near(nb,[0,0,1]))return null;
  return [[...a],[a[0],a[1],-.65],[-1.70,a[1],-.65],[-1.70,a[1],-2.08],[-1.70,b[1],-2.08],[b[0],b[1],-2.08],[...b]];
+}
+
+// Separate this lower-polarity source lead from the upper lead at both ends.
+// The side/roof corridor clears the source bank; the aft return approaches the
+// PCDU below the paired cable. This is an exact-interface proposal, admitted by
+// the ordinary complete-solid, neighbor, endpoint and bend checks below.
+export function starmindRightCollectorRoofHint(h,layout,line,a,b,na,nb,waypoints=[]){
+ const spec=line.r?.spec,escape=line.toEscape;
+ const near=(p,q)=>Array.isArray(p)&&p.length===3&&p.every((x,i)=>
+  Number.isFinite(x)&&Math.abs(x-q[i])<1e-10);
+ const zero=p=>p?.x===0&&p?.y===0&&p?.z===0;
+ if(h.input?.referenceCenterId!=='starmind-ai1'||h.architectureFamilyId!=='starmind-cross'||
+  layout.familyId!=='starmind-cross'||line.id!=='P-SA-2/6'||spec?.id!=='P-SA-2'||
+  spec.fromBoxId!=='solar-root-2'||spec.toBoxId!=='pcdu'||
+  spec.fromPortId!=='P-SA-2:from'||spec.toPortId!=='P-SA-2:to'||
+  spec.terminationAllowanceM!==.3||line.radiusM!==.00675||line.bendRadiusM!==.135||
+  line.r.from.matingTravel!==.045||line.r.to.matingTravel!==.045||
+  !zero(line.r.from.plug.position)||!zero(line.r.to.plug.position)||
+  line.fromEscape||line.fromPortal||line.toPortal||waypoints.length||!escape)return null;
+ const end=escape.points?.at(-1);
+ if(!near(a,[1.7380395191257105,.7766492071371994,-.18280000000000002])||
+  !near(b,[-.4831325992139549,.5776926886151879,-2.8735997022735233])||
+  !near(na,[0,0,-1])||!near(nb,[1,0,0])||!near(escape.anchor,b)||
+  !near(escape.normal,[0,0,1])||
+  !near(end,[-.06563259921395487,.5776926886151879,-2.3497897022735232]))return null;
+ const wall=Math.max(.018,Math.min(h.bodyWidthM,h.bodyHeightM,h.bodyLengthM)*.024);
+ const outboardX=h.bodyWidthM/2-wall-.030;
+ return [[...a],[a[0],a[1],-.80],[outboardX,a[1],-.80],[outboardX,1.16,-.80],
+  [.66,1.16,-.80],[.66,1.16,-2.55],[.66,.15,-2.55],[end[0],.15,-2.55],
+  [end[0],.15,-2.20],[end[0],end[1],-2.20],[...end]];
+}
+
+// These two battery returns use separate lanes in the lower outboard aisle.
+// They descend before crossing the other battery leads, then return to the
+// PCDU aft of the first rack. Full-radius turns retain at least 45 mm of
+// straight cable at each plug. The current-scene planner must admit the hint;
+// no obstacle, neighboring route or service requirement is waived here.
+export function starmindBatteryOutboardHint(h,layout,line,a,b,na,nb,waypoints=[]){
+ const lane=line.id==='P-BAT-3/2'?{harness:'P-BAT-3',box:'battery-3',
+  from:[.1210974724705234,-.4930772921837871,3.3413061685461773],
+  to:[-.8029325992139549,-.33426731138481264,-2.4924897022735237],
+  x:-1.90,y:-.95,sourceZ:2.98,returnZ:-2.10}:
+  line.id==='P-BAT-4/0'?{harness:'P-BAT-4',box:'battery-4',
+   from:[.9230300716844785,-.4930772921837871,3.3413061685461773],
+   to:[-.7449325992139548,-.33426731138481264,-2.4924897022735237],
+   x:-1.92,y:-1.05,sourceZ:2.84,returnZ:-2.30}:null;
+ const spec=line.r?.spec,near=(p,q)=>Array.isArray(p)&&p.length===3&&
+  p.every((v,k)=>Number.isFinite(v)&&Math.abs(v-q[k])<1e-10),
+  zero=p=>p?.x===0&&p?.y===0&&p?.z===0;
+ if(!lane||h.input?.referenceCenterId!=='starmind-ai1'||
+  h.architectureFamilyId!=='starmind-cross'||layout.familyId!=='starmind-cross'||
+  spec?.id!==lane.harness||spec.groupId!=='primary'||spec.kind!=='power'||
+  spec.fromBoxId!==lane.box||spec.toBoxId!=='pcdu'||
+  spec.fromPortId!==lane.harness+':from'||spec.toPortId!==lane.harness+':to'||
+  spec.terminationAllowanceM!==.3||line.radiusM!==.00675||line.bendRadiusM!==.135||
+  line.r.from?.matingTravel!==.045||line.r.to?.matingTravel!==.045||
+  !zero(line.r.from?.plug?.position)||!zero(line.r.to?.plug?.position)||
+  line.fromEscape||line.toEscape||line.fromPortal||line.toPortal||waypoints.length||
+  !near(a,lane.from)||!near(b,lane.to)||!near(na,[0,0,-1])||!near(nb,[0,0,1]))return null;
+ return [[...a],[a[0],a[1],lane.sourceZ],[a[0],lane.y,lane.sourceZ],
+  [lane.x,lane.y,lane.sourceZ],[lane.x,lane.y,lane.returnZ],
+  [b[0],lane.y,lane.returnZ],[b[0],b[1],lane.returnZ],[...b]];
+}
+
+// The relocated service bank and three crowded worker leads use distinct
+// interior roof lanes. Early turns clear earlier source crossovers while
+// retaining at least 45 mm of straight cable at each plug. The last worker
+// descends forward of the switch cassette and coolant riser. These proposals
+// still require the current complete-scene planner's ordinary admission.
+export function starmindInteriorRouteHint(h,layout,line,a,b,na,nb,waypoints=[]){
+ const cases={
+  'P-SVC-fabric-11/0':{harness:'P-SVC-fabric-11',fromBox:'pcdu',toBox:'fabric-11',
+   group:'service',kind:'power',radius:.0032645083840347707,bend:.06529016768069541,
+   from:[-1.1845325992139548,-.08776731138481259,-2.7667897022735235],
+   to:[-1.0155,1.0167751956165842,-.9761897022735233],
+   fromNormal:[-1,0,0],toNormal:[0,0,1]},
+  'D-WORKER-16/0':{harness:'D-WORKER-16',fromBox:'fabric-1',toBox:'compute-16',
+   group:'fabric',kind:'data',radius:.0015,bend:.03,
+   from:[-.7720000000000001,1.0292751956165842,-2.5853897022735235],
+   to:[1.4394,-.0572,-1.8408987812018631],fromNormal:[0,0,1],toNormal:[1,0,0],
+   roofY:1.18,sourceZ:-2.475,targetOffsetX:.12,targetOffsetZ:0},
+  'D-WORKER-52/0':{harness:'D-WORKER-52',fromBox:'fabric-4',toBox:'compute-52',
+   group:'fabric',kind:'data',radius:.0015,bend:.03,
+   from:[.44500000000000006,.9722751956165843,-2.5853897022735235],
+   to:[-.8406000000000001,.3927999999999999,-1.040898781201863],
+   fromNormal:[0,0,1],toNormal:[1,0,0],
+   roofY:1.16,sourceZ:-2.47,targetOffsetX:.10,targetOffsetZ:0},
+  'D-WORKER-53/0':{harness:'D-WORKER-53',fromBox:'fabric-4',toBox:'compute-53',
+   group:'fabric',kind:'data',radius:.0015,bend:.03,
+   from:[.4770000000000001,.9722751956165843,-2.5853897022735235],
+   to:[-.8406000000000001,-.7321999999999999,-1.040898781201863],
+   fromNormal:[0,0,1],toNormal:[1,0,0],
+   roofY:1.17,sourceZ:-2.48,targetOffsetX:.10,targetOffsetZ:.14}
+ },lane=cases[line.id],spec=line.r?.spec;
+ const near=(p,q)=>Array.isArray(p)&&p.length===3&&
+  p.every((v,k)=>Number.isFinite(v)&&Math.abs(v-q[k])<1e-10),
+  zero=p=>p?.x===0&&p?.y===0&&p?.z===0;
+ if(!lane||h.input?.referenceCenterId!=='starmind-ai1'||
+  h.architectureFamilyId!=='starmind-cross'||layout.familyId!=='starmind-cross'||
+  !near([h.bodyWidthM,h.bodyHeightM,h.bodyLengthM],
+   [4.279662996069774,2.514653772303748,10.323177545532943])||
+  spec?.id!==lane.harness||spec.groupId!==lane.group||spec.kind!==lane.kind||
+  spec.fromBoxId!==lane.fromBox||spec.toBoxId!==lane.toBox||
+  spec.fromPortId!==lane.harness+':from'||spec.toPortId!==lane.harness+':to'||
+  spec.terminationAllowanceM!==.3||line.radiusM!==lane.radius||line.bendRadiusM!==lane.bend||
+  line.r.from?.matingTravel!==.045||line.r.to?.matingTravel!==.045||
+  !zero(line.r.from?.plug?.position)||!zero(line.r.to?.plug?.position)||
+  line.fromEscape||line.toEscape||line.fromPortal||line.toPortal||waypoints.length||
+  !near(a,lane.from)||!near(b,lane.to)||!near(na,lane.fromNormal)||
+  !near(nb,lane.toNormal))return null;
+ if(lane.group==='service')return [[...a],[-1.385,a[1],a[2]],[-1.385,a[1],-2.97],
+  [-1.385,1.18,-2.97],[b[0],1.18,-2.97],[b[0],1.18,-.75],[b[0],b[1],-.75],[...b]];
+ const x=b[0]+lane.targetOffsetX,y=lane.roofY,z=lane.sourceZ,
+  targetZ=b[2]+lane.targetOffsetZ;
+ return [[...a],[a[0],a[1],z],[a[0],y,z],[x,y,z],[x,y,targetZ],[x,b[1],targetZ],
+  ...(lane.targetOffsetZ?[[x,b[1],b[2]]]:[]),[...b]];
 }
 
 export function physicalFlightMeshes(root){
@@ -94,6 +213,8 @@ export function createInstalledElectricalRouting({factory,h,architecture,routes,
   members.forEach(({line,which},i)=>{const c=[...portal.center];if(solar){const column=solarColumns.indexOf(+Math.abs(world(line[which])[0]).toFixed(6));c[tangent]+=(column-(solarColumns.length-1)/2)*pitch;c[vertical]+=(i%2?1:-1)*.05;}else c[tangent]+=(i-(members.length-1)/2)*pitch;const reach=line.bendRadiusM*2.4+.13,n=[0,0,0];n[axis]=sign;line[which+'Portal']={bank,center:c,normal:n,inner:c.map((x,k)=>x-n[k]*reach),outer:c.map((x,k)=>x+n[k]*reach),lane:i};});
  }
  const redwireInstallation=createRedwireHarnessInstallation({factory,h,architecture,material:metal});
+ const starmindInstallation=createStarmindHarnessInstallation({factory,h,architecture,material:metal});
+ accommodationIssues.push(...(starmindInstallation?.issues||[]));
  const cardSweeps=[];for(const definition of architecture.cards.filter(c=>!c.external)){const card=cards.get(definition.itemId);if(!card)continue;const travelM=Math.max(.06,definition.dimensionsM[2]*1.4),box=new T.Box3().setFromObject(card),d=V([0,0,travelM]).transformDirection(card.parent.matrixWorld).multiplyScalar(travelM).toArray(),min=box.min.toArray().map((x,k)=>Math.min(x,x+d[k])),max=box.max.toArray().map((x,k)=>Math.max(x,x+d[k]));cardSweeps.push({id:definition.id+':extraction-sweep',type:'box',min,max,bounds:{min,max}});}
  const solarEnvelopes=createSolarTrackingEnvelopes(factory,h),allObstacles=[...obstacles(),...solarEnvelopes.obstacles,...cardSweeps];
  // Accepted coolant and propellant lines already occupy physical space.
@@ -119,9 +240,21 @@ export function createInstalledElectricalRouting({factory,h,architecture,routes,
   const control=lines.filter(l=>l.r.spec.fromBoxId==='avionics'&&l.r.spec.kind==='control'),columns=[...new Set(control.map(l=>+world(l.from)[2].toFixed(6)))].sort((a,b)=>a-b);
   for(const line of control){const a=world(line.from),column=columns.indexOf(+a[2].toFixed(6)),x=-.70+(columns.length-1-column)*.060,controls=[a,[x,a[1],a[2]],[x,a[1],h.bodyLengthM*.30],...(line.r.spec.id==='C-ka-1'?[[x,h.bodyHeightM*.26,h.bodyLengthM*.30]]:[])],shape=roundedConnectionRoute(controls,line.bendRadiusM);line.fromEscape={end:'from',anchor:a,points:shape.points,controlPoints:controls,minimumBendRadiusM:shape.minimumBendRadiusM,lengthM:shape.lengthM,normal:line.r.spec.id==='C-ka-1'?[0,1,0]:[0,0,1]};}
  }
- const payloadComb=allocatePcduPayloadComb(lines.map(line=>({id:line.id,fromBoxId:line.r.spec.fromBoxId,from:world(line.from),fromNormal:normal(line.from),radiusM:line.radiusM,bendRadiusM:line.bendRadiusM})),{rackLayout:h.rackLayout});
+ const payloadComb=allocateStarmindPayloadDeparture(h,allocatePcduPayloadComb(lines.map(line=>({id:line.id,fromBoxId:line.r.spec.fromBoxId,from:world(line.from),fromNormal:normal(line.from),radiusM:line.radiusM,bendRadiusM:line.bendRadiusM})),{rackLayout:h.rackLayout}));
  const batchServiceAllocation=layout.familyId==='protected-core'||payloadComb.active;
  for(const escape of payloadComb.escapes)lines.find(line=>line.id===escape.id).fromEscape=escape;
+ const mountedPayloadLines=layout.familyId==='starmind-cross'?lines.filter(line=>line.r.spec.fromBoxId==='pcdu'&&line.r.spec.groupId==='payload'):[];
+ const mountedPayload=allocateStarmindPayloadRoutes(h,mountedPayloadLines.map(line=>({id:line.id,
+  from:world(line.from),to:world(line.to),fromNormal:normal(line.from),toNormal:normal(line.to),
+  radiusM:line.radiusM,bendRadiusM:line.bendRadiusM})),payloadComb);
+ accommodationIssues.push(...mountedPayload.issues);
+ for(const row of mountedPayload.rows){
+  const line=lines.find(line=>line.id===row.id);
+  line.mountedPayload=true;line.mountedPayloadRoute=row;delete line.fromEscape;
+  line.serviceWithdrawalAssessment='unassessed';
+  line.servicePlanningIssues=[{reason:'mounted-service-withdrawal-unassessed',unassessed:true,
+   basis:'Release the payload harness retainers before connector withdrawal; that service sequence is not modeled in this preliminary installation.'}];
+ }
  const connectorSweeps=[];
  for(const port of ports.values())for(const [index,mate] of port.mates.entries()){
   const owner=[...lines,...(inline?.physicalLines||[])].find(line=>line.from===port.exits[index]||line.to===port.exits[index]);if(!owner)continue;
@@ -136,15 +269,33 @@ export function createInstalledElectricalRouting({factory,h,architecture,routes,
  // beyond that turn. The full curved service sweep is still independently
  // constructed and added after the route passes the ordinary clearance checks.
  function terminalApproachEnd(line,end,a,n,escape){
+  if(line.mountedPayload){
+   const points=line.mountedPayloadRoute.points,tangent=end==='from'?points[1]:points.at(-2);
+   // The real straight lead contains the declared 45 mm plug stroke. The
+   // generic 2.4R ray would enter the next tray after this mounted turn.
+   if(V(a).distanceTo(V(tangent))+1e-9>=line.r[end].matingTravel)return tangent;
+   accommodationIssues.push({code:'starmind-mounted-terminal-lead-shortfall',routeId:line.id,end});
+  }
   const lane=layout.familyId==='redwire-platform'&&redwirePanelLane(line.r.spec,architecture);
   if(lane){const point=localPoints([a],factory.payloadRack)[0];point[0]=lane.x-lane.side*line.bendRadiusM+lane.side*Math.max(line.r.from.matingTravel,line.r.to.matingTravel);return transformed([point],factory.payloadRack)[0];}
   return escape&&layout.familyId!=='redwire-platform'?escape.points[1]:a.map((x,i)=>x+n[i]*(line.bendRadiusM*2.4+.015));
  }
  const terminalVolumes=[...connectorSweeps,...lines.flatMap(line=>['from','to'].flatMap(end=>{const a=world(line[end]),n=normal(line[end]),escape=line[end+'Escape'],b=terminalApproachEnd(line,end,a,n,escape),r=line.radiusM+.002,volume=(a,b,suffix)=>({id:line.id+':'+end+':'+suffix,lineId:line.id,type:'capsule',a,b,radiusM:r,bounds:{min:[0,1,2].map(i=>Math.min(a[i],b[i])-r),max:[0,1,2].map(i=>Math.max(a[i],b[i])+r)}}),portal=line[end+'Portal'];return [volume(a,b,'approach'),...(portal&&!line[end+'Escape']?.includesPortal?[volume(portal.inner,portal.outer,'feedthrough')]:[])];}))];
  for(const line of lines)for(const escape of [line.fromEscape,line.toEscape].filter(Boolean))for(let i=1;i<escape.points.length;i++){const a=escape.points[i-1],b=escape.points[i],r=line.radiusM+.002;terminalVolumes.push({id:line.id+':'+escape.end+':fanout:'+i,lineId:line.id,type:'capsule',a,b,radiusM:r,bounds:{min:[0,1,2].map(k=>Math.min(a[k],b[k])-r),max:[0,1,2].map(k=>Math.max(a[k],b[k])+r)}});}
- for(const line of layout.familyId==='redwire-platform'?[]:lines)for(const escape of [line.fromEscape,line.toEscape].filter(Boolean)){const a=escape.points.at(-1),b=a.map((v,k)=>v+escape.normal[k]*(line.bendRadiusM*2.4+.015)),r=line.radiusM+.002;terminalVolumes.push({id:line.id+':'+escape.end+':fanout-entry',lineId:line.id,type:'capsule',a,b,radiusM:r,bounds:{min:[0,1,2].map(k=>Math.min(a[k],b[k])-r),max:[0,1,2].map(k=>Math.max(a[k],b[k])+r)}});}
+ for(const line of layout.familyId==='redwire-platform'?[]:lines)for(const escape of [line.fromEscape,line.toEscape].filter(Boolean)){const a=escape.mountedDeparture?.startM||escape.points.at(-1),b=escape.mountedDeparture?.endM||a.map((v,k)=>v+escape.normal[k]*(line.bendRadiusM*2.4+.015)),r=line.radiusM+.002;terminalVolumes.push({id:line.id+':'+escape.end+':fanout-entry',lineId:line.id,type:'capsule',a,b,radiusM:r,bounds:{min:[0,1,2].map(k=>Math.min(a[k],b[k])-r),max:[0,1,2].map(k=>Math.max(a[k],b[k])+r)}});}
+ // Reserve every actual mounted segment before fluid or unrelated electrical
+ // routing. This prevents an earlier greedy route consuming a later bay's lane.
+ for(const row of mountedPayload.rows)for(let i=1;i<row.points.length;i++){
+  const a=row.points[i-1],b=row.points[i],radiusM=row.radiusM+.002;
+  terminalVolumes.push({id:row.id+':mounted:'+i,lineId:row.id,type:'capsule',a,b,radiusM,
+   bounds:{min:a.map((v,k)=>Math.min(v,b[k])-radiusM),max:a.map((v,k)=>Math.max(v,b[k])+radiusM)}});
+ }
  if(inline)terminalVolumes.push(...inline.endpointVolumes(),...inline.connectorSweeps());
- payloadComb.installedValidation=inspectPcduPayloadComb(payloadComb,allObstacles,terminalVolumes);accommodationIssues.push(...payloadComb.installedValidation.issues);root.userData.pcduPayloadComb=payloadComb;
+ const installedPayloadComb=mountedPayload.rows.length?{...payloadComb,issues:mountedPayload.issues,
+  escapes:mountedPayload.rows.map(row=>({id:row.id,points:row.points,entryEnd:row.points.at(-1),radiusM:row.radiusM}))}:payloadComb;
+ payloadComb.installedValidation=inspectPcduPayloadComb(installedPayloadComb,allObstacles,terminalVolumes);
+ if(mountedPayload.rows.length)payloadComb.installedValidation.scope='Complete mounted payload routes against current solids and all foreign endpoint/cable reservations, before fluid replanning; service withdrawal remains unassessed.';
+ accommodationIssues.push(...payloadComb.installedValidation.issues);root.userData.pcduPayloadComb=payloadComb;
  const collectorAccommodation=inspectFixedCollectorHardware({root,architecture,actualBoxes,physicalMeshes:physicalFlightMeshes(root),lines,obstacles:allObstacles,terminalVolumes,world,normal});
  accommodationIssues.push(...collectorAccommodation.issues);root.userData.fixedCollectorAccommodation=collectorAccommodation;
  for(const row of collectorAccommodation.rows){const allocation=architecture.collectorAccommodations.find(a=>a.boxId===row.boxId);allocation.installedHardware=row;allocation.ok=allocation.ok&&row.ok;allocation.issues.push(...row.issues);}
@@ -196,7 +347,10 @@ export function createInstalledElectricalRouting({factory,h,architecture,routes,
  if(inline){planned.push(...inline.plan({obstacles:allObstacles,otherRoutes:fluidReservations,terminalVolumes}));const volumes=inline.serviceSweepVolumes||[];terminalVolumes.push(...volumes);fluidPlanningReservations.push(...volumes);servicePlanningObstacles.push(...volumes);}
  function plan(line,a,b,na,nb,waypoints=[],extra={}){
   const reserved=[...allObstacles,...terminalVolumes.filter(o=>o.lineId!==line.id)],escapes=[line.fromEscape,line.toEscape].filter(Boolean),escape=escapes.find(e=>V(a).distanceTo(V(e.anchor))<1e-6),suffix=escapes.find(e=>V(b).distanceTo(V(e.anchor))<1e-6);
-  const candidateControls=starmindCollectorStaticHint(h,layout,line,a,b,na,nb,waypoints);
+  const candidateControls=starmindCollectorStaticHint(h,layout,line,a,b,na,nb,waypoints)||
+   starmindRightCollectorRoofHint(h,layout,line,a,b,na,nb,waypoints)||
+   starmindBatteryOutboardHint(h,layout,line,a,b,na,nb,waypoints)||
+   starmindInteriorRouteHint(h,layout,line,a,b,na,nb,waypoints);
   const result=planElectricalRoute(escape?escape.points.at(-1):a,suffix?suffix.points.at(-1):b,{id:line.id,fromNormal:escape?escape.normal:na,toNormal:suffix?suffix.normal:nb,radiusM:line.radiusM,bendRadiusM:line.bendRadiusM,obstacles:reserved,otherRoutes:planned,waypoints,candidateControls,clearanceM:.002,maxAttempts:120,...extra});
   if(escape){const points=[...escape.points,...result.points.slice(1)],screen=routeClearance({id:line.id,points,radiusM:line.radiusM,clearanceM:.002},reserved,{otherRoutes:planned});result.points=points;result.controlPoints=[...escape.controlPoints,...result.controlPoints.slice(1)];result.lengthM=routeLength(points);result.minimumBendRadiusM=Math.min(result.minimumBendRadiusM,escape.minimumBendRadiusM);result.ok=result.ok&&screen.ok&&escape.minimumBendRadiusM+1e-7>=line.bendRadiusM;if(!screen.ok)result.screen=screen;}
   if(suffix){const points=[...result.points,...[...suffix.points].reverse().slice(1)],screen=routeClearance({id:line.id,points,radiusM:line.radiusM,clearanceM:.002},reserved,{otherRoutes:planned});result.points=points;result.controlPoints=[...result.controlPoints,...[...suffix.controlPoints].reverse().slice(1)];result.lengthM=routeLength(points);result.minimumBendRadiusM=Math.min(result.minimumBendRadiusM,suffix.minimumBendRadiusM);result.ok=result.ok&&screen.ok&&suffix.minimumBendRadiusM+1e-7>=line.bendRadiusM;if(!screen.ok)result.screen=screen;}
@@ -212,7 +366,14 @@ export function createInstalledElectricalRouting({factory,h,architecture,routes,
   if(line.controlledTray)continue;
   electricalRoutingDiagnostics.onBeforeRoute?.({id:line.id});
   const {r}=line,a=world(line.from),b=world(line.to),na=normal(line.from),nb=normal(line.to),movingEnd=electricalBoxMoves(boxById[r.spec.fromBoxId])?'from':electricalBoxMoves(boxById[r.spec.toBoxId])?'to':null;
-  if(layout.familyId==='redwire-platform'&&boxById[r.spec.fromBoxId]?.frame==='payload'&&boxById[r.spec.toBoxId]?.frame==='payload'){
+  if(line.mountedPayload){
+   const row=line.mountedPayloadRoute,reserved=[...allObstacles,...terminalVolumes.filter(o=>o.lineId!==line.id)],
+    screen=routeClearance(row,reserved,{otherRoutes:planned}),ends=auditRoutes([row],[],{maxIssues:8});
+   if(row.bendLimited||!screen.ok||!ends.ok)line.planningIssues=[{
+    reason:'mounted-payload-clearance-or-bend',bendLimited:row.bendLimited,screen,issues:ends.issues}];
+   line.staticPoints=row.points;line.staticControls=row.controlPoints;line.initialFrom=a;line.initialTo=b;
+   line.restLengthM=row.lengthM;line.minimumStaticBendM=row.minimumBendRadiusM;
+  }else if(layout.familyId==='redwire-platform'&&boxById[r.spec.fromBoxId]?.frame==='payload'&&boxById[r.spec.toBoxId]?.frame==='payload'){
    line.rigidFrame=factory.payloadRack;
    const local=localPoints([a,b],line.rigidFrame),controlsLocal=redwirePanelRouteControls(r.spec,architecture,local[0],local[1]);
    if(!controlsLocal)throw new Error(line.id+': missing mounted payload route allocation');
@@ -271,6 +432,11 @@ export function createInstalledElectricalRouting({factory,h,architecture,routes,
  }
  function allocateLineService(line){
   if(line.controlledTray)return;
+  if(line.mountedPayload){
+   electricalRoutingDiagnostics.onServiceRoute?.({id:line.id,passed:null,
+    assessment:line.serviceWithdrawalAssessment,issues:line.servicePlanningIssues});
+   return;
+  }
   const fail=(end,result)=>{line.servicePlanningIssues??=[];line.servicePlanningIssues.push({end,...result});};
   if(!line.movingFrame){
    const allocation=servicePlan(line,line.staticControls,line.r.from.matingTravel,line.r.to.matingTravel);
@@ -286,13 +452,14 @@ export function createInstalledElectricalRouting({factory,h,architecture,routes,
   electricalRoutingDiagnostics.onServiceRoute?.({id:line.id,passed:!line.servicePlanningIssues,issues:line.servicePlanningIssues||[]});
  }
  if(batchServiceAllocation)for(const line of lines)if(!line.planningIssues)allocateLineService(line);
- reconcileInstalledElectricalRouting(architecture,[...lines.map(line=>({id:line.id,harnessId:line.r.spec.id,lengthM:line.restLengthM,minimumBendRadiusM:line.minimumStaticBendM,planningPassed:line.controlledTray?null:!line.planningIssues&&!line.servicePlanningIssues,...(line.controlledTray?{installationBasis:'Controlled June tray allocation; current-source full-scene clearance remains unassessed',currentSourceClearanceAccepted:false}:{})})),...(inline?.reconciliationRecords()||[])]);
+ reconcileInstalledElectricalRouting(architecture,[...lines.map(line=>({id:line.id,harnessId:line.r.spec.id,lengthM:line.restLengthM,minimumBendRadiusM:line.minimumStaticBendM,...installedLinePlanningAssessment(line),...(line.controlledTray?{planningPassed:null,installationBasis:'Controlled June tray allocation; current-source full-scene clearance remains unassessed',currentSourceClearanceAccepted:false}:{})})),...(inline?.reconciliationRecords()||[])]);
  const withdrawal=(point,allocation,end)=>Math.max(0,V(point).sub(V(end==='from'?allocation.controls[0]:allocation.controls.at(-1))).dot(V(allocation[end+'Normal'])));
  function update(){
   inline?.update();updateAcceptedTrayLines();
   root.updateMatrixWorld(true);for(const line of lines){const {tube,r}=line;let points,minimum;
    if(line.controlledTray)continue;
-   if(line.rigidFrame){
+   if(line.mountedPayload){points=line.staticPoints;minimum=line.minimumStaticBendM;}
+   else if(line.rigidFrame){
     if(line.rigidService){const endpoints=localPoints([world(line.from),world(line.to)],line.rigidFrame),shape=sampleMatingReservoir(line.rigidService,{fromWithdrawalM:withdrawal(endpoints[0],line.rigidService,'from'),toWithdrawalM:withdrawal(endpoints[1],line.rigidService,'to')});points=transformed(shape.points,line.rigidFrame);minimum=shape.minimumBendRadiusM;}else{points=transformed(line.rigidPoints,line.rigidFrame);minimum=line.minimumStaticBendM;}
    }else if(line.movingFrame){const flex=flexShape(line);if(line.beforeService)line.before=sampleMatingReservoir(line.beforeService,{fromWithdrawalM:withdrawal(world(line.reverse?line.to:line.from),line.beforeService,'from')}).points;if(line.afterService){const endpoint=localPoints([world(line.reverse?line.from:line.to)],line.movingFrame)[0],after=sampleMatingReservoir(line.afterService,{toWithdrawalM:withdrawal(endpoint,line.afterService,'to')});line.afterLocal=[...line.afterPrefixLocal.slice(0,-1),...after.points];}const after=transformed(line.afterLocal,line.movingFrame);if(flex.ok===false)throw new Error(line.id+': '+flex.reason);points=[...line.before,...flex.points.slice(1),...after.slice(1)];minimum=Math.min(line.minimumStaticBendM,flex.minimumBendRadiusM);line.currentFlex=flex;line.lengthToleranceM=(flex.renderedLengthErrorM||0)+3e-5;if(line.reverse)points.reverse();}
    else {if(line.serviceAllocation){const fromWithdrawalM=withdrawal(world(line.from),line.serviceAllocation,'from'),toWithdrawalM=withdrawal(world(line.to),line.serviceAllocation,'to');if(line.lastWithdrawal?.[0]===fromWithdrawalM&&line.lastWithdrawal?.[1]===toWithdrawalM)continue;line.lastWithdrawal=[fromWithdrawalM,toWithdrawalM];const shape=sampleMatingReservoir(line.serviceAllocation,{fromWithdrawalM,toWithdrawalM});points=shape.points;minimum=shape.minimumBendRadiusM;}else{points=line.staticPoints.map(p=>[...p]);points[0]=world(line.from);points[points.length-1]=world(line.to);minimum=line.minimumStaticBendM;}}
@@ -342,5 +509,5 @@ export function createInstalledElectricalRouting({factory,h,architecture,routes,
   return route;
  }),...(inline?.snapshotRoutes({frame})||[])],obstacles:obstacles({frame})};}
  function audit(options={}){const s=snapshot();return auditRoutes(s.routes,s.obstacles,options);}
- return {update,snapshot,audit,lines:[...lines,...(inline?.physicalLines||[])],ordinaryLines:lines,inline,plans:new Map([...plans,...(inline?.plans||[])]),obstacles,banks,terminalReservations:terminalVolumes,fluidPlanningReservations,servicePlanningObstacles,accommodationIssues,collectorAccommodation,equipmentAccommodation,payloadComb,rackPowerTrays,redwireInstallation,get operationalEnvelopes(){return operationalEnvelopes;},revision:layout.familyId==='redwire-platform'?'installed-routing-redwire-mounted-rotary-r2':'installed-routing-r1'};
+ return {update,snapshot,audit,lines:[...lines,...(inline?.physicalLines||[])],ordinaryLines:lines,inline,plans:new Map([...plans,...(inline?.plans||[])]),obstacles,banks,terminalReservations:terminalVolumes,fluidPlanningReservations,servicePlanningObstacles,accommodationIssues,collectorAccommodation,equipmentAccommodation,payloadComb,rackPowerTrays,redwireInstallation,starmindInstallation,get operationalEnvelopes(){return operationalEnvelopes;},revision:layout.familyId==='redwire-platform'?'installed-routing-redwire-mounted-rotary-r2':layout.familyId==='starmind-cross'?'installed-routing-starmind-under-rack-r1':'installed-routing-r1'};
 }

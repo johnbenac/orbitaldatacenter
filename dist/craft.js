@@ -11,6 +11,7 @@ import {routingFeedthroughFactory,perforatedPanelGeometry,registerRoutingBox,con
 import {protectedFluidAllocation as F,protectedUnionOutletControls} from './protected-fluid-allocation.js';
 import {declareRotaryFluidChannel} from './fluid-interface-allocation.js';
 import {connectionTube,connectionAnchor,anchorInFrame,normalInFrame} from './connection-geometry.js';
+import {protectedSolarCollectorMaterialGeometry} from './protected-solar-collector.js';
 import {roleMaterial,tagMaterial,engineeringGraphic,boxMaterialUV,planeMaterialUV,cylinderMaterialUV,sphereMaterialUV,finalizeCraftMaterials} from './spacecraft-material-render.js';
 const v=(x,y,z)=>new T.Vector3(x,y,z);
 const solid=(c,m=.24,r=.49)=>new T.MeshStandardMaterial({color:c,metalness:m,roughness:r});
@@ -138,14 +139,16 @@ function marker(parent,x,y,z){const o=new T.Object3D();o.position.set(x,y,z);par
 function beamTo(o,a,b){const delta=b.clone().sub(a);o.position.copy(a).add(b).multiplyScalar(.5);o.scale.y=delta.length();o.visible=o.scale.y>.000001;if(o.visible)o.quaternion.setFromUnitVectors(yAxis,delta.normalize());cylinderMaterialUV(o,o.scale.x,o.scale.y);}
 // The restraint plunger bridges a hardpoint doubler and a reinforced end fitting.
 // It retracts toward the primary frame before the associated mechanism is released.
-function faceSupport(parent,support,axis,hardware){
+function faceSupport(parent,support,axis,hardware,installation=null){
  const [x,y,z]=support.foot,[ex,ey,ez]=support.seat,solar=axis==='x',lock=support.role==='restraint';
  const sx=Math.sign(ex-x),sy=Math.sign(ey-y),length=Math.hypot(ex-x,ey-y),radius=lock?.044:.067;
  const base=join(parent,x,y,z,'structure');
  const plate=box(base,0,0,0,solar?.035:radius*3,solar?radius*3:.035,radius*3.5,mechanismMat,'structure');plate.name='Hardpoint load-spreading plate';
+ const extension=installation?.piece?.lengthM||0,guideBase=extension?join(base,sx*extension,sy*extension,0,hardware):base;
+ if(extension){const tube=obj(base,protectedSolarCollectorMaterialGeometry(T,installation.piece),mechanismMat,sx*extension/2,sy*extension/2,0,hardware);tube.name=lock?'Fixed launch-lock guide extension':'Fixed solar-root pedestal extension';Object.assign(tube.userData,{physicalPartId:installation.part.itemId,electricalItemIds:[installation.part.itemId],installationHardwareId:installation.part.id,materialPieceId:installation.piece.id});}
  const guide=pin(base,sx*.04,sy*.04,0,radius*1.18,.09,mechanismMat,axis,'structure');guide.name=lock?'Captive restraint housing':'Bearing pedestal';
- const slider=join(base,0,0,0,hardware);
- const rod=pin(slider,sx*length/2,sy*length/2,0,radius*(lock?.60:1),length,lock?mechanismMat:mechanismMat,axis,hardware);rod.name=lock?'Retracting launch lock':'Face-mounted bearing';
+ const slider=join(guideBase,0,0,0,hardware),rodLength=length-extension;
+ const rod=pin(slider,sx*rodLength/2,sy*rodLength/2,0,radius*(lock?.60:1),rodLength,mechanismMat,axis,hardware);rod.name=lock?'Retracting launch lock':'Face-mounted bearing';
  rod.updateMatrix();const axisIndex=axis==='x'?0:1,position=rod.geometry.attributes.position;let extentM=0;for(let i=0;i<position.count;i++)extentM=Math.max(extentM,Math.abs(new T.Vector3().fromBufferAttribute(position,i).applyMatrix4(rod.matrix).getComponent(axisIndex)));
  slider.userData.retractAxis=axis;slider.userData.retractExtentM=extentM;
  return slider;
@@ -155,7 +158,8 @@ for(const d of kin.descriptors.filter(q=>q.type==='pv')){
  const {side,end}=d,z=kin.center+end*kin.mountZ,rx=side*kin.rootX,id='solar';
  const base=join(appendages,rx,0,z,id),table=join(base,0,0,0,id);
  const points=kin.mounts.find(m=>m.kind==='solar'&&m.end===end&&m.side===side).supports;
- const saddles=points.map(p=>faceSupport(appendages,p,'x',id)).slice(1);
+ const collector=h.solarRootCollector?.hardwareSchedule?.[wings.length];
+ const saddles=points.map((p,index)=>faceSupport(appendages,p,'x',id,collector?{part:collector,piece:collector.materialPieces.find(piece=>piece.id==='support-extension-'+index)}:null)).slice(1);
  pin(base,-side*.10,0,0,.105,.18,mechanismMat,'x',id);pin(base,0,0,0,.072,.18,mechanismMat,'x',id);
  box(table,0,0,0,.11,.08,panelW+.18,mechanismMat,id);
  const tip=join(table,0,0,0,id),reel=join(tip,0,0,0,id);

@@ -109,3 +109,32 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh pr merge --auto --rebase "${{ github.event.pull_request.number }}" --repo "${{ github.repository }}"
+
+  deploy-after-merge:
+    name: deploy after merge
+    needs: gate
+    if: >-
+      github.event_name == 'pull_request' && !github.event.pull_request.draft &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      actions: write
+      pull-requests: read
+    steps:
+      # A merge made by auto-merge does not start the push-triggered deploy, so wait for the merge
+      # here and start the deploy explicitly. A pull request that waits longer than this for an
+      # owner approval deploys through the push trigger when the owner merges it.
+      - name: Wait for the merge, then start the deploy
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for _ in $(seq 1 120); do
+            state=$(gh pr view "${{ github.event.pull_request.number }}" --repo "${{ github.repository }}" --json state --jq .state)
+            case "$state" in
+              MERGED) gh workflow run deploy.yml --repo "${{ github.repository }}" --ref main; exit 0 ;;
+              CLOSED) echo "Closed without merging."; exit 0 ;;
+            esac
+            sleep 15
+          done
+          echo "Not merged within 30 minutes; the owner's merge starts the deploy through the push trigger."

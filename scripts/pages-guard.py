@@ -47,13 +47,25 @@ def fetch(url):
         return error.code, b''
 
 
-def site_problems(url, index_sha256):
+def site_problems(url, index_sha256, exact_url=''):
+    """Verify the live site.
+
+    The exact index.html bytes are checked on the project's pages.dev address, which serves the
+    deployment untouched. The custom domain passes through Cloudflare's edge, which can add scripts
+    such as the Web Analytics beacon, so there only status codes and the canonical link are checked.
+    """
     problems = []
+    if exact_url and index_sha256:
+        status, body = fetch(exact_url + '/')
+        if status != 200:
+            problems.append(f'{exact_url}/ returned {status}')
+        elif hashlib.sha256(body).hexdigest() != index_sha256:
+            problems.append(f'{exact_url}/ is not the freshly built index.html')
     status, body = fetch(url + '/')
     if status != 200:
         problems.append(f'/ returned {status}')
-    elif index_sha256 and hashlib.sha256(body).hexdigest() != index_sha256:
-        problems.append('/ is not the freshly built index.html')
+    elif f'rel="canonical" href="{url}/"'.encode() not in body:
+        problems.append('/ is missing its canonical link')
     for path in ('/about/', '/assets.json.zip', '/robots.txt'):
         status, _ = fetch(url + path)
         if status != 200:
@@ -69,14 +81,17 @@ def main():
     verify.add_argument('--url', default='https://orbitaldatacenter.design')
     verify.add_argument('--index-sha256', default='')
     verify.add_argument('--previous-id', default='')
+    verify.add_argument('--exact-url', default='',
+                        help='Untouched deployment address for the exact hash check (default: the project pages.dev)')
     verify.add_argument('--wait', type=int, default=240, help='Seconds to allow for edge propagation')
     args = parser.parse_args()
     if args.command == 'current':
         print(json.dumps(current()))
         return 0
+    exact = args.exact_url or 'https://' + api(BASE)['subdomain']
     deadline, problems = time.time() + args.wait, ['not checked']
     while problems and time.time() < deadline:
-        problems = site_problems(args.url, args.index_sha256)
+        problems = site_problems(args.url, args.index_sha256, exact)
         if problems:
             time.sleep(15)
     if not problems:

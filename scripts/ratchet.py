@@ -23,7 +23,10 @@ SUITES = {
     'design': dict(lane='fast', cmd=['node', 'design-test.mjs'], timeout=900),
     'ai-core': dict(lane='fast', cmd=['node', 'ai-core-checks.mjs'], timeout=1800),
     'scene-interaction': dict(lane='fast', cmd=['node', 'scene-interaction-checks.mjs'], timeout=1800),
-    'deployment': dict(lane='fast', cmd=['node', 'deployment-checks.mjs'], timeout=3000),
+    # Pathfinder is the preset that once collided; it finishes in minutes. The full sweep is long.
+    'deployment': dict(lane='fast', cmd=['node', 'deployment-checks.mjs'], timeout=1800,
+                       env={'ODC_AUDIT_ONLY': 'pathfinder'}),
+    'deployment-full': dict(lane='extended', cmd=['node', 'deployment-checks.mjs'], timeout=14400),
     'engine': dict(lane='extended', cmd=['node', 'engine-checks.mjs'], timeout=5400),
     'upstream-publish': dict(lane='extended', cmd=['npm', 'run', 'check:publish'], timeout=21000),
 }
@@ -34,7 +37,7 @@ def run_suite(name, repo):
     started = time.time()
     try:
         result = subprocess.run(spec['cmd'], cwd=repo, capture_output=True, text=True,
-                                timeout=spec['timeout'])
+                                timeout=spec['timeout'], env={**os.environ, **spec.get('env', {})})
         status, tail = ('pass' if result.returncode == 0 else 'fail'), result.stdout + result.stderr
     except subprocess.TimeoutExpired as error:
         status, tail = 'timeout', str(error.stdout or '') + str(error.stderr or '')

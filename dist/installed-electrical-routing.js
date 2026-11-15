@@ -66,11 +66,11 @@ export function starmindRightCollectorRoofHint(h,layout,line,a,b,na,nb,waypoints
   [end[0],.15,-2.20],[end[0],end[1],-2.20],[...end]];
 }
 
-// These two battery returns use separate lanes in the lower outboard aisle.
-// They descend before crossing the other battery leads, then return to the
-// PCDU aft of the first rack. Full-radius turns retain at least 45 mm of
-// straight cable at each plug. The current-scene planner must admit the hint;
-// no obstacle, neighboring route or service requirement is waived here.
+// Two battery returns use separate lanes in the lower outboard aisle. The
+// other return rises before the coolant crossing and passes aft of the rack
+// longerons. Full-radius turns retain at least 45 mm of straight cable at
+// each plug. The current-scene planner must admit every hint; no obstacle,
+// neighboring route or service requirement is waived here.
 export function starmindBatteryOutboardHint(h,layout,line,a,b,na,nb,waypoints=[]){
  const lane=line.id==='P-BAT-3/2'?{harness:'P-BAT-3',box:'battery-3',
   from:[.1210974724705234,-.4930772921837871,3.3413061685461773],
@@ -79,7 +79,10 @@ export function starmindBatteryOutboardHint(h,layout,line,a,b,na,nb,waypoints=[]
   line.id==='P-BAT-4/0'?{harness:'P-BAT-4',box:'battery-4',
    from:[.9230300716844785,-.4930772921837871,3.3413061685461773],
    to:[-.7449325992139548,-.33426731138481264,-2.4924897022735237],
-   x:-1.92,y:-1.05,sourceZ:2.84,returnZ:-2.30}:null;
+   x:-1.92,y:-1.05,sourceZ:2.84,returnZ:-2.30}:
+  line.id==='P-BAT-4/3'?{harness:'P-BAT-4',box:'battery-4',forwardRise:true,
+   from:[.9770300716844785,-.4409972921837871,3.3413061685461773],
+   to:[-.6909325992139548,-.2821873113848126,-2.4924897022735237]}:null;
  const spec=line.r?.spec,near=(p,q)=>Array.isArray(p)&&p.length===3&&
   p.every((v,k)=>Number.isFinite(v)&&Math.abs(v-q[k])<1e-10),
   zero=p=>p?.x===0&&p?.y===0&&p?.z===0;
@@ -93,6 +96,11 @@ export function starmindBatteryOutboardHint(h,layout,line,a,b,na,nb,waypoints=[]
   !zero(line.r.from?.plug?.position)||!zero(line.r.to?.plug?.position)||
   line.fromEscape||line.toEscape||line.fromPortal||line.toPortal||waypoints.length||
   !near(a,lane.from)||!near(b,lane.to)||!near(na,[0,0,-1])||!near(nb,[0,0,1]))return null;
+ if(lane.forwardRise)return [[...a],[.97703007,-.44099729,2.95],
+  [.97703007,-.13499729,2.95],[.97703007,-.13499729,-2.29],
+  [-.0609326,-.13499729,-2.29],[-.0609326,-.56699729,-2.29],
+  [-.3849326,-.56699729,-2.29],[-.3849326,-.28218731,-2.29],
+  [-.6909326,-.28218731,-2.29],[...b]];
  return [[...a],[a[0],a[1],lane.sourceZ],[a[0],lane.y,lane.sourceZ],
   [lane.x,lane.y,lane.sourceZ],[lane.x,lane.y,lane.returnZ],
   [b[0],lane.y,lane.returnZ],[b[0],b[1],lane.returnZ],[...b]];

@@ -1,4 +1,4 @@
-// Bounded construction checks for two ordinary planner hints. Native scene
+// Bounded construction checks for three ordinary planner hints. Native scene
 // clearance is assessed separately against actual equipment and fluid routes.
 import assert from 'node:assert/strict';
 import {starmindBatteryOutboardHint} from './dist/installed-electrical-routing.js';
@@ -14,7 +14,10 @@ const cases=[
   to:[-.8029325992139549,-.33426731138481264,-2.4924897022735237]},
  {id:'P-BAT-4/0',harness:'P-BAT-4',box:'battery-4',
   from:[.9230300716844785,-.4930772921837871,3.3413061685461773],
-  to:[-.7449325992139548,-.33426731138481264,-2.4924897022735237]}
+  to:[-.7449325992139548,-.33426731138481264,-2.4924897022735237]},
+ {id:'P-BAT-4/3',harness:'P-BAT-4',box:'battery-4',
+  from:[.9770300716844785,-.4409972921837871,3.3413061685461773],
+  to:[-.6909325992139548,-.2821873113848126,-2.4924897022735237]}
 ];
 const makeLine=c=>({id:c.id,radiusM:.00675,bendRadiusM:.135,r:{spec:{
  id:c.harness,groupId:'primary',kind:'power',fromBoxId:c.box,toBoxId:'pcdu',
@@ -67,5 +70,5 @@ for(const c of cases){
  assert.equal(call(h,layout,changedStroke),null);
 }
 const pair=auditRoutes(routes,[],{maxIssues:5});assert(pair.ok,JSON.stringify(pair.issues));
-console.log('PASS Starmind battery aisle: two full-radius routes, 45 mm terminal straights, '+
+console.log('PASS Starmind battery aisle: three full-radius routes, 45 mm terminal straights, '+
  'pair/self clearance, ordinary obstacle rejection and exact-interface isolation.');

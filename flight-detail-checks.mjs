@@ -3,6 +3,7 @@ import * as T from './dist/vendor/three.module.js';
 import {canvas} from './render-test-canvas.mjs';
 import {sizeDesign,missionStarter} from './dist/design.js';
 import {architectureFamilies} from './dist/architecture-families.js';
+import {buildReferenceDesign} from './dist/reference-configurations.js';
 import {buildPartsCatalog} from './dist/parts-catalog.js';
 import {createPartModel} from './dist/part-model.js';
 import {buildFlightPartDetail,flightDetailRoles} from './dist/flight-part-detail.js';
@@ -34,8 +35,10 @@ assert.equal(detail.hardwareDetailSource,box);assert.equal(detail.userData.detai
 const nonphysical=new T.Mesh(new T.BoxGeometry(),material);nonphysical.userData={materialRole:'compute-chassis',physicalMaterial:false};assert.equal(buildFlightPartDetail(nonphysical),null);
 
 const rows=[],roles=new Set(),seenGeometryTypes=new Set(),input=missionStarter('text');let selected=0;
+// Inspect the complete published construction for prepared presentation families.
+const preparedReferences={'starmind-cross':'starmind-ai1','heatlift-study':'star-catcher-self-powered'};
 for(const family of Object.keys(architectureFamilies)){
- const h=sizeDesign({...input,architectureFamily:family}),snapshot=JSON.stringify(h),model=createPartModel(h,'flight'),catalog=buildPartsCatalog(h);
+ const h=sizeDesign(preparedReferences[family]?buildReferenceDesign(preparedReferences[family]):{...input,architectureFamily:family}),snapshot=JSON.stringify(h),model=createPartModel(h,'flight'),catalog=buildPartsCatalog(h);
  model.pose(catalog.byId['flight:02.01']);const samples=new Map();
  model.factory.root.traverse(o=>{if(o.isMesh){const role=o.userData.materialRole,key=role+'/'+o.geometry.type;if(flightDetailRoles.includes(role)&&!samples.has(key))samples.set(key,o);}});
  let highTotal=0,mediumTotal=0,maximumCalls=0;

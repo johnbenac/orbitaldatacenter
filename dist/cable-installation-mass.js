@@ -120,8 +120,7 @@ const opticsElementCache=new WeakMap(),installationElementCache=new WeakMap();
 // Hardware schedules are immutable between adoptions. Keep body-fixed pieces
 // in their installed frame once; an electrical takeoff revision or a replaced
 // schedule invalidates them. Articulated payload pieces still follow every pose.
-function framedElements(entries,deployment,attitude,h,movingOnly){
- const frames={};
+function framedElements(entries,deployment,attitude,h,movingOnly,frames={}){
  return entries.flatMap(entry=>{
   if(entry.fixed)return movingOnly?[]:entry.fixed;
   if(entry.motion){
@@ -150,22 +149,55 @@ export function workerOpticsMassElements(h,deployment=1,attitude=null,{movingOnl
  return framedElements(cached.entries,deployment,attitude,h,movingOnly);
 }
 
+function installationElements(h,movingOnly=false){
+ const hardware=h.cableInstallationHardware,parts=hardware?.parts||[];
+ if(!parts.length)return null;
+ const revision=h.electricalMassRevision||0;let cached=installationElementCache.get(h);
+ if(!cached||cached.hardware!==hardware||cached.parts!==parts||cached.massRevision!==revision){
+  // A motion-only request for an entirely fixed schedule must not read or
+  // transform its material geometry. Once adopted, the stored motion flag
+  // also avoids scanning thousands of fixed pieces on every control step.
+  if(movingOnly&&!parts.some(part=>part.frame==='payload'||part.pieces.some(piece=>piece.motion)))return null;
+  const records=parts.map(part=>{
+   const pieces=part.pieces.map(piece=>({...piece,id:part.id+':'+piece.id,partId:part.id,wbs:part.wbs,moving:part.frame==='payload'||!!piece.motion}));
+   const fixed=bodyElements(pieces.filter(piece=>!piece.moving)),movingPieces=pieces.filter(piece=>piece.moving),
+    entries=part.frame==='payload'?[{parts:movingPieces}]:movingPieces.map(piece=>({parts:[piece],motion:piece.motion}));
+   let fixedIndex=0,movingIndex=0;
+   const order=pieces.map(piece=>({moving:piece.moving,index:piece.moving?movingIndex++:fixedIndex++}));
+   return {entries,group:{partId:part.id,fixed,moving:[],order}};
+  });
+  const hasMoving=records.some(record=>record.entries.length),groups=new Map(records.map(record=>[record.group.partId,record.group]));
+  cached={hardware,parts,massRevision:revision,records,groups,hasMoving,
+   fixed:hasMoving?null:records.flatMap(record=>record.group.fixed)};
+  installationElementCache.set(h,cached);
+ }
+ return cached;
+}
+
+// Fixed groups retain their array identity even when another piece in the
+// installation rotates. Their mass moments can therefore be reused without
+// regrouping or reconstructing body-fixed material at every attitude pose.
+// The order map retains the original per-assembly piece ordering for callers
+// that need the complete material inventory rather than its mass moments.
+export function cableInstallationMassGroups(h,deployment=1,attitude=null){
+ const cached=installationElements(h);if(!cached)return new Map();
+ if(!cached.hasMoving)return cached.groups;
+ const frames={},groups=new Map();
+ for(const {entries,group} of cached.records)groups.set(group.partId,entries.length?
+  {...group,moving:framedElements(entries,deployment,attitude,h,false,frames)}:group);
+ return groups;
+}
+
 // Returns one mass element per actual material piece or named internal component.
 // The payload frame is the rendered payloadRack, 60 mm above its radiator datum.
 export function cableInstallationMassElements(h,deployment=1,attitude=null,{movingOnly=false}={}){
- const hardware=h.cableInstallationHardware,parts=hardware?.parts||[];
- if(!parts.length)return [];
- if(movingOnly&&!parts.some(part=>part.frame==='payload'||part.pieces.some(piece=>piece.motion)))return [];
- const revision=h.electricalMassRevision||0;let cached=installationElementCache.get(h);
- if(!cached||cached.hardware!==hardware||cached.massRevision!==revision){
-  const entries=parts.flatMap(part=>{
-   const pieces=part.pieces.map(piece=>({...piece,id:part.id+':'+piece.id,partId:part.id,wbs:part.wbs,moving:part.frame==='payload'||!!piece.motion}));
-   if(part.frame==='payload')return [{parts:pieces}];
-   if(!pieces.some(piece=>piece.motion))return [{fixed:bodyElements(pieces)}];
-   return pieces.map(piece=>piece.motion?{parts:[piece],motion:piece.motion}:{fixed:bodyElements([piece])});
-  });
-  cached={hardware,massRevision:revision,entries,fixed:entries.every(entry=>entry.fixed)?entries.flatMap(entry=>entry.fixed):null};installationElementCache.set(h,cached);
+ const cached=installationElements(h,movingOnly);if(!cached)return [];
+ if(movingOnly){
+  if(!cached.hasMoving)return [];
+  const frames={};return cached.records.flatMap(({entries})=>entries.length?
+   framedElements(entries,deployment,attitude,h,false,frames):[]);
  }
- if(cached.fixed)return movingOnly?[]:cached.fixed;
- return framedElements(cached.entries,deployment,attitude,h,movingOnly);
+ if(cached.fixed)return cached.fixed;
+ return [...cableInstallationMassGroups(h,deployment,attitude).values()].flatMap(group=>
+  !group.moving.length?group.fixed:group.order.map(slot=>(slot.moving?group.moving:group.fixed)[slot.index]));
 }

@@ -4,7 +4,7 @@
 import {componentMassProperties,equipmentAllocations,terminalMassElements,mechanismStations} from './component-stations.js';
 import {equipmentResources} from './equipment-resources.js';
 import {deploymentLayout,mechanismPose,leafPose,leafAxes} from './deployment.js';
-import {cableInstallationMassElements,workerOpticsMassElements} from './cable-installation-mass.js';
+import {cableInstallationMassElements,cableInstallationMassGroups,workerOpticsMassElements} from './cable-installation-mass.js';
 import {radiatorPanelMaterialRectangles,radiatorPanelNetArea} from './radiator-surface-area.js';
 
 export const inertiaReferences=[
@@ -165,16 +165,19 @@ function jointElements(h,rows,deploy,attitude){
   return {...intrinsicElement(station.id,mass,center,boxInertia(mass,[.16,.16,.20])),wbs:'07.04',kind:'mechanismJoint'};
  });
 }
-const installationTensorCache=new WeakMap(),opticsTensorCache=new WeakMap(),installationGroups=new WeakMap();
-function cableInstallationElements(h,deploy,attitude,movingOnly=false){
- const growth=1+(h.input.structureMargin??0);
- const source=cableInstallationMassElements(h,deploy,attitude,{movingOnly}),saved=installationTensorCache.get(source);
+const installationTensorCache=new WeakMap(),opticsTensorCache=new WeakMap(),fixedInstallationShapes=new WeakMap();
+function installationTensors(source,growth){
+ const saved=installationTensorCache.get(source);
  if(saved?.growth===growth)return saved.parts;
  const parts=source.map(part=>{
   const mass=part.massKg*growth,tensor=part.intrinsicTensorPerKg?Array.from({length:9},(_,index)=>{const i=Math.floor(index/3),j=index%3;let value=0;for(let a=0;a<3;a++)for(let b=0;b<3;b++)value+=part.axes[a][i]*part.intrinsicTensorPerKg[a*3+b]*part.axes[b][j];return mass*value;}):boxInertia(mass,part.dimensionsM,part.axes);
   return {...part,massKg:mass,intrinsicTensorKgM2:tensor,kind:'cableInstallationHardware'};
  });
  installationTensorCache.set(source,{growth,parts});return parts;
+}
+function cableInstallationElements(h,deploy,attitude,movingOnly=false){
+ return installationTensors(cableInstallationMassElements(h,deploy,attitude,{movingOnly}),
+  1+(h.input.structureMargin??0));
 }
 function opticsElements(h,deploy,attitude,movingOnly=false){
  const growth=1+(h.input.structureMargin??0);
@@ -183,10 +186,24 @@ function opticsElements(h,deploy,attitude,movingOnly=false){
  const parts=source.map(part=>({...part,massKg:part.massKg*growth,intrinsicTensorKgM2:boxInertia(part.massKg*growth,part.dimensionsM,part.axes),kind:'workerOptics'}));
  opticsTensorCache.set(source,{growth,parts});return parts;
 }
-function groupInstallation(elements){
- let grouped=installationGroups.get(elements);
- if(!grouped){grouped=new Map();for(const part of elements){if(!grouped.has(part.partId))grouped.set(part.partId,[]);grouped.get(part.partId).push(part);}installationGroups.set(elements,grouped);}
- return grouped;
+function fixedInstallationShape(source,growth){
+ let saved=fixedInstallationShapes.get(source);
+ if(saved?.growth===growth)return saved;
+ const parts=installationTensors(source,growth),massKg=parts.reduce((sum,part)=>sum+part.massKg,0),
+  moment=parts.reduce((sum,part)=>sum.map((value,axis)=>value+part.massKg*part.centroidM[axis]),[0,0,0]),
+  centroidM=massKg>0?moment.map(value=>value/massKg):[0,0,0];
+ saved={growth,massKg,centroidM,tensorKgM2:aboutPoint(parts,centroidM)};
+ fixedInstallationShapes.set(source,saved);return saved;
+}
+function installationGroupTensor(group,origin,growth){
+ if(!group)return zero();
+ // The parallel-axis theorem exactly transports the already integrated fixed
+ // material. Rotating pieces are still transformed and integrated at this pose.
+ // No piece, centroid, off-diagonal term or allocated growth is discarded.
+ const fixed=fixedInstallationShape(group.fixed,growth),tensor=[...fixed.tensorKgM2];
+ sumInto(tensor,parallelAxisTensor(fixed.massKg,difference(fixed.centroidM,origin)));
+ if(group.moving.length)sumInto(tensor,aboutPoint(installationTensors(group.moving,growth),origin));
+ return tensor;
 }
 const movingMassCache=new WeakMap();
 // Geometry-only path for mechanism angular momentum and rate derivatives.
@@ -225,14 +242,16 @@ const poseKeys=['wingPitchDeg','upperRadiatorPitchDeg','lowerRadiatorPitchDeg','
 export function componentInertia(h,{remainingKg=h.propellantKg,deployment=1,adapterAttached=false,attitude=null}={}){
  const deploy=Math.max(0,Math.min(1,deployment)),left=Math.max(0,Math.min(h.propellantKg,remainingKg));
  const key=[h.electricalMassRevision||0,left,deploy,Number(adapterAttached),...poseKeys.map(k=>attitude?.[k]??''),...(attitude?.dishBoresightBody??attitude?.dish??[]),...(attitude?.opticalBoresightBody??attitude?.optic??[])].join('/');
- let cache=recent.get(h);if(!cache){cache=new Map();recent.set(h,cache)}
+ const hardware=h.cableInstallationHardware,parts=hardware?.parts;
+ let saved=recent.get(h);if(!saved||saved.hardware!==hardware||saved.parts!==parts){saved={hardware,parts,poses:new Map()};recent.set(h,saved)}
+ const cache=saved.poses;
  if(cache.has(key))return cache.get(key);
  const properties=componentMassProperties(h,left,deploy,adapterAttached,true,attitude),{rows,cm}=properties;
- const surfaces=movingSurfaces(h,rows,deploy,attitude),payload=payloadElements(h,rows,deploy,attitude),terminals=terminalElements(h,attitude),joints=jointElements(h,rows,deploy,attitude),installation=groupInstallation(cableInstallationElements(h,deploy,attitude)),optics=opticsElements(h,deploy,attitude),tensorKgM2=zero(),contributions=[];
+ const surfaces=movingSurfaces(h,rows,deploy,attitude),payload=payloadElements(h,rows,deploy,attitude),terminals=terminalElements(h,attitude),joints=jointElements(h,rows,deploy,attitude),installation=cableInstallationMassGroups(h,deploy,attitude),optics=opticsElements(h,deploy,attitude),tensorKgM2=zero(),contributions=[];
  for(const row of rows){
   let tensor,basis;
   if(row.installationPartId){
-   tensor=aboutPoint(installation.get(row.installationPartId)||[],cm);
+   tensor=installationGroupTensor(installation.get(row.installationPartId),cm,1+(h.input.structureMargin??0));
    basis='Actual boxes and annular material pieces at their installed body/platform frames; separately named rotary internal estimates use uniform allocated envelopes. Each physical assembly enters the ledger once.';
   }else if(row.wbs==='01.05'){
    tensor=aboutPoint(optics,cm);basis='Individual LR4 module envelopes at their actual allocated box/port interfaces. Compute-side modules follow the payload platform; switch-side modules remain fixed.';

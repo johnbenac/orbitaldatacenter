@@ -1,0 +1,16 @@
+# Stable module and entry URLs must validate after a new deployment.
+# Leave image, texture and other media caching unchanged.
+/
+  Cache-Control: public, no-cache, must-revalidate
+
+/*.html
+  Cache-Control: public, no-cache, must-revalidate
+
+/*.js
+  Cache-Control: public, no-cache, must-revalidate
+
+/*.css
+  Cache-Control: public, no-cache, must-revalidate
+
+/assets.json.zip
+  Cache-Control: public, no-cache, must-revalidate

@@ -123,3 +123,21 @@ python3 scripts/check-workbench-startup.py --browsers chromium firefox
 That command requires installed Playwright browsers and checks fresh default and
 SpaceX studies at desktop and mobile sizes. It is separate from the inherited
 metadata smoke test; the latter does not establish that SpaceX has rendered.
+
+## Browser asset revalidation
+
+The Pages response policy in `dist/_headers` requires revalidation of the entry
+page, HTML documents, JavaScript modules (including workers), stylesheets and the
+downloadable asset index. These stable URLs can change between deployments, so a
+fresh deployment must not be hidden behind a still-fresh browser copy of old code.
+Image, texture and other media caching keeps its existing policy.
+
+The assembly copies `_headers` into the deployment directory. Pages consumes it
+as configuration rather than serving it as an asset, so it is deliberately absent
+from `assets.json.zip`; the site's static export must not try to download it.
+Verify the actual public `Cache-Control` responses after changing this policy,
+because a zone rule can affect browser caching. A previously cached response keeps
+its prior freshness lifetime until it is revalidated; the new policy cannot
+replace an already running module graph. An existing stale tab may need a hard
+reload to retrieve the policy and current code. If worker code remains stale,
+empty the browser cache and reload.

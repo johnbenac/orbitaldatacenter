@@ -160,6 +160,16 @@ through the developer construction tools.
 `part-construction-startup-checks.mjs` exercises both prepared references and changed-design
 rejection through the real part-model factory and viewer.
 
+The document import map pins the preview model and viewer to content-hashed filename aliases.
+Those aliases contain the exact source bytes and remain beside the original modules, preserving
+relative imports. Node checks and workers continue to use the original module paths. After editing
+either preview module, run `python3 scripts/package-part-preview-modules.py` to refresh the aliases,
+import map and export index; the command removes only obsolete generated preview aliases.
+`part-preview-delivery-checks.mjs` rejects stale source hashes, altered aliases and missing export
+entries in the fast design gate. After assembly, run it with `--dist .build/public` as well.
+The published HTML therefore identifies the preview implementation even when an older unversioned
+module is cached. This changes module delivery without changing the native installation assets.
+
 The mass inventory retains its exact native design hash and a second complete fingerprint
 with geometric numbers compared at nine decimal places (one nanometre for metre coordinates).
 This accommodates last-bit differences between browser and Node math libraries. Only the

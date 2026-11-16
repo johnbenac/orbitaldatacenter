@@ -8,6 +8,7 @@ import {buildElectricalArchitecture} from './dist/electrical-architecture.js';
 import {makeCraft} from './dist/craft.js';
 import {createStarcatcherHarnessInstallation} from './dist/starcatcher-harness-installation.js';
 import {starcatcherLoopTwoReturnAccommodation} from './dist/starcatcher-harness-routing.js';
+import {matchStarcatcherConstruction,applyStarcatcherFluidConstruction} from './dist/starcatcher-construction-cache.js';
 import {anchorInFrame,normalInFrame} from './dist/connection-geometry.js';
 import {roundedConnectionRoute} from './dist/connection-routes.js';
 import {obstacleFromMesh,routeFromTube,routeClearance,auditRoutes} from './dist/routing-audit.js';
@@ -16,6 +17,10 @@ globalThis.document={createElement:canvas};
 const h=sizeDesign(buildReferenceDesign('star-catcher-self-powered')),g=buildElectricalArchitecture(h);
 const craft=makeCraft(h,{installElectrical:false,planFluidRoutes:false});
 const installation=createStarcatcherHarnessInstallation({factory:craft,h,architecture:g});
+const construction=matchStarcatcherConstruction(h,g);
+assert(construction,'The default physical configuration matches the complete Star construction asset');
+assert(applyStarcatcherFluidConstruction(construction,craft),
+ 'The retained fluid routes match every actual fitting, frame, radius and connection');
 craft.root.updateWorldMatrix(true,true);
 const supply=craft.routingFeedthroughs.find(p=>p.id==='coolant-2-return');
 const retained=craft.routingFeedthroughs.find(p=>p.id==='coolant-2-supply');
@@ -45,7 +50,7 @@ const rows=[];
 for(const name of names){
  const c=craft.fluidConnections.find(c=>c.id===name);assert(c,name);
  const a=anchorInFrame(c.a,c.parent),b=anchorInFrame(c.b,c.parent);
- const controls=[a,...c.via(a,b),b].map(p=>p.toArray());
+ const controls=c.staticPlan?c.staticPlan.map(point=>[...point]):[a,...c.via(a,b),b].map(p=>p.toArray());
  const shape=roundedConnectionRoute(controls,c.bendRadiusM);
  assert(!shape.bendLimited,name+' retains its full bend radius');
  const route=routeFromTube(c.tube,{id:name,frame:craft.root,radiusM:c.radiusM,clearanceM:.001,

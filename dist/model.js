@@ -781,11 +781,16 @@ return {lastUnpoweredAt:b.terminalPowered?s.lastUnpoweredAt:to,antennaRateDegS:e
   context.phase='window';await focusPrepared(options.start,context);
   const span=Math.min(DAY,duration-options.start);
   await prepareWindowReads(options.start,span,145,context);
-  context.report({stage:'window',detail:'Preparing the power, thermal and data results for this window.'},true);
-  summaryCache.set(options.start,await context.drain(summarySteps(options.start)));
+  const summarize=async(iterator,detail)=>{
+   const progress=t=>({stage:'window',detail,completed:clip(t-options.start,0,span),total:span});
+   context.report(progress(options.start),true);
+   const result=await context.drain(iterator,progress);
+   context.report(progress(options.start+span),true);return result;
+  };
+  summaryCache.set(options.start,await summarize(summarySteps(options.start),'Summarizing power and stored energy.'));
   events(options.start,span);
-  serviceCache.set(options.start+'|'+span+'|false',await context.drain(serviceSteps(options.start,span)));
-  thermalCache.set(options.start+'|'+span,await context.drain(thermalSteps(options.start,span)));
+  serviceCache.set(options.start+'|'+span+'|false',await summarize(serviceSteps(options.start,span),'Summarizing accepted payload transfers.'));
+  thermalCache.set(options.start+'|'+span,await summarize(thermalSteps(options.start,span),'Evaluating thermal interval results.'));
   if(options.scope==='now'){
    const start=clip(Math.floor(options.instant/1800)*1800-900,0,Math.max(0,duration-3600)),end=Math.min(duration,start+3600);
    await prepareWindowReads(start,end-start,91,context);

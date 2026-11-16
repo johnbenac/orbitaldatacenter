@@ -653,6 +653,11 @@ export function installedElectricalLayoutKey(graph){
  });
 }
 export function installedLinePlanningAssessment(line){
+ if(line.constructionOnly)return {planningPassed:line.planningIssues?.length?false:null,
+  serviceWithdrawalAssessment:'unassessed',installationBasis:'Displayed construction; current-scene clearance and service qualification are not implied.'};
+ if(line.serviceWithdrawalAssessment==='unassessed'&&!line.mountedPayload)return {
+  planningPassed:line.planningIssues?.length?false:null,serviceWithdrawalAssessment:'unassessed',
+  installationBasis:'Static route construction; connector withdrawal has not been assessed.'};
  if(!line.mountedPayload)return {planningPassed:!line.planningIssues&&!line.servicePlanningIssues};
  const failed=!!line.planningIssues?.length||!!line.servicePlanningIssues?.some(issue=>!issue.unassessed);
  return {planningPassed:failed?false:line.serviceWithdrawalAssessment==='unassessed'?null:true,
@@ -661,6 +666,7 @@ export function installedLinePlanningAssessment(line){
 }
 export function reconcileInstalledMassFromCraft(h,craft){
  if(!supportsInstalledHarnessMass(h)||!craft?.electrical?.routing?.lines)return false;
+ if(craft.electrical.routing.constructionOnly)return false;
  const graph=buildElectricalArchitecture(h),actual=craft.electrical.architecture;
  const key=g=>canonical(g.harnesses.map(a=>[a.id,a.quantity,a.connectorTypeId,a.wire.areaMM2,a.cableDiameterM,a.bendRadiusM]));
  if(key(graph)!==key(actual))return false;

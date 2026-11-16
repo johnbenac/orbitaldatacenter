@@ -22,10 +22,11 @@ function ownMaterial(h,role,color){const m=roleMaterial(h,role).clone();m.userDa
 // sequence is not an allocated connector service loop. Keep that distinction
 // at the physical plug control as well as in the inspection viewer.
 export function createElectricalMatingControl({hardware,architecture,cards,ports,routes,groundPortRoots,refresh,lines=[]}){
- const reason='Release the payload harness retainers before connector withdrawal; that service sequence is not modeled in this preliminary installation.';
+ const reason=lines.some(line=>line.constructionOnly)?'Connector withdrawal has not been assessed for this displayed harness construction.':
+  'Release the payload harness retainers before connector withdrawal; that service sequence is not modeled in this preliminary installation.';
  const restrictedPorts=new Set();
- if(hardware?.input?.referenceCenterId==='starmind-ai1'&&hardware.architectureFamilyId==='starmind-cross')for(const line of lines){
-  if(line.mountedPayload!==true||line.serviceWithdrawalAssessment!=='unassessed')continue;
+ for(const line of lines){
+  if((line.mountedPayload!==true&&!line.constructionOnly)||line.serviceWithdrawalAssessment!=='unassessed')continue;
   for(const id of [line.r?.spec?.fromPortId,line.r?.spec?.toPortId])if(id)restrictedPorts.add(id);
  }
  function matingTargets(itemId){
@@ -64,7 +65,7 @@ function overviewBatch(parent,sources,name,data){
  update();return {meshes:batches.map(b=>b.mesh),update};
 }
 
-export function installElectricalHarnessScene(factory,h,{planFluidRoutes=true}={}){
+export function installElectricalHarnessScene(factory,h,{planFluidRoutes=true,constructionOnly=false,constructionAsset=null,electricalPlannerLimits={},allocateElectricalService=true}={}){
  const architecture=buildElectricalArchitecture(h),family=architectureFamily(h),legacy=family.id==='protected-core'&&family.kaTerminalCount===1&&family.sPatchCount===2,root=factory.root,body=factory.internal||root;
  // Legacy internal accommodation has a non-unit Z scale. New allocations are
  // expressed in body metres, so they belong to a unit body frame, not to that
@@ -186,7 +187,7 @@ export function installElectricalHarnessScene(factory,h,{planFluidRoutes=true}={
    const points=routeElectricalHarness(from.toArray(),to.toArray(),{fromNormal:fromNormal.toArray(),toNormal:toNormal.toArray(),...r.spec.routing,bodyBoundsM:[h.bodyWidthM,h.bodyHeightM,h.bodyLengthM]});r.tubes[i].update(points);
   }
  }
- installedRouting=createInstalledElectricalRouting({factory,h,architecture,routes,ports,cards,actualBoxes,raw,colors,metal,planFluidRoutes});updateRoutes();
+ installedRouting=createInstalledElectricalRouting({factory,h,architecture,routes,ports,cards,actualBoxes,raw,colors,metal,planFluidRoutes,constructionOnly,constructionAsset,electricalPlannerLimits,allocateElectricalService});updateRoutes();
  // Grouping by parent retains meaningful pick/menu targets without leaders.
  const sourceGroups=new Map();function register(source,key,moving){const id=key+'|'+moving;if(!sourceGroups.has(id))sourceGroups.set(id,{sources:[],moving,key});sourceGroups.get(id).sources.push(source);}
  for(const r of routes.values()){for(const tube of [...r.tubes,...(r.extraTubes||[])])register(tube.mesh,r.spec.kind+'|'+r.spec.parentWbs,r.moving);r.root.visible=false;}

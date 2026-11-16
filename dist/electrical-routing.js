@@ -9,6 +9,7 @@ const distance=(a,b)=>len(sub(a,b)),axes=[0,1,2],orders=[[0,1,2],[0,2,1],[1,0,2]
 const compact=points=>points.filter((p,i)=>!i||distance(p,points[i-1])>1e-7).filter((p,i,a)=>!i||i===a.length-1||len(sub(unit(sub(p,a[i-1])),unit(sub(a[i+1],p))))>1e-5);
 const presetPlans=new Map(routingPlanPresets.map(p=>[p.key,p.controlPoints]));
 export const routingPlanObservations=new Map();
+export const electricalRouteDiagnostics={onPlan:null};
 const bounds=o=>o.bounds||{min:o.min,max:o.max};
 const closedComponentCache=new WeakMap();
 function closedMeshComponents(triangles){
@@ -38,6 +39,7 @@ function firstSolid(points,obstacles,radiusM,id){
 function rectilinear(a,b,order){const out=[[...a]],p=[...a];for(const axis of order){p[axis]=b[axis];out.push([...p]);}return compact(out);}
 
 export function planElectricalRoute(from,to,{id='route',fromNormal=[1,0,0],toNormal=[-1,0,0],radiusM=.003,bendRadiusM=.05,obstacles=[],otherRoutes=[],waypoints=[],candidateControls=null,clearanceM=.002,maxAttempts=900,gridStepM=null,gridMarginM=null,maxGridNodes=65000}={}){
+ electricalRouteDiagnostics.onPlan?.({id});
  if(otherRoutes.length){const occupied=[],deviationM=2e-6;for(const route of otherRoutes){
   // A capsule around each simplified chord, enlarged by the complete RDP
   // deviation, contains every original rendered interval. This reduces long

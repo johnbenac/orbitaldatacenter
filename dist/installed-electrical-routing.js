@@ -3,6 +3,7 @@ import {reconcileInstalledElectricalRouting,electricalBoxMoves,installedLinePlan
 import {anchorInFrame,normalInFrame} from './connection-geometry.js';
 import {obstacleFromMesh,routeFromTube,auditRoutes,routeClearance,routingMatrix} from './routing-audit.js';
 import {planElectricalRoute,fixedLengthFlex} from './electrical-routing.js';
+import {validateStarmindConstructionLines} from './starmind-construction-cache.js';
 import {roundedConnectionRoute,routeLength} from './connection-routes.js';
 import {deploymentLayout} from './deployment.js';
 import {constantLengthHingeRoute,routingMotionFor} from './flight-fluid-routing.js';
@@ -167,7 +168,10 @@ export function physicalFlightMeshes(root){
   if(o.userData.routingNonPhysical)return;meshes.push(o);});return meshes;
 }
 
-export function createInstalledElectricalRouting({factory,h,architecture,routes,ports,cards=new Map(),actualBoxes,raw,colors,metal,planFluidRoutes=true}){
+export function createInstalledElectricalRouting({factory,h,architecture,routes,ports,cards=new Map(),actualBoxes,raw,colors,metal,planFluidRoutes=true,constructionOnly=false,constructionAsset=null,electricalPlannerLimits={},allocateElectricalService=true}){
+ for(const [key,value] of Object.entries(electricalPlannerLimits))if(!['maxAttempts','maxGridNodes'].includes(key)||!Number.isInteger(value)||value<0)throw new Error('Invalid electrical planner limit: '+key);
+ if(constructionOnly&&h.architectureFamilyId!=='starmind-cross')throw new Error('Construction view requires the Starmind family');
+ if(constructionOnly)planFluidRoutes=false;
  const root=factory.root,layout=deploymentLayout(h),lines=[],plans=new Map(),banks=new Map();
  const storageAllocation=h.propulsion?.storageAccommodation,accommodationIssues=layout.familyId==='protected-core'?!storageAllocation?[{code:'missing-protected-storage-accommodation'}]:storageAllocation.ok?[]:storageAllocation.issues.map(issue=>({...issue,scope:'Protected recorder installation'})):[];
  for(const box of architecture.boxes.filter(b=>b.frame==='solar-root'&&!b.deploymentMotion)){const allocation=architecture.collectorAccommodations?.find(a=>a.boxId===box.id);if(!allocation)accommodationIssues.push({code:'missing-fixed-collector-accommodation',boxId:box.id});else accommodationIssues.push(...allocation.issues);}
@@ -205,7 +209,10 @@ export function createInstalledElectricalRouting({factory,h,architecture,routes,
   const key=box.frame==='payload'?'payload-hinge':box.id;
   if(!banks.has(key))banks.set(key,{key,box,members:[],external:p});banks.get(key).members.push({line,which});
  }
- root.updateWorldMatrix(true,true);for(const line of lines){addEndpoint(line,'from');addEndpoint(line,'to');}
+ root.updateWorldMatrix(true,true);
+ const constructionLines=constructionOnly?validateStarmindConstructionLines(constructionAsset,lines,{world,normal}):null;
+ if(constructionOnly&&!constructionLines)throw new Error('Cached SpaceX electrical construction does not match the installed interfaces');
+ for(const line of lines){addEndpoint(line,'from');addEndpoint(line,'to');}
  for(const bank of banks.values()){
   const {box,key,members}=bank;let axis,sign,center;
   if(box.frame==='payload'){const allocation=redwireHingeFlexAllocation(layout);axis=1;sign=1;center=[-.55+(members.length-1)*.045/2,h.bodyHeightM/2,allocation.fixedClamp[2]];}
@@ -224,7 +231,17 @@ export function createInstalledElectricalRouting({factory,h,architecture,routes,
  const starmindInstallation=createStarmindHarnessInstallation({factory,h,architecture,material:metal});
  accommodationIssues.push(...(starmindInstallation?.issues||[]));
  const cardSweeps=[];for(const definition of architecture.cards.filter(c=>!c.external)){const card=cards.get(definition.itemId);if(!card)continue;const travelM=Math.max(.06,definition.dimensionsM[2]*1.4),box=new T.Box3().setFromObject(card),d=V([0,0,travelM]).transformDirection(card.parent.matrixWorld).multiplyScalar(travelM).toArray(),min=box.min.toArray().map((x,k)=>Math.min(x,x+d[k])),max=box.max.toArray().map((x,k)=>Math.max(x,x+d[k]));cardSweeps.push({id:definition.id+':extraction-sweep',type:'box',min,max,bounds:{min,max}});}
- const solarEnvelopes=createSolarTrackingEnvelopes(factory,h),allObstacles=[...obstacles(),...solarEnvelopes.obstacles,...cardSweeps];
+ // Collision meshes, motion envelopes and route search are engineering work.
+ // Construct the interactive geometry first; the inspector builds the actual
+ // obstacle snapshot on demand. Native checks keep the complete analysis path.
+ const pendingInspection=()=>({ok:null,assessed:false,rows:[],issues:[]});
+ const solarEnvelopes=constructionOnly?{...pendingInspection(),obstacles:[]}:createSolarTrackingEnvelopes(factory,h);
+ const allObstacles=constructionOnly?[]:[...obstacles(),...solarEnvelopes.obstacles,...cardSweeps];
+ if(constructionOnly){
+  operationalEnvelopes={...pendingInspection(),obstacles:[]};
+  accommodationIssues.push({code:'routing-analysis-unassessed',unassessed:true,
+   basis:'Displayed construction retains equipment, connectors, cable radii and mounted payload raceways. Full-scene clearance and connector service qualification are separate checks.'});
+ }
  // Accepted coolant and propellant lines already occupy physical space.
  // Electrical paths and their withdrawal reservoirs must reserve that space
  // from the first candidate, including the fixed fitting leads which cannot
@@ -301,13 +318,13 @@ export function createInstalledElectricalRouting({factory,h,architecture,routes,
  if(inline)terminalVolumes.push(...inline.endpointVolumes(),...inline.connectorSweeps());
  const installedPayloadComb=mountedPayload.rows.length?{...payloadComb,issues:mountedPayload.issues,
   escapes:mountedPayload.rows.map(row=>({id:row.id,points:row.points,entryEnd:row.points.at(-1),radiusM:row.radiusM}))}:payloadComb;
- payloadComb.installedValidation=inspectPcduPayloadComb(installedPayloadComb,allObstacles,terminalVolumes);
- if(mountedPayload.rows.length)payloadComb.installedValidation.scope='Complete mounted payload routes against current solids and all foreign endpoint/cable reservations, before fluid replanning; service withdrawal remains unassessed.';
+ payloadComb.installedValidation=constructionOnly?pendingInspection():inspectPcduPayloadComb(installedPayloadComb,allObstacles,terminalVolumes);
+ if(mountedPayload.rows.length)payloadComb.installedValidation.scope=constructionOnly?'Mounted construction displayed; current solids, foreign reservations and service withdrawal remain unassessed.':'Complete mounted payload routes against current solids and all foreign endpoint/cable reservations, before fluid replanning; service withdrawal remains unassessed.';
  accommodationIssues.push(...payloadComb.installedValidation.issues);root.userData.pcduPayloadComb=payloadComb;
- const collectorAccommodation=inspectFixedCollectorHardware({root,architecture,actualBoxes,physicalMeshes:physicalFlightMeshes(root),lines,obstacles:allObstacles,terminalVolumes,world,normal});
+ const collectorAccommodation=constructionOnly?pendingInspection():inspectFixedCollectorHardware({root,architecture,actualBoxes,physicalMeshes:physicalFlightMeshes(root),lines,obstacles:allObstacles,terminalVolumes,world,normal});
  accommodationIssues.push(...collectorAccommodation.issues);root.userData.fixedCollectorAccommodation=collectorAccommodation;
  for(const row of collectorAccommodation.rows){const allocation=architecture.collectorAccommodations.find(a=>a.boxId===row.boxId);allocation.installedHardware=row;allocation.ok=allocation.ok&&row.ok;allocation.issues.push(...row.issues);}
- const equipmentAccommodation=inspectInstalledEquipmentHardware({root,architecture,actualBoxes,physicalMeshes:physicalFlightMeshes(root),lines,obstacles:allObstacles,terminalVolumes,world,normal});
+ const equipmentAccommodation=constructionOnly?pendingInspection():inspectInstalledEquipmentHardware({root,architecture,actualBoxes,physicalMeshes:physicalFlightMeshes(root),lines,obstacles:allObstacles,terminalVolumes,world,normal});
  accommodationIssues.push(...equipmentAccommodation.issues);root.userData.equipmentRoutingAccommodation=equipmentAccommodation;
  for(const row of equipmentAccommodation.rows)architecture.boxById[row.boxId].routingAccommodation.installedHardware=row;
  // All real connector banks and wall glands exist before either discipline
@@ -351,7 +368,7 @@ export function createInstalledElectricalRouting({factory,h,architecture,routes,
  updateAcceptedTrayLines();root.userData.rackPowerTrayInstallation=rackPowerTrays;
  electricalRoutingDiagnostics.onTrayInstallation?.({factory,h,architecture,layout,lines,world,normal,routes,ports,actualBoxes,rackPowerTrays,controlledTrayLines,plans,planned,allObstacles,originalTerminalVolumes,terminalVolumes,servicePlanningObstacles,fluidPlanningReservations,updateAcceptedTrayLines,boundary:'Controlled tubes and service reservations installed before fluid replanning and unrelated electrical route search'});
  if(planFluidRoutes)factory.replanFluidConnections?.({reservedObstacles:fluidPlanningReservations});
- fluidReservations.push(...(factory.fluidRoutingSnapshot?.().routes||[]));planned.push(...fluidReservations);
+ if(!constructionOnly)fluidReservations.push(...(factory.fluidRoutingSnapshot?.().routes||[]));planned.push(...fluidReservations);
  if(inline){planned.push(...inline.plan({obstacles:allObstacles,otherRoutes:fluidReservations,terminalVolumes}));const volumes=inline.serviceSweepVolumes||[];terminalVolumes.push(...volumes);fluidPlanningReservations.push(...volumes);servicePlanningObstacles.push(...volumes);}
  function plan(line,a,b,na,nb,waypoints=[],extra={}){
   const reserved=[...allObstacles,...terminalVolumes.filter(o=>o.lineId!==line.id)],escapes=[line.fromEscape,line.toEscape].filter(Boolean),escape=escapes.find(e=>V(a).distanceTo(V(e.anchor))<1e-6),suffix=escapes.find(e=>V(b).distanceTo(V(e.anchor))<1e-6);
@@ -359,7 +376,7 @@ export function createInstalledElectricalRouting({factory,h,architecture,routes,
    starmindRightCollectorRoofHint(h,layout,line,a,b,na,nb,waypoints)||
    starmindBatteryOutboardHint(h,layout,line,a,b,na,nb,waypoints)||
    starmindInteriorRouteHint(h,layout,line,a,b,na,nb,waypoints);
-  const result=planElectricalRoute(escape?escape.points.at(-1):a,suffix?suffix.points.at(-1):b,{id:line.id,fromNormal:escape?escape.normal:na,toNormal:suffix?suffix.normal:nb,radiusM:line.radiusM,bendRadiusM:line.bendRadiusM,obstacles:reserved,otherRoutes:planned,waypoints,candidateControls,clearanceM:.002,maxAttempts:120,...extra});
+  const result=planElectricalRoute(escape?escape.points.at(-1):a,suffix?suffix.points.at(-1):b,{id:line.id,fromNormal:escape?escape.normal:na,toNormal:suffix?suffix.normal:nb,radiusM:line.radiusM,bendRadiusM:line.bendRadiusM,obstacles:reserved,otherRoutes:planned,waypoints,candidateControls,clearanceM:.002,maxAttempts:120,...extra,...electricalPlannerLimits});
   if(escape){const points=[...escape.points,...result.points.slice(1)],screen=routeClearance({id:line.id,points,radiusM:line.radiusM,clearanceM:.002},reserved,{otherRoutes:planned});result.points=points;result.controlPoints=[...escape.controlPoints,...result.controlPoints.slice(1)];result.lengthM=routeLength(points);result.minimumBendRadiusM=Math.min(result.minimumBendRadiusM,escape.minimumBendRadiusM);result.ok=result.ok&&screen.ok&&escape.minimumBendRadiusM+1e-7>=line.bendRadiusM;if(!screen.ok)result.screen=screen;}
   if(suffix){const points=[...result.points,...[...suffix.points].reverse().slice(1)],screen=routeClearance({id:line.id,points,radiusM:line.radiusM,clearanceM:.002},reserved,{otherRoutes:planned});result.points=points;result.controlPoints=[...result.controlPoints,...[...suffix.controlPoints].reverse().slice(1)];result.lengthM=routeLength(points);result.minimumBendRadiusM=Math.min(result.minimumBendRadiusM,suffix.minimumBendRadiusM);result.ok=result.ok&&screen.ok&&suffix.minimumBendRadiusM+1e-7>=line.bendRadiusM;if(!screen.ok)result.screen=screen;}
   if(!result.ok){line.planningIssues??=[];line.planningIssues.push({...result.screen,grid:result.gridFailure,reason:result.screen?.reason||'bend-or-clearance'});}return result;
@@ -372,9 +389,21 @@ export function createInstalledElectricalRouting({factory,h,architecture,routes,
  const occupied=planned;
  for(const line of lines){
   if(line.controlledTray)continue;
+  if(constructionOnly)line.constructionOnly=true;
+  if(constructionOnly||!allocateElectricalService)line.serviceWithdrawalAssessment='unassessed';
   electricalRoutingDiagnostics.onBeforeRoute?.({id:line.id});
   const {r}=line,a=world(line.from),b=world(line.to),na=normal(line.from),nb=normal(line.to),movingEnd=electricalBoxMoves(boxById[r.spec.fromBoxId])?'from':electricalBoxMoves(boxById[r.spec.toBoxId])?'to':null;
-  if(line.mountedPayload){
+  if(constructionOnly){
+   const record=constructionLines.get(line.id);
+   if(!!line.mountedPayload!==record.mountedPayload)throw new Error(line.id+': cached mounting allocation differs');
+   line.staticPoints=record.points.map(point=>[...point]);
+   line.staticControls=record.controls.map(point=>[...point]);
+   line.initialFrom=a;line.initialTo=b;line.restLengthM=record.lengthM;
+   line.minimumStaticBendM=record.minimumBendRadiusM;
+   line.constructionSource='compiled-native';
+   if(record.planningIssues.length)line.planningIssues=structuredClone(record.planningIssues);
+   if(record.servicePlanningIssues.length)line.servicePlanningIssues=structuredClone(record.servicePlanningIssues);
+  }else if(line.mountedPayload){
    const row=line.mountedPayloadRoute,reserved=[...allObstacles,...terminalVolumes.filter(o=>o.lineId!==line.id)],
     screen=routeClearance(row,reserved,{otherRoutes:planned}),ends=auditRoutes([row],[],{maxIssues:8});
    if(row.bendLimited||!screen.ok||!ends.ok)line.planningIssues=[{
@@ -422,8 +451,8 @@ export function createInstalledElectricalRouting({factory,h,architecture,routes,
   line.lengthToleranceM=(shape?.renderedLengthErrorM||0)+3e-5;
   if(!line.planningIssues)planned.push({id:line.id,points:occupied,radiusM:line.radiusM});
   plans.set(line.id,line);
-  electricalRoutingDiagnostics.onRoute?.({id:line.id,passed:!line.planningIssues,issues:line.planningIssues||[]});
-  if(!line.planningIssues&&!batchServiceAllocation)allocateLineService(line);
+  electricalRoutingDiagnostics.onRoute?.({id:line.id,passed:line.planningIssues?.length?false:constructionOnly?null:true,issues:line.planningIssues||[],...(constructionOnly?{assessment:'unassessed'}:{})});
+  if(!constructionOnly&&allocateElectricalService&&!line.planningIssues&&!batchServiceAllocation)allocateLineService(line);
  }
  // Allocate protected and explicitly accommodated high-density tray layouts
  // before their reservoirs
@@ -459,8 +488,10 @@ export function createInstalledElectricalRouting({factory,h,architecture,routes,
   occupied.find(r=>r.id===line.id).points=line.movingFrame?[...line.before,...flexShape(line).points.slice(1),...transformed(line.afterLocal,line.movingFrame).slice(1)]:line.staticPoints;
   electricalRoutingDiagnostics.onServiceRoute?.({id:line.id,passed:!line.servicePlanningIssues,issues:line.servicePlanningIssues||[]});
  }
- if(batchServiceAllocation)for(const line of lines)if(!line.planningIssues)allocateLineService(line);
- reconcileInstalledElectricalRouting(architecture,[...lines.map(line=>({id:line.id,harnessId:line.r.spec.id,lengthM:line.restLengthM,minimumBendRadiusM:line.minimumStaticBendM,...installedLinePlanningAssessment(line),...(line.controlledTray?{planningPassed:null,installationBasis:'Controlled June tray allocation; current-source full-scene clearance remains unassessed',currentSourceClearanceAccepted:false}:{})})),...(inline?.reconciliationRecords()||[])]);
+ if(!constructionOnly&&allocateElectricalService&&batchServiceAllocation)for(const line of lines)if(!line.planningIssues)allocateLineService(line);
+ // A display construction must not overwrite the independently accounted
+ // preliminary harness takeoff or manufacture a successful planning result.
+ if(!constructionOnly)reconcileInstalledElectricalRouting(architecture,[...lines.map(line=>({id:line.id,harnessId:line.r.spec.id,lengthM:line.restLengthM,minimumBendRadiusM:line.minimumStaticBendM,...installedLinePlanningAssessment(line),...(line.controlledTray?{planningPassed:null,installationBasis:'Controlled June tray allocation; current-source full-scene clearance remains unassessed',currentSourceClearanceAccepted:false}:{})})),...(inline?.reconciliationRecords()||[])]);
  const withdrawal=(point,allocation,end)=>Math.max(0,V(point).sub(V(end==='from'?allocation.controls[0]:allocation.controls.at(-1))).dot(V(allocation[end+'Normal'])));
  function update(){
   inline?.update();updateAcceptedTrayLines();
@@ -517,5 +548,5 @@ export function createInstalledElectricalRouting({factory,h,architecture,routes,
   return route;
  }),...(inline?.snapshotRoutes({frame})||[])],obstacles:obstacles({frame})};}
  function audit(options={}){const s=snapshot();return auditRoutes(s.routes,s.obstacles,options);}
- return {update,snapshot,audit,lines:[...lines,...(inline?.physicalLines||[])],ordinaryLines:lines,inline,plans:new Map([...plans,...(inline?.plans||[])]),obstacles,banks,terminalReservations:terminalVolumes,fluidPlanningReservations,servicePlanningObstacles,accommodationIssues,collectorAccommodation,equipmentAccommodation,payloadComb,rackPowerTrays,redwireInstallation,starmindInstallation,get operationalEnvelopes(){return operationalEnvelopes;},revision:layout.familyId==='redwire-platform'?'installed-routing-redwire-mounted-rotary-r2':layout.familyId==='starmind-cross'?'installed-routing-starmind-under-rack-r1':'installed-routing-r1'};
+ return {update,snapshot,audit,constructionOnly,lines:[...lines,...(inline?.physicalLines||[])],ordinaryLines:lines,inline,plans:new Map([...plans,...(inline?.plans||[])]),obstacles,banks,terminalReservations:terminalVolumes,fluidPlanningReservations,servicePlanningObstacles,accommodationIssues,collectorAccommodation,equipmentAccommodation,payloadComb,rackPowerTrays,redwireInstallation,starmindInstallation,get operationalEnvelopes(){return operationalEnvelopes;},revision:layout.familyId==='redwire-platform'?'installed-routing-redwire-mounted-rotary-r2':layout.familyId==='starmind-cross'?'installed-routing-starmind-under-rack-r1':'installed-routing-r1'};
 }

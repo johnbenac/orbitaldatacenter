@@ -82,6 +82,17 @@ function leafGroups(h,deploy,attitude){
 }
 const fixedCentroids=new WeakMap();
 const electricalStationLayouts=new WeakMap();
+const installationGroups=new WeakMap(),elementStations=new WeakMap();
+function groupInstallation(elements){
+ let grouped=installationGroups.get(elements);
+ if(!grouped){grouped=new Map();for(const part of elements){if(!grouped.has(part.partId))grouped.set(part.partId,[]);grouped.get(part.partId).push(part);}installationGroups.set(elements,grouped);}
+ return grouped;
+}
+function materialStations(parts,kg){
+ let saved=elementStations.get(parts);
+ if(!saved||saved.kg!==kg){const stationsM=parts.map(part=>part.centroidM),stationShares=parts.map(part=>part.massKg/kg);saved={kg,stationsM,stationShares,centroidM:mean(stationsM,stationShares),movingStationCount:parts.filter(part=>part.moving).length};elementStations.set(parts,saved);}
+ return saved;
+}
 function partsAt(h,deploy,attitude){
  const p=h.propulsion,d=h.input,w=h.bodyWidthM,b=h.bodyHeightM,l=h.bodyLengthM;
  const supplied=p.stations||{},rows=equipmentAllocations(h);
@@ -99,7 +110,7 @@ function partsAt(h,deploy,attitude){
   }
  }
  const leaves=leafGroups(h,deploy,attitude),engines=p.engines.map(e=>e.throatZ!=null?[e.x,e.y,.5*(e.throatZ+e.z)]:[e.x,.5*(e.throatY+e.y),e.z]);
- const terminals=terminalMassElements(h,attitude),installation=cableInstallationMassElements(h,deploy,attitude),optics=workerOpticsMassElements(h,deploy,attitude);
+ const terminals=terminalMassElements(h,attitude),installation=groupInstallation(cableInstallationMassElements(h,deploy,attitude)),optics=workerOpticsMassElements(h,deploy,attitude);
  const stack=h.fairing?.stack||[],bus=stack.find(v=>/insulated bus/i.test(v.part)),adapter=stack[0];
  const suppliedPoint=(wbs,id)=>supplied[wbs]||supplied[id]||[0,0,0];
  const radii=p.tanks.map(xyz);
@@ -110,11 +121,11 @@ function partsAt(h,deploy,attitude){
  };
  for(const row of rows){
   if(row.wbs==='01.05'){
-   row.stationsM=optics.map(part=>part.centroidM);row.stationShares=optics.map(part=>part.massKg/row.kg);row.centroidM=mean(row.stationsM,row.stationShares);continue;
+   const {stationsM,stationShares,centroidM}=materialStations(optics,row.kg);Object.assign(row,{stationsM,stationShares,centroidM});continue;
   }
   if(row.installationPartId){
-   const pieces=installation.filter(part=>part.partId===row.installationPartId);
-   row.stationsM=pieces.map(part=>part.centroidM);row.stationShares=pieces.map(part=>part.massKg/row.kg);row.centroidM=mean(row.stationsM,row.stationShares);row.movingStationCount=pieces.filter(part=>part.moving).length;continue;
+   const {stationsM,stationShares,centroidM,movingStationCount}=materialStations(installation.get(row.installationPartId)||[],row.kg);
+   Object.assign(row,{stationsM,stationShares,centroidM,movingStationCount});continue;
   }
   if(electrical[row.wbs]){Object.assign(row,electrical[row.wbs]);continue;}
   if(h.payloadLocation==='radiator'&&['03.02','07.03'].includes(row.wbs)){

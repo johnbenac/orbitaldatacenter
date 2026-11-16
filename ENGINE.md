@@ -166,3 +166,28 @@ The quantitative PDR exports the following matching records and views:
 The public references are comparison evidence rather than substitutes for the installed design. Their power boundaries, mission orbits, maturity and launch configurations remain distinct. The mission boundary is one complete operational spacecraft per launch with attached deployment; it receives no external compute, beamed power, external cooling or on-orbit assembly credit. Ground networks and any relay are explicitly external services.
 
 Model scope remains preliminary: the nominal annual drag budget supports circular cases within the 100–900 km source table; flexible structural/control response, detailed slosh and optical jitter are not integrated flight plants; thermal hydraulics use allocated pump curves and bounded constant properties; relay access is a scheduling sensitivity; direct optical weather availability is unassessed; and part-specific radiation, heritage, life and recovery evidence remains open. The mission model represents nominal operation and gradual degradation. Numerical regression, an applicable study envelope, or a favorable simulated service interval does not record hardware qualification or independent PDR acceptance.
+
+
+## Fixed installation inertia and startup work
+
+Body-fixed cable supports and worker optical hardware use cached transforms and
+inertia tensors. The moving-mass query excludes fixed pieces before constructing
+their tensors. Component stations reuse grouped installation pieces. These caches
+invalidate on an electrical mass revision, a replacement material schedule, or a
+replacement optical placement list; moving payload frames remain evaluated for
+the requested pose. The arithmetic and summation order are unchanged.
+
+`installation-inertia-cache-checks.mjs` checks fixed/moving classification,
+replacement and revision invalidation, and exact numerical parity across poses.
+The existing inertia suite remains applicable. Mission-window preparation reports
+its power, payload-transfer and thermal-summary work separately, so completion of
+the integration loop no longer leaves an apparently finished progress display
+while the summaries are still being calculated.
+
+Opening an early flight window no longer starts the complete mission sweep in the
+background. The prepared window is already chronological; the model continues to
+resolve early windows on demand. A projected or late seek, the existing 60-day
+playback boundary, explicit mission/PDR analysis, and disposal preparation still
+request the shared full-history job. Pausing does not cancel an analysis explicitly
+requested elsewhere. `flight-audit-demand-checks.mjs` exercises those application
+paths, pending-seek completion, deduplication, and cancellation.

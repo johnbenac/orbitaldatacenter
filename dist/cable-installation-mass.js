@@ -115,24 +115,45 @@ function installedFrame(h,frame,deployment,attitude){
  const layout=deploymentLayout(h),descriptor=layout.descriptors.find(part=>part.type==='rad'),pose=leafPose(layout,descriptor,deployment,h.input.solarTiltDeg,attitude),axes=leafAxes(pose);
  return {axes,origin:[pose.x,pose.y,pose.z].map((value,axis)=>value+.06*axes[1][axis])};
 }
-export function workerOpticsMassElements(h,deployment=1,attitude=null){
- const optics=h.serviceArchitecture?.fabric?.workerOptics;if(!optics?.massKg)return [];
- const placements=optics.placements||[{id:'lr4:pre-layout',frame:'body',positionM:[0,0,0],axes:identity,dimensionsM:optics.moduleDimensionsM,massKg:optics.massKg}];
+const opticsElementCache=new WeakMap(),installationElementCache=new WeakMap();
+// Hardware schedules are immutable between adoptions. Keep body-fixed pieces
+// in their installed frame once; an electrical takeoff revision or a replaced
+// schedule invalidates them. Articulated payload pieces still follow every pose.
+function framedElements(entries,deployment,attitude,h,movingOnly){
  const frames={};
- return placements.map(part=>{
-  const frame=frames[part.frame]??=installedFrame(h,part.frame,deployment,attitude);
-  return {...part,wbs:'01.05',centroidM:add(frame.origin,rotate(part.positionM,frame.axes)),axes:part.axes.map(axis=>rotate(axis,frame.axes)),moving:part.frame==='payload'};
+ return entries.flatMap(entry=>{
+  if(entry.fixed)return movingOnly?[]:entry.fixed;
+  const frame=frames.payload??=installedFrame(h,'payload',deployment,attitude);
+  return entry.parts.map(part=>({...part,centroidM:add(frame.origin,rotate(part.positionM,frame.axes)),axes:part.axes.map(axis=>rotate(axis,frame.axes))}));
  });
+}
+function bodyElements(parts){
+ return parts.map(part=>({...part,centroidM:add([0,0,0],rotate(part.positionM,identity)),axes:part.axes.map(axis=>rotate(axis,identity))}));
+}
+export function workerOpticsMassElements(h,deployment=1,attitude=null,{movingOnly=false}={}){
+ const optics=h.serviceArchitecture?.fabric?.workerOptics;if(!optics?.massKg)return [];
+ if(movingOnly&&!optics.placements?.some(part=>part.frame==='payload'))return [];
+ const revision=h.electricalMassRevision||0;let cached=opticsElementCache.get(h);
+ if(!cached||cached.optics!==optics||cached.placements!==optics.placements||cached.massRevision!==revision||cached.massKg!==optics.massKg){
+  const placements=optics.placements||[{id:'lr4:pre-layout',frame:'body',positionM:[0,0,0],axes:identity,dimensionsM:optics.moduleDimensionsM,massKg:optics.massKg}];
+  const entries=placements.map(part=>{const parts=[{...part,wbs:'01.05',moving:part.frame==='payload'}];return part.frame==='payload'?{parts}:{fixed:bodyElements(parts)};});
+  cached={optics,placements:optics.placements,massRevision:revision,massKg:optics.massKg,entries,fixed:entries.every(entry=>entry.fixed)?entries.flatMap(entry=>entry.fixed):null};opticsElementCache.set(h,cached);
+ }
+ if(cached.fixed)return movingOnly?[]:cached.fixed;
+ return framedElements(cached.entries,deployment,attitude,h,movingOnly);
 }
 
 // Returns one mass element per actual material piece or named internal component.
 // The payload frame is the rendered payloadRack, 60 mm above its radiator datum.
-export function cableInstallationMassElements(h,deployment=1,attitude=null){
- const parts=h.cableInstallationHardware?.parts||[];
+export function cableInstallationMassElements(h,deployment=1,attitude=null,{movingOnly=false}={}){
+ const hardware=h.cableInstallationHardware,parts=hardware?.parts||[];
  if(!parts.length)return [];
- const frames={};
- return parts.flatMap(part=>part.pieces.map(piece=>{
-  const frame=frames[part.frame]??=installedFrame(h,part.frame,deployment,attitude),centroidM=add(frame.origin,rotate(piece.positionM,frame.axes));
-  return {...piece,id:part.id+':'+piece.id,partId:part.id,wbs:part.wbs,centroidM,axes:piece.axes.map(axis=>rotate(axis,frame.axes)),moving:part.frame==='payload'};
- }));
+ if(movingOnly&&!parts.some(part=>part.frame==='payload'))return [];
+ const revision=h.electricalMassRevision||0;let cached=installationElementCache.get(h);
+ if(!cached||cached.hardware!==hardware||cached.massRevision!==revision){
+  const entries=parts.map(part=>{const pieces=part.pieces.map(piece=>({...piece,id:part.id+':'+piece.id,partId:part.id,wbs:part.wbs,moving:part.frame==='payload'}));return part.frame==='payload'?{parts:pieces}:{fixed:bodyElements(pieces)};});
+  cached={hardware,massRevision:revision,entries,fixed:entries.every(entry=>entry.fixed)?entries.flatMap(entry=>entry.fixed):null};installationElementCache.set(h,cached);
+ }
+ if(cached.fixed)return movingOnly?[]:cached.fixed;
+ return framedElements(cached.entries,deployment,attitude,h,movingOnly);
 }

@@ -83,12 +83,74 @@ export function fluidPhysicalMeshes(root){
 // Choose a nearby explicitly allocated panel station which does not intersect
 // a structural frame or installed component. Only the pierced wall layers are
 // cuttable; a primary beam is never silently treated as an aperture.
-export function locateFluidFeedthrough(root,{axis=0,sign=1,positionM,dimensionsM,ignoreRoot=null,radiusM=.045}={}){
- root.updateWorldMatrix(true,true);const ai=axisIndex(axis),[u,v]=panelAxes(ai),inside=o=>{for(let p=o;p;p=p.parent)if(p===ignoreRoot)return true;return false;},cuttable=m=>{if(!m.userData.routingPanelId&&!m.userData.routingWallId)return false;const n=new T.Vector3(0,0,1).applyQuaternion(m.getWorldQuaternion(new T.Quaternion())),p=root.worldToLocal(m.getWorldPosition(new T.Vector3()));return Math.abs(n.getComponent(ai))>.999&&Math.abs(p.getComponent(ai)-sign*dimensionsM[ai]/2)<.10;},obstacles=fluidPhysicalMeshes(root).filter(m=>!inside(m)&&!cuttable(m)).map(m=>obstacleFromMesh(m,{id:m.uuid})),offsets=[0,-.12,.12,-.24,.24,-.36,.36];
- for(const du of offsets)for(const dv of offsets){const point=[...positionM];point[u]+=du;point[v]+=dv;if(Math.abs(point[u])>dimensionsM[u]*.42||Math.abs(point[v])>dimensionsM[v]*.42)continue;const a=[...point],b=[...point];a[ai]-=sign*.14;b[ai]+=sign*.14;if(routeClearance({id:'feedthrough-accommodation',points:[a,b],radiusM},obstacles).ok)return point;}
- throw new Error('No clear fluid feedthrough station near '+positionM.join(','));
+function feedthroughMeshBounds(mesh,geometryBounds){
+ const geometry=mesh.geometry,position=geometry.attributes.position,index=geometry.index;
+ const matrix=mesh.matrixWorld.elements;
+ if(mesh.isInstancedMesh||!matrix.every(Number.isFinite)||matrix[3]||matrix[7]||matrix[11]||matrix[15]!==1)return null;
+ let local=geometryBounds.get(geometry);
+ if(!local){
+  // Re-read buffers once per geometry in this synchronous query. A persistent
+  // boundingBox can be stale after a buffer edit without needsUpdate.
+  geometry.computeBoundingBox();const box=geometry.boundingBox;
+  let valid=position.count>0&&[...box.min.toArray(),...box.max.toArray()].every(Number.isFinite);
+  if(index)for(let i=0;valid&&i<index.count;i++){const k=index.getX(i);valid=Number.isInteger(k)&&k>=0&&k<position.count;}
+  local={box:box.clone(),valid};geometryBounds.set(geometry,local);
+ }
+ if(!local.valid)return null;
+ const box=local.box.clone().applyMatrix4(mesh.matrixWorld);
+ const vertex=i=>{
+  const x=position.getX(i),y=position.getY(i),z=position.getZ(i);
+  const w=matrix[3]*x+matrix[7]*y+matrix[11]*z+matrix[15];
+  return [(matrix[0]*x+matrix[4]*y+matrix[8]*z+matrix[12])/w,
+   (matrix[1]*x+matrix[5]*y+matrix[9]*z+matrix[13])/w,
+   (matrix[2]*x+matrix[6]*y+matrix[10]*z+matrix[14])/w];
+ };
+ let hasFace=false;
+ for(let i=0,n=index?.count??position.count;i+2<n;i+=3){
+  const a=vertex(index?index.getX(i):i),b=vertex(index?index.getX(i+1):i+1),c=vertex(index?index.getX(i+2):i+2);
+  const u=b.map((x,k)=>x-a[k]),v=c.map((x,k)=>x-a[k]);
+  if(Math.hypot(u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0])>1e-10){hasFace=true;break;}
+ }
+ // The exact adapter encloses a wholly degenerate buffer in a capsule. Its
+ // radius cannot exceed the vertex-box diagonal; retain that whole enclosure.
+ if(!hasFace)box.expandByScalar(box.getSize(new T.Vector3()).length()+1e-10);
+ if(geometry.type==='CylinderGeometry'){
+  if(!geometry.parameters)return null;
+  // The exact adapter can use a continuous cylinder, which extends outside
+  // the polygonal vertex box. Include its full radial envelope as well.
+  const lo=local.box.min,hi=local.box.max,columns=[0,4,8].map(i=>new T.Vector3(matrix[i],matrix[i+1],matrix[i+2]));
+  const scales=columns.map(column=>column.length()),axis=scales[1]<1e-12?
+   new T.Vector3().crossVectors(columns[2],columns[0]).normalize():columns[1].clone().divideScalar(scales[1]);
+  const radius=Math.hypot(Math.max(Math.abs(lo.x),Math.abs(hi.x)),Math.max(Math.abs(lo.z),Math.abs(hi.z)))*scales[0];
+  const half=(hi.y-lo.y)*scales[1]/2,center=new T.Vector3(0,(lo.y+hi.y)/2,0).applyMatrix4(mesh.matrixWorld);
+  const extent=axis.toArray().map(value=>Math.abs(value)*half+Math.sqrt(Math.max(0,1-value*value))*radius);
+  box.union(new T.Box3(center.clone().sub(V(extent)),center.clone().add(V(extent))));
+ }
+ const coordinates=[...box.min.toArray(),...box.max.toArray()];
+ if(!coordinates.every(Number.isFinite))return null;
+ return box.expandByScalar(1e-7+Math.max(...coordinates.map(Math.abs))*Number.EPSILON*64);
 }
-export const fluidRoutingDiagnostics={onPlan:null,onPlanningContext:null,onBeforePlan:null};
+export function locateFluidFeedthrough(root,{axis=0,sign=1,positionM,dimensionsM,ignoreRoot=null,radiusM=.045}={}){
+ root.updateWorldMatrix(true,true);const ai=axisIndex(axis),[u,v]=panelAxes(ai),inside=o=>{for(let p=o;p;p=p.parent)if(p===ignoreRoot)return true;return false;},cuttable=m=>{if(!m.userData.routingPanelId&&!m.userData.routingWallId)return false;const n=new T.Vector3(0,0,1).applyQuaternion(m.getWorldQuaternion(new T.Quaternion())),p=root.worldToLocal(m.getWorldPosition(new T.Vector3()));return Math.abs(n.getComponent(ai))>.999&&Math.abs(p.getComponent(ai)-sign*dimensionsM[ai]/2)<.10;},offsets=[0,-.12,.12,-.24,.24,-.36,.36],stations=[],union=new T.Box3();
+ for(const du of offsets)for(const dv of offsets){const point=[...positionM];point[u]+=du;point[v]+=dv;if(Math.abs(point[u])>dimensionsM[u]*.42||Math.abs(point[v])>dimensionsM[v]*.42)continue;const a=[...point],b=[...point];a[ai]-=sign*.14;b[ai]+=sign*.14;const bounds=new T.Box3().setFromPoints([V(a),V(b)]).expandByScalar(radiusM+1e-7);stations.push({point,a,b,bounds});union.union(bounds);}
+ const meshes=fluidPhysicalMeshes(root),geometryBounds=new Map(),candidates=[];
+ for(const mesh of meshes){if(inside(mesh)||cuttable(mesh))continue;const bounds=feedthroughMeshBounds(mesh,geometryBounds);if(!bounds||bounds.intersectsBox(union))candidates.push({mesh,bounds,obstacle:null});}
+ let queriedCandidateCount=0,testedStationCount=0;
+ const counts=()=>({physicalMeshCount:meshes.length,candidateMeshCount:candidates.length,queriedCandidateCount,testedStationCount});
+ fluidRoutingDiagnostics.onFeedthroughStart?.(counts());
+ try{
+  for(const {point,a,b,bounds} of stations){
+   testedStationCount++;const obstacles=[];
+   for(const candidate of candidates)if(!candidate.bounds||candidate.bounds.intersectsBox(bounds)){
+    if(!candidate.obstacle){queriedCandidateCount++;candidate.obstacle=obstacleFromMesh(candidate.mesh,{id:candidate.mesh.uuid});}
+    obstacles.push(candidate.obstacle);
+   }
+   if(routeClearance({id:'feedthrough-accommodation',points:[a,b],radiusM},obstacles).ok)return point;
+  }
+  throw new Error('No clear fluid feedthrough station near '+positionM.join(','));
+ }finally{fluidRoutingDiagnostics.onFeedthroughEnd?.(counts());}
+}
+export const fluidRoutingDiagnostics={onPlan:null,onPlanningContext:null,onBeforePlan:null,onFeedthroughStart:null,onFeedthroughEnd:null};
 export function planStaticFluidConnections(root,connections,{maxAttempts=160,onPlan=null,otherRoutes:reservedRoutes=[],reservedObstacles=[]}={}){
  root.updateWorldMatrix(true,true);const meshes=fluidPhysicalMeshes(root),base=meshes.map(mesh=>({mesh,obstacle:obstacleFromMesh(mesh,{id:mesh.uuid})})),rows=[];
  const ancestor=(mesh,id)=>{for(let p=mesh;p;p=p.parent)if(p.uuid===id)return true;return false;},pending=connections.filter(c=>!c.restLengthM&&(c.planRouting||c.part==='propulsion'||c.name.includes('supported internal pipe')||c.name.includes('fixed union feed'))),accepted=connections.filter(c=>!pending.includes(c));

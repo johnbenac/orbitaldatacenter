@@ -40,7 +40,7 @@ export function protectedSolarCollectorAllocation({wingLengthM,contactCount}){
 // and extension material piece is counted in full; open bores add no mass.
 export function protectedSolarCollectorHardware(h,layout){
  const a=h.solarRootCollector;if(!a)return [];
- const d=protectedSolarCollectorDimensions,starmind=h.architectureFamilyId==='starmind-cross';
+ const d=protectedSolarCollectorDimensions,starmind=h.architectureFamilyId==='starmind-cross',starcatcher=h.architectureFamilyId==='heatlift-study',offsetDrive=starmind||starcatcher;
  return layout.mounts.filter(m=>m.kind==='solar').map((mount,instance)=>{
   const side=mount.side,root=starmind?mount.root:mount.supports[0].seat,x=-side*a.inboardCenterM,
    annulus=(id,role,outerRadiusM,innerRadiusM,lengthM,positionM,material,densityKgM3)=>({id,role,shape:'annulus',axis:'x',outerRadiusM,innerRadiusM,lengthM,positionM,material,densityKgM3}),
@@ -56,7 +56,7 @@ export function protectedSolarCollectorHardware(h,layout){
     {id:'brush-'+k,role:'stator',shape:'box',dimensionsM:[d.brushAxialM,d.brushRadialMaxM-d.brushRadialMinM,d.brushWidthM],positionM:[station,(d.brushRadialMaxM+d.brushRadialMinM)/2,0],material:'Carbon contact brush',densityKgM3:d.brushDensityKgM3,circuit});
   }
   let rotorCoupling=null;
-  if(starmind){
+  if(offsetDrive){
    // A straight axial shaft would pass through the wound blanket. This
    // small rotating strap leaves the carrier through the existing end-cap
    // bore, turns below the stowed roll, and joins the root crossbar underside.
@@ -72,12 +72,12 @@ export function protectedSolarCollectorHardware(h,layout){
     piece('tie',.020,dropM+.002,tieTopM-.004,tieTopM,.020),
     piece('rise',.040,.044,tieTopM,-.054,.020),
     piece('shoe',.020,.064,-.054,-.050,.040));
-   rotorCoupling={revision:'starmind-offset-rotor-drive-1',carrierContactM:point(carrierEndM,-.076),rootContactM:point(.042,-.050),
+   rotorCoupling={revision:(starcatcher?'starcatcher':'starmind')+'-offset-rotor-drive-1',carrierContactM:point(carrierEndM,-.076),rootContactM:point(.042,-.050),
     joints:[['bond','finger',point(carrierEndM-filmM,-.076)],['finger','drop',point(dropM+.002,-.076)],['drop','tie',point(dropM,tieTopM)],['tie','rise',point(.042,tieTopM)],['rise','shoe',point(.042,-.054)]],
     basis:'Six finite material pieces form a continuous rotating drive. A 0.2 mm structural adhesive film joins the dielectric carrier end face; an aluminium finger passes inside the existing case bore. The offset strap stays below the stowed blanket and its shoe meets the original crossbar underside. The shoe is allocated as a welded aluminium joint. Bond and weld qualification remain preliminary design verification, without an omitted geometric connection or uncounted shaft.'};
   }
   if(a.supportExtensionM>1e-9)for(const [index,support]of mount.supports.entries()){
-   if(starmind){
+   if(offsetDrive){
     const original=a.originalSolarSupports[instance][index],vector=original.seat.map((v,k)=>v-original.foot[k]),rodFoot=support.seat.map((v,k)=>v-vector[k]),delta=rodFoot.map((v,k)=>v-original.foot[k]),length=Math.hypot(...delta),direction=delta.map(v=>v/length),up=Math.abs(direction[1])<.9?[0,1,0]:[0,0,1],dot=up.reduce((n,v,k)=>n+v*direction[k],0),y0=up.map((v,k)=>v-dot*direction[k]),yn=Math.hypot(...y0),y=y0.map(v=>v/yn),z=[direction[1]*y[2]-direction[2]*y[1],direction[2]*y[0]-direction[0]*y[2],direction[0]*y[1]-direction[1]*y[0]],center=original.foot.map((v,k)=>v+delta[k]/2-root[k]);
     pieces.push({...annulus('support-extension-'+index,'support',.054,.030,length,center,'Aluminium',d.aluminiumDensityKgM3),axes:[direction,y,z],rodFootM:rodFoot,baseFootM:[...original.foot],rodRadiusM:a.originalSupportRodRadiusM,originalRodLengthM:Math.hypot(...vector),originalRodVectorM:vector,basis:'Fixed hollow stand extends the original body hardpoint to the shifted mechanism foot. The original root or telescoping-lock rod keeps its full vector, physical radius and length; only that original rod retracts. The stand follows the allocated wider blanket attachment station, without lengthening the retained rod.'});
     continue;
@@ -87,7 +87,8 @@ export function protectedSolarCollectorHardware(h,layout){
    pieces.push({...annulus('support-extension-'+index,'support',lock?d.lockExtensionOuterRadiusM:d.rootExtensionOuterRadiusM,lock?d.lockExtensionBoreRadiusM:d.rootExtensionBoreRadiusM,a.supportExtensionM,center,'Aluminium',d.aluminiumDensityKgM3),
     basis:'New fixed hollow extension for the '+(lock?'launch-lock guide':'root-shaft pedestal')+'. The original guide stays at the wall; the original rod shifts outward without changing length. Its archived mass allocation is unchanged. Only the rod retracts, so the added extension stays in the fixed body mass frame.'});
   }
-  return {id:(starmind?'starmind':'protected')+'-solar-collector-'+(instance+1),wbs:'07.08.'+String(instance+1).padStart(2,'0'),itemId:'flight:07.08.'+String(instance+1).padStart(2,'0'),label:'Solar root '+(instance+1)+' electrical cassette and support extension',frame:'body',positionM:[...root],wingInstance:instance,side,materialPieces:pieces,...(rotorCoupling?{rotorCoupling}:{}),sourceUrl:'./protected-solar-collector.js',basis:a.basis+' Aluminium 2700, copper 8960, polyimide 1420 and carbon-brush 1800 kg/m³ are preliminary material-density selections. The old decorative stator torus is replaced; electrical cassette material was not a separate mass row before this repair. Existing mechanism and routed-cable allocations are retained, with no duplicated connector mass.'};
+  if(starcatcher)for(const piece of pieces)if(piece.role==='rotor')piece.motion={kind:'solar-rotor',wingInstance:instance,originM:[...root]};
+  return {id:(starmind?'starmind':starcatcher?'starcatcher':'protected')+'-solar-collector-'+(instance+1),wbs:'07.08.'+String(instance+1).padStart(2,'0'),itemId:'flight:07.08.'+String(instance+1).padStart(2,'0'),label:'Solar root '+(instance+1)+' electrical cassette and support extension',frame:'body',positionM:[...root],wingInstance:instance,side,materialPieces:pieces,...(rotorCoupling?{rotorCoupling}:{}),sourceUrl:'./protected-solar-collector.js',basis:a.basis+' Aluminium 2700, copper 8960, polyimide 1420 and carbon-brush 1800 kg/m³ are preliminary material-density selections. The old decorative stator torus is replaced; electrical cassette material was not a separate mass row before this repair. Existing mechanism and routed-cable allocations are retained, with no duplicated connector mass.'};
  });
 }
 

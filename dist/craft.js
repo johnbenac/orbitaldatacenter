@@ -9,6 +9,8 @@ import {makeFamilyCraft} from './craft-family.js';
 import {installElectricalHarnessScene} from './electrical-harness-scene.js';
 import {buildElectricalArchitecture} from './electrical-architecture.js';
 import {matchStarmindConstruction,applyStarmindFluidConstruction} from './starmind-construction-cache.js';
+import {matchStarcatcherConstruction} from './starcatcher-construction-cache.js';
+import {ConstructionCacheMissError} from './scene-construction-state.js';
 import {routingFeedthroughFactory,perforatedPanelGeometry,registerRoutingBox,constantLengthHingeRoute,planStaticFluidConnections,joinedFluidRoutes,fluidPhysicalMeshes,installColdPlateCollection,flightFluidSnapshot,auditFlightFluidSnapshot,bindFluidJunctions,hollowFluidFitting,routingMotionFor} from './flight-fluid-routing.js';
 import {protectedFluidAllocation as F,protectedUnionOutletControls} from './protected-fluid-allocation.js';
 import {declareRotaryFluidChannel} from './fluid-interface-allocation.js';
@@ -46,14 +48,20 @@ function join(p,x,y,z,id){let g=new T.Group();g.position.set(x,y,z);g.userData.p
 function labelPlate(p,x,y,z,w,d,caption){const [c,g]=canvas(512,112);g.fillStyle='#e3e1d7';g.fillRect(0,0,512,112);g.fillStyle='#26343b';g.font='bold 60px monospace';g.fillText(caption,18,74);g.fillStyle='#bd6b21';g.fillRect(0,0,7,112);let m=solid('#fff');m.map=tex(c);m.userData.physicalMaterial=false;m.userData.surfaceRepresentation='Engineering realization label';return face(p,x,y,z,w,d,m,'structure');}
 export function makeCraft(h,{installElectrical=true,planFluidRoutes=true,routingMode='analysis',electricalPlannerLimits={},allocateElectricalService=true}={}){
  if(!['analysis','construction'].includes(routingMode))throw new Error('Unknown routing mode');
- const constructionAsset=installElectrical&&routingMode==='construction'&&h.architectureFamilyId==='starmind-cross'?
-  matchStarmindConstruction(h,buildElectricalArchitecture(h)):null;
+ const constructionMatch=h.architectureFamilyId==='heatlift-study'?matchStarcatcherConstruction:matchStarmindConstruction;
+ const constructionRequested=installElectrical&&routingMode==='construction'&&
+  ['starmind-cross','heatlift-study'].includes(h.architectureFamilyId);
+ const constructionAsset=constructionRequested?
+  constructionMatch(h,buildElectricalArchitecture(h)):null;
+ // A changed design must neither borrow stale cuts nor start minutes of native
+ // route search on the browser's main thread. Analysis is an explicit mode.
+ if(constructionRequested&&!constructionAsset)throw new ConstructionCacheMissError(h);
  const constructionOnly=!!constructionAsset;
  if(constructionOnly)planFluidRoutes=false;
  const planInitialFluidRoutes=planFluidRoutes&&!installElectrical;
  const finish=factory=>{
   if(!installElectrical)return factory;
-  if(constructionOnly&&!applyStarmindFluidConstruction(constructionAsset,factory))throw new Error('Cached SpaceX fluid construction does not match the installed interfaces');
+  if(constructionOnly&&!applyStarmindFluidConstruction(constructionAsset,factory))throw new Error('Cached fluid construction does not match the installed interfaces');
   const installed=installElectricalHarnessScene(factory,h,{planFluidRoutes,constructionOnly,constructionAsset,electricalPlannerLimits,allocateElectricalService});
   if(planFluidRoutes)installed.replanFluidConnections?.({otherRoutes:installed.electrical.routing.snapshot().routes,reservedObstacles:installed.electrical.routing.fluidPlanningReservations});
   return installed;

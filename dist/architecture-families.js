@@ -108,6 +108,14 @@ export function architectureTerminalStations(h){
  if(f.kaTerminalCount)out.push({id:'ka-0',kind:'ka',positionM:original?[original.ka[0],b/2,original.ka[1]]:flat?[w*.24,-b/2,0]:[w*.16,b/2,-l*.32],normalBody:flat?[0,-1,0]:[0,1,0],evidence:'Allocated RF backup installation; aperture and interface require mission verification.'});
  for(let j=0;j<f.opticalTerminalCount;j++)out.push({id:`optical-${j}`,kind:'optical',positionM:original?[original.optical[0],b/2,original.optical[1]]:flat?[-w*.26,-b/2,0]:[(j?1:-1)*w*.30,b/2,(j?1:-1)*l*.28],normalBody:flat?[0,-1,0]:[0,1,0],evidence:f.id==='starcloud-inline'?'Two terminals follow announced procurement scope; mounting locations are allocations.':'Terminal count and installation are project allocations.'});
  for(let j=0;j<f.sPatchCount;j++)out.push({id:`s-${j}`,kind:'s',positionM:legacy?[(j?1:-1)*(w/2+Math.min(.17,Math.min(w,b)*.052)*.42),b*.26,l*.3]:[(j?1:-1)*(w/2+.035),b*.18,l*.23],normalBody:[j?1:-1,0,0],evidence:'Allocated contingency TT&C patch; not attributed to supplier hardware.'});
+ // Heat-lift terminal stators belong beneath their actual roof pedestals,
+ // forward of the tank deck. Move each whole mounting station, so the
+ // rendered head, its interior interface and its mass datum stay together.
+ if(f.id==='heatlift-study'&&Number.isFinite(h.propulsion?.forwardDeckZ))for(const terminal of out){
+  if(!['ka','optical'].includes(terminal.kind))continue;
+  terminal.positionM[2]=Math.max(terminal.positionM[2],h.propulsion.forwardDeckZ+.25);
+  terminal.evidence+=' Interior terminal stator and enclosed roof transfer share this forward service-bay mount.';
+ }
  return out;
 }
 

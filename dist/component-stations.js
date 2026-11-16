@@ -3,6 +3,7 @@ import {installedCommunications} from './communications-packages.js';
 import {electricalBoxLayout} from './electrical-architecture.js';
 import {cableInstallationMassElements,workerOpticsMassElements} from './cable-installation-mass.js';
 import {radiatorPanelMaterialRectangles} from './radiator-surface-area.js';
+import {heatliftPackageAllocation} from './heatlift-service-installation.js';
 // Installed mass and body stations. Distances in m, masses in kg. Instance stations
 // for a group use equal unit masses unless its measured weight shares are supplied.
 import {deploymentLayout,leafPose,mechanismPose,terminalLayout,leafAxes} from './deployment.js';
@@ -128,6 +129,15 @@ function partsAt(h,deploy,attitude){
    Object.assign(row,{stationsM,stationShares,centroidM,movingStationCount});continue;
   }
   if(electrical[row.wbs]){Object.assign(row,electrical[row.wbs]);continue;}
+  if(row.wbs==='03.02'&&h.architectureFamilyId==='heatlift-study'){
+   const allocation=heatliftPackageAllocation(h),packageKg=allocation.assemblyMassKg,
+    original=supplied[row.wbs]||supplied.coolant||[0,0,0],
+    remaining=Array.isArray(original[0])?original:[original];
+   if(!(packageKg>0&&packageKg<=row.kg+1e-7))throw new Error('Heat-lift package mass is outside its subsystem allocation');
+   const share=packageKg/row.kg;row.stationsM=[allocation.positionM,...remaining];
+   row.stationShares=[share,...remaining.map(()=>Math.max(0,1-share)/remaining.length)];
+   row.centroidM=mean(row.stationsM,row.stationShares);row.heatLiftPackage=allocation;continue;
+  }
   if(h.payloadLocation==='radiator'&&['03.02','07.03'].includes(row.wbs)){
    const g=deploymentLayout(h),desc=g.descriptors.find(d=>d.type==='rad'),pose=leafPose(g,desc,deploy,h.input.solarTiltDeg,attitude),axes=leafAxes(pose),q=h.energySystem.thermal.passive||{};
    const localKg=Math.min(row.kg,row.wbs==='07.03'?(h.payloadShieldKg||0):(q.spreaderKg||0)+(q.heatPipeKg||0)+(q.mountKg||0));

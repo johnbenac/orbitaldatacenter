@@ -17,7 +17,8 @@ const recovered=recoverPath?JSON.parse(fs.readFileSync(recoverPath,'utf8')):null
 function sourceManifest(){
  const pending=['dist/craft.js','dist/design.js'],seen=new Set();
  while(pending.length){
-  const name=pending.pop();if(seen.has(name)||name.includes('starmind-construction-cache'))continue;
+  const name=pending.pop();if(seen.has(name)||name.includes('construction-cache')||
+   name==='dist/starcatcher-harness-takeoff.js')continue;
   const source=fs.readFileSync(path.join(root,name),'utf8');seen.add(name);
   for(const match of source.matchAll(/(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s*)["'](\.[^"']+)["']/g)){
    const next=path.posix.normalize(path.posix.join(path.posix.dirname(name),match[1]));

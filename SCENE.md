@@ -120,9 +120,56 @@ successful camera change followed by another rendered frame:
 python3 scripts/check-workbench-startup.py --browsers chromium firefox
 ```
 
-That command requires installed Playwright browsers and checks fresh default and
-SpaceX studies at desktop and mobile sizes. It is separate from the inherited
-metadata smoke test; the latter does not establish that SpaceX has rendered.
+That command requires installed Playwright browsers and checks fresh default,
+SpaceX and Star Catcher studies at desktop and mobile sizes. It is separate from the inherited
+metadata smoke test; the latter does not establish that the spacecraft has rendered.
+
+
+## Star Catcher workbench startup
+
+The `heatlift-study` family uses the same bounded construction path for the shipped
+`star-catcher-self-powered` reference. Its separate native asset contains all 537 electrical
+cuts and the corresponding planned fixed pipes. Complete physical configuration and each
+actual endpoint, normal, diameter, identity and mounting frame must match before reuse.
+Changed geometry rejects reuse. The live view shows that routing for the changed design is
+pending and offers Restore reference; it does not silently start native route searches on the
+browser's main thread. Explicit native analysis remains available to the construction compiler
+and developer checks, with its own findings.
+
+```sh
+node scripts/compile-starcatcher-construction.mjs
+node scripts/compile-starcatcher-construction.mjs --check-source
+node starcatcher-scene-startup-checks.mjs
+```
+
+Compilation writes both the losslessly packed geometry module and the small data-only
+`starcatcher-harness-takeoff.js` inventory. Sizing imports only the latter; it does not import
+the scene or decompress its geometry. The paired source/design guards prevent the physical
+construction and mass takeoff from drifting apart. The startup check rejects full electrical,
+fluid or withdrawal planning and compares the actual rendered cable/pipe buffers with the
+retained construction. Browser acceptance additionally requires an observed rendered frame
+and a responsive camera or other scene interaction.
+
+The mass inventory retains its exact native design hash and a second complete fingerprint
+with geometric numbers compared at nine decimal places (one nanometre for metre coordinates).
+This accommodates last-bit differences between browser and Node math libraries. Only the
+comparison fingerprint is rounded; stored geometry and measured cuts retain full precision.
+Inputs, inventory, interface IDs, conductor sizes, cable diameters and bend radii remain exact;
+a changed design cannot borrow the default cuts. The source check verifies both identities
+and every record against the compiled geometry.
+
+Diagnostic `--context-only --context /absolute/path/outside-the-repository.json.gz` stops after
+constructing native physical interfaces and initial fluid planning. The optional
+`--unplanned-fluid-context` is explicitly diagnostic and cannot write a runtime asset.
+Working contexts, checkpoints, logs and other evidence stay outside the repository.
+
+The supplementary support table is also losslessly packed. Its exported
+`starcatcherSupplementalInstallationData` object retains the complete physical configuration,
+unrounded corridor coordinates, real attachment points and guarded payload corrections.
+Importing `dist/starcatcher-supplemental-installation-data.js` returns that full JSON object for
+inspection. Sizing compares its physical guard and constructs the declared material; it does
+not rerun the support-placement search. The same material builder supplies rendering, mass,
+CG, inertia and the MEL.
 
 ## Browser asset revalidation
 

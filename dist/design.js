@@ -207,7 +207,7 @@ export function sizeDesign(input={}){
  const radiatorNetM2=geometryDefinition.radiatorNetM2??d.radiatorM2;
  const installGeometry={...geometryDefinition,input:d,solarM2:d.solarM2,radiatorM2:radiatorNetM2};
  let energySystem=deriveEnergySystem({input:d,trays,chips,cmg,acceleratorKw,installedElectronicsKw,storageKw,solarM2:d.solarM2,radiatorM2:d.radiatorM2,batteryKWh:d.batteryKWh,...installGeometry});
- if(family.id==='protected-core'||family.id==='starmind-cross'){
+ if(['protected-core','starmind-cross','heatlift-study'].includes(family.id)){
   let solarRootCollector=protectedSolarCollectorAllocation({wingLengthM,contactCount:2*energySystem.electrical.mppt.jointCircuitsPerWing});
   if(family.id==='starmind-cross'){
    const original=deploymentLayout({...installGeometry}),originalStandOffM=original.rootX-bodyWidthM/2,spanM=bodyWidthM+2*(originalStandOffM+wingLengthM),contactCount=solarRootCollector.contactCount;
@@ -220,6 +220,11 @@ export function sizeDesign(input={}){
    Object.assign(solarRootCollector,{revision:'starmind-solar-collector-bay-r1',originalStandOffM,supportExtensionM:solarRootCollector.rootStandOffM-originalStandOffM,originalSupportRodRadiusM:Math.min(.17,Math.min(bodyWidthM,bodyHeightM)*.052)*.28,originalSolarSupports:original.mounts.filter(m=>m.kind==='solar').map(m=>m.supports.map(s=>({role:s.role,foot:[...s.foot],seat:[...s.seat]})))});
    geometryDefinition.architectureDefinition.allocations.push('The complete inboard electrical cassettes occupy explicit supported root bays. Blanket length and width preserve the installed photovoltaic area and stated deployed span; the original body hardpoints and support rod vectors are retained.');
    energySystem=deriveEnergySystem({input:d,trays,chips,cmg,acceleratorKw,installedElectronicsKw,storageKw,solarM2:d.solarM2,radiatorM2:d.radiatorM2,batteryKWh:d.batteryKWh,...installGeometry});
+  }
+  if(family.id==='heatlift-study'){
+   const original=deploymentLayout({...installGeometry}),originalStandOffM=original.rootX-bodyWidthM/2;
+   Object.assign(solarRootCollector,{revision:'starcatcher-solar-collector-bay-r1',originalStandOffM,supportExtensionM:solarRootCollector.rootStandOffM-originalStandOffM,originalSupportRodRadiusM:Math.min(.17,Math.min(bodyWidthM,bodyHeightM)*.052)*.28,originalSolarSupports:original.mounts.filter(m=>m.kind==='solar').map(m=>m.supports.map(s=>({role:s.role,foot:[...s.foot],seat:[...s.seat]})))});
+   geometryDefinition.architectureDefinition.allocations.push('Four complete solar electrical cassettes and their rotating drives occupy supported inboard root bays. Original blanket lengths, widths, photovoltaic area and body hardpoints are retained; the allocated packaging span grows by the actual cassette accommodation. No supplier flight envelope is claimed.');
   }
   geometryDefinition.solarRootCollector=installGeometry.solarRootCollector=solarRootCollector;
   solarRootCollector.hardwareSchedule=protectedSolarCollectorHardware(installGeometry,deploymentLayout(installGeometry));
@@ -248,10 +253,10 @@ export function sizeDesign(input={}){
  hardware.physicalArchitecture=resolveArchitecture(hardware);
  hardware.assemblyChecks=architectureAssemblyChecks(hardware);
  hardware.serviceArchitecture=serviceArchitecture(hardware);
- // Redwire and Starmind carry the unscaled cable/termination estimate in every
+ // The installed reference families carry unscaled cable/termination estimates in every
  // sizing path. A matching native takeoff refines it before simulation/export;
  // scene construction can later replace model cuts with actual installed cuts.
- if(family.id==='redwire-platform'||family.id==='starmind-cross')buildElectricalArchitecture(hardware);
+ if(family.id==='redwire-platform'||family.id==='starmind-cross'||family.id==='heatlift-study')buildElectricalArchitecture(hardware);
  hardware.architecture=deriveArchitectureTrade(hardware);
  hardware.applicability=architectureApplicability(hardware);
  return hardware;

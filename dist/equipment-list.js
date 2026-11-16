@@ -160,7 +160,7 @@ export function buildEquipmentList(h,s=null) {
  for(const row of rows){
   row.assemblyDetails=assemblyDetails.filter(a=>a.parentWbs===row.wbs);
   row.harnessEntries=harnessEntries.filter(a=>a.parentWbs===row.wbs);
-  if(row.harnessEntries.length)row.massBasis+=row.harnessEntries.some(entry=>entry.geometryStatus==='not-individually-routed')?' The individual embedded-harness register retains model-estimated conductor lengths in this parent, without claiming native installed routing or adding external termination mass.':' The individual harness register uses installed route cuts and includes each cable and its terminations once in this parent equipment mass.';
+  if(row.harnessEntries.length)row.massBasis+=row.harnessEntries.some(entry=>entry.geometryStatus==='not-individually-routed')?' The individual embedded-harness register retains model-estimated conductor lengths in this parent, without claiming native installed routing or adding external termination mass.':h.architectureFamilyId==='heatlift-study'&&h.installedHarnessAccounting?.status==='model-estimate-adopted'?' The individual harness register retains each current model cut and its terminations once in this parent equipment mass; native scene routing can refine these lengths.':' The individual harness register uses installed route cuts and includes each cable and its terminations once in this parent equipment mass.';
  }
  const sum=(items)=>items.reduce((v,r)=>v+r.extendedMassKg,0);
  const hardwareKg=sum(rows.filter(r=>r.classification==='Hardware')),dryKg=hardwareKg+ledger.margin.kg,

@@ -11,6 +11,8 @@ import {adoptInstalledHarnessMass,supportsInstalledHarnessMass,harnessDesignInpu
 import {redwirePayloadTransferPolicy,redwirePayloadTransferAllocation,redwireOpticalLinkBudget} from './redwire-payload-transfer.js';
 import {redwireHarnessInstallationHardware,redwirePlatformHarnessLocalRoute} from './redwire-harness-installation.js';
 import {declareStarmindHarnessInstallation} from './starmind-harness-routing.js';
+import {declareStarcatcherHarnessInstallation} from './starcatcher-harness-routing.js';
+import {heatliftPackageAllocation} from './heatlift-service-installation.js';
 
 export const electricalArchitectureRevision='electrical-interfaces-2026-11-r4-redwire-mounted-transfer';
 export const electricalSources=Object.freeze({
@@ -104,8 +106,8 @@ export function electricalBoxLayout(h){
    addBox('sband-patch-'+(i+1),'05.01','S-band patch '+(i+1),position,legacy?[beam*.35,b*.14,w*.21]:[.17,.024,.17],{geometry:'existing',hostKey:'patches',instance:i,...(!legacy?{mountNormal:normal}:{})});
   }
  }
- const terminalCounts={ka:0,optical:0};
- for(const terminal of terminalStations){const kind=terminal.kind;if(!Object.hasOwn(terminalCounts,kind))continue;const i=terminalCounts[kind]++;addBox(kind+'-'+(i+1),kind==='ka'?'05.02':'05.03',(kind==='ka'?'Ka-band':'Optical')+' terminal '+(i+1),add(terminal.positionM,scale(terminal.normalBody||[0,1,0],legacy?-.12:.055)),[.18,.10,.18],{geometry:'existing',hostKey:kind==='ka'?'dish':'optic',instance:i,mountNormal:terminal.normalBody||[0,1,0],baseInterfaceInsideBus:legacy,scope:legacy?'Fixed terminal stator interface beneath the roof mounting face, clear of the entire yawing support. A real open roof gland carries the enclosed device transfer into the pedestal; external harnesses terminate on the stationary interior connector bank.':'Stationary terminal base interface'});}
+ const terminalCounts={ka:0,optical:0},interiorTerminal=legacy||family.id==='heatlift-study';
+ for(const terminal of terminalStations){const kind=terminal.kind;if(!Object.hasOwn(terminalCounts,kind))continue;const i=terminalCounts[kind]++;addBox(kind+'-'+(i+1),kind==='ka'?'05.02':'05.03',(kind==='ka'?'Ka-band':'Optical')+' terminal '+(i+1),add(terminal.positionM,scale(terminal.normalBody||[0,1,0],interiorTerminal?-.12:.055)),[.18,.10,.18],{geometry:'existing',hostKey:kind==='ka'?'dish':'optic',instance:i,mountNormal:terminal.normalBody||[0,1,0],baseInterfaceInsideBus:interiorTerminal,scope:interiorTerminal?'Fixed terminal stator interface beneath the roof mounting face, clear of the entire yawing support. A real open roof gland carries the enclosed device transfer into the pedestal; external harnesses terminate on the stationary interior connector bank.':'Stationary terminal base interface'});}
  // Keep the protected terminal stator modules on the equipment side of the
  // aft support deck, beneath the fixed pedestal footprint. The displaced roof
  // gland is modeled explicitly; no cable is allowed through the deck.
@@ -115,7 +117,13 @@ export function electricalBoxLayout(h){
   const carried=family.id==='starcloud-inline',wing=solarPose.wings[i],root=wing.root,axes=wing.axes||leafAxes({pitch:wing.pitch}),side=Math.sign(root[0])||1,inboardOffsetM=carried?0:Math.abs(root[0])-w/2+.20,collector=root.map((v,k)=>v+.095*axes[1][k]),bodyPosition=[side*(w/2-.20),b*(family.id==='redwire-platform'?.20:root[2]>0?.12:.32),collector[2]],delta=bodyPosition.map((v,k)=>v-root[k]),position=carried?[0,.095,0]:axes.map(axis=>sum(axis.map((v,k)=>v*delta[k]))),normalAxis=[0,1,2].reduce((a,k)=>Math.abs(axes[k][2])>Math.abs(axes[a][2])?k:a,0),sourceFace=normalAxis===0?(axes[0][2]>0?'right':'left'):normalAxis===1?(axes[1][2]>0?'top':'bottom'):(axes[2][2]>0?'front':'back');
   addBox('solar-root-'+(i+1),'02.01','Solar root '+(i+1)+' stator outlet',position,[.14,.09,.14],{geometry:'existing',hostKey:'wings',frame:'solar-root',instance:i,deploymentMotion:carried,statorInboardOffsetM:inboardOffsetM,statorBodyPositionM:carried?null:bodyPosition,sourceFace:carried?'front':family.id==='redwire-platform'?sourceFace:({front:'back',back:'front',left:'right',right:'left',top:'bottom',bottom:'top'}[sourceFace]),rotaryTransfer:true,scope:'Allocated multi-circuit rotary electrical transfer at the array root. Body-mounted outlets sit inside the bus on a fixed insulated collector rail through a real shaft feedthrough, clear of the rolled blanket and tracking sweep. Current, voltage, contact loss, life and supplier qualification remain controlled joint requirements.'});
  }
- if(h.energySystem.thermal.kind!=='passive-local')addBox('thermal-drive','03.02',h.energySystem.thermal.kind==='heat-lift'?'Heat-pump motor drive':'Pump control',[w*.28,-b*.29,-l*.10],[.24,.18,.20]);
+ if(h.energySystem.thermal.kind!=='passive-local'){
+  const lift=heatliftPackageAllocation(h);
+  addBox('thermal-drive','03.02',h.energySystem.thermal.kind==='heat-lift'?'Heat-pump motor drive':'Pump control',
+   lift?.positionM||[w*.28,-b*.29,-l*.10],lift?.dimensionsM||[.24,.18,.20],
+   lift?{geometry:'existing',hostKey:'heatLiftPackage',sourceFace:'back',
+    scope:lift.basis+' The primary-voltage and control connectors are the actual package interfaces.'}:{});
+ }
  addBox('egse','07.05','Ground electrical checkout port',[station[0],-.1,Math.max(-l*.5+.025,station[2]-.30)],[.14,.10,.035],{scope:'Flight-side test interface; ground fixture is excluded from spacecraft mass'});
  addBox('gnss-antenna','08.01.16','GNSS antenna',[0,b*.5+.025,l*.18],[.10,.035,.10],{hostKey:'gnssAntenna',scope:'Preliminary antenna envelope within the existing avionics suite; vendor performance and sky-view analysis remain open'});
  const deck=h.propulsion.forwardDeckZ+.017/2;
@@ -241,7 +249,7 @@ function packElectricalPorts(graph,h){
    // SpaceX's payload star feeds occupy one terminal row per rack column
    // and bay. Empty places in a partially populated bay remain empty; the
    // following bay cannot shift into those places and cross its neighbors.
-   const mountedPayload=box.id==='pcdu'&&face==='right'&&h.architectureFamilyId==='starmind-cross',
+   const mountedPayload=box.id==='pcdu'&&face==='right'&&['starmind-cross','heatlift-study'].includes(h.architectureFamilyId),
     payloadTargets=mountedPayload?new Map(graph.harnesses.filter(a=>a.fromBoxId==='pcdu'&&a.groupId==='payload')
      .map(a=>[a.fromPortId,graph.boxById[a.toBoxId]])):new Map(),
     orderedPorts=[...ports].sort((a,b)=>{
@@ -273,7 +281,9 @@ function packElectricalPorts(graph,h){
    const payloadService=redwirePayloadServiceFace(box,h)===face,expanded=payloadService||layout.height>baseH+1e-8||width>baseW+1e-8,depth=expanded?(payloadService?redwirePayloadInterfacePolicy.plateThicknessM:.035):0,panelPosition=[0,0,0],panelDims=[...box.dimensionsM];panelPosition[axis]=sign*(box.dimensionsM[axis]/2+depth/2);panelDims[axis]=depth||.006;panelDims[u]=width;panelDims[v]=Math.max(baseH,layout.height);
    if(expanded){const panel={id:box.id+':'+face,face,positionM:panelPosition,dimensionsM:panelDims,hostRelative:true,reason:'Physical connector bank sized to contact count, diameter and 12 mm centre-pitch allowance; attached to the allocated equipment enclosure.'};if(payloadService){const hardware=redwirePayloadServicePlate(box,panel);graph.installationHardware.push(hardware);panel.installationHardwareId=hardware.id;panel.itemId=hardware.itemId;panel.reason=hardware.basis;}box.connectorPanels.push(panel);}
    for(const a of layout.positions){const port=a.port,normal=[0,0,0];normal[axis]=sign;port.normal=normal;port.positionM=[0,0,0];port.positionM[axis]=sign*(box.dimensionsM[axis]/2+depth);port.positionM[u]=a.x+a.pitch/2-width/2;port.positionM[v]=payloadService&&a.rows===1&&layout.positions.every(q=>q.y===margin)?0:a.y+a.cellH/2-panelDims[v]/2;
-    port.instanceOffsetsM=Array.from({length:port.quantity},(_,i)=>{const p=[0,0,0];p[u]=(i%a.cols)*a.pitch;p[v]=Math.floor(i/a.cols)*a.cellH;return p;});
+    port.instanceOffsetsM=Array.from({length:port.quantity},(_,i)=>{const p=[0,0,0];
+     p[u]=(i%a.cols)*a.pitch;
+     p[v]=Math.floor(i/a.cols)*a.cellH;return p;});
     port.packing={count:port.quantity,rows:a.rows,columns:a.cols,pitchM:a.pitch,widthM:a.w,heightM:a.h,representative:true,withinFace:true,panelId:expanded?box.id+':'+face:null};
    }
    const allowed=[h.bodyWidthM,h.bodyHeightM,h.bodyLengthM],withinAllocatedEnvelope=box.frame!=='body'||panelDims.every((d,i)=>d<=allowed[i]);
@@ -419,8 +429,8 @@ const cache=new WeakMap(),graphOwners=new WeakMap();
 export function buildElectricalArchitecture(h){
  if(cache.has(h))return cache.get(h);
  const e=h.energySystem.electrical,f=h.serviceArchitecture.fabric,af=architectureFamily(h),boxes=electricalBoxLayout(h),boxById=Object.fromEntries(boxes.map(b=>[b.id,b])),ports=[],harnesses=[],connectors=[],cards=[],portCounters={},groupMap=Object.fromEntries(groups.map(([id,wbs,parentWbs,label,kind])=>[id,{id,wbs,itemId:'flight:'+wbs,parentWbs,parentId:'flight:'+parentWbs,label,kind,harnessIds:[],connectorIds:[],quantity:0,allocatedMassKg:0,estimatedMassKg:0}]));
- const revision=af.id==='starmind-cross'?'electrical-interfaces-2026-11-r5-starmind-mounted-rack':electricalArchitectureRevision;
- const sources=af.id==='starmind-cross'?{...electricalSources,'el-project':{...electricalSources['el-project'],section:revision}}:electricalSources;
+ const revision=af.id==='heatlift-study'?'electrical-interfaces-2026-11-r6-starcatcher-mounted-rack':af.id==='starmind-cross'?'electrical-interfaces-2026-11-r5-starmind-mounted-rack':electricalArchitectureRevision;
+ const sources=['starmind-cross','heatlift-study'].includes(af.id)?{...electricalSources,'el-project':{...electricalSources['el-project'],section:revision}}:electricalSources;
  const graph={schema:'orbital-data-center/electrical-architecture/1',revision,configurationId:'ELC:'+electricalFingerprint({revision,input:harnessDesignInputs(h.input)}),sources,boxes,boxById,cards,ports,portById:{},harnesses,connectors,assemblies:[],connectorDetails:[],massAccounting:{},checks:[],basis:'Preliminary ODC interface/build allocation, separate from reference-provider internals and supplier-qualified hardware.'};
  const connect=(id,groupId,fromId,toId,{kind=groupMap[groupId].kind,voltageV=0,currentA=0,rateMbps=0,quantity=1,connectorTypeId=null,operatingVoltageMinV=null,fromFace='right',toFace='left',signal=null,notes='',minimumAreaMM2=.205}={})=>{
   const group=groupMap[groupId];if(!boxById[fromId]||!boxById[toId]||quantity<1)return;
@@ -434,7 +444,8 @@ export function buildElectricalArchitecture(h){
    else if(boxId.startsWith('fabric-')||boxId==='recorder')face='front';
    else if(boxId.startsWith('solar-root-'))face=b.sourceFace||'front';
    else if(boxId.startsWith('sband-patch-'))face=b.mountNormal?'bottom':b.positionM[0]<0?'right':'left';
-   else if(boxId==='gnss-antenna'&&af.id==='protected-core')face='bottom';
+   else if(boxId==='gnss-antenna'&&['protected-core','heatlift-study'].includes(af.id))face='bottom';
+   else if(boxId==='thermal-drive'&&af.id==='heatlift-study')face='back';
    if(b.routingAccommodation?.interfaceFace)face=b.routingAccommodation.interfaceFace;
    if(boxId==='pcdu'&&groupId==='array'&&af.id!=='redwire-platform'&&boxById[fromId].statorBodyPositionM?.[0]>0)face='right';
    // Inline arm root banks approach from opposite bus faces. Their PCDU
@@ -447,7 +458,7 @@ export function buildElectricalArchitecture(h){
    // The Starmind payload bundle turns down from the right-hand panel into
    // the under-rack tray. Service and pump outlets use the opposite panel,
    // keeping their real plugs and withdrawal leads out of that departure.
-   if(boxId==='pcdu'&&af.id==='starmind-cross'&&['service','thermal'].includes(groupId))face='left';
+   if(boxId==='pcdu'&&['starmind-cross','heatlift-study'].includes(af.id)&&['service','thermal'].includes(groupId))face='left';
    const axis=face==='left'||face==='right'?0:face==='front'||face==='back'?2:1,sign=['left','back','bottom'].includes(face)?-1:1,normal=[0,0,0];normal[axis]=sign;const local=[0,0,0];local[axis]=sign*b.dimensionsM[axis]/2;const other=[0,1,2].filter(x=>x!==axis);local[other[0]]=(((n%4)+.5)/4-.5)*b.dimensionsM[other[0]]*.78;local[other[1]]=(((Math.floor(n/4)%4)+.5)/4-.5)*b.dimensionsM[other[1]]*.70;const port={id:id+':'+suffix,boxId,itemId:b.itemId,label:(suffix==='from'?'J':'P')+'-'+id,positionM:local,normal,face,connectorTypeId:typeId,connectorItemId:null,kind,signal:signal||(kind==='power'?'Dedicated supply and return':kind==='control'?'SpaceWire Type A / LVDS':kind==='data'?'Optical payload packet lane group':'50 Ω RF'),voltageV,currentA,rateMbps,quantity,proposedPinout:true};ports.push(port);graph.portById[port.id]=port;return port;};
   const from=makePort(fromId,'from',fromFace),to=makePort(toId,'to',toFace),fromPose=electricalPortPose(h,graph,from.id),toPose=electricalPortPose(h,graph,to.id);
   const routing={kind,bodyBoundsM:[h.bodyWidthM,h.bodyHeightM,h.bodyLengthM],lane:{power:0,control:2,data:4,rf:6}[kind]||0,bendRadiusM:kind==='data'?.06:kind==='rf'?.045:.035};
@@ -527,11 +538,12 @@ export function buildElectricalArchitecture(h){
  updateRedwirePayloadTransferAccounting(graph);
  if(rotary)graph.installationHardware.push(...redwireHarnessInstallationHardware(h,graph));
  const starmindInstallation=declareStarmindHarnessInstallation(h,graph,{circuitExitPose:electricalCircuitExitPose,connectorTypes:connectorSelections});
+ const starcatcherInstallation=declareStarcatcherHarnessInstallation(h,graph,{circuitExitPose:electricalCircuitExitPose,connectorTypes:connectorSelections});
  // These complete mounted paths are already constructed in physical metres.
  // Use their actual length in the preliminary ledger as well as the scene;
  // the generic 15% detour factor would invent additional unplaced cable.
  for(const a of harnesses){
-  const rows=starmindInstallation?.payloadRouting?.rows.filter(row=>row.id.startsWith(a.id+'/'));
+  const rows=(starmindInstallation||starcatcherInstallation)?.payloadRouting?.rows.filter(row=>row.id.startsWith(a.id+'/'));
   if(!rows?.length)continue;
   const type=connectorSelections[a.connectorTypeId],cut=Math.max(...rows.map(row=>row.lengthM))+a.terminationAllowanceM;
   a.routeLengthM=cut-a.terminationAllowanceM;a.cutLengthM=cut;a.slackFraction=0;
@@ -544,7 +556,7 @@ export function buildElectricalArchitecture(h){
   a.voltageDropV=a.currentA*a.resistanceOhm;a.powerLossW=a.currentA*a.currentA*a.resistanceOhm;
   a.estimatedCableKg=2*cut*a.wire.areaMM2*1e-6*8960*1.4;a.procurement.cutLengthM=cut;
  }
- if(af.id==='starmind-cross')graph.installationHardware=[...new Map([...(graph.installationHardware||[]),...(h.solarRootCollector?.hardwareSchedule||[])].map(part=>[part.id,part])).values()];
+ if(['starmind-cross','heatlift-study'].includes(af.id))graph.installationHardware=[...new Map([...(graph.installationHardware||[]),...(h.solarRootCollector?.hardwareSchedule||[])].map(part=>[part.id,part])).values()];
  const connectorGroups=new Map();
  for(const c of connectors){const a=harnesses.find(h=>h.id===c.harnessId),parent=a.parentWbs,key=parent+'|'+c.typeId;let g=connectorGroups.get(key);if(!g){const index=Object.keys(connectorSelections).indexOf(c.typeId),wbs=parent+'.'+(parent==='01.04'?50+index:60+index);g={id:key,itemId:'flight:'+wbs,wbs,parentId:'flight:'+parent,parentWbs:parent,label:connectorSelections[c.typeId].label,typeId:c.typeId,portIds:[],connectorIds:[],quantity:0,allocatedMassKg:0,estimatedMassKg:0,exemplarPortId:c.portId};connectorGroups.set(key,g);}g.portIds.push(c.portId);g.connectorIds.push(c.id);g.quantity+=c.quantity;g.estimatedMassKg+=c.quantity*connectorSelections[c.typeId].estimatedPairKg;c.itemId=g.itemId;graph.portById[c.portId].connectorItemId=g.itemId;}
  const budgets={'07.05':h.massLedger.find(r=>r.id==='cables')?.kg||0,'01.04':f.cableMassKg||0};
@@ -594,7 +606,7 @@ function declareInlineRootRouting(h,graph){
 // change resistance, loss and material take-off as well as the displayed cut
 // length. This never silently changes the gauge/connector of an existing mesh.
 export function reconcileInstalledElectricalRouting(graph,records,{source={kind:'native-installed-routing'}}={}){
- const starmind=graphOwners.get(graph)?.architectureFamilyId==='starmind-cross';
+ const mountedAccounting=['starmind-cross','heatlift-study'].includes(graphOwners.get(graph)?.architectureFamilyId);
  for(const a of graph.harnesses){
   const rows=records.filter(r=>r.harnessId===a.id);if(!rows.length)throw new Error('Missing installed harness '+a.id);
   if(rows.some(r=>!Number.isFinite(r.lengthM)||r.lengthM<=0))throw new Error('Invalid installed length '+a.id);
@@ -602,7 +614,7 @@ export function reconcileInstalledElectricalRouting(graph,records,{source={kind:
   a.routeLengthM=Math.max(...rows.map(r=>r.lengthM));a.installedRouteLengthM=a.routeLengthM;a.cutLengthM=a.routeLengthM+a.terminationAllowanceM;
   a.minimumRenderedBendRadiusM=Math.min(...rows.map(r=>r.minimumBendRadiusM));a.routeBendLimited=rows.some(r=>r.minimumBendRadiusM+1e-7<a.bendRadiusM);
   a.routeBasis='Installed collision-routed centreline, including explicit flex reservoirs; termination allowance remains inside the build assembly. See individual circuit cuts.';
-  if(starmind){
+  if(mountedAccounting){
    a.installedRoutePlanningPassed=rows.some(r=>r.planningPassed===false)?false:rows.every(r=>r.planningPassed===true)?true:null;
    a.routeBasis='Measured installed centreline and in-assembly termination allowance. Every physical cut contributes material; bend and route-planning qualification remain separate checks.';
   }
@@ -641,25 +653,25 @@ export function reconcileInstalledElectricalRouting(graph,records,{source={kind:
 // topology/gauge change from borrowing the retained craft's material takeoff.
 export function installedElectricalLayoutKey(graph){
  const material=p=>[p.id,p.shape,p.positionM,p.dimensionsM,p.axes,p.axis,
-  p.outerRadiusM,p.innerRadiusM,p.lengthM,p.angleRad,p.startAngleRad];
+  p.outerRadiusM,p.innerRadiusM,p.lengthM,p.angleRad,p.startAngleRad,...(p.motion?[p.motion]:[])];
  return JSON.stringify({
   boxes:graph.boxes.map(b=>[b.id,b.frame,b.positionM,b.dimensionsM,b.connectorPanels]),
   ports:graph.ports.map(p=>[p.id,p.boxId,p.positionM,p.normal,p.connectorTypeId,p.quantity,p.instanceOffsetsM,p.packing]),
   harnesses:graph.harnesses.map(a=>[a.id,a.quantity,a.fromPortId,a.toPortId,a.connectorTypeId,a.wire.awg,a.wire.areaMM2,a.cableDiameterM,a.bendRadiusM,a.routing]),
-  ...(graph.starmindHarnessInstallation?{
-   mountedPayload:graph.starmindHarnessInstallation.payloadRouting?.rows.map(row=>[row.id,row.controlPoints]),
+  ...(graph.starmindHarnessInstallation||graph.starcatcherHarnessInstallation?{
+   mountedPayload:(graph.starmindHarnessInstallation||graph.starcatcherHarnessInstallation).payloadRouting?.rows.map(row=>[row.id,row.controlPoints]),
    installationHardware:graph.installationHardware.map(part=>[part.id,part.frame,part.positionM,
     part.axes,part.dimensionsM,part.materialPieces?.map(material)])}:{}),
  });
 }
 export function installedLinePlanningAssessment(line){
- if(line.constructionOnly)return {planningPassed:line.planningIssues?.length?false:null,
+ const failed=!!line.planningIssues?.length||!!line.servicePlanningIssues?.some(issue=>!issue.unassessed);
+ if(line.constructionOnly)return {planningPassed:failed?false:null,
   serviceWithdrawalAssessment:'unassessed',installationBasis:'Displayed construction; current-scene clearance and service qualification are not implied.'};
  if(line.serviceWithdrawalAssessment==='unassessed'&&!line.mountedPayload)return {
-  planningPassed:line.planningIssues?.length?false:null,serviceWithdrawalAssessment:'unassessed',
+  planningPassed:failed?false:null,serviceWithdrawalAssessment:'unassessed',
   installationBasis:'Static route construction; connector withdrawal has not been assessed.'};
  if(!line.mountedPayload)return {planningPassed:!line.planningIssues&&!line.servicePlanningIssues};
- const failed=!!line.planningIssues?.length||!!line.servicePlanningIssues?.some(issue=>!issue.unassessed);
  return {planningPassed:failed?false:line.serviceWithdrawalAssessment==='unassessed'?null:true,
   serviceWithdrawalAssessment:line.serviceWithdrawalAssessment,
   installationBasis:'Mounted body-fixed payload corridor; service withdrawal requires retainer release and is not modeled.'};
@@ -670,7 +682,7 @@ export function reconcileInstalledMassFromCraft(h,craft){
  const graph=buildElectricalArchitecture(h),actual=craft.electrical.architecture;
  const key=g=>canonical(g.harnesses.map(a=>[a.id,a.quantity,a.connectorTypeId,a.wire.areaMM2,a.cableDiameterM,a.bendRadiusM]));
  if(key(graph)!==key(actual))return false;
- if(h.architectureFamilyId==='starmind-cross'&&installedElectricalLayoutKey(graph)!==installedElectricalLayoutKey(actual))return false;
+ if(['starmind-cross','heatlift-study'].includes(h.architectureFamilyId)&&installedElectricalLayoutKey(graph)!==installedElectricalLayoutKey(actual))return false;
  const before=h.electricalMassRevision||0;
  const records=craft.electrical.routing.lines.map(line=>({id:line.id,harnessId:line.r.spec.id,lengthM:line.restLengthM,minimumBendRadiusM:line.minimumStaticBendM,...installedLinePlanningAssessment(line)}));
  reconcileInstalledElectricalRouting(graph,records,{source:{kind:'current-scene-installed-route-takeoff'}});

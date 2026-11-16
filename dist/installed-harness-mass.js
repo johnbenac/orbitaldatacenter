@@ -1,4 +1,5 @@
 import {redwireHarnessTakeoff} from './redwire-harness-takeoff.js';
+import {starcatcherHarnessTakeoff} from './starcatcher-harness-takeoff.js';
 import {deriveArchitectureTrade,architectureApplicability} from './architecture-trades.js';
 import {adoptCableInstallationHardware,installWorkerOpticsPlacements} from './cable-installation-mass.js';
 import {updateRedwireRadiatorExposure} from './radiator-surface-area.js';
@@ -10,35 +11,82 @@ import {sha256} from './sha256.js';
 // retained takeoff never supplies another design's cable lengths.
 export const installedHarnessRoutingRevision='redwire-mounted-installation-87679e8e3f20';
 export const starmindHarnessRoutingRevision='starmind-mounted-installation-r1';
-export const supportsInstalledHarnessMass=h=>['redwire-platform','starmind-cross'].includes(h.architectureFamilyId);
-export const installedHarnessRoutingRevisionFor=h=>h.architectureFamilyId==='starmind-cross'?starmindHarnessRoutingRevision:installedHarnessRoutingRevision;
+export const starcatcherHarnessRoutingRevision='starcatcher-mounted-installation-r1';
+export const supportsInstalledHarnessMass=h=>['redwire-platform','starmind-cross','heatlift-study'].includes(h.architectureFamilyId);
+export const installedHarnessRoutingRevisionFor=h=>h.architectureFamilyId==='starmind-cross'?starmindHarnessRoutingRevision:h.architectureFamilyId==='heatlift-study'?starcatcherHarnessRoutingRevision:installedHarnessRoutingRevision;
 const canonical=v=>v===null?'null':typeof v!=='object'?JSON.stringify(v):Array.isArray(v)?'['+v.map(canonical).join(',')+']':'{'+Object.keys(v).sort().map(k=>JSON.stringify(k)+':'+canonical(v[k])).join(',')+'}';
 const sum=rows=>rows.reduce((n,x)=>n+x,0);
 const clone=value=>JSON.parse(JSON.stringify(value));
 const takeoffs=new Map();
 export const harnessDesignInputs=input=>Object.fromEntries(Object.entries(input||{}).filter(([key])=>key!=='installedHarnessTakeoff'));
-export function installedHarnessDesignKey(h,graph){
+function installedHarnessConfiguration(h,graph){
  const port=p=>({id:p.id,boxId:p.boxId,positionM:p.positionM,normal:p.normal,instanceOffsetsM:p.instanceOffsetsM});
- const material=p=>({shape:p.shape||'box',positionM:p.positionM,dimensionsM:p.dimensionsM,axes:p.axes,axis:p.axis,outerRadiusM:p.outerRadiusM,innerRadiusM:p.innerRadiusM,lengthM:p.lengthM,angleRad:p.angleRad,startAngleRad:p.startAngleRad});
+ const material=p=>({shape:p.shape||'box',positionM:p.positionM,dimensionsM:p.dimensionsM,axes:p.axes,axis:p.axis,outerRadiusM:p.outerRadiusM,innerRadiusM:p.innerRadiusM,lengthM:p.lengthM,angleRad:p.angleRad,startAngleRad:p.startAngleRad,...(p.motion?{motion:p.motion}:{})});
  const installationHardware=(graph.installationHardware||[]).map(part=>({id:part.id,frame:part.frame,positionM:part.positionM,dimensionsM:part.dimensionsM,axes:part.axes,materialPieces:part.materialPieces?.map(material)}));
  // Keep the complete canonical layout in the equality fingerprint while
  // avoiding a duplicate 125 kB geometry payload in every share URL/worker input.
- return 'sha256:'+sha256(canonical({routingRevision:installedHarnessRoutingRevisionFor(h),input:harnessDesignInputs(h.input),geometry:{family:h.architectureFamilyId,body:[h.bodyWidthM,h.bodyHeightM,h.bodyLengthM],wing:[h.wingWidthM,h.wingLengthM],radiator:[h.radiatorWidthM,h.radiatorLengthM,h.radiatorPanelsPerBank],rack:h.rackLayout.slots,tanks:h.propulsion.tanks,engines:h.propulsion.engines,boxes:graph.boxes.map(b=>({id:b.id,positionM:b.positionM,dimensionsM:b.dimensionsM,frame:b.frame,connectorPanels:b.connectorPanels})),installationHardware,...(h.architectureFamilyId==='starmind-cross'?{mountedPayload:graph.starmindHarnessInstallation?.payloadRouting?.rows.map(row=>[row.id,row.controlPoints])}:{})},interfaces:graph.harnesses.map(a=>({id:a.id,quantity:a.quantity,type:a.connectorTypeId,areaMM2:a.wire.areaMM2,diameterM:a.cableDiameterM,bendRadiusM:a.bendRadiusM,from:port(graph.portById[a.fromPortId]),to:port(graph.portById[a.toPortId])}))}));
+ return {routingRevision:installedHarnessRoutingRevisionFor(h),input:harnessDesignInputs(h.input),geometry:{family:h.architectureFamilyId,body:[h.bodyWidthM,h.bodyHeightM,h.bodyLengthM],wing:[h.wingWidthM,h.wingLengthM],radiator:[h.radiatorWidthM,h.radiatorLengthM,h.radiatorPanelsPerBank],rack:h.rackLayout.slots,tanks:h.propulsion.tanks,engines:h.propulsion.engines,boxes:graph.boxes.map(b=>({id:b.id,positionM:b.positionM,dimensionsM:b.dimensionsM,frame:b.frame,connectorPanels:b.connectorPanels})),installationHardware,...(h.architectureFamilyId==='starmind-cross'?{mountedPayload:graph.starmindHarnessInstallation?.payloadRouting?.rows.map(row=>[row.id,row.controlPoints])}:h.architectureFamilyId==='heatlift-study'?{mountedPayload:graph.starcatcherHarnessInstallation?.payloadRouting?.rows.map(row=>[row.id,row.controlPoints])}:{})},interfaces:graph.harnesses.map(a=>({id:a.id,quantity:a.quantity,type:a.connectorTypeId,areaMM2:a.wire.areaMM2,diameterM:a.cableDiameterM,bendRadiusM:a.bendRadiusM,from:port(graph.portById[a.fromPortId]),to:port(graph.portById[a.toPortId])}))};
 }
+export function installedHarnessDesignKey(h,graph){
+ return 'sha256:'+sha256(canonical(installedHarnessConfiguration(h,graph)));
+}
+// The original exact key remains the native provenance. A second fingerprint
+// permits geometry roundoff between browser and Node math libraries. Only the
+// comparison projection is rounded; stored coordinates and cuts stay exact.
+// User inputs, inventory, identities, gauges and radii are never quantized.
+export function starcatcherHarnessCompatibilityKey(h,graph){
+ const value=installedHarnessConfiguration(h,graph);
+ const roundGeometry=row=>typeof row==='number'&&Number.isFinite(row)?
+  (Number.isInteger(row)?row:Math.round(row*1e9)/1e9):Array.isArray(row)?row.map(roundGeometry):
+  row&&typeof row==='object'?Object.fromEntries(Object.entries(row).map(([key,child])=>
+   [key,roundGeometry(child)])):row;
+ value.geometry=roundGeometry(value.geometry);
+ value.interfaces=value.interfaces.map(row=>({...row,
+  from:roundGeometry(row.from),to:roundGeometry(row.to)}));
+ return 'sha256:'+sha256(canonical(value));
+}
+
 function validTakeoff(value,key,revision,graph){
- // A failed Starmind bend still has a measured length and carried material.
+ // A failed mounted-study bend still has a measured length and carried material.
  // Keep its zero-radius evidence for the geometry checks; rejecting the entire
  // inventory here would crash the scene and discard otherwise complete cuts.
  // Retain the original Redwire takeoff acceptance contract unchanged.
- const starmind=revision===starmindHarnessRoutingRevision;
- const valid=value?.routingRevision===revision&&value.designKey===key&&Array.isArray(value.records)&&value.records.length>0&&value.records.every(r=>typeof r.id==='string'&&typeof r.harnessId==='string'&&Number.isFinite(r.lengthM)&&r.lengthM>0&&Number.isFinite(r.minimumBendRadiusM)&&(starmind?r.minimumBendRadiusM>=0:r.minimumBendRadiusM>0));
- if(!valid||revision!==starmindHarnessRoutingRevision)return valid;
+ const completeCuts=[starmindHarnessRoutingRevision,starcatcherHarnessRoutingRevision].includes(revision);
+ const valid=value?.routingRevision===revision&&value.designKey===key&&Array.isArray(value.records)&&value.records.length>0&&value.records.every(r=>typeof r.id==='string'&&typeof r.harnessId==='string'&&Number.isFinite(r.lengthM)&&r.lengthM>0&&Number.isFinite(r.minimumBendRadiusM)&&(completeCuts?r.minimumBendRadiusM>=0:r.minimumBendRadiusM>0));
+ if(!valid||!completeCuts)return valid;
  const expected=new Map(graph.harnesses.flatMap(a=>Array.from({length:a.quantity*(a.connectorTypeId.startsWith('hv-single')?2:1)},(_,i)=>[a.id+'/'+i,a.id])));
  return value.records.length===expected.size&&new Set(value.records.map(r=>r.id)).size===expected.size&&value.records.every(r=>expected.get(r.id)===r.harnessId);
 }
+// This compact published inventory is independent of renderer/cache modules,
+// so sizing and simulation do not import the complete scene or form a cycle.
+// The compiler separately checks the full current native-source manifest; this
+// runtime guard checks its stored integrity and exact design/interface identity.
+function publishedStarcatcherTakeoff(h,graph,key,revision){
+ const value=starcatcherHarnessTakeoff,source=value?.source,files=source?.sourceFiles;
+ if(h.architectureFamilyId!=='heatlift-study'||h.input?.referenceCenterId!=='star-catcher-self-powered'||
+  value?.schema!=='orbital-data-center/starcatcher-harness-takeoff/1'||
+  source?.kind!=='compiled-native-starcatcher-construction'||
+  source.constructionSchema!=='orbital-data-center/starcatcher-construction/1'||
+  !/^sha256:[a-f0-9]{64}$/.test(source.constructionKey||'')||
+  !/^[a-f0-9]{64}$/.test(source.constructionSha256||'')||
+  source.clearanceAssessment!=='unassessed'||source.serviceWithdrawalAssessment!=='unassessed'||
+  !Array.isArray(files)||!files.length||
+  !files.every(file=>file&&typeof file.path==='string'&&/^[a-f0-9]{64}$/.test(file.sha256))||
+  new Set(files.map(file=>file.path)).size!==files.length||
+  !['dist/craft.js','dist/design.js','dist/installed-harness-mass.js'].every(path=>files.some(file=>file.path===path))||
+  source.sourceManifestSha256!==sha256(JSON.stringify(files))||
+  !/^sha256:[a-f0-9]{64}$/.test(value.designKey||'')||
+  !validTakeoff(value,value.designKey,revision,graph)||
+  value.records.some(record=>![false,null].includes(record.planningPassed)||record.serviceWithdrawalAssessment!=='unassessed'))return null;
+ const candidate=value.designKey===key?value:
+  value.compatibilityKey===starcatcherHarnessCompatibilityKey(h,graph)?
+   {...value,designKey:key,source:{...source,capturedDesignKey:value.designKey,
+    physicalMatch:'Complete input/interface/material identity with geometric numbers compared at nine decimal places'}}:null;
+ return validTakeoff(candidate,key,revision,graph)?candidate:null;
+}
 export function retainedHarnessTakeoff(h,graph){
  const key=installedHarnessDesignKey(h,graph),revision=installedHarnessRoutingRevisionFor(h),embedded=h.input.installedHarnessTakeoff;
- for(const candidate of [embedded,takeoffs.get(key),redwireHarnessTakeoff])if(validTakeoff(candidate,key,revision,graph))return clone(candidate);
+ for(const candidate of [embedded,takeoffs.get(key),publishedStarcatcherTakeoff(h,graph,key,revision),redwireHarnessTakeoff])if(validTakeoff(candidate,key,revision,graph))return clone(candidate);
  // A changed design must never export a stale route takeoff as its own.
  if(embedded)delete h.input.installedHarnessTakeoff;
  return null;
@@ -73,8 +121,8 @@ export function harnessMassRecords(graph,{installed=false,connectorSelections}){
  return records;
 }
 
-function retainStarmindIntraArrayHarness(h,graph){
- if(h.architectureFamilyId!=='starmind-cross')return null;
+function retainMountedStudyIntraArrayHarness(h,graph){
+ if(!['starmind-cross','heatlift-study'].includes(h.architectureFamilyId))return null;
  const e=h.energySystem.electrical,oneWayLeadM=.60*h.wingLengthM,areaMM2=e.harness.array.areaMM2;
  const basis='Retained preliminary intra-array source-lead allocation: two conductors per MPPT circuit, each 0.60 times the current blanket length, at the original EPS conductor area and hot-copper resistivity. Copper mass includes the existing 40% jacket/local binding factor. These embedded wing leads are not native-routed body cuts or cell interconnects; the external root connectors are counted separately, with no extra termination mass here.';
  const records=graph.harnesses.filter(a=>a.groupId==='array').flatMap(a=>Array.from({length:a.quantity},(_,instance)=>{
@@ -90,13 +138,13 @@ function retainStarmindIntraArrayHarness(h,graph){
  return allocation;
 }
 
-function synchronizeStarmindHarnessEnergy(h,graph,records,intraArray,{installed,connectorSelections}){
- if(h.architectureFamilyId!=='starmind-cross')return null;
- const e=h.energySystem.electrical,groups=[];
- for(const id of ['array','payload']){
-  const w=e.harness[id],hs=graph.harnesses.filter(a=>a.groupId===id),ids=new Set(hs.map(a=>a.id)),rows=records.filter(row=>ids.has(row.harnessId));
-  const count=sum(hs.map(a=>a.quantity)),expectedCurrentA=id==='array'?e.mppt.jointCircuitRatingA:e.installedElectronicsKW*1000/(w.count*e.payload.voltageV);
-  const matchesEndpoints=a=>id==='array'?a.fromBoxId.startsWith('solar-root-')&&a.toBoxId==='pcdu':a.fromBoxId==='pcdu'&&a.toBoxId.startsWith('compute-')&&a.voltageV===e.payload.voltageV;
+function synchronizeMountedStudyHarnessEnergy(h,graph,records,intraArray,{installed,connectorSelections}){
+ if(!['starmind-cross','heatlift-study'].includes(h.architectureFamilyId))return null;
+ const e=h.energySystem.electrical,groups=[],heatlift=h.architectureFamilyId==='heatlift-study';
+ for(const id of ['array','payload',...(heatlift&&e.harness.heatPump?['heatPump']:[])]){
+  const w=e.harness[id],hs=graph.harnesses.filter(a=>id==='heatPump'?a.id==='P-THERMAL':a.groupId===id),ids=new Set(hs.map(a=>a.id)),rows=records.filter(row=>ids.has(row.harnessId));
+  const count=sum(hs.map(a=>a.quantity)),expectedCurrentA=id==='array'?e.mppt.jointCircuitRatingA:id==='heatPump'?e.heatPumpDrive.peakEndpointKW*1000/(w.count*e.heatPumpDrive.voltageV):e.installedElectronicsKW*1000/(w.count*e.payload.voltageV);
+  const matchesEndpoints=a=>id==='array'?a.fromBoxId.startsWith('solar-root-')&&a.toBoxId==='pcdu':id==='heatPump'?a.fromBoxId==='pcdu'&&a.toBoxId==='thermal-drive'&&a.voltageV===e.heatPumpDrive.voltageV:a.fromBoxId==='pcdu'&&a.toBoxId.startsWith('compute-')&&a.voltageV===e.payload.voltageV;
   const valid=count===w.count&&rows.length===count&&count>0&&(id!=='array'||count===e.mppt.count)&&hs.every(a=>a.kind==='power'&&Math.abs(a.currentA-expectedCurrentA)<1e-9&&matchesEndpoints(a));
   const originalResistanceOhm=w.installedResistanceAccounting?.originalResistanceOhm??w.resistanceOhm;
   if(!valid){
@@ -108,18 +156,22 @@ function synchronizeStarmindHarnessEnergy(h,graph,records,intraArray,{installed,
   const contactResistanceOhm=sum(rows.map(row=>{const a=hs.find(a=>a.id===row.harnessId);return (a.matedContactCount??4)*connectorSelections[a.connectorTypeId].contactResistanceBudgetOhm+(a.additionalRotaryResistanceOhm||0);}))/count;
   const retainedIntraArrayResistanceOhm=id==='array'?sum(intraArray.records.map(row=>row.wireResistanceOhm))/count:0;
   w.resistanceOhm=wireResistanceOhm+contactResistanceOhm+retainedIntraArrayResistanceOhm;
-  w.installedResistanceAccounting={mapped:true,status:installed?'installed-cut-resistance-adopted':'model-cut-resistance-adopted',count,harnessIds:hs.map(a=>a.id),wireResistanceOhm,contactResistanceOhm,retainedIntraArrayResistanceOhm,originalResistanceOhm,basis:'Mean complete-loop resistance across the existing equal-current parallel circuits, including both physical conductors and each allocated contact once. '+(id==='array'?'The retained embedded-wing source-lead resistance is added once; the external cuts cover collector to PCDU.':'The cuts cover PCDU to each compute tray.')};
+  w.installedResistanceAccounting={mapped:true,status:installed?'installed-cut-resistance-adopted':'model-cut-resistance-adopted',count,harnessIds:hs.map(a=>a.id),wireResistanceOhm,contactResistanceOhm,retainedIntraArrayResistanceOhm,originalResistanceOhm,basis:'Mean complete-loop resistance across the existing equal-current parallel circuits, including both physical conductors and each allocated contact once. '+(id==='array'?'The retained embedded-wing source-lead resistance is added once; the external cuts cover collector to PCDU.':id==='heatPump'?'The cuts cover PCDU to the primary-voltage compressor drive.':'The cuts cover PCDU to each compute tray.')};
   groups.push({id,...w.installedResistanceAccounting});
  }
  // Refresh demand against the selected hardware using the same algebra as
  // electricalDesign. Counts, converter capacities, gauges and thermal transport
  // remain installed choices; a larger demand is a check, never an auto-resize.
  const peakKeys=['peakPayloadBranchKW','peakBusDemandKW','peakConversionLossKW','peakHarnessLossKW'];
- const originalDemand=e.harness.installedDemandAccounting?.originalDemand??{...Object.fromEntries(peakKeys.map(key=>[key,e[key]])),requiredPayloadModules:e.payload.requiredModules,busbarRequiredA:e.distribution.busbarRequiredA};
- const payloadMapped=groups.find(group=>group.id==='payload').mapped;
- if(payloadMapped){
-  const loss=(w,kw,voltage)=>w.count*(kw*1000/(Math.max(1,w.count)*voltage))**2*w.resistanceOhm/1000;
-  e.peakPayloadBranchKW=e.installedElectronicsKW+loss(e.harness.payload,e.installedElectronicsKW,e.payload.voltageV);
+ const originalDemand=e.harness.installedDemandAccounting?.originalDemand??{...Object.fromEntries(peakKeys.map(key=>[key,e[key]])),requiredPayloadModules:e.payload.requiredModules,busbarRequiredA:e.distribution.busbarRequiredA,...(heatlift?{heatPumpPeakBranchKW:e.heatPumpDrive.peakBranchKW}:{})};
+ const payloadMapped=groups.find(group=>group.id==='payload').mapped,heatPumpMapped=heatlift&&groups.find(group=>group.id==='heatPump')?.mapped===true;
+ const loss=(w,kw,voltage)=>w.count*(kw*1000/(Math.max(1,w.count)*voltage))**2*w.resistanceOhm/1000;
+ if(heatlift){
+  e.heatPumpDrive.peakBranchKW=heatPumpMapped?e.heatPumpDrive.peakEndpointKW+loss(e.harness.heatPump,e.heatPumpDrive.peakEndpointKW,e.heatPumpDrive.voltageV):originalDemand.heatPumpPeakBranchKW;
+  e.heatPumpDrive.requiredModules=Math.max(1,Math.ceil(e.heatPumpDrive.peakBranchKW/e.heatPumpDrive.moduleOutputKW));
+ }
+ if(payloadMapped||heatPumpMapped){
+  e.peakPayloadBranchKW=payloadMapped?e.installedElectronicsKW+loss(e.harness.payload,e.installedElectronicsKW,e.payload.voltageV):originalDemand.peakPayloadBranchKW;
   const heatPumpBranchKW=e.heatPumpDrive?.peakBranchKW||0,heatPumpEndpointKW=e.heatPumpDrive?.peakEndpointKW||0;
   const loadInputsKW=e.peakPayloadBranchKW/e.payload.efficiency+e.peakServiceBranchKW/e.service.efficiency+heatPumpBranchKW/(e.heatPumpDrive?.efficiency||1),primaryPowerKW=loadInputsKW+e.quiescentKW;
   e.peakBusDemandKW=primaryPowerKW+loss(e.harness.primary,primaryPowerKW,e.family.primaryV);
@@ -141,10 +193,10 @@ function synchronizeStarmindHarnessEnergy(h,graph,records,intraArray,{installed,
   a.wire.supported=a.wire.areaMM2>=a.wire.requiredAreaMM2;a.voltageDropV=a.currentA*a.resistanceOhm;a.powerLossW=a.currentA*a.currentA*a.resistanceOhm;
   for(const row of records.filter(row=>row.harnessId===a.id)){const loopResistanceOhm=row.conductorLengthM*2.10e-8/(a.wire.areaMM2*1e-6)+(a.matedContactCount??4)*connectorSelections[a.connectorTypeId].contactResistanceBudgetOhm+(a.additionalRotaryResistanceOhm||0);row.powerLossW=a.currentA*a.currentA*loopResistanceOhm;}
  }
- const demandBasis='Peak payload and bus demand are recalculated from the adopted payload loop resistance with the existing service, primary and heat-pump estimates. Installed converter/feed counts, ratings and gauges remain fixed; required-module, busbar, voltage-drop and battery-circuit current checks expose any shortfall.';
- e.harness.installedDemandAccounting={payloadMapped,originalDemand,peakPayloadBranchKW:e.peakPayloadBranchKW,peakBusDemandKW:e.peakBusDemandKW,basis:demandBasis};
+ const demandBasis=heatlift?'Peak payload, compressor-drive and bus demand are recalculated from the adopted complete loop resistances with the existing mixed-service and primary-distribution estimates. Installed converters, feeds, ratings and gauges remain fixed; required-module, busbar, voltage-drop and battery-circuit current checks expose any shortfall.':'Peak payload and bus demand are recalculated from the adopted payload loop resistance with the existing service, primary and heat-pump estimates. Installed converter/feed counts, ratings and gauges remain fixed; required-module, busbar, voltage-drop and battery-circuit current checks expose any shortfall.';
+ e.harness.installedDemandAccounting={payloadMapped,originalDemand,peakPayloadBranchKW:e.peakPayloadBranchKW,peakBusDemandKW:e.peakBusDemandKW,basis:demandBasis,...(heatlift?{heatPumpMapped,heatPumpPeakBranchKW:e.heatPumpDrive.peakBranchKW}:{})};
  h.energySystem.checks=energyDesignChecks(h);h.energySystem.applicability=h.energySystem.checks.some(check=>check.status==='shortfall')?'outside_design_envelope':'within_preliminary_envelope';
- const basis='Starmind runtime I²R uses the current array and payload conductor cuts with the existing equal-load parallel-feed assumption. Intra-array source leads remain the explicit model allocation in WBS 02.01. Primary distribution and mixed-voltage service/pump paths retain their existing EPS aggregate estimates: the detailed battery-to-PCDU circuits are not the distribution feeds, and no new service-current sharing is assumed. '+demandBasis+' This does not redesign thermal transport or qualify individual routes.';
+ const basis=(heatlift?'Star Catcher runtime I²R uses the current array, payload and primary-voltage compressor-drive conductor cuts':'Starmind runtime I²R uses the current array and payload conductor cuts')+' with the existing equal-load parallel-feed assumption. Intra-array source leads remain the explicit model allocation in WBS 02.01. Primary distribution and mixed-voltage service/pump paths retain their existing EPS aggregate estimates: the detailed battery-to-PCDU circuits are not the distribution feeds, and no new service-current sharing is assumed. '+demandBasis+' This does not redesign thermal transport or qualify individual routes.';
  e.harness.runtimeLossBasis=basis;
  return {groups,demand:e.harness.installedDemandAccounting,basis};
 }
@@ -155,7 +207,7 @@ export function adoptInstalledHarnessMass(h,graph,{installed=false,source=null,c
  installWorkerOpticsPlacements(h,graph);
  updateRedwireRadiatorExposure(h,graph);
  const records=harnessMassRecords(graph,{installed,connectorSelections}),status=installed?'installed-route-mass-adopted':'model-estimate-adopted';
- const intraArray=retainStarmindIntraArrayHarness(h,graph),energyAccounting=synchronizeStarmindHarnessEnergy(h,graph,records,intraArray,{installed,connectorSelections});
+ const intraArray=retainMountedStudyIntraArrayHarness(h,graph),energyAccounting=synchronizeMountedStudyHarnessEnergy(h,graph,records,intraArray,{installed,connectorSelections});
  const oldSignature=h.installedHarnessAccounting?.massSignature;
  for(const a of graph.harnesses){
   const rows=records.filter(r=>r.harnessId===a.id);

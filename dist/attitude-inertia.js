@@ -113,7 +113,7 @@ function fixedShape(h,row){
     else tensor=boxInertia(mass,[.10,.10,.10]);
    }else if(/^06\.0[345]$/.test(wbs)){
     tensor=sphereInertia(mass,h.propulsion.tanks[Number(wbs.slice(3))-3].radiusM,h.propulsion.tanks[Number(wbs.slice(3))-3].radiusM);
-   }else tensor=boxInertia(mass,resource.dimensionsM);
+   }else tensor=boxInertia(mass,row.heatLiftPackage&&index===0?row.heatLiftPackage.dimensionsM:resource.dimensionsM);
    return intrinsicElement(wbs+'-'+index,mass,position,tensor);
   });
  }
@@ -121,6 +121,7 @@ function fixedShape(h,row){
  if(/^06\.0[345]$/.test(wbs))basis='Thin spherical shell at the installed outer vessel radius. Mount and pressure-management allowance is distributed over that shell.';
  if(wbs==='01.01'||wbs==='01.02')basis='Uniform tray volumes at every occupied rack slot. Accelerator and host allocations partition the shared tray mass.';
  if(wbs==='04.01')basis='Four uniform mechanism envelopes at their installed mounting stations. Rotor spin momentum is an additional attitude-state variable.';
+ if(row.heatLiftPackage)basis='The complete allocated heat-pump assembly uses its actual forward service-bay envelope and station. The remaining rotary hardware retains its existing subsystem allocation; the motor drive is included once in the package mass.';
  const result={specificTensor:aboutPoint(elements,centroidM),basis};cache.set(wbs,result);return result;
 }
 

@@ -9,6 +9,7 @@ import {getFacilityAsset,chooseFacilityAsset,assessFacilityFit} from './test-fac
 import {stablePerspectiveNear} from './camera-clipping.js';
 import {thermalScales,temperatureColor} from './thermal-colors.js';
 import {activeThermalBoundaryIds} from './thermal-engineering-visuals.js';
+import {createConstructionPendingState} from './scene-construction-state.js';
 
 const V=(x=0,y=0,z=0)=>new T.Vector3(x,y,z),clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),array=x=>Array.isArray(x)?x:[x];
 const BG='#0c141d',presets={iso:[.8,.42],front:[0,0],side:[Math.PI/2,0],top:[0,Math.PI/2-.001]};
@@ -37,9 +38,9 @@ export function createPartViewer(container,{onSelect,onStatus,onChange,onHoldPla
  const perspective=new T.PerspectiveCamera(34,1,.001,1e6),ortho=new T.OrthographicCamera(-1,1,1,-1,.001,1e6);
  const hemi=new T.HemisphereLight(0xe4f0ff,0x8f9caa,1.3),key=new T.DirectionalLight(0xffedcf,3.2),rim=new T.DirectionalLight(0xaccfff,1.4);scene.add(hemi,key,rim,key.target,rim.target);
  const softbox=new T.DirectionalLight(0xfff1db,2.65),bounce=new T.DirectionalLight(0xdcecff,1.6);scene.add(softbox,bounce,softbox.target,bounce.target);
- const rendering=createLaunchRendering(renderer,gpu),models=new Map(),materials=new Set(),pairs=[];
- const state={available:false,geometryStatus:'Choose a part to inspect.',contextOnly:false,matingRestriction:null,animations:[],animationId:null,progress:1,playing:false,mode:'materials',detailMode:'high',context:false,setting:offscreen?'studio':'review',facilityAssetId:null,scaleMode:'auto',projection:'perspective',axes:false,autoRotate:false,lighting:'studio',exposureEV:0,thermalScale:'full'};
- let configKey='',model=null,record=null,snapshot={},selection=null,selectedObjects=new Set(),detailRevision=-1,renderMs=0,camera=perspective,w=width,ht=height,radius=1,distance=5,yaw=.8,pitch=.42,target=V(),revision=0,holds=0,appearance=null,recording=null,capturing=false;
+ const rendering=createLaunchRendering(renderer,gpu),models=new Map(),materials=new Set(),pairs=[],constructionPending=createConstructionPendingState();
+ const state={available:false,constructionPending:false,geometryStatus:'Choose a part to inspect.',contextOnly:false,matingRestriction:null,animations:[],animationId:null,progress:1,playing:false,mode:'materials',detailMode:'high',context:false,setting:offscreen?'studio':'review',facilityAssetId:null,scaleMode:'auto',projection:'perspective',axes:false,autoRotate:false,lighting:'studio',exposureEV:0,thermalScale:'full'};
+ let configKey='',configHardware=null,model=null,record=null,snapshot={},selection=null,selectedObjects=new Set(),detailRevision=-1,renderMs=0,camera=perspective,w=width,ht=height,radius=1,distance=5,yaw=.8,pitch=.42,target=V(),revision=0,holds=0,appearance=null,recording=null,capturing=false;
  const bounds=new T.Box3(),box=new T.Box3(),size=V(),center=V(),trackedCenter=V(),raycaster=new T.Raycaster(),pointer=new T.Vector2();
  let stage=null,parentRecord=null,parentSelection=null,stageOffset=V(),partSize=V(),mateTravel=0;
  let thermalRun=null,thermalFrame=null,thermalProgress=0,thermalMapped=0,thermalDisplay=null;
@@ -230,18 +231,31 @@ export function createPartViewer(container,{onSelect,onStatus,onChange,onHoldPla
  }
  function textureChanged(){if(!alive)return;sync();revision++;appearance?.listener?.();request();}
  const unsubscribe=onSpacecraftTextureUpdate(textureChanged);
+ function showConstructionPending(){
+  model=null;selection=parentSelection=null;selectedObjects.clear();dropDisplay();partSize.set(0,0,0);
+  Object.assign(state,{available:false,constructionPending:true,contextOnly:false,animations:[],geometryStatus:'3D preview unavailable. Prepared harness routing does not match this design.'});
+  changed(true);return getState();
+ }
  function setPart(next,h,s={},options={}){
   if(!alive)return getState();const signature=partConfigurationKey(h),family=next?.render?.family||'flight';
   thermalRun=thermalFrame=thermalDisplay=null;thermalMapped=thermalProgress=0;if(state.mode==='thermal')state.mode='materials';
-  model?.detail?.clear();detailRevision=-1;selectedObjects=new Set();
-  if(signature!==configKey){dropDisplay();for(const m of models.values())m.dispose();models.clear();model=null;configKey=signature;}
-  record=next;snapshot=s||{};parentRecord=options.parentRecord||null;parentSelection=null;state.playing=false;state.progress=1;state.animationId=null;state.matingRestriction=null;state.animations=partAnimations(record);dropStage();
+  model?.detail?.clear();detailRevision=-1;selectedObjects=new Set();selection=null;
+  state.available=false;state.contextOnly=false;partSize.set(0,0,0);
+  if(signature!==configKey||h!==configHardware){dropDisplay();for(const m of models.values())m.dispose();models.clear();model=null;configKey=signature;configHardware=h;}
+  record=next;snapshot=s||{};parentRecord=options.parentRecord||null;parentSelection=null;state.playing=false;state.progress=1;state.animationId=null;state.matingRestriction=null;state.animations=partAnimations(record);state.constructionPending=false;dropStage();
   if(settings.has(options.setting))state.setting=options.setting;else if(options.context===true)state.setting='installed';
   if(Object.prototype.hasOwnProperty.call(options,'facilityAssetId')){const requested=getFacilityAsset(options.facilityAssetId);if(!options.facilityAssetId)facilitySelections.delete(state.setting);else if(requested?.kind===state.setting)facilitySelections.set(state.setting,requested.id);}
   state.facilityAssetId=null;
   if(scaleModes.has(options.scaleMode))state.scaleMode=options.scaleMode;state.context=['installed','fit-check'].includes(state.setting);
   if(!record||record.render?.unavailable){selection=null;dropDisplay();partSize.set(0,0,0);state.available=false;state.contextOnly=false;state.geometryStatus=record?.render?.unavailableReason||'This allocation has no independent modeled geometry.';changed(true);return getState();}
-  if(!models.has(family))models.set(family,createPartModel(h,family,textureChanged,{renderer,gpu}));model=models.get(family);model.pose(record,1,null,snapshot);selection=model.select(record);selectedObjects=new Set(selection.meshes);
+  if(family==='flight'&&constructionPending.blocks(h))return showConstructionPending();
+  try{if(!models.has(family))models.set(family,createPartModel(h,family,textureChanged,{renderer,gpu}));}
+  catch(error){
+   model=null;dropDisplay();
+   if(!constructionPending.defer(h,error))throw error;
+   return showConstructionPending();
+  }
+  model=models.get(family);model.pose(record,1,null,snapshot);selection=model.select(record);selectedObjects=new Set(selection.meshes);
   if(parentRecord&&parentRecord.render?.family===family){parentSelection=model.select(parentRecord);selection=model.select(record);selectedObjects=new Set(selection.meshes);}
   Object.assign(state,{available:selection.available,geometryStatus:selection.geometryStatus,contextOnly:selection.contextOnly});rebuild();if(selection.available){buildStage();fit(options.reset!==false);if(refreshDetail(true,offscreen))fit(false);}else partSize.set(0,0,0);changed(true);return getState();
  }
@@ -355,9 +369,14 @@ export function createPartViewer(container,{onSelect,onStatus,onChange,onHoldPla
   renderThumbnail(){renderNow();return canvas.toDataURL('image/webp',.78);}};
 }
 
-let thumbnailViewer=null,thumbnailHost=null,thumbnailQueue=[],thumbnailBusy=false,thumbnailIdle=0;
-const thumbnailCache=new Map(),thumbnailPending=new Map();
-function thumbnailKey(record,h,width,height){return detailMaterialRevision+'|'+partConfigurationKey(h)+'|'+record.id+'|'+JSON.stringify(record.render)+'|'+width+'x'+height;}
+let thumbnailViewer=null,thumbnailHost=null,thumbnailQueue=[],thumbnailBusy=false,thumbnailIdle=0,thumbnailHardwareSerial=0;
+const thumbnailCache=new Map(),thumbnailPending=new Map(),thumbnailHardwareIds=new WeakMap();
+function thumbnailKey(record,h,width,height){
+ // A fresh sized build can change physical geometry without changing its input
+ // serialization. Never return an earlier build's thumbnail before its guard.
+ if(!thumbnailHardwareIds.has(h))thumbnailHardwareIds.set(h,++thumbnailHardwareSerial);
+ return detailMaterialRevision+'|'+thumbnailHardwareIds.get(h)+'|'+partConfigurationKey(h)+'|'+record.id+'|'+JSON.stringify(record.render)+'|'+width+'x'+height;
+}
 function abortError(){return new DOMException('Thumbnail request canceled.','AbortError');}
 function idleTurn(){return new Promise(resolve=>{if(typeof requestIdleCallback==='function')requestIdleCallback(resolve,{timeout:250});else setTimeout(resolve,0);});}
 async function runThumbnails(){

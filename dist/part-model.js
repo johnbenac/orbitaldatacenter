@@ -60,7 +60,11 @@ export function selectPartGeometry(model,record){
 // owned factory's buffers; cached materials and textures remain read-only.
 export function createPartModel(h,family,onUpdate=()=>{},detailOptions=null){
  let alive=true;
- const factory=family==='launch'?makeLaunch(h,()=>{if(alive)onUpdate();},{environment:false}):makeCraft(h);
+ // Part previews use the same retained installation as the main flight view.
+ // A changed design without that construction must not start native route
+ // searches on the UI thread, even when only one thumbnail is requested.
+ const routingMode=['starmind-cross','heatlift-study'].includes(h.architectureFamilyId)?'construction':'analysis';
+ const factory=family==='launch'?makeLaunch(h,()=>{if(alive)onUpdate();},{environment:false}):makeCraft(h,{routingMode});
  const detail=detailOptions?createHardwareDetail(factory.root,{family,hardware:h,onWake:onUpdate,...detailOptions}):null;
  const model={factory,family,h,detail,pose,select:record=>selectPartGeometry(model,record),dispose};
  function pose(record,progress=1,animationId=null,snapshot={}){

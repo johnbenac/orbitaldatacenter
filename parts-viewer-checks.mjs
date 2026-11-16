@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import * as T from './dist/vendor/three.module.js';
 import {sizeDesign,missionStarter} from './dist/design.js';
 import {architectureFamilies} from './dist/architecture-families.js';
+import {buildReferenceDesign} from './dist/reference-configurations.js';
 import {buildPartsCatalog,resolveScenePart} from './dist/parts-catalog.js';
 import {createPartModel,partObjectDescriptor,visiblePartObject} from './dist/part-model.js';
 import {canvas as testCanvas} from './render-test-canvas.mjs';
@@ -18,8 +19,11 @@ for(let i=0;i<one.meshes.length;i++)if(!one.meshes[i].geometry.userData.shared)a
 const shared=one.meshes.flatMap(o=>[o.geometry,...[].concat(o.material)]).filter(o=>o.userData.shared);let sharedDisposals=0;for(const object of shared)object.addEventListener('dispose',()=>sharedDisposals++);
 const unknown={id:'missing',render:{family:'flight',names:['Not an installed component']}};assert.equal(model.select(unknown).available,false,'unmatched selector must not show a substitute assembly');
 const unavailable={...array,render:{family:'flight',unavailable:true,unavailableReason:'Allocated quantity only'}};assert.equal(model.select(unavailable).geometryStatus,'Allocated quantity only');
+// Presentation models use the complete published configuration for the two
+// references whose installed construction is prepared outside the browser.
+const preparedReferences={'starmind-cross':'starmind-ai1','heatlift-study':'star-catcher-self-powered'};
 for(const family of Object.keys(architectureFamilies)){
- const hardware=sizeDesign({...input,architectureFamily:family}),records=buildPartsCatalog(hardware),flight=createPartModel(hardware,'flight');
+ const hardware=sizeDesign(preparedReferences[family]?buildReferenceDesign(preparedReferences[family]):{...input,architectureFamily:family}),records=buildPartsCatalog(hardware),flight=createPartModel(hardware,'flight');
  for(const id of ['flight:01.01','flight:01.02','flight:01.03','flight:02.01','flight:02.02','flight:03.01','flight:04.01','flight:04.02','flight:05.02','flight:05.03','flight:06.01','flight:06.03','flight:06.04','flight:07.01','flight:07.02','flight:08.01']){const record=records.byId[id];flight.pose(record);assert(flight.select(record).available,family+' '+id);}
  const fuel=records.byId['flight:06.03'];flight.pose(fuel);const source=flight.select(fuel).meshes[0];assert(resolveScenePart(records,partObjectDescriptor(source,flight))?.id.startsWith('flight:06.03'),'vessel selection retains fuel/oxidizer identity');
  flight.dispose();

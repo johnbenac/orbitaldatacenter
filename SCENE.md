@@ -150,6 +150,16 @@ fluid or withdrawal planning and compares the actual rendered cable/pipe buffers
 retained construction. Browser acceptance additionally requires an observed rendered frame
 and a responsive camera or other scene interaction.
 
+Equipment-list thumbnails and focused Parts navigator views use the same guarded
+construction mode for Star Catcher and SpaceX. A part viewer owns its display geometry,
+but opening a preview must not run the full electrical or fluid planner. If a changed
+physical configuration has no matching construction, the preview clears any old selection
+and reports that prepared routing is unavailable for that design. Returning to the
+published reference restores its installed geometry. Explicit analysis remains available
+through the developer construction tools.
+`part-construction-startup-checks.mjs` exercises both prepared references and changed-design
+rejection through the real part-model factory and viewer.
+
 The mass inventory retains its exact native design hash and a second complete fingerprint
 with geometric numbers compared at nine decimal places (one nanometre for metre coordinates).
 This accommodates last-bit differences between browser and Node math libraries. Only the

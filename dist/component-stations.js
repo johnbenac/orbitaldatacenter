@@ -1,7 +1,7 @@
 import {architectureFamily,architectureTerminalStations} from './architecture-families.js';
 import {installedCommunications} from './communications-packages.js';
 import {electricalBoxLayout} from './electrical-architecture.js';
-import {cableInstallationMassElements,workerOpticsMassElements} from './cable-installation-mass.js';
+import {cableInstallationMassGroups,workerOpticsMassElements} from './cable-installation-mass.js';
 import {radiatorPanelMaterialRectangles} from './radiator-surface-area.js';
 import {heatliftPackageAllocation} from './heatlift-service-installation.js';
 // Installed mass and body stations. Distances in m, masses in kg. Instance stations
@@ -83,16 +83,20 @@ function leafGroups(h,deploy,attitude){
 }
 const fixedCentroids=new WeakMap();
 const electricalStationLayouts=new WeakMap();
-const installationGroups=new WeakMap(),elementStations=new WeakMap();
-function groupInstallation(elements){
- let grouped=installationGroups.get(elements);
- if(!grouped){grouped=new Map();for(const part of elements){if(!grouped.has(part.partId))grouped.set(part.partId,[]);grouped.get(part.partId).push(part);}installationGroups.set(elements,grouped);}
- return grouped;
-}
+const elementStations=new WeakMap(),emptyInstallation=[];
 function materialStations(parts,kg){
  let saved=elementStations.get(parts);
  if(!saved||saved.kg!==kg){const stationsM=parts.map(part=>part.centroidM),stationShares=parts.map(part=>part.massKg/kg);saved={kg,stationsM,stationShares,centroidM:mean(stationsM,stationShares),movingStationCount:parts.filter(part=>part.moving).length};elementStations.set(parts,saved);}
  return saved;
+}
+function installationStations(group,kg){
+ if(!group)return materialStations(emptyInstallation,kg);
+ const fixed=materialStations(group.fixed,kg);
+ if(!group.moving.length)return fixed;
+ const moving=materialStations(group.moving,kg),
+  stationsM=group.order.map(slot=>(slot.moving?moving:fixed).stationsM[slot.index]),
+  stationShares=group.order.map(slot=>(slot.moving?moving:fixed).stationShares[slot.index]);
+ return {stationsM,stationShares,centroidM:mean(stationsM,stationShares),movingStationCount:group.moving.length};
 }
 function partsAt(h,deploy,attitude){
  const p=h.propulsion,d=h.input,w=h.bodyWidthM,b=h.bodyHeightM,l=h.bodyLengthM;
@@ -111,7 +115,7 @@ function partsAt(h,deploy,attitude){
   }
  }
  const leaves=leafGroups(h,deploy,attitude),engines=p.engines.map(e=>e.throatZ!=null?[e.x,e.y,.5*(e.throatZ+e.z)]:[e.x,.5*(e.throatY+e.y),e.z]);
- const terminals=terminalMassElements(h,attitude),installation=groupInstallation(cableInstallationMassElements(h,deploy,attitude)),optics=workerOpticsMassElements(h,deploy,attitude);
+ const terminals=terminalMassElements(h,attitude),installation=cableInstallationMassGroups(h,deploy,attitude),optics=workerOpticsMassElements(h,deploy,attitude);
  const stack=h.fairing?.stack||[],bus=stack.find(v=>/insulated bus/i.test(v.part)),adapter=stack[0];
  const suppliedPoint=(wbs,id)=>supplied[wbs]||supplied[id]||[0,0,0];
  const radii=p.tanks.map(xyz);
@@ -125,7 +129,7 @@ function partsAt(h,deploy,attitude){
    const {stationsM,stationShares,centroidM}=materialStations(optics,row.kg);Object.assign(row,{stationsM,stationShares,centroidM});continue;
   }
   if(row.installationPartId){
-   const {stationsM,stationShares,centroidM,movingStationCount}=materialStations(installation.get(row.installationPartId)||[],row.kg);
+   const {stationsM,stationShares,centroidM,movingStationCount}=installationStations(installation.get(row.installationPartId),row.kg);
    Object.assign(row,{stationsM,stationShares,centroidM,movingStationCount});continue;
   }
   if(electrical[row.wbs]){Object.assign(row,electrical[row.wbs]);continue;}
@@ -179,7 +183,10 @@ function partsAt(h,deploy,attitude){
 const memo=new WeakMap();
 export function componentMassProperties(h,remainingKg=h.propellantKg,deployedFraction=1,adapterAttached=false,cache=true,attitude=null){
  const p=h.propulsion,loaded=p.fuelKg+p.oxidizerKg,liquid=Math.min(loaded,Math.max(0,remainingKg??loaded));
- const frac=Math.max(0,Math.min(1,deployedFraction)),revision=h.electricalMassRevision||0,saved=memo.get(h),poses=saved?.massRevision===revision?saved:{massRevision:revision};
+ const frac=Math.max(0,Math.min(1,deployedFraction)),revision=h.electricalMassRevision||0,
+  hardware=h.cableInstallationHardware,parts=hardware?.parts,saved=memo.get(h),
+  poses=saved?.massRevision===revision&&saved.hardware===hardware&&saved.parts===parts?
+   saved:{massRevision:revision,hardware,parts};
  let base=cache&&!attitude&&poses[frac];
  if(!base){base=partsAt(h,frac,attitude);if(cache&&!attitude&&(frac===0||frac===1)){poses[frac]=base;memo.set(h,poses)}}
  const gas=heliumDistribution(p,liquid),dryGrowth=h.input.structureMargin??0;
@@ -203,7 +210,8 @@ export function componentCentroid(h,remainingKg,deploy=1,adapterAttached=false,a
  // Fixed-mixture liquids and regulated ullage masses vary linearly with remaining
  // stock. Interpolate first moments, then divide by the instantaneous total mass.
  if(attitude||deploy!==0&&deploy!==1)return componentMassProperties(h,remainingKg,deploy,adapterAttached,false,attitude).cm;
- const revision=h.electricalMassRevision||0;let poses=momentCache.get(h);if(!poses||poses.massRevision!==revision){poses={massRevision:revision};momentCache.set(h,poses)}
+ const revision=h.electricalMassRevision||0,hardware=h.cableInstallationHardware,parts=hardware?.parts;
+ let poses=momentCache.get(h);if(!poses||poses.massRevision!==revision||poses.hardware!==hardware||poses.parts!==parts){poses={massRevision:revision,hardware,parts};momentCache.set(h,poses)}
  const key=deploy+'/'+adapterAttached;
  const ends=poses[key]??=( [componentMassProperties(h,0,deploy,adapterAttached),componentMassProperties(h,h.propellantKg,deploy,adapterAttached)] );
  const f=Math.min(1,Math.max(0,remainingKg/h.propellantKg)),mass=ends[0].massKg*(1-f)+ends[1].massKg*f;

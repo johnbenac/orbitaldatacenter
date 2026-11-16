@@ -171,6 +171,18 @@ inspection. Sizing compares its physical guard and constructs the declared mater
 not rerun the support-placement search. The same material builder supplies rendering, mass,
 CG, inertia and the MEL.
 
+Flight propagation also separates fixed installation material from articulated material.
+The Star Catcher schedule contains 4,654 fixed pieces and 100 moving pieces. A collector's
+changing pose must not rebuild every fixed station and material tensor. Each fixed assembly
+retains its complete per-piece station array and an exactly integrated central tensor; the
+parallel-axis theorem transports that tensor to the current vehicle center. Moving rotor
+and payload pieces still receive their full pose transforms. Hardware revisions, replacement
+of the adopted schedule, and replacement of its parts array invalidate the mass-property
+caches, including the existing four-pose inertia cache. No mass or geometric detail is removed.
+`installation-inertia-cache-checks.mjs` checks the complete material inventory, independent
+centroid/tensor integration, nine distinct poses, fixed-geometry reuse and those invalidation
+boundaries. Its work-count assertions avoid machine-dependent timing thresholds.
+
 ## Browser asset revalidation
 
 The Pages response policy in `dist/_headers` requires revalidation of the entry

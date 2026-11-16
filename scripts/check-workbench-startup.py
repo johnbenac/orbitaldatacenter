@@ -25,6 +25,7 @@ VIEWS = {'desktop': dict(width=1440, height=900), 'mobile': dict(width=390, heig
 CASES = {
     'default': ('/', 'redwire-8kw'),
     'spacex': ('/?center=starmind-ai1&play=0', 'starmind-ai1'),
+    'starcatcher': ('/?center=star-catcher-self-powered&play=0', 'star-catcher-self-powered'),
 }
 CHROME_ARGS = ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader',
                '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist']
@@ -35,7 +36,8 @@ READY = """center => {
   const canvas = host?.querySelector('canvas');
   return !!(cover?.hidden && !document.body.hasAttribute('data-starting') &&
     host?.dataset.renderedReferenceCenter === center &&
-    (center !== 'starmind-ai1' || host.dataset.renderedRouting === 'compiled-native') &&
+    (!['starmind-ai1', 'star-catcher-self-powered'].includes(center) ||
+      host.dataset.renderedRouting === 'compiled-native') &&
     Number(host.dataset.renderedFrames) > 0 && canvas?.width > 0 &&
     canvas.height > 0 && canvas.getBoundingClientRect().width > 0 &&
     canvas.getBoundingClientRect().height > 0);
@@ -123,7 +125,8 @@ def check_case(playwright, base, browser_name, view_name, case_name, timeout_s):
         page.wait_for_function("""({center, frames, target}) => {
           const host = document.getElementById('scene');
           return host?.dataset.renderedReferenceCenter === center &&
-            (center !== 'starmind-ai1' || host.dataset.renderedRouting === 'compiled-native') &&
+            (!['starmind-ai1', 'star-catcher-self-powered'].includes(center) ||
+              host.dataset.renderedRouting === 'compiled-native') &&
             Number(host.dataset.renderedFrames) > frames &&
             document.getElementById('camera-mode-' + target)?.getAttribute('aria-pressed')
               === 'true';

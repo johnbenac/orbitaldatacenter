@@ -1,7 +1,7 @@
 // The installed raceway/support schedule is shared with the physical renderer.
 // Metal is counted from material pieces, so hollow cable space adds no mass.
 // Functional rotary internals may instead have explicitly named PDR estimates.
-import {deploymentLayout,leafPose,leafAxes} from './deployment.js';
+import {deploymentLayout,leafPose,leafAxes,mechanismPose} from './deployment.js';
 
 const identity=[[1,0,0],[0,1,0],[0,0,1]];
 const finiteVector=value=>Array.isArray(value)&&value.length===3&&value.every(Number.isFinite);
@@ -35,7 +35,8 @@ function normalizePiece(piece,part,index,allocated=false){
  const label=part.id+':'+(piece.id||index),shape=allocated?'allocated':piece.shape||'box',positionM=piece.positionM||[0,0,0],axes=axesFor(piece.axes,label);
  if(!finiteVector(positionM))throw new Error(label+': invalid material position');
  let dimensionsM=piece.dimensionsM,volumeM3=null,massKg,axisIndex=1,outerRadiusM=null,innerRadiusM=0,lengthM=null,centroidOffsetM=[0,0,0],intrinsicTensorPerKg=null,angleRad=null,startAngleRad=null;
- const materialTakeoff=piece.materialTakeoff||null;
+ const materialTakeoff=piece.materialTakeoff||null,motion=piece.motion;
+ if(motion&&(motion.kind!=='solar-rotor'||!Number.isInteger(motion.wingInstance)||motion.wingInstance<0||!finiteVector(motion.originM)))throw new Error(label+': invalid solar rotor material frame');
  const densityKgM3=piece.densityKgM3??part.densityKgM3,material=piece.material||part.material||'Preliminary material';
  if(shape==='box'||shape==='allocated'){
   if(!finiteVector(dimensionsM)||!dimensionsM.every(positive))throw new Error(label+': invalid material dimensions');
@@ -62,7 +63,7 @@ function normalizePiece(piece,part,index,allocated=false){
   if(!positive(densityKgM3))throw new Error(label+': material density is required');
   massKg=volumeM3*densityKgM3;
  }
- return {id:piece.id||String(index+1),label:piece.label||part.label,shape,positionM:[...positionM],centroidOffsetM,intrinsicTensorPerKg,axes,dimensionsM:[...dimensionsM],axisIndex,outerRadiusM,innerRadiusM,lengthM,angleRad,startAngleRad,material,densityKgM3:allocated?null:densityKgM3,volumeM3,massKg,materialTakeoff,occlusion:piece.occlusion||part.occlusion||'exposed',basis:allocated?piece.basis:piece.basis||part.basis||sourceLabel,massBasis:materialTakeoff?'contained-cut-volume-times-density':allocated?'declared-functional-component':'material-volume-times-density'};
+ return {id:piece.id||String(index+1),label:piece.label||part.label,shape,positionM:[...positionM],centroidOffsetM,intrinsicTensorPerKg,axes,dimensionsM:[...dimensionsM],axisIndex,outerRadiusM,innerRadiusM,lengthM,angleRad,startAngleRad,material,densityKgM3:allocated?null:densityKgM3,volumeM3,massKg,materialTakeoff,occlusion:piece.occlusion||part.occlusion||'exposed',basis:allocated?piece.basis:piece.basis||part.basis||sourceLabel,massBasis:materialTakeoff?'contained-cut-volume-times-density':allocated?'declared-functional-component':'material-volume-times-density',...(motion?{motion:{kind:motion.kind,wingInstance:motion.wingInstance,originM:[...motion.originM]}}:{})};
 }
 function pieceExtent(piece,axes){
  if(piece.shape==='annulus'||piece.shape==='cylinder')return [0,1,2].map(axis=>Math.abs(axes[piece.axisIndex][axis])*piece.lengthM/2+piece.outerRadiusM*Math.sqrt(Math.max(0,1-axes[piece.axisIndex][axis]**2)));
@@ -123,6 +124,12 @@ function framedElements(entries,deployment,attitude,h,movingOnly){
  const frames={};
  return entries.flatMap(entry=>{
   if(entry.fixed)return movingOnly?[]:entry.fixed;
+  if(entry.motion){
+   const poses=frames.solar??=mechanismPose(deploymentLayout(h),deployment,h.input.solarTiltDeg,attitude).wings,pose=poses[entry.motion.wingInstance],origin=entry.motion.originM;
+   if(!pose||pose.root.some((value,axis)=>Math.abs(value-origin[axis])>1e-8))throw new Error('Solar rotor material frame does not match its installed wing root');
+   const axes=pose.axes||leafAxes({pitch:pose.pitch});
+   return entry.parts.map(part=>({...part,centroidM:add(origin,rotate(part.positionM.map((value,axis)=>value-origin[axis]),axes)),axes:part.axes.map(axis=>rotate(axis,axes))}));
+  }
   const frame=frames.payload??=installedFrame(h,'payload',deployment,attitude);
   return entry.parts.map(part=>({...part,centroidM:add(frame.origin,rotate(part.positionM,frame.axes)),axes:part.axes.map(axis=>rotate(axis,frame.axes))}));
  });
@@ -148,10 +155,15 @@ export function workerOpticsMassElements(h,deployment=1,attitude=null,{movingOnl
 export function cableInstallationMassElements(h,deployment=1,attitude=null,{movingOnly=false}={}){
  const hardware=h.cableInstallationHardware,parts=hardware?.parts||[];
  if(!parts.length)return [];
- if(movingOnly&&!parts.some(part=>part.frame==='payload'))return [];
+ if(movingOnly&&!parts.some(part=>part.frame==='payload'||part.pieces.some(piece=>piece.motion)))return [];
  const revision=h.electricalMassRevision||0;let cached=installationElementCache.get(h);
  if(!cached||cached.hardware!==hardware||cached.massRevision!==revision){
-  const entries=parts.map(part=>{const pieces=part.pieces.map(piece=>({...piece,id:part.id+':'+piece.id,partId:part.id,wbs:part.wbs,moving:part.frame==='payload'}));return part.frame==='payload'?{parts:pieces}:{fixed:bodyElements(pieces)};});
+  const entries=parts.flatMap(part=>{
+   const pieces=part.pieces.map(piece=>({...piece,id:part.id+':'+piece.id,partId:part.id,wbs:part.wbs,moving:part.frame==='payload'||!!piece.motion}));
+   if(part.frame==='payload')return [{parts:pieces}];
+   if(!pieces.some(piece=>piece.motion))return [{fixed:bodyElements(pieces)}];
+   return pieces.map(piece=>piece.motion?{parts:[piece],motion:piece.motion}:{fixed:bodyElements([piece])});
+  });
   cached={hardware,massRevision:revision,entries,fixed:entries.every(entry=>entry.fixed)?entries.flatMap(entry=>entry.fixed):null};installationElementCache.set(h,cached);
  }
  if(cached.fixed)return movingOnly?[]:cached.fixed;

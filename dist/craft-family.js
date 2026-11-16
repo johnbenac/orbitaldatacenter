@@ -7,8 +7,10 @@ import {tagMaterial,engineeringGraphic,planeMaterialUV,cylinderMaterialUV,sphere
 import {connectionTube,connectionAnchor,anchorInFrame,normalInFrame} from './connection-geometry.js';
 import {inlineArmServiceAllocation} from './inline-arm-routing.js';
 import {starmindLoopTwoSupplyAccommodation} from './starmind-harness-routing.js';
+import {starcatcherLoopTwoReturnAccommodation} from './starcatcher-harness-routing.js';
 import {familyAppendageDimensions as appendageDimensions} from './family-appendage-dimensions.js';
 import {protectedSolarCollectorMaterialGeometry} from './protected-solar-collector.js';
+import {heatliftTerminalTransfer,heatliftTerminalAnnulusGeometry,heatliftPackageAllocation,heatliftHotPipeControls} from './heatlift-service-installation.js';
 import {installRadiatorFluidTransfer} from './radiator-fluid-transfer.js';
 import {declareRotaryFluidChannel,fluidInterfaceAllocationReport} from './fluid-interface-allocation.js';
 import {createRoutingWall,addRoutingWallLayer,routingFeedthroughFactory,perforatedPanelGeometry,constantLengthHingeRoute,registerRoutingBox,planStaticFluidConnections,joinedFluidRoutes,fluidPhysicalMeshes,installColdPlateCollection,flightFluidSnapshot,auditFlightFluidSnapshot,bindFluidJunctions,hollowFluidFitting,locateFluidFeedthrough,routingMotionFor} from './flight-fluid-routing.js';
@@ -61,7 +63,7 @@ export function makeFamilyCraft(h,kit){
   const lug=box(root,point[0],point[1],point[2]-thickness/2,size,size,thickness,role('launch-interface'),'structure');lug.name='Allocated '+f.launchInterface+' hardpoint';
   const pin=cyl(root,point[0],point[1],point[2]-thickness/2,.02,.02,thickness+.025,mechanismMat,'structure',24);pin.rotation.x=Math.PI/2;
  }
- const supportBars=[],collectorSupports=['protected-core','starmind-cross'].includes(f.id)?h.solarRootCollector?.hardwareSchedule||[]:[];let solarSupportInstance=0;
+ const supportBars=[],collectorSupports=['protected-core','starmind-cross','heatlift-study'].includes(f.id)?h.solarRootCollector?.hardwareSchedule||[]:[];let solarSupportInstance=0;
  for(const m of g.mounts){
   const collector=m.kind==='solar'?collectorSupports[solarSupportInstance++]:null;
   for(const [index,s]of m.supports.entries()){
@@ -98,6 +100,7 @@ export function makeFamilyCraft(h,kit){
   panels.push({surface,descriptor:desc});mechanismAudit.wings.push({root:rootPin,tip:tipPin,mandrel:roll,blanket:front,booms:edges,side:desc.side,end:desc.end});
  }
  const radiatorMeshes=new Map(),radiatorPorts=new Map(),jointLinks=[],fluidConnections=[],thermalPumps=[];
+ let heatLiftPackage=null;
  let payloadPlatformAnchor=null,payloadRack=null;
  for(const desc of g.descriptors.filter(s=>s.type==='rad')){
   const p=join(appendages,0,0,0,'radiator');p.userData.routingMotion={kind:'rigid',frameId:p.uuid,attachment:'radiator-leaf',bankEnd:desc.end,leafIndex:desc.j};p.name=f.payloadLocation==='radiator'?'Local compute / radiator platform':`Radiator ${desc.bankId||desc.end} leaf ${desc.j+1}`;
@@ -194,11 +197,50 @@ export function makeFamilyCraft(h,kit){
    thermalPumps.push({root:pump,positionM:pump.position.toArray(),supply:connectionAnchor(pump,[0,.175,.10],[0,1,0],'Pump supply fitting'),return:connectionAnchor(pump,[0,.175,-.10],[0,1,0],'Pump return fitting')});
   }
   if(f.thermalTopology==='heat-lift'){
-   const lift=join(internal,w*.24,0,l*.16,'radiator');lift.name='Analytical heat-lift package · allocated geometry';
-   box(lift,0,0,0,.55,.40,.60,role('heat-pump-case'),'radiator');box(lift,-.30,0,0,.05,.36,.56,role('heat-pump-case'),'radiator');box(lift,.30,0,0,.05,.36,.56,role('heat-pump-case'),'radiator');
+   const allocation=heatliftPackageAllocation(h),lift=join(internal,...allocation.positionM,'radiator');
+   lift.name='Heat-lift package · forward service bay';
+   Object.assign(lift.userData,{physicalPartId:'flight:03.02',electricalBoxId:'thermal-drive',
+    heatLiftPackage:true,installationBasis:allocation.basis});
+   box(lift,0,0,0,.55,.40,.60,role('heat-pump-case'),'radiator');
+   for(const side of [-1,1])box(lift,side*.30,0,0,.05,.36,.56,role('heat-pump-case'),'radiator');
+   for(const side of [-1,1])box(lift,0,0,side*.297,.65,.40,.006,role('heat-pump-case'),'radiator').name='Heat-lift package service face';
+   for(const x of [-.22,.22])for(const z of [-.22,.22]){
+    box(lift,x,.197,z,.065,.006,.065,frameMat,'radiator').name='Heat-lift package mounting pad';
+    box(lift,x,.272,z,.025,.144,.025,frameMat,'radiator').name='Heat-lift package roof hanger';
+    box(lift,x,.347,z,.065,.006,.065,frameMat,'radiator').name='Heat-lift package roof foot';
+   }
+   const coldPorts={};
+   for(const side of [-1,1]){
+    const name=side>0?'Heat-lift evaporator warm inlet':'Heat-lift evaporator cold outlet',
+     port=connectionAnchor(lift,[-.325,-.11,side*.12],[-1,0,0],name);
+    hollowFluidFitting(port,{lengthM:.030,material:tubeMat,name:name+' open fitting'});
+    port.userData.routingOwnerIds=[lift.uuid,port.uuid];coldPorts[side]=port;
+   }
+   root.userData.fluidComponentChannels.push({componentId:lift.uuid,name:'Separate heat-lift evaporator passage',
+    portIds:Object.values(coldPorts).map(port=>port.uuid),interfaceType:'heat-exchanger-cold',
+    fluidDomain:'heatlift-cold',minimumFlowDiameterM:.028,allocatedMassKg:0,
+    basis:'Evaporator passage included in the existing complete heat-pump allocation. Heat crosses to the hot circuit through the compressor cycle; the cold and hot secondary-fluid channels do not connect.'});
+   heatLiftPackage={root:lift,allocation,coldPorts,hotPorts:[],mounts:4};
   }
  }
  const coolantCollection=f.thermalTopology==='passive-local'?null:installColdPlateCollection({h,root,rack,pumps:thermalPumps,link:fluidLink,kit:{box,cyl,join,v,material:tubeMat}});
+ if(heatLiftPackage){
+  const pump=thermalPumps[0];
+  for(const [side,pumpPort]of [[1,pump.return],[-1,pump.supply]]){
+   pumpPort.userData.routingOwnerIds=[pump.root.uuid,pumpPort.uuid];
+   hollowFluidFitting(pumpPort,{lengthM:.024,material:tubeMat,name:'Cold manifold open evaporator fitting'});
+   fluidLink(heatLiftPackage.coldPorts[side],pumpPort,{name:side>0?'Heat-lift cold return to evaporator':'Heat-lift cold supply from evaporator',
+    circuitId:'heatlift-cold',fluidKind:'heatlift-cold-secondary',parent:root,bendRadiusM:.108,
+    via:(a,bb)=>[v(bb.x,a.y,a.z),v(bb.x,a.y,bb.z)]});
+   const branchPorts=coolantCollection.ports.filter(port=>port.parent===pump.root&&
+    port.name.includes(side>0?'warm return':'cold supply'));
+   root.userData.fluidComponentChannels.push({componentId:pump.root.uuid,
+    name:side>0?'Cold collection return manifold':'Cold collection supply manifold',
+    portIds:[pumpPort,...branchPorts].map(port=>port.uuid),interfaceType:'cold-manifold',
+    fluidDomain:'heatlift-cold',allocatedMassKg:0,basis:'Separate cold-side collection headers within the heat-lift assembly allocation.'});
+  }
+  coolantCollection.topology='Cold manifold → payload cold plates → evaporator → cold manifold; separate condenser headers → hot radiator banks → condenser';
+ }
  // Retained allocated propulsion is identical in capability, while placement
  // and tank accommodation come from the family's resolved body geometry.
  for(const t of p.tanks){
@@ -220,15 +262,32 @@ export function makeFamilyCraft(h,kit){
  // that rigid leaf, tank or injector instead of a guessed world coordinate.
  function fluidLink(a,bb,{part='radiator',radius=.018,name='Coolant interconnect',parent=appendages,via=null,bendRadiusM=part==='propulsion'?Math.max(.03,radius*4):Math.max(.07,radius*6),restLengthM=null,flexOutward=null,circuitId=null,tubeMaterial=null,fluidKind=null,motionModel=null}={}){
   const tube=connectionTube(parent,{radius,material:tubeMaterial||(part==='radiator'?tubeMat:feedMat),part,name,bendRadiusM,segments:80,radialSegments:8});
+  if(part==='radiator'&&f.id==='heatlift-study'&&!fluidKind)fluidKind=String(circuitId).startsWith('coldplates-')?'heatlift-cold-secondary':'heatlift-hot-secondary';
   tube.mesh.userData.fluidConnectionId=name;tube.mesh.userData.routingLine=true;
-  if(part==='radiator')thermalMesh(tube.mesh,'coolant');fluidConnections.push({id:name,a,b:bb,tube,parent,via,part,name,radiusM:radius,bendRadiusM,restLengthM,flexOutward,circuitId,fluidKind,motionModel});return tube;
+  if(part==='radiator')thermalMesh(tube.mesh,'coolant');fluidConnections.push({id:name,a,b:bb,tube,parent,via,part,name,radiusM:radius,bendRadiusM,restLengthM,flexOutward,circuitId,fluidKind,motionModel,...(f.id==='heatlift-study'&&circuitId==='heatlift-cold'?{planRouting:true}:{})});return tube;
  }
  for(const [pumpIndex,pump] of thermalPumps.entries()){
   const count=initial.banks.filter((_,i)=>i%thermalPumps.length===pumpIndex).length;pump.branches={};for(const side of [-1,1]){
-   box(pump.root,0,.20,side*.10,.12*count,.05,.08,tubeMat,'radiator').name='Supported coolant distribution manifold';
-   for(let branch=0;branch<count;branch++){const x=(branch-(count-1)/2)*.12,port=connectionAnchor(pump.root,[x,.225,side*.10],[0,1,0],'Coolant distribution '+side+'/'+branch);port.userData.routingOwnerId=pump.root.uuid;pump.branches[side+'/'+branch]=port;}
+   if(heatLiftPackage){
+    const owner=heatLiftPackage.root;
+    box(owner,-.35,.10,side*.16,.05,.08,.12*count,tubeMat,'radiator').name='Separate hot-side radiator distribution manifold';
+    for(let branch=0;branch<count;branch++){
+     const z=side*.16+(branch-(count-1)/2)*.070,
+      port=connectionAnchor(owner,[-.375,.10,z],[-1,0,0],'Hot radiator '+(side>0?'supply':'return')+' '+branch);
+     port.userData.routingOwnerIds=[owner.uuid,port.uuid];
+     hollowFluidFitting(port,{lengthM:.030,material:tubeMat,name:'Open condenser distribution fitting'});
+     pump.branches[side+'/'+branch]=port;heatLiftPackage.hotPorts.push(port);
+    }
+   }else{
+    box(pump.root,0,.20,side*.10,.12*count,.05,.08,tubeMat,'radiator').name='Supported coolant distribution manifold';
+    for(let branch=0;branch<count;branch++){const x=(branch-(count-1)/2)*.12,port=connectionAnchor(pump.root,[x,.225,side*.10],[0,1,0],'Coolant distribution '+side+'/'+branch);port.userData.routingOwnerId=pump.root.uuid;pump.branches[side+'/'+branch]=port;}
+   }
   }
  }
+ if(heatLiftPackage)root.userData.fluidComponentChannels.push({componentId:heatLiftPackage.root.uuid,
+  name:'Separate heat-lift condenser passage',portIds:heatLiftPackage.hotPorts.map(port=>port.uuid),
+  interfaceType:'heat-exchanger-hot',fluidDomain:'heatlift-hot',minimumFlowDiameterM:.028,
+  allocatedMassKg:0,basis:'Condenser and both hot radiator manifolds remain in the complete heat-pump allocation. The hot secondary circuit has no cold-side fluid connection.'});
  for(const [bankIndex,bank] of initial.banks.entries())if(f.thermalTopology!=='passive-local'){
   const descriptors=g.descriptors.filter(s=>s.type==='rad'&&s.end===bank.end).sort((a,bb)=>a.j-bb.j),pump=thermalPumps[bankIndex%thermalPumps.length],firstDesc=descriptors[0],firstFrame=radiatorMeshes.get(firstDesc),bankSpec=g.banks?.find(b=>b.end===bank.end),inline=bankSpec?.kind==='inline',multiAxis=inline||f.radiatorTracking==='root-cant',rootAxes=bank.panelAxes?.[0]||leafAxes({pitch:bank.rootPitch,roll:bank.roll}),hingeLocalZ=-(g.custom?firstDesc.depth:g.r)/2,hingeNormalOffset=g.custom?(firstDesc.normalOffset||0):bank.end*g.hingeStand,fixedFeedZSign=bankSpec?.kind==='rack'?bankSpec.side:1;
   for(const side of [-1,1]){
@@ -236,7 +295,7 @@ export function makeFamilyCraft(h,kit){
    const swivel=join(appendages,...jointCenter,'radiator');swivel.name=pipeLabel+(multiAxis?' allocated two-axis coolant swivel':' allocated hinge-axis rotary coolant union');const union=ell(swivel,0,0,0,.115,.115,.115,mechanismMat,'radiator');union.userData.routingInterface=true;union.userData.qualification='Project accommodation; pressure, leakage, torque and life qualification remain open.';
    if(!multiAxis){const support=dynamicLine(appendages,.026,mechanismMat,'radiator');link(support,bank.root,jointCenter);support.name='Extended coolant hinge bearing support';}
    if(Math.abs(station[2]-p.forwardDeckZ)<.20)station[2]=p.forwardDeckZ+.24;
-   const supplyAccommodation=starmindLoopTwoSupplyAccommodation(h,{bankIndex,side});
+   const supplyAccommodation=starmindLoopTwoSupplyAccommodation(h,{bankIndex,side})||starcatcherLoopTwoReturnAccommodation(h,{bankIndex,side});
    if(supplyAccommodation)for(let k=0;k<3;k++)station[k]+=supplyAccommodation.stationOffsetM[k];
    const locatedStation=locateFluidFeedthrough(root,{axis,sign,positionM:station,dimensionsM:[w,b,l],ignoreRoot:appendages});station.splice(0,3,...locatedStation);const port=addRoutingFeedthrough({id:`coolant-${bankIndex+1}-${side>0?'supply':'return'}`,axis,sign,positionM:station,radiusM:.034,part:'radiator',straightM:inline?.02:.06}),sourceZ=source.getWorldPosition(v(0,0,0)).z;
    if(sourceZ>p.forwardDeckZ&&port.inner.position.z<p.forwardDeckZ){
@@ -244,11 +303,11 @@ export function makeFamilyCraft(h,kit){
     fluidLink(source,bulk.inner,{name:pipeLabel+' forward supported internal pipe',circuitId,parent:root,via:(a,bb)=>{const z=a.z+.36,y=bb.y;return [a.clone().add(v(0,.26,0)),v(a.x,a.y+.26,z),v(a.x,y,z),v(bb.x,y,z),v(bb.x,y,bb.z+.30)];}});
     fluidLink(bulk.boreIn,bulk.boreOut,{name:pipeLabel+' equipment bulkhead passage',circuitId,parent:root,bendRadiusM:0,via:()=>[]});
     fluidLink(bulk.outer,port.inner,{name:pipeLabel+' aft supported internal pipe',circuitId,parent:root,via:(a,bb)=>{const x=bb.x-sign*.26;return [v(a.x,a.y,bb.z),v(x,a.y,bb.z),v(x,bb.y,bb.z)];}});
-   }else fluidLink(source,port.inner,{name:pipeLabel+' supported internal pipe',circuitId,parent:root,via:(a,bb)=>{const proposal=starmindLoopTwoSupplyAccommodation(h,{bankIndex,side,a:a.toArray(),b:bb.toArray()});if(proposal)return proposal.controlPoints.slice(1,-1).map(point=>v(...point));const pa=a.clone().add(v(0,.26,0)),pb=bb.clone().addScaledVector(v(...normal),-.26);return [pa,v(pa.x,pa.y,pb.z),v(pb.x,pa.y,pb.z),pb];}});
+   }else fluidLink(source,port.inner,{name:pipeLabel+' supported internal pipe',circuitId,parent:root,via:(a,bb)=>{const proposal=starmindLoopTwoSupplyAccommodation(h,{bankIndex,side,a:a.toArray(),b:bb.toArray()})||starcatcherLoopTwoReturnAccommodation(h,{bankIndex,side,a:a.toArray(),b:bb.toArray()});if(proposal)return proposal.controlPoints.slice(1,-1).map(point=>v(...point));const hot=heatliftHotPipeControls(h,{bankIndex,side,a:a.toArray(),b:bb.toArray()});if(hot)return hot.slice(1,-1).map(point=>v(...point));const pa=a.clone().add(v(0,.26,0)),pb=bb.clone().addScaledVector(v(...normal),-.26);return [pa,v(pa.x,pa.y,pb.z),v(pb.x,pa.y,pb.z),pb];}});
    fluidLink(port.boreIn,port.boreOut,{name:pipeLabel+' bulkhead passage',circuitId,parent:root,bendRadiusM:0,via:()=>[]});
    const inletPoint=inline?[bank.root[0]-sign*.11,-(.34+side*.06),bank.root[2]-.30]:multiAxis?[bank.root[0]+side*.20,bank.root[1],bank.root[2]+fixedFeedZSign*(bankSpec?.kind==='rack'?.20:-1.10)]:[jointCenter[0],jointCenter[1]-Math.sign(jointCenter[1])*.13,jointCenter[2]],inletNormal=inline?[-sign,0,0]:multiAxis?[0,-Math.sign(bank.root[1]),0]:[0,-Math.sign(jointCenter[1]),0],inlet=connectionAnchor(appendages,inletPoint,inletNormal,pipeLabel+' fixed union inlet');inlet.userData.routingOwnerId=swivel.uuid;hollowFluidFitting(inlet,{lengthM:.04,material:tubeMat,name:'Open rotary union inlet fitting'});inlet.userData.routingOwnerIds=[swivel.uuid,inlet.uuid];
    if(multiAxis){const neck=dynamicLine(swivel,.025,mechanismMat,'radiator');link(neck,[0,0,0],inletPoint.map((x,i)=>x-bank.root[i]-inletNormal[i]*.04));neck.name='Fixed two-axis union inlet neck';}
-   fluidLink(port.outer,inlet,{name:pipeLabel+' fixed union feed',circuitId,parent:root,bendRadiusM:.108,via:(a,bb)=>{const proposal=starmindLoopTwoSupplyAccommodation(h,{bankIndex,side,a:a.toArray(),b:bb.toArray(),section:'union'});if(proposal)return proposal.controlPoints.slice(1,-1).map(point=>v(...point));if(inline)return [a.clone().add(v(sign*.15,0,0)),bb.clone().add(v(-sign*.15,0,0))];if(multiAxis){const y=(a.y+bb.y)/2;return [v(a.x,y,a.z),v(bb.x,y,bb.z)];}return [a.clone().add(v(sign*.18,0,0)),v(bb.x,a.y,bb.z)];}});
+   fluidLink(port.outer,inlet,{name:pipeLabel+' fixed union feed',circuitId,parent:root,bendRadiusM:.108,via:(a,bb)=>{const proposal=starmindLoopTwoSupplyAccommodation(h,{bankIndex,side,a:a.toArray(),b:bb.toArray(),section:'union'})||starcatcherLoopTwoReturnAccommodation(h,{bankIndex,side,a:a.toArray(),b:bb.toArray(),section:'union'});if(proposal)return proposal.controlPoints.slice(1,-1).map(point=>v(...point));if(inline)return [a.clone().add(v(sign*.15,0,0)),bb.clone().add(v(-sign*.15,0,0))];if(multiAxis){const y=(a.y+bb.y)/2;return [v(a.x,y,a.z),v(bb.x,y,bb.z)];}return [a.clone().add(v(sign*.18,0,0)),v(bb.x,a.y,bb.z)];}});
    const rotor=join(firstFrame,0,0,0,'radiator'),local=multiAxis?[side*.17,inline?appendageDimensions.inlineRootFluidOutletYM:Math.sign(bank.root[1])*.34,hingeLocalZ-(inline?.08:.40)]:[side*(jointDistance+.15),-hingeNormalOffset,hingeLocalZ];
    if(multiAxis){box(rotor,side*.08,local[1],local[2]+.025,.18,2*appendageDimensions.inlineRootFluidManifoldHalfYM,.08,mechanismMat,'radiator').name='Moving two-axis coolant outlet manifold';const neck=dynamicLine(rotor,.030,mechanismMat,'radiator');link(neck,[0,-hingeNormalOffset,hingeLocalZ],[side*.08,local[1],local[2]+.025]);neck.name='Moving two-axis union outlet neck';}
    else{const bearing=connectionAnchor(rotor,local,[side,0,0],'Rotary outlet bearing');hollowFluidFitting(bearing,{outerRadiusM:.060,boreRadiusM:.025,lengthM:.15,material:mechanismMat,name:'Open rotating coolant bearing'});}
@@ -306,7 +365,22 @@ export function makeFamilyCraft(h,kit){
    const patch=box(mount,0,.012,0,.17,.024,.17,patchMat,'communications');patches.push(patch);apertures.patches.push(marker(mount,[0,.026,0]));continue;
   }
   const optical=spec.kind==='optical',scale=optical?d.opticalApertureM:d.kaDishM,height=optical?terminal.opticalHeight:terminal.kaHeight,supportMat=optical?role('optical-support'):reflectorMat,turntable=join(mount,0,0,0,'communications'),head=join(turntable,0,height,0,'communications');
-  cyl(mount,0,.025,0,scale*.20,scale*.24,.05,supportMat,'communications',24);
+  const terminalTransfer=heatliftTerminalTransfer(h);
+  if(terminalTransfer){
+   const data={part:'communications',terminalTransferId:spec.id,
+    routingSolid:true,internalAssemblyTransfer:true,interfaceBasis:terminalTransfer.basis};
+   const addTransfer=(name,allocation)=>{const mesh=tagMaterial(new T.Mesh(
+    heatliftTerminalAnnulusGeometry(T,allocation),supportMat));mesh.name=name;
+    Object.assign(mesh.userData,data);mount.add(mesh);return mesh;};
+   addTransfer('Hollow terminal roof neck',{innerRadiusM:terminalTransfer.boreRadiusM,
+    outerBottomRadiusM:terminalTransfer.neckOuterRadiusM,
+    bottomM:terminalTransfer.statorOffsetM+terminalTransfer.statorDimensionsM[1]/2-
+     terminalTransfer.enclosureWallM/2,topM:0});
+   addTransfer('Hollow terminal pointing pedestal',{innerRadiusM:terminalTransfer.boreRadiusM,
+    outerBottomRadiusM:Math.max(scale*.24,terminalTransfer.neckOuterRadiusM+.004),
+    outerTopRadiusM:Math.max(scale*.20,terminalTransfer.neckOuterRadiusM+.002),
+    bottomM:0,topM:terminalTransfer.pedestalHeightM});
+  }else cyl(mount,0,.025,0,scale*.20,scale*.24,.05,supportMat,'communications',24);
   for(const side of [-1,1])pipe(turntable,v(side*scale*.18,.03,0),v(side*scale*(optical?.85:.55),height,0),Math.max(.007,scale*.025),supportMat,'communications');
   let aperture;
   if(optical){const barrel=join(head,0,-terminal.opticalPin,0,'communications');cyl(barrel,0,scale*.45,0,scale*.68,scale*.80,scale,opticalHousingMat,'communications',32);cyl(barrel,0,scale*.98,0,scale*.63,scale*.63,scale*.08,baffleMat,'communications',32);cyl(barrel,0,scale*1.01,0,scale*.46,scale*.46,scale*.04,opticalGlassMat,'communications',32);aperture=marker(barrel,[0,scale*1.035,0]);apertures.optical.push(aperture);if(!optic){optic=head;apertures.Optical=aperture;}}
@@ -353,5 +427,5 @@ export function makeFamilyCraft(h,kit){
  const points=g.descriptors.flatMap(s=>{const p=leafPose(g,s,1,d.solarTiltDeg||0),a=leafAxes(p);return [-.5,.5].flatMap(x=>[-.5,.5].map(z=>[p.x,p.y,p.z].map((v,i)=>v+a[0][i]*x*s.width+a[2][i]*z*s.depth)));});
  const ext=[0,1,2].map(i=>Math.max(...points.map(p=>p[i]))-Math.min(...points.map(p=>p[i])));
  finalizeCraftMaterials(root);
- return {root,internal,skin,enclosure,service,shelf,tankMap,engines,regulator,walls,routingWalls,routingFeedthroughs,addRoutingFeedthrough,radiatorMeshes,wings,panels,mechanismAudit,appendages,recorder,avionics,torquers,driveCount,shownDrives,trayRows,positionPanels,setCoreView,rads,cmgs,cells,leds,dish,optic,opticalTerminals:heads.filter(a=>a.spec.kind==='optical').map(a=>a.head),terminalMounts:heads.map(a=>a.mount),terminalGimbals:heads,pointTerminals,patches,apertures,plumes,gyroPack,payloadPlatformAnchor,payloadRack,rack,thermalPumps,coolantCollection,fluidConnections,get fluidRoutingPlans(){return fluidRoutingPlans;},replanFluidConnections,fluidRoutingSnapshot,auditFluidRouting,bw:w,bh:b,bl:l,wingspan:Math.max(w,ext[0]),spanZ:Math.max(l,ext[1],ext[2]),physicalArchitecture:h.physicalArchitecture};
+ return {root,internal,skin,enclosure,service,shelf,tankMap,engines,regulator,walls,routingWalls,routingFeedthroughs,addRoutingFeedthrough,radiatorMeshes,wings,panels,mechanismAudit,appendages,recorder,avionics,torquers,driveCount,shownDrives,trayRows,positionPanels,setCoreView,rads,cmgs,cells,leds,dish,optic,opticalTerminals:heads.filter(a=>a.spec.kind==='optical').map(a=>a.head),terminalMounts:heads.map(a=>a.mount),terminalGimbals:heads,pointTerminals,patches,apertures,plumes,gyroPack,payloadPlatformAnchor,payloadRack,rack,thermalPumps,heatLiftPackage,coolantCollection,fluidConnections,get fluidRoutingPlans(){return fluidRoutingPlans;},replanFluidConnections,fluidRoutingSnapshot,auditFluidRouting,bw:w,bh:b,bl:l,wingspan:Math.max(w,ext[0]),spanZ:Math.max(l,ext[1],ext[2]),physicalArchitecture:h.physicalArchitecture};
 }

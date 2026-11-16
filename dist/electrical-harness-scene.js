@@ -7,6 +7,8 @@ import {architectureFamily} from './architecture-families.js';
 import {createInstalledElectricalRouting} from './installed-electrical-routing.js';
 import {familyAppendageDimensions as appendageDimensions} from './family-appendage-dimensions.js';
 import {installProtectedSolarCollectorGeometry} from './protected-solar-collector.js';
+import {heatliftTerminalTransfer} from './heatlift-service-installation.js';
+import {perforatedPanelGeometry} from './connection-installation-geometry.js';
 
 const V=(x=0,y=0,z=0)=>new T.Vector3(x,y,z),Z=V(0,0,1),Y=V(0,1,0),clamp=x=>Math.max(0,Math.min(1,Number(x)||0));
 const parts={power:'power',control:'avionics',data:'fabric',rf:'communications'};
@@ -102,6 +104,13 @@ export function installElectricalHarnessScene(factory,h,{planFluidRoutes=true,co
   if(spec.hostKey==='payloadRack'){
    host=group(spec.frame==='payload'?(factory.payloadRack||body):equipment,spec.label+' electrical datum',{part:'compute',electricalItemIds:[spec.itemId]});host.position.set(...spec.positionM);
    dimensions=spec.dimensionsM;localCenter=[0,0,0];
+  }else if(spec.hostKey==='heatLiftPackage'&&family.id==='heatlift-study'){
+   if(!factory.heatLiftPackage)throw new Error('Heat-lift motor drive has no physical package');
+   host=group(factory.heatLiftPackage.root,spec.label+' electrical datum',
+    {part:'radiator',physicalPartId:spec.itemId,electricalItemIds:[spec.itemId]});
+   dimensions=[...factory.heatLiftPackage.allocation.dimensionsM];
+   factory.heatLiftPackage.root.userData.electricalBoxId=spec.id;
+   factory.heatLiftPackage.root.traverse(o=>{if(o.isMesh)o.userData.explicitElectricalPorts=true;});
   }else if(spec.hostKey==='recorder'){
    host=factory.recorder;root.updateWorldMatrix(true,true);host.position.copy(host.parent.worldToLocal(root.localToWorld(V(...spec.positionM))));host.updateWorldMatrix(true,true);dimensions=legacy?[h.bodyWidthM*.512,Math.min(h.bodyHeightM*.145,h.bodyHeightM*.66/factory.shownDrives)*(factory.shownDrives-.20),h.bodyLengthM*.132]:[Math.min(.55,h.bodyWidthM*.3),Math.min(.075,h.bodyHeightM*.30/factory.shownDrives)*(factory.shownDrives-.22),.25];
    const scale=host.getWorldScale(V()),frame=group(host,'Recorder connector datum in physical metres',{part:'storage',electricalItemIds:[spec.itemId]});frame.scale.set(1/scale.x,1/scale.y,1/scale.z);dimensions=dimensions.map((x,i)=>x*scale.getComponent(i));host=frame;
@@ -137,8 +146,22 @@ export function installElectricalHarnessScene(factory,h,{planFluidRoutes=true,co
    const patch=factory.patches[spec.instance];if(patch){const frame=group(patch.parent,spec.label+' RF feed datum',{part:'communications',electricalItemIds:[spec.itemId]});frame.position.copy(patch.position);frame.quaternion.copy(patch.quaternion);const g=patch.geometry;g.computeBoundingBox();dimensions=g.boundingBox.getSize(V()).multiply(patch.scale).toArray();host=frame;}
   }else if(['dish','optic'].includes(spec.hostKey)){
    // A stationary terminal-base junction leaves the pointing gimbal free.
-   const terminal=factory.terminalMounts?.find(o=>o.name?.startsWith(spec.hostKey==='dish'?'ka-':'optical-'+spec.instance))||null;host=group(terminal||root,spec.label+' base interface',{part:'communications',electricalItemIds:[spec.itemId]});if(terminal)host.position.y=spec.baseInterfaceInsideBus?-.12:.055;else{host.position.set(...spec.positionM);host.quaternion.setFromUnitVectors(Y,V(...(spec.mountNormal||[0,1,0])));}dimensions=[.18,.10,.18];cuboid(host,dimensions,[0,0,0],metal,'Terminal interface enclosure',{explicitElectricalPorts:true,part:'communications'});
-   if(spec.baseInterfaceInsideBus){const center=[...spec.positionM];center[1]=h.bodyHeightM/2;factory.addRoutingFeedthrough({id:spec.id+':stator-device-transfer',axis:'y',sign:1,positionM:center,radiusM:.032,part:'communications',straightM:.17});host.userData.interfaceBasis=spec.scope;}
+   const terminal=factory.terminalMounts?.find(o=>o.name?.startsWith(spec.hostKey==='dish'?'ka-':'optical-'+spec.instance))||null;host=group(terminal||root,spec.label+' base interface',{part:'communications',electricalItemIds:[spec.itemId]});if(terminal)host.position.y=spec.baseInterfaceInsideBus?-.12:.055;else{host.position.set(...spec.positionM);host.quaternion.setFromUnitVectors(Y,V(...(spec.mountNormal||[0,1,0])));}dimensions=[.18,.10,.18];
+   const transfer=heatliftTerminalTransfer(h);
+   if(transfer){
+    const [width,height,depth]=dimensions,t=transfer.enclosureWallM,
+     data={explicitElectricalPorts:true,part:'communications',terminalTransferId:terminal?.name.split(' · ')[0],internalAssemblyTransfer:true};
+    for(const side of [-1,1]){
+     cuboid(host,[t,height,depth],[side*(width-t)/2,0,0],metal,'Terminal interface side wall',data);
+     cuboid(host,[width-2*t,height,t],[0,0,side*(depth-t)/2],metal,'Terminal interface end wall',data);
+    }
+    cuboid(host,[width-2*t,t,depth-2*t],[0,-(height-t)/2,0],metal,'Terminal interface bottom wall',data);
+    const top=mesh(host,perforatedPanelGeometry(width-2*t,depth-2*t,t,
+     [{id:spec.id+':internal-transfer',u:0,v:0,radiusM:transfer.boreRadiusM}]),
+     metal,'Open terminal interface transfer lid',data);
+    top.rotation.x=-Math.PI/2;top.position.y=(height-t)/2;
+   }else cuboid(host,dimensions,[0,0,0],metal,'Terminal interface enclosure',{explicitElectricalPorts:true,part:'communications'});
+   if(spec.baseInterfaceInsideBus){const center=[...spec.positionM];center[1]=h.bodyHeightM/2;factory.addRoutingFeedthrough({id:spec.id+':stator-device-transfer',axis:'y',sign:1,positionM:center,radiusM:transfer?.neckOuterRadiusM||.032,part:'communications',straightM:.17});host.userData.interfaceBasis=transfer?.basis||spec.scope;}
   }
   if(!host)return physicalBox(spec);
   return {root:host,frame:host,dimensions,localCenter};

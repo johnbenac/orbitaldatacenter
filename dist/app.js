@@ -8,6 +8,7 @@ import {getReferenceIllustration,referenceIllustrationImage,referenceIllustratio
 import {installWorkspaceLayout} from './workspace-layout.js';
 import {installCaptureTools} from './capture-ui.js';
 import {installRoutingInspector} from './routing-inspector.js';
+import {createConstructionPendingState} from './scene-construction-state.js';
 import {electricalRoutingDiagnostics} from './installed-electrical-routing.js';
 import {fluidRoutingDiagnostics} from './flight-fluid-routing.js';
 if(new URLSearchParams(location.search).has('routing-debug')){
@@ -609,20 +610,38 @@ function updatePointingPanels(){
  refreshResponse(chart,$('ad-seek'),snap,start,end);
 }
 let sceneLoad;
+const sceneConstructionPending=createConstructionPendingState();
 function updateScene(){
- if(!scene)return;
- const before=hardware.electricalMassRevision||0;
- scene.update(hardware,snap);
- if((hardware.electricalMassRevision||0)===before)return;
- // The native route takeoff can refine a modified Redwire design after its
- // first scene build. Refresh every mass-dependent result on that same
- // hardware object; unchanged geometry does not need another construction.
- const envelope=sizingEnvelope(hardware);
- partsCatalogCache=null;
- recalc({...result,mode:'installed',input:hardware.input,hardware,margin:hardware.launchScreenMarginKg,binding:envelope.binding,feasible:envelope.feasible,envelope});
- scene.update(hardware,snap);
- const current=hardware;
- queueMicrotask(()=>{if(hardware===current)draw();});
+ if(!scene)return false;
+ try{
+  const before=hardware.electricalMassRevision||0;
+  scene.update(hardware,snap);
+  if((hardware.electricalMassRevision||0)===before)return true;
+  // The native route takeoff can refine a modified Redwire design after its
+  // first scene build. Refresh every mass-dependent result on that same
+  // hardware object; unchanged geometry does not need another construction.
+  const envelope=sizingEnvelope(hardware);
+  partsCatalogCache=null;
+  recalc({...result,mode:'installed',input:hardware.input,hardware,margin:hardware.launchScreenMarginKg,binding:envelope.binding,feasible:envelope.feasible,envelope});
+  scene.update(hardware,snap);
+  const current=hardware;
+  queueMicrotask(()=>{if(hardware===current)draw();});
+  return true;
+ }catch(error){
+  if(!sceneConstructionPending.defer(hardware,error))throw error;
+  scene?.destroy?.();scene=null;sceneLoad=null;
+  const host=$('scene');host.textContent='';
+  delete host.dataset.renderedReferenceCenter;delete host.dataset.renderedFrames;
+  delete host.dataset.firstRenderMs;host.dataset.renderedRouting='pending';
+  const status=sceneLoadingMessage('Harness routing has not been prepared for this design. Restore the reference to view its installed harnesses, or continue editing the design.');
+  const referenceId=error.referenceCenterId||hardware.input?.referenceCenterId;
+  if(referenceId){
+   const restore=document.createElement('button');restore.className='btn';
+   restore.textContent='Restore reference';restore.dataset.restoreReference=referenceId;
+   status.append(restore);
+  }
+  return false;
+ }
 }
 function sceneLoadingMessage(message){
  const status=$('scene-loading'),art=getReferenceIllustration(input.referenceCenterId);
@@ -631,7 +650,7 @@ function sceneLoadingMessage(message){
  return status;
 }
 function ensureScene(){
- if(scene||sceneLoad)return;
+ if(scene||sceneLoad||sceneConstructionPending.blocks(hardware))return;
  const status=$('scene-loading'),host=$('scene');
  sceneLoadingMessage('Preparing the 3D view…');
  sceneLoad=import('./scene.js').then(({createScene})=>{
@@ -654,7 +673,7 @@ function ensureScene(){
   scene.setHardwareDetail(view.geometryDetail);
   scene.setOrbitVectors(view.orbitVectors);
   if(view.cameraStates)scene.setCameraState(view.cameraStates);
-  scene.setSignalPlayback?.(replayMotion());updateScene();
+  scene.setSignalPlayback?.(replayMotion());if(!updateScene())return;
   scene.setOverlays(effectiveLayers());
   scene.highlight(view.inspect||'');
   status.hidden=true;

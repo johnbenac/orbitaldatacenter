@@ -124,3 +124,129 @@ and detailed motion validators retain their own results; the mounted payload che
 an acceptance of every other vehicle cable or continuous mechanism motion. The existing thermal
 flow shortfall is unchanged by this harness work. The website remains a living preliminary
 design open to review, with no formal PDR closure asserted.
+
+
+## Star Catcher reference harness installation
+
+`star-catcher-self-powered` is the project's self-powered, heat-lift reference based on the
+Star Catcher analytical study. Its 128 compute trays are inside the central body. The installed
+wiring and service-bay arrangement are workbench allocations, not supplier flight drawings.
+
+The payload bank is grouped by the actual three rack columns and seven longitudinal bays.
+All 128 feeds have individual connector endpoints and complete full-radius paths. The
+source ladder and transverse fanout feed three under-rack trunks and staggered bay risers.
+The payload raceways contain explicit rails, rungs, retaining bridges, mounting feet and
+stands. The same schedule supplies the visible geometry and material mass.
+
+Power, data and service wiring use the body equipment aisles and installed network corridors.
+The data installation combines a shared roof fan with source-drop, rack-entry and lower-aisle
+frames. Battery, collector, compressor, control and RF wiring have finite support sections for
+their long runs. Short seated connector approaches and bends connect those retained sections.
+Where one support crosses another, mounting feet attach to the existing rail or the finite
+members end at a shared support. Overlapping material is not counted as two independent parts.
+The radio floor installation, for example, mounts on actual payload rails where a new floor
+post would otherwise pass through them. Existing roof and bulkhead material closes selected
+trays only at its real surface; no duplicate plate or invisible restraint is added.
+
+The default installation has 108 support sections: 24 payload sections and 84 shared power,
+data and service sections. Their 4,063 finite material pieces and purchased-fastener allowances
+add 95.718 kg to the vehicle. All 76 connected material groups have geometric load paths to
+441 actual shell, floor, roof or bulkhead attachment roots. Shared feet must touch the declared
+parent's real material, and that parent must itself connect to structure. Disconnected rail
+remnants are removed from both the model and its mass rather than retained as floating parts.
+
+The complete cable radius must fit within an actual keeper interior to count as retained.
+The preliminary allocation permits up to 0.85 m of continuous connector or bend transition
+between retained sections; the default layout's longest is 0.796 m. These geometric checks
+establish installation coverage, while attachment loads and vibration remain qualification
+work beyond this preliminary model. Removing a real roof or RF support fails the coverage
+check even if other records claim to support those same routes. Actual keeper and end spacing
+must also match the retention allocation; an empty keeper tail cannot count as retained space.
+
+The solar roots terminate on stationary electrical collectors; external equipment cables do
+not follow the rotating blanket. The four complete cassettes retain 18 contact tracks each.
+The two starboard PCDU banks turn toward the aft service bay, separating the power fanout
+from the forward data corridors. Their nested tail order matches that direction; each
+polarity pair and the original collector circuit assignments and positions are retained. Added
+hollow support extensions and rotor drives move the electrical material clear of the wound
+blankets while retaining the original bearing and restraint rods. The allocated
+photovoltaic area remains 1,100 square metres. The resulting deployed envelope is an explicit
+preliminary design consequence of accommodating the collector hardware.
+
+The aft starboard PCDU bank turns 100 mm closer to the enclosure, clearing the actual recorder
+stack. Its shortest transverse reach remains 190 mm: a full 135 mm bend plus a 55 mm straight
+at the seated plug, exceeding the 45 mm mating stroke. The other right-hand bank reaches
+200 mm farther out below the recorder, giving the two return banks separate transverse bands.
+Both banks turn forward of the actual equipment bulkhead. The recorder and conductor sizes
+retain their allocated positions and dimensions; the cable paths change to fit the hardware.
+The limiting aft tail retains 48.6 mm of straight cable beyond its full-radius bend, clearing
+the allocated 45 mm connector stroke. The roof fan also remains aft of the Ka terminal case.
+
+The heat-pump assembly occupies the upper forward service bay, ahead of the compute rack,
+with four real roof attachments. Its primary and control connectors belong to the actual
+motor-drive face. Cold evaporator links connect to the compute circuit; separate hot manifold
+ports connect to the two radiator loops. The complete 625 kg package is counted once at its
+installed station, with the remaining rotary hardware at its existing allocation. Its COP,
+capacity and fluid-selection assumptions retain their original analytical limits.
+
+The second radiator return uses a relocated 68 mm floor aperture and sleeve at x = −0.34 m.
+Its connected internal pipe, bulkhead passage and external union feed use that same physical
+station. The 108 mm pipe bends and full material radii are retained. Ka and optical stationary
+connectors are inside the body, connected through actual hollow roof necks and pedestals.
+The GNSS lead enters through its own roof passage. No free cable loop follows a pointing head.
+
+### Individual cuts and vehicle accounting
+
+The reference has 490 external harness assemblies comprising 537 physical cuts, plus 36
+individually listed embedded solar source-lead pairs. The resulting MEL has 526 individual
+harness entries. The embedded 72 conductors keep the explicit allocation of 0.60 times blanket
+length per conductor; they belong to the moving solar wings and do not acquire duplicate
+external connectors. They remain model estimates rather than measured body routes.
+
+Every external cut, termination and installation part carries its calculated material mass.
+The native construction compiler also emits a separate complete 537-cut takeoff for sizing,
+so the default model can adopt actual installed lengths before opening the scene. The takeoff
+has exact design/interface identity and source provenance. Missing, duplicated or stale cuts
+cannot silently replace the current inventory. A failed geometric assessment still carries
+its measured positive cable length and mass; it does not become an accepted route.
+
+The ledger, MEL, center of gravity, inertia and launch mass use the same inventory. Array,
+payload and primary-voltage compressor-drive losses use the matching individual loop
+resistances and the existing equal-load circuit model. Embedded array resistance is counted
+once. Other distribution and mixed-voltage service estimates retain their original topology.
+Installed gauges, contact ratings and converter counts remain fixed, so increased demand can
+still expose a rating shortfall instead of silently resizing the spacecraft.
+
+The compiled default contains 2,496.351 m of measured fixed centerline routing. Its external
+cut inventory is 2,657.451 m including termination allowances. The shipped mass result is:
+
+| Item | Mass (kg) | Basis |
+| --- | ---: | --- |
+| External cable material | 930.485 | Individual installed cuts |
+| External terminations | 128.873 | Actual connector inventory |
+| Embedded solar source leads | 1,420.876 | Explicit 72-conductor length allocation |
+| All harnesses | 2,480.234 | External cuts plus embedded leads |
+| Installation hardware | 163.748 | 95.718 kg of raceways plus 68.029 kg of collectors |
+| Vehicle dry mass | 18,464.357 | Complete updated vehicle ledger |
+| Vehicle launch mass | 21,103.419 | Complete updated launch ledger |
+
+Dry and launch mass each increase by 812.218 kg from the preceding reference allocation.
+The complete MEL reconciles with the vehicle ledger to numerical roundoff. The native default
+admits all 537 fixed electrical cuts and all 25 fixed pipes with their full material radii;
+all 273 retained data-route controls agree exactly with the compiled installation. These are
+static installation results, with the qualification limits below still applying.
+
+### Preliminary review and startup
+
+The bounded Star Catcher checks cover payload endpoints, bends and material clearance,
+physical attachments, the four collector installations at 77 selected movement poses,
+terminal passages, the heat-pump installation, individual MEL accounting and runtime
+construction reuse. They run through the existing fast regression suite. They do not claim
+continuous-motion, fatigue, attachment-strength or connector-withdrawal qualification.
+Mounted payload connectors stay seated until a retainer-release service sequence is modeled.
+
+The browser uses a compact, losslessly packed native construction only for its matching
+physical configuration. It verifies every stored electrical and fluid interface before use.
+Known planner failures stay failures, and unassessed clearance/service states remain visible.
+Loading the scene does not run a new route search or change an already sized vehicle's mass.
+The site remains a living preliminary design with ongoing public review.

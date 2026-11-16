@@ -20,9 +20,15 @@ import {createRedwireHarnessInstallation,redwirePanelRouteControls,redwirePanelL
 import {createStarmindHarnessInstallation} from './starmind-harness-installation.js';
 import {allocateStarmindPayloadDeparture} from './starmind-harness-routing.js';
 import {allocateStarmindPayloadRoutes} from './starmind-payload-routing.js';
+import {createStarcatcherHarnessInstallation} from './starcatcher-harness-installation.js';
+import {allocateStarcatcherPayloadDeparture} from './starcatcher-harness-routing.js';
+import {allocateStarcatcherPayloadRoutes} from './starcatcher-payload-routing.js';
+import {selectStarcatcherDataRoute} from './starcatcher-data-routing.js';
+import {starcatcherServiceRouteHint} from './starcatcher-service-routing.js';
+import {starcatcherPowerRouteHint} from './starcatcher-power-routing.js';
 const V=p=>new T.Vector3(...(p||[0,0,0]));
 const inherited=(o,key)=>{for(let p=o;p;p=p.parent)if(p.userData?.[key]!=null)return p.userData[key];};
-export const electricalRoutingDiagnostics={onBeforeRoute:null,onRoute:null,onServiceRoute:null,onBeforeService:null,onPlanningContext:null,onTrayInstallation:null};
+export const electricalRoutingDiagnostics={onBeforeRoute:null,onRoute:null,onServiceRoute:null,onBeforeService:null,onPlanningContext:null,onTrayInstallation:null,onPhysicalInterfaces:null};
 
 // H11's one static collector conductor uses the outboard aisle before the
 // retained coolant crossing, then enters the PCDU from the aft side. These
@@ -170,7 +176,7 @@ export function physicalFlightMeshes(root){
 
 export function createInstalledElectricalRouting({factory,h,architecture,routes,ports,cards=new Map(),actualBoxes,raw,colors,metal,planFluidRoutes=true,constructionOnly=false,constructionAsset=null,electricalPlannerLimits={},allocateElectricalService=true}){
  for(const [key,value] of Object.entries(electricalPlannerLimits))if(!['maxAttempts','maxGridNodes'].includes(key)||!Number.isInteger(value)||value<0)throw new Error('Invalid electrical planner limit: '+key);
- if(constructionOnly&&h.architectureFamilyId!=='starmind-cross')throw new Error('Construction view requires the Starmind family');
+ if(constructionOnly&&!['starmind-cross','heatlift-study'].includes(h.architectureFamilyId))throw new Error('Construction view requires a supported fixed-rack family');
  if(constructionOnly)planFluidRoutes=false;
  const root=factory.root,layout=deploymentLayout(h),lines=[],plans=new Map(),banks=new Map();
  const storageAllocation=h.propulsion?.storageAccommodation,accommodationIssues=layout.familyId==='protected-core'?!storageAllocation?[{code:'missing-protected-storage-accommodation'}]:storageAllocation.ok?[]:storageAllocation.issues.map(issue=>({...issue,scope:'Protected recorder installation'})):[];
@@ -198,7 +204,7 @@ export function createInstalledElectricalRouting({factory,h,architecture,routes,
   // Both plugs of a rotary-transfer downstream cut belong to the same leaf.
   // It is a carried static cable, with no bus-wall or flexible hinge crossing.
   if(layout.familyId==='redwire-platform'&&['from','to'].every(end=>boxById[line.r.spec[end+'BoxId']]?.frame==='payload'))return;
-  if(box.id==='gnss-antenna'&&layout.familyId==='protected-core'){
+  if(box.id==='gnss-antenna'&&['protected-core','heatlift-study'].includes(layout.familyId)){
    // The protected bus's stowed radiator covers the external roof service
    // lane. Feed its antenna through a real underside SMA/roof gland so the
    // installed coax and its withdrawal reservoir stay inside the bus.
@@ -211,7 +217,7 @@ export function createInstalledElectricalRouting({factory,h,architecture,routes,
  }
  root.updateWorldMatrix(true,true);
  const constructionLines=constructionOnly?validateStarmindConstructionLines(constructionAsset,lines,{world,normal}):null;
- if(constructionOnly&&!constructionLines)throw new Error('Cached SpaceX electrical construction does not match the installed interfaces');
+ if(constructionOnly&&!constructionLines)throw new Error('Cached electrical construction does not match the installed interfaces');
  for(const line of lines){addEndpoint(line,'from');addEndpoint(line,'to');}
  for(const bank of banks.values()){
   const {box,key,members}=bank;let axis,sign,center;
@@ -230,6 +236,9 @@ export function createInstalledElectricalRouting({factory,h,architecture,routes,
  const redwireInstallation=createRedwireHarnessInstallation({factory,h,architecture,material:metal});
  const starmindInstallation=createStarmindHarnessInstallation({factory,h,architecture,material:metal});
  accommodationIssues.push(...(starmindInstallation?.issues||[]));
+ const starcatcherInstallation=createStarcatcherHarnessInstallation({factory,h,architecture,material:metal});
+ accommodationIssues.push(...(starcatcherInstallation?.issues||[]));
+ electricalRoutingDiagnostics.onPhysicalInterfaces?.({factory,h,architecture,layout,lines,world,normal,routes,ports,actualBoxes,banks,boundary:'Actual equipment, connectors, wall apertures and mounted installation before collision snapshots or route search'});
  const cardSweeps=[];for(const definition of architecture.cards.filter(c=>!c.external)){const card=cards.get(definition.itemId);if(!card)continue;const travelM=Math.max(.06,definition.dimensionsM[2]*1.4),box=new T.Box3().setFromObject(card),d=V([0,0,travelM]).transformDirection(card.parent.matrixWorld).multiplyScalar(travelM).toArray(),min=box.min.toArray().map((x,k)=>Math.min(x,x+d[k])),max=box.max.toArray().map((x,k)=>Math.max(x,x+d[k]));cardSweeps.push({id:definition.id+':extraction-sweep',type:'box',min,max,bounds:{min,max}});}
  // Collision meshes, motion envelopes and route search are engineering work.
  // Construct the interactive geometry first; the inspector builds the actual
@@ -258,18 +267,30 @@ export function createInstalledElectricalRouting({factory,h,architecture,routes,
   line[end+'Escape']={end,anchor:a,points:shape.points,controlPoints:controls,minimumBendRadiusM:shape.minimumBendRadiusM,lengthM:shape.lengthM,normal:[0,0,1]};
  }
  if(layout.familyId!=='redwire-platform')for(const line of lines.filter(l=>l.r.spec.id.startsWith('P-SA-')&&['left','right'].includes(architecture.portById[l.r.spec.toPortId]?.face))){
-  const end=line.r.spec.fromBoxId==='pcdu'?'from':'to',port=architecture.portById[line.r.spec[end+'PortId']],a=world(line[end]),columns=port.packing.columns,column=(line[end].userData.circuitInstance||0)%columns,pitch=line.radiusM*2+.012,sign=port.face==='right'?1:-1,rackSide=Math.max(0,...h.rackLayout.slots.map(s=>Math.abs(s.x)+h.rackLayout.slotDimensionsM[0]/2)),x=layout.familyId==='orbital-rack'&&sign>0?Math.max(a[0]+2*line.bendRadiusM+.020,rackSide+line.bendRadiusM+.045)+(columns-1-column)*pitch:a[0]+sign*(2*line.bendRadiusM+.020+(columns-1-column)*pitch),z=boxById.pcdu.positionM[2]+.45,controls=[a,[x,a[1],a[2]],[x,a[1],z]],shape=roundedConnectionRoute(controls,line.bendRadiusM);
-  line[end+'Escape']={end,anchor:a,points:shape.points,controlPoints:controls,minimumBendRadiusM:shape.minimumBendRadiusM,lengthM:shape.lengthM,normal:[0,0,1]};
+  const end=line.r.spec.fromBoxId==='pcdu'?'from':'to',port=architecture.portById[line.r.spec[end+'PortId']],a=world(line[end]),columns=port.packing.columns,column=(line[end].userData.circuitInstance||0)%columns,pitch=line.radiusM*2+.012,sign=port.face==='right'?1:-1,rackSide=Math.max(0,...h.rackLayout.slots.map(s=>Math.abs(s.x)+h.rackLayout.slotDimensionsM[0]/2));
+  const aftStarcatcher=layout.familyId==='heatlift-study'&&h.input?.referenceCenterId==='star-catcher-self-powered'&&/^P-SA-[34]$/.test(line.r.spec.id);
+  // The right Star Catcher banks turn toward the aft service bay, leaving
+  // the forward data fan-out unobstructed. Reversing the nested X order is
+  // necessary when the tails point aft. Bank3 reaches 200mm farther out,
+  // below the recorder; bank4 turns 100mm earlier, retaining the full135mm
+  // fillet and55mm straight. Their separate X bands fit in front of the
+  // actual equipment bulkhead, without crossing the forward data corridor.
+  const reach=2*line.bendRadiusM+.020+(aftStarcatcher?column:columns-1-column)*pitch+
+   (aftStarcatcher?(line.r.spec.id==='P-SA-3'?.200:-.100):0);
+  const x=layout.familyId==='orbital-rack'&&sign>0?Math.max(a[0]+2*line.bendRadiusM+.020,rackSide+line.bendRadiusM+.045)+(columns-1-column)*pitch:a[0]+sign*reach,z=boxById.pcdu.positionM[2]+(aftStarcatcher?-.430:.45),controls=[a,[x,a[1],a[2]],[x,a[1],z]],shape=roundedConnectionRoute(controls,line.bendRadiusM);
+  line[end+'Escape']={end,anchor:a,points:shape.points,controlPoints:controls,minimumBendRadiusM:shape.minimumBendRadiusM,lengthM:shape.lengthM,normal:[0,0,aftStarcatcher?-1:1]};
  }
  if(layout.familyId==='redwire-platform'){
   const control=lines.filter(l=>l.r.spec.fromBoxId==='avionics'&&l.r.spec.kind==='control'),columns=[...new Set(control.map(l=>+world(l.from)[2].toFixed(6)))].sort((a,b)=>a-b);
   for(const line of control){const a=world(line.from),column=columns.indexOf(+a[2].toFixed(6)),x=-.70+(columns.length-1-column)*.060,controls=[a,[x,a[1],a[2]],[x,a[1],h.bodyLengthM*.30],...(line.r.spec.id==='C-ka-1'?[[x,h.bodyHeightM*.26,h.bodyLengthM*.30]]:[])],shape=roundedConnectionRoute(controls,line.bendRadiusM);line.fromEscape={end:'from',anchor:a,points:shape.points,controlPoints:controls,minimumBendRadiusM:shape.minimumBendRadiusM,lengthM:shape.lengthM,normal:line.r.spec.id==='C-ka-1'?[0,1,0]:[0,0,1]};}
  }
- const payloadComb=allocateStarmindPayloadDeparture(h,allocatePcduPayloadComb(lines.map(line=>({id:line.id,fromBoxId:line.r.spec.fromBoxId,from:world(line.from),fromNormal:normal(line.from),radiusM:line.radiusM,bendRadiusM:line.bendRadiusM})),{rackLayout:h.rackLayout}));
+ const payloadDeparture=layout.familyId==='heatlift-study'?allocateStarcatcherPayloadDeparture:allocateStarmindPayloadDeparture;
+ const payloadComb=payloadDeparture(h,allocatePcduPayloadComb(lines.map(line=>({id:line.id,fromBoxId:line.r.spec.fromBoxId,from:world(line.from),fromNormal:normal(line.from),radiusM:line.radiusM,bendRadiusM:line.bendRadiusM})),{rackLayout:h.rackLayout}));
  const batchServiceAllocation=layout.familyId==='protected-core'||payloadComb.active;
  for(const escape of payloadComb.escapes)lines.find(line=>line.id===escape.id).fromEscape=escape;
- const mountedPayloadLines=layout.familyId==='starmind-cross'?lines.filter(line=>line.r.spec.fromBoxId==='pcdu'&&line.r.spec.groupId==='payload'):[];
- const mountedPayload=allocateStarmindPayloadRoutes(h,mountedPayloadLines.map(line=>({id:line.id,
+ const mountedPayloadLines=['starmind-cross','heatlift-study'].includes(layout.familyId)?lines.filter(line=>line.r.spec.fromBoxId==='pcdu'&&line.r.spec.groupId==='payload'):[];
+ const payloadRoutes=layout.familyId==='heatlift-study'?allocateStarcatcherPayloadRoutes:allocateStarmindPayloadRoutes;
+ const mountedPayload=payloadRoutes(h,mountedPayloadLines.map(line=>({id:line.id,
   from:world(line.from),to:world(line.to),fromNormal:normal(line.from),toNormal:normal(line.to),
   radiusM:line.radiusM,bendRadiusM:line.bendRadiusM})),payloadComb);
  accommodationIssues.push(...mountedPayload.issues);
@@ -372,7 +393,16 @@ export function createInstalledElectricalRouting({factory,h,architecture,routes,
  if(inline){planned.push(...inline.plan({obstacles:allObstacles,otherRoutes:fluidReservations,terminalVolumes}));const volumes=inline.serviceSweepVolumes||[];terminalVolumes.push(...volumes);fluidPlanningReservations.push(...volumes);servicePlanningObstacles.push(...volumes);}
  function plan(line,a,b,na,nb,waypoints=[],extra={}){
   const reserved=[...allObstacles,...terminalVolumes.filter(o=>o.lineId!==line.id)],escapes=[line.fromEscape,line.toEscape].filter(Boolean),escape=escapes.find(e=>V(a).distanceTo(V(e.anchor))<1e-6),suffix=escapes.find(e=>V(b).distanceTo(V(e.anchor))<1e-6);
-  const candidateControls=starmindCollectorStaticHint(h,layout,line,a,b,na,nb,waypoints)||
+  const effectiveA=escape?escape.points.at(-1):a,effectiveB=suffix?suffix.points.at(-1):b,
+   effectiveFromNormal=escape?escape.normal:na,effectiveToNormal=suffix?suffix.normal:nb,
+   starcatcherData=selectStarcatcherDataRoute(h,line,effectiveA,effectiveB,
+    effectiveFromNormal,effectiveToNormal,{obstacles:reserved,otherRoutes:planned});
+  const candidateControls=starcatcherPowerRouteHint(h,layout,line,effectiveA,effectiveB,
+   effectiveFromNormal,effectiveToNormal,waypoints)||
+   starcatcherServiceRouteHint(h,layout,line,effectiveA,effectiveB,
+   effectiveFromNormal,effectiveToNormal,waypoints)||
+   (starcatcherData.ok?starcatcherData.controlPoints:null)||
+   starmindCollectorStaticHint(h,layout,line,a,b,na,nb,waypoints)||
    starmindRightCollectorRoofHint(h,layout,line,a,b,na,nb,waypoints)||
    starmindBatteryOutboardHint(h,layout,line,a,b,na,nb,waypoints)||
    starmindInteriorRouteHint(h,layout,line,a,b,na,nb,waypoints);
@@ -548,5 +578,5 @@ export function createInstalledElectricalRouting({factory,h,architecture,routes,
   return route;
  }),...(inline?.snapshotRoutes({frame})||[])],obstacles:obstacles({frame})};}
  function audit(options={}){const s=snapshot();return auditRoutes(s.routes,s.obstacles,options);}
- return {update,snapshot,audit,constructionOnly,lines:[...lines,...(inline?.physicalLines||[])],ordinaryLines:lines,inline,plans:new Map([...plans,...(inline?.plans||[])]),obstacles,banks,terminalReservations:terminalVolumes,fluidPlanningReservations,servicePlanningObstacles,accommodationIssues,collectorAccommodation,equipmentAccommodation,payloadComb,rackPowerTrays,redwireInstallation,starmindInstallation,get operationalEnvelopes(){return operationalEnvelopes;},revision:layout.familyId==='redwire-platform'?'installed-routing-redwire-mounted-rotary-r2':layout.familyId==='starmind-cross'?'installed-routing-starmind-under-rack-r1':'installed-routing-r1'};
+ return {update,snapshot,audit,constructionOnly,lines:[...lines,...(inline?.physicalLines||[])],ordinaryLines:lines,inline,plans:new Map([...plans,...(inline?.plans||[])]),obstacles,banks,terminalReservations:terminalVolumes,fluidPlanningReservations,servicePlanningObstacles,accommodationIssues,collectorAccommodation,equipmentAccommodation,payloadComb,rackPowerTrays,redwireInstallation,starmindInstallation,starcatcherInstallation,get operationalEnvelopes(){return operationalEnvelopes;},revision:layout.familyId==='redwire-platform'?'installed-routing-redwire-mounted-rotary-r2':layout.familyId==='starmind-cross'?'installed-routing-starmind-under-rack-r1':layout.familyId==='heatlift-study'?'installed-routing-starcatcher-mounted-r1':'installed-routing-r1'};
 }

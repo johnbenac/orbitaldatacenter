@@ -68,3 +68,58 @@ Run `node ai-purpose-ui-checks.mjs` for the six profiles across phases A–F. Us
 ## Starship lateral cargo handling
 
 Keep the cargo deck, nose, windward tiles and flap roots in the ship frame. The rigid ground transfer, retained leeward hatch, telescoping carriage, guided lift, free payload and hatch recovery share geometry in `dist/starship-cargo.js` and the carrier clock in `dist/launch-effects-state.js`. With the article outboard, the guided lift clears the installed nozzle tips above the retained adapter before lateral push-off. Four ground and orbital presentations use this path: integration bay, insertion camera, transverse section and master timeline. The attached payload mass and control authority switch at the end of guided extraction. Reverse playback reads the same mission instants. Check fixed and moving clearances with `node starship-cargo-checks.mjs` and interior visibility with `node mesh-checks.mjs`.
+
+
+## SpaceX workbench startup
+
+The interactive scene requests `makeCraft(h, {routingMode: 'construction'})` for
+Starmind-family hardware. The shipped `starmind-ai1` reference can reuse a compact
+native construction asset only when its complete physical configuration matches.
+The installer verifies every electrical endpoint, normal, connector identity and
+cable radius, and every stored fluid endpoint and mounting frame, before using it.
+A different configuration uses the normal analysis path. `makeCraft(h)` itself
+continues to run the full engineering analysis by default.
+
+The asset contains the native bounded static planner's 496 electrical returns and
+the final native pipe constructions. It retains full numeric precision, existing
+failed results, the 128 mounted payload feeds, and all 26 supporting raceways.
+Compilation uses zero detour/grid expansion for electrical candidates and does not
+allocate connector withdrawal reservoirs. This is the preliminary static
+construction basis, not a successful full-vehicle clearance or service review.
+Runtime reuse leaves clearance and withdrawal unassessed, retains known failures,
+and prevents an unassessed connector withdrawal from stretching installed cables.
+The inspection snapshot still uses the actual rendered material when requested.
+
+Displaying the construction does not replace the independently accounted harness
+mass or MEL. In particular, opening a scene cannot silently change the hardware
+revision and discard the already prepared mission window.
+
+Regenerate the application geometry after changing its native source:
+
+```sh
+node scripts/compile-starmind-construction.mjs
+node scripts/compile-starmind-construction.mjs --check-source
+node starmind-scene-startup-checks.mjs
+```
+
+The compressed ES module is application input. Do not commit compilation logs or
+working evidence. Its source manifest covers the complete loaded native dependency
+closure; the structural startup suite rejects a stale manifest. That suite also
+checks real cable/pipe buffers, physical inventory, mass/MEL preservation, and the
+absence of full-scene planning or service searches during cached construction.
+The local fluid feedthrough allocator retains its exact clearance predicate and
+candidate order, using conservative nearby-solid bounds before triangulation.
+`fluid-feedthrough-broad-phase-checks.mjs` compares it with the exhaustive oracle.
+
+A canvas alone is not a successful startup. The scene records `renderedFrames`
+and `renderedReferenceCenter` only after its render returns. The browser check
+requires those markers, a closed startup cover, an available WebGL context, and a
+successful camera change followed by another rendered frame:
+
+```sh
+python3 scripts/check-workbench-startup.py --browsers chromium firefox
+```
+
+That command requires installed Playwright browsers and checks fresh default and
+SpaceX studies at desktop and mobile sizes. It is separate from the inherited
+metadata smoke test; the latter does not establish that SpaceX has rendered.

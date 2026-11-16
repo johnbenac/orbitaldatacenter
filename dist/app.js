@@ -1785,11 +1785,14 @@ function flightRange(){
  return [Math.max(DEPLOY_START_S,view.start),Math.min(view.start+DAY,sim.ignition)];
 }
 function flightPlayer(){
- const [start,end]=flightRange(),pc=clamp((view.t-start)/(end-start||1),0,1),status=view.phase==='E'?(sim.audit?'Chronological mission complete':flightSyncError?'Mission integration interrupted':auditStatus||'Chronological flight · resolving mission'):view.phase==='F'?(flightSyncError?'Chronological disposal integration interrupted':sim.audit?'Chronological disposal solution':'Preview · '+(auditStatus||'resolving preceding mission')):'Mission elapsed time';
+ const [start,end]=flightRange(),pc=clamp((view.t-start)/(end-start||1),0,1),status=view.phase==='E'?(sim.audit?'Chronological mission complete':flightSyncError?'Mission integration interrupted':auditStatus||'Selected flight window ready'):view.phase==='F'?(flightSyncError?'Chronological disposal integration interrupted':sim.audit?'Chronological disposal solution':'Preview · '+(auditStatus||'resolving preceding mission')):'Mission elapsed time';
  return `<section class="flightdeck"><div class="flight-clock"><span class="guideflag">${view.phase==='E'?'FLIGHT DIRECTOR':'MISSION CLOCK'}</span><b id="live-met">${time(view.t)}</b><span id="flight-verification">${esc(status)}</span></div><input aria-label="Scrub modeled flight time" id="flight-cursor" type="range" min="0" max="10000" step="1" value="${Math.round(pc*10000)}" style="--pct:${pc*100}%"><div class="flight-deck-tools"><button class="chip" data-action="window">Time window</button><button class="chip" data-action="events">Event ledger</button><button class="chip" data-action="instruments">${view.detail?'Hide':'Show'} instruments</button>${flightSyncError?'<button class="chip" data-action="retryflight">Retry integration</button>':''}</div></section>`;
 }
 function prepareFlight(){
  if(view.phase!=='E'||sim.audit||commissioning()&&!pendingFlightSeek)return;
+ // The selected early window is already chronological. Opening or playing
+ // it does not request a separate sweep of the entire mission.
+ if(!pendingFlightSeek&&!snap.projected&&view.t<60*DAY)return;
  // The core integrates the initial 60 days sequentially. Late seeks wait for verified daily seeds.
  if(snap.projected||view.t>=60*DAY){
   pendingFlightSeek??={t:view.t,start:view.start};view.t=sim.story('operations').instant||3438;view.start=dayStart(view.t);refreshSamples();snap=sim.at(view.t);draw();

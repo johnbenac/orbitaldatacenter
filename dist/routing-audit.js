@@ -2,6 +2,7 @@
 // The renderer supplies its actual tube buffers; declarations are never used
 // as a substitute for the geometry being displayed.
 import {sampleConnectionRoute} from './connection-routes.js';
+export const routingAuditDiagnostics={onObstacleFromMesh:null};
 const EPS=1e-10;
 const add=(a,b)=>a.map((v,i)=>v+b[i]);
 const sub=(a,b)=>a.map((v,i)=>v-b[i]);
@@ -151,6 +152,7 @@ function freezeRecovered(value){if(!value||typeof value!=='object'||Object.isFro
 function extractionEntry(geometry,matrix,signature,value){return {geometry,position:geometry.attributes.position,index:geometry.index,signature,matrix:Array.from(matrix),positions:attributeArray(geometry.attributes.position)?.slice(),indices:attributeArray(geometry.index)?.slice(),value:freezeRecovered(value)};}
 /** Adapter for one real Three.js mesh. Rotated boxes remain oriented boxes. */
 export function obstacleFromMesh(mesh,{id=mesh?.uuid,apertures=[],closed,frame}={}){
+ routingAuditDiagnostics.onObstacleFromMesh?.(mesh);
  if(!mesh?.geometry?.attributes?.position)throw new Error('Routing obstacle has no mesh position buffer: '+id);
  const geometry=mesh.geometry,m=routingMatrix(mesh,frame).elements,signature=JSON.stringify([geometry.type,geometry.parameters,mesh.isInstancedMesh]),prior=obstacleExtractionCache.get(mesh);
  let recovered;if(extractionMatches(prior,geometry,m,signature))recovered=prior.value;else{recovered=recoverObstacleFromMesh(mesh,{id:mesh.uuid},m);obstacleExtractionCache.set(mesh,extractionEntry(geometry,m,signature,recovered));}

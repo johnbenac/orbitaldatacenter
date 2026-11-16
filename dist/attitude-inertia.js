@@ -164,16 +164,28 @@ function jointElements(h,rows,deploy,attitude){
   return {...intrinsicElement(station.id,mass,center,boxInertia(mass,[.16,.16,.20])),wbs:'07.04',kind:'mechanismJoint'};
  });
 }
-function cableInstallationElements(h,deploy,attitude){
+const installationTensorCache=new WeakMap(),opticsTensorCache=new WeakMap(),installationGroups=new WeakMap();
+function cableInstallationElements(h,deploy,attitude,movingOnly=false){
  const growth=1+(h.input.structureMargin??0);
- return cableInstallationMassElements(h,deploy,attitude).map(part=>{
+ const source=cableInstallationMassElements(h,deploy,attitude,{movingOnly}),saved=installationTensorCache.get(source);
+ if(saved?.growth===growth)return saved.parts;
+ const parts=source.map(part=>{
   const mass=part.massKg*growth,tensor=part.intrinsicTensorPerKg?Array.from({length:9},(_,index)=>{const i=Math.floor(index/3),j=index%3;let value=0;for(let a=0;a<3;a++)for(let b=0;b<3;b++)value+=part.axes[a][i]*part.intrinsicTensorPerKg[a*3+b]*part.axes[b][j];return mass*value;}):boxInertia(mass,part.dimensionsM,part.axes);
   return {...part,massKg:mass,intrinsicTensorKgM2:tensor,kind:'cableInstallationHardware'};
  });
+ installationTensorCache.set(source,{growth,parts});return parts;
 }
-function opticsElements(h,deploy,attitude){
+function opticsElements(h,deploy,attitude,movingOnly=false){
  const growth=1+(h.input.structureMargin??0);
- return workerOpticsMassElements(h,deploy,attitude).map(part=>({...part,massKg:part.massKg*growth,intrinsicTensorKgM2:boxInertia(part.massKg*growth,part.dimensionsM,part.axes),kind:'workerOptics'}));
+ const source=workerOpticsMassElements(h,deploy,attitude,{movingOnly}),saved=opticsTensorCache.get(source);
+ if(saved?.growth===growth)return saved.parts;
+ const parts=source.map(part=>({...part,massKg:part.massKg*growth,intrinsicTensorKgM2:boxInertia(part.massKg*growth,part.dimensionsM,part.axes),kind:'workerOptics'}));
+ opticsTensorCache.set(source,{growth,parts});return parts;
+}
+function groupInstallation(elements){
+ let grouped=installationGroups.get(elements);
+ if(!grouped){grouped=new Map();for(const part of elements){if(!grouped.has(part.partId))grouped.set(part.partId,[]);grouped.get(part.partId).push(part);}installationGroups.set(elements,grouped);}
+ return grouped;
 }
 const movingMassCache=new WeakMap();
 // Geometry-only path for mechanism angular momentum and rate derivatives.
@@ -188,7 +200,7 @@ export function movingMassElements(h,{deployment=1,attitude=null}={}){
   movingMassCache.set(h,{massRevision:revision,rows});
  }
  const u=Math.max(0,Math.min(1,deployment)),payload=h.payloadLocation==='radiator'?payloadElements(h,componentMassProperties(h,h.propellantKg,u,false,true,attitude).rows,u,attitude).filter(p=>p.moving):[];
- return [...movingSurfaces(h,rows,u,attitude),...payload,...terminalElements(h,attitude).filter(p=>p.moving),...jointElements(h,rows,u,attitude),...cableInstallationElements(h,u,attitude).filter(p=>p.moving),...opticsElements(h,u,attitude).filter(p=>p.moving)];
+ return [...movingSurfaces(h,rows,u,attitude),...payload,...terminalElements(h,attitude).filter(p=>p.moving),...jointElements(h,rows,u,attitude),...cableInstallationElements(h,u,attitude,true),...opticsElements(h,u,attitude,true)];
 }
 function liquidShape(h,row){
  const tank=h.propulsion.tanks[Number(row.wbs.slice(3))-6],density=row.wbs==='06.06'?h.input.fuelDensity:h.input.oxidizerDensity;
@@ -215,11 +227,11 @@ export function componentInertia(h,{remainingKg=h.propellantKg,deployment=1,adap
  let cache=recent.get(h);if(!cache){cache=new Map();recent.set(h,cache)}
  if(cache.has(key))return cache.get(key);
  const properties=componentMassProperties(h,left,deploy,adapterAttached,true,attitude),{rows,cm}=properties;
- const surfaces=movingSurfaces(h,rows,deploy,attitude),payload=payloadElements(h,rows,deploy,attitude),terminals=terminalElements(h,attitude),joints=jointElements(h,rows,deploy,attitude),installation=cableInstallationElements(h,deploy,attitude),optics=opticsElements(h,deploy,attitude),tensorKgM2=zero(),contributions=[];
+ const surfaces=movingSurfaces(h,rows,deploy,attitude),payload=payloadElements(h,rows,deploy,attitude),terminals=terminalElements(h,attitude),joints=jointElements(h,rows,deploy,attitude),installation=groupInstallation(cableInstallationElements(h,deploy,attitude)),optics=opticsElements(h,deploy,attitude),tensorKgM2=zero(),contributions=[];
  for(const row of rows){
   let tensor,basis;
   if(row.installationPartId){
-   tensor=aboutPoint(installation.filter(part=>part.partId===row.installationPartId),cm);
+   tensor=aboutPoint(installation.get(row.installationPartId)||[],cm);
    basis='Actual boxes and annular material pieces at their installed body/platform frames; separately named rotary internal estimates use uniform allocated envelopes. Each physical assembly enters the ledger once.';
   }else if(row.wbs==='01.05'){
    tensor=aboutPoint(optics,cm);basis='Individual LR4 module envelopes at their actual allocated box/port interfaces. Compute-side modules follow the payload platform; switch-side modules remain fixed.';
